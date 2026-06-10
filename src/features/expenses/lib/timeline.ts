@@ -17,10 +17,11 @@ function sectionMeta(
   today: string,
 ): Pick<TimelineSection, "id" | "title" | "subtitle" | "tone"> {
   if (occurrence.status === "paid") {
+    const paidDate = parseISO(occurrence.dueDate);
     return {
-      id: "paid",
-      title: "Pagados",
-      subtitle: "Historial reciente",
+      id: `paid-${occurrence.dueDate}`,
+      title: format(paidDate, "EEEE d", { locale: es }),
+      subtitle: "Pagado",
       tone: "paid",
     };
   }
@@ -102,10 +103,19 @@ export function buildTimelineSections(
     });
   }
 
-  return Array.from(sections.values()).map((section) => ({
-    ...section,
-    items: section.items.sort((a, b) =>
-      a.estimatedChargeDate.localeCompare(b.estimatedChargeDate),
-    ),
-  }));
+  return Array.from(sections.values())
+    .map((section) => ({
+      ...section,
+      items: section.items.sort((a, b) =>
+        a.estimatedChargeDate.localeCompare(b.estimatedChargeDate),
+      ),
+    }))
+    .sort((a, b) => {
+      const aPaid = a.tone === "paid" ? 1 : 0;
+      const bPaid = b.tone === "paid" ? 1 : 0;
+      if (aPaid !== bPaid) return aPaid - bPaid;
+      return a.items[0].estimatedChargeDate.localeCompare(
+        b.items[0].estimatedChargeDate,
+      );
+    });
 }

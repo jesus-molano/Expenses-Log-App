@@ -1,6 +1,6 @@
 "use client";
 
-import { addDays, endOfMonth, subDays } from "date-fns";
+import { addMonths, endOfMonth, subMonths } from "date-fns";
 import { useMemo, useState } from "react";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
 import { generateOccurrences } from "@/domain/recurrence";
@@ -11,8 +11,8 @@ export function useExpenseFilters(store: ExpenseStore) {
   const [query, setQuery] = useState("");
 
   const today = toDateOnly(new Date());
-  const windowStart = toDateOnly(subDays(new Date(), 14));
-  const windowEnd = toDateOnly(addDays(new Date(), 365));
+  const windowStart = toDateOnly(subMonths(new Date(), 2));
+  const windowEnd = toDateOnly(addMonths(new Date(), 12));
 
   const occurrences = useMemo(
     () =>
