@@ -30,7 +30,7 @@ export function DashboardShell({
           {activeTab === "expenses" ? (
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-full z-0 h-12 bg-gradient-to-b from-[#020617]/62 via-[#020617]/22 to-transparent backdrop-blur-[1px] lg:hidden"
+              className="pointer-events-none absolute inset-x-0 top-full z-0 h-20 bg-gradient-to-b from-[#020617]/92 via-[#020617]/52 to-transparent backdrop-blur-[2px] lg:hidden"
             />
           ) : null}
           <section
@@ -89,7 +89,11 @@ export function DashboardShell({
           </section>
         </aside>
 
-        <section className="flex min-w-0 flex-1 flex-col px-3 pb-16 pt-3 sm:px-6 lg:px-8 lg:py-6">
+        <section
+          className={`flex min-w-0 flex-1 flex-col px-3 pb-16 sm:px-6 lg:px-8 lg:py-6 ${
+            activeTab === "expenses" ? "pt-12" : "pt-5"
+          }`}
+        >
           {children}
         </section>
       </div>
