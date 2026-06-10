@@ -30,7 +30,7 @@ export function DashboardShell({
           {activeTab === "expenses" ? (
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[calc(100%+4.25rem)] bg-gradient-to-b from-[#020617]/96 via-[#020617]/86 to-transparent backdrop-blur-[2px] [mask-image:linear-gradient(to_bottom,#000_0%,#000_68%,transparent_100%)] lg:hidden"
+              className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[calc(100%+4.25rem)] bg-gradient-to-b from-[#020617]/98 via-[#020617]/94 to-[#020617]/18 backdrop-blur-md [mask-image:linear-gradient(to_bottom,#000_0%,#000_72%,transparent_100%)] lg:hidden"
             />
           ) : null}
           <section
