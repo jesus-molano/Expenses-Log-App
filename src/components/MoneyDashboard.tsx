@@ -88,7 +88,7 @@ export function MoneyDashboard({
       userEmail={userEmail}
       isCloudReady={isCloudReady}
     >
-      <section className="grid gap-3 pb-8">
+      <section className="grid gap-3 pb-8 pt-2">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-slate-300">

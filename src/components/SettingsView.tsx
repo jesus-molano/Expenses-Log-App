@@ -141,7 +141,7 @@ export function SettingsView() {
         <section className="mt-4 rounded-[1.35rem] border border-white/10 bg-slate-950/82 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.48)] backdrop-blur-2xl">
           <h1 className="text-2xl font-semibold text-white">Ajustes</h1>
           <p className="mt-2 text-sm text-slate-300">
-            EUR · Atlantic/Canary · local-first con sync opcional.
+            EUR · Atlantic/Canary · sincronización opcional.
           </p>
 
           <div className="mt-5 grid gap-3">
@@ -151,7 +151,7 @@ export function SettingsView() {
               description={
                 user
                   ? `Último sync: ${lastSync ?? "pendiente"}`
-                  : "Entra con Google para guardar en Supabase."
+                  : "Entra con Google para guardar tus datos."
               }
               action={
                 user ? (

@@ -27,8 +27,14 @@ export function DashboardShell({
           data-app-chrome="true"
           className="sticky top-0 z-40 h-[9.15rem] overflow-visible px-3 pt-[max(0.6rem,env(safe-area-inset-top))] text-white lg:relative lg:min-h-dvh lg:p-5"
         >
+          {activeTab === "expenses" ? (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-full z-0 h-12 bg-gradient-to-b from-[#020617]/62 via-[#020617]/22 to-transparent backdrop-blur-[1px] lg:hidden"
+            />
+          ) : null}
           <section
-            className="relative mx-auto max-w-2xl overflow-hidden rounded-[1.45rem] border border-lime-300/20 bg-slate-950/84 p-3.5 shadow-[0_0_42px_rgba(132,204,22,0.14),0_18px_40px_rgba(0,0,0,0.44)] backdrop-blur-2xl lg:max-w-none"
+            className="relative z-10 mx-auto max-w-2xl overflow-hidden rounded-[1.45rem] border border-lime-300/20 bg-slate-950/84 p-3.5 shadow-[0_0_42px_rgba(132,204,22,0.14),0_18px_40px_rgba(0,0,0,0.44)] backdrop-blur-2xl lg:max-w-none"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">

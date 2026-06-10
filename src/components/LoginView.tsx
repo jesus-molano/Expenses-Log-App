@@ -12,7 +12,7 @@ export function LoginView() {
     const supabase = createClient();
 
     if (!supabase) {
-      setMessage("Supabase no está configurado.");
+      setMessage("El inicio de sesión no está configurado.");
       return;
     }
 
@@ -47,7 +47,7 @@ export function LoginView() {
           </div>
           <h1 className="mt-5 text-2xl font-semibold text-white">Entrar con Google</h1>
           <p className="mt-2 text-sm text-slate-300">
-            Usa tu cuenta de Google para sincronizar gastos, ingresos y ajustes con Supabase.
+            Usa tu cuenta de Google para sincronizar gastos, ingresos y ajustes.
           </p>
 
           <button
