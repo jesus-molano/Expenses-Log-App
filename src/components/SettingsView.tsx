@@ -9,7 +9,6 @@ import {
   LogIn,
   LogOut,
   Upload,
-  WalletCards,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
@@ -185,14 +184,6 @@ export function SettingsView() {
                 )
               }
             />
-
-            <Link href="/money" className="block">
-              <SettingCard
-                icon={<WalletCards size={20} />}
-                title="Reparto mensual"
-                description="Editar bancos, sueldo, ahorro e ingresos puntuales."
-              />
-            </Link>
 
             <SettingCard
               icon={<Bell size={20} />}
