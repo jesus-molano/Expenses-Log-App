@@ -9,7 +9,7 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { Home } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatCurrency } from "@/domain/calendar";
 import type { ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
 import type { TimelineSection } from "../lib/timeline";
@@ -36,41 +36,13 @@ export function ExpenseList({
 }: ExpenseListProps) {
   const focusRef = useRef<HTMLElement | null>(null);
   const didFocusTimeline = useRef(false);
-  const [scheduling, setScheduling] = useState(false);
+  const [draggedOccurrence, setDraggedOccurrence] =
+    useState<ExpenseOccurrence | null>(null);
   const [pendingMove, setPendingMove] = useState<{
     occurrence: ExpenseOccurrence;
     dueDate: string;
   } | null>(null);
   const focusIndex = sections.findIndex((section) => section.anchorDate >= today);
-  const schedulingDays = useMemo(() => {
-    const monthKeys = Array.from(
-      new Set(sections.map((section) => section.anchorDate.slice(0, 7))),
-    ).sort();
-    const occurrencesByDate = new Map<string, ExpenseOccurrence[]>();
-
-    for (const section of sections) {
-      for (const item of section.items) {
-        const items = occurrencesByDate.get(item.dueDate) ?? [];
-        items.push(item);
-        occurrencesByDate.set(item.dueDate, items);
-      }
-    }
-
-    return monthKeys.flatMap((monthKey) => {
-      const month = parseISO(`${monthKey}-01`);
-      return eachDayOfInterval({
-        start: startOfMonth(month),
-        end: endOfMonth(month),
-      }).map((date) => {
-        const dateKey = format(date, "yyyy-MM-dd");
-
-        return {
-          date: dateKey,
-          items: occurrencesByDate.get(dateKey) ?? [],
-        };
-      });
-    });
-  }, [sections]);
 
   function closeMoveSheet() {
     setPendingMove(null);
@@ -136,90 +108,30 @@ export function ExpenseList({
               className="pointer-events-none absolute inset-x-0 -top-10 z-10 h-24 bg-gradient-to-b from-[#020617] via-[#020617]/80 to-transparent lg:-top-16 lg:h-36"
             />
           ) : null}
-          {scheduling ? schedulingDays.map((day) => {
-            const isToday = day.date === today;
-            const isPast = day.date < today;
-
-            return (
-              <article
-                key={day.date}
-                data-section-id={isToday ? "today" : undefined}
-                data-timeline-date={day.date}
-                className={`relative scroll-mt-24 pl-4 transition duration-300 ${
-                  day.items.length ? "opacity-100" : "animate-[fade-in_240ms_ease-out] opacity-80"
-                }`}
-              >
-                <span
-                  className={`absolute left-0 top-1.5 size-2 rounded-full ring-2 ${
-                    isToday
-                      ? "bg-cyan-200 text-cyan-200 shadow-[0_0_18px_currentColor] ring-cyan-200/30"
-                      : day.items.length
-                        ? "bg-white/55 ring-white/15"
-                        : "bg-white/18 ring-white/8"
-                  }`}
-                />
-                <span className="absolute bottom-[-1.25rem] left-[3px] top-5 w-px bg-white/12" />
-                {isToday ? (
-                  <div className="absolute -left-2 -top-2 bottom-[-1.25rem] w-[3px] rounded-full bg-cyan-200 shadow-[0_0_24px_rgba(103,232,249,0.9)]" />
-                ) : null}
-
-                <header
-                  className={`mb-1.5 flex items-end justify-between gap-3 ${
-                    isPast ? "opacity-60" : ""
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <h2
-                      className={`truncate font-semibold capitalize leading-tight text-white ${
-                        isToday ? "text-[19px]" : "text-[15px]"
-                      }`}
-                    >
-                      {isToday ? "Hoy" : format(parseISO(day.date), "EEEE d", { locale: es })}
-                    </h2>
-                    <p className="mt-0.5 text-xs text-slate-300">
-                      {day.items.length ? "Con gastos" : "Disponible"}
-                    </p>
-                  </div>
-                  {day.items.length ? (
-                    <p className="shrink-0 text-sm font-semibold text-white">
-                      {formatCurrency(
-                        day.items.reduce(
-                          (sum, item) =>
-                            sum +
-                            (item.status === "paid" ? 0 : item.template.amount),
-                          0,
-                        ),
-                      )}
-                    </p>
-                  ) : null}
-                </header>
-
-                <div className="space-y-1.5">
-                  {day.items.length ? (
-                    day.items.map((occurrence) => (
-                      <ExpenseRow
-                        key={occurrence.id}
-                        occurrence={occurrence}
-                        category={categories.find(
-                          (category) =>
-                            category.id === occurrence.template.categoryId,
-                        )}
-                        today={today}
-                        onTogglePaid={onTogglePaid}
-                        onScheduleMove={(occurrence, dueDate) =>
-                          setPendingMove({ occurrence, dueDate })
-                        }
-                        onLiftChange={setScheduling}
-                      />
-                    ))
-                  ) : (
-                    <div className="h-8 rounded-2xl border border-dashed border-white/10 bg-white/[0.018]" />
-                  )}
-                </div>
-              </article>
-            );
-          }) : sections.map((section, index) => {
+          {sections.map((section, index) => {
             const shouldAnchorFocus = index === focusIndex;
+            const expandSection =
+              Boolean(draggedOccurrence) &&
+              section.items.some((item) => item.id === draggedOccurrence?.id);
+            const sectionDays = expandSection
+              ? eachDayOfInterval({
+                  start: startOfMonth(parseISO(section.anchorDate)),
+                  end: endOfMonth(parseISO(section.anchorDate)),
+                }).map((date) => format(date, "yyyy-MM-dd"))
+              : [];
+            const sectionItemDates = new Set(
+              section.items.map((item) => item.dueDate),
+            );
+            const emptyDaysBefore = sectionDays.filter(
+              (day) =>
+                day < (draggedOccurrence?.dueDate ?? "") &&
+                !sectionItemDates.has(day),
+            );
+            const emptyDaysAfter = sectionDays.filter(
+              (day) =>
+                day > (draggedOccurrence?.dueDate ?? "") &&
+                !sectionItemDates.has(day),
+            );
 
             return (
             <article
@@ -269,21 +181,38 @@ export function ExpenseList({
                   index === 0 ? "drop-shadow-[0_20px_35px_rgba(132,204,22,0.22)]" : ""
                 } ${index > 2 ? "opacity-90" : ""}`}
               >
-                {section.items.length ? section.items.map((occurrence) => (
-                  <ExpenseRow
-                    key={occurrence.id}
-                    occurrence={occurrence}
-                    category={categories.find(
-                      (category) => category.id === occurrence.template.categoryId,
-                    )}
-                    today={today}
-                    onTogglePaid={onTogglePaid}
-                    onScheduleMove={(occurrence, dueDate) =>
-                      setPendingMove({ occurrence, dueDate })
-                    }
-                    onLiftChange={setScheduling}
-                  />
-                )) : (
+                {section.items.length ? (
+                  <>
+                    {expandSection
+                      ? emptyDaysBefore.map((day) => (
+                          <EmptyDayTarget key={day} date={day} />
+                        ))
+                      : null}
+                    {section.items.map((occurrence) => (
+                      <ExpenseRow
+                        key={occurrence.id}
+                        occurrence={occurrence}
+                        category={categories.find(
+                          (category) =>
+                            category.id === occurrence.template.categoryId,
+                        )}
+                        today={today}
+                        onTogglePaid={onTogglePaid}
+                        onScheduleMove={(occurrence, dueDate) =>
+                          setPendingMove({ occurrence, dueDate })
+                        }
+                        onLiftChange={(lifted, occurrence) =>
+                          setDraggedOccurrence(lifted ? occurrence : null)
+                        }
+                      />
+                    ))}
+                    {expandSection
+                      ? emptyDaysAfter.map((day) => (
+                          <EmptyDayTarget key={day} date={day} />
+                        ))
+                      : null}
+                  </>
+                ) : (
                   <div className="rounded-2xl border border-cyan-200/16 bg-white/[0.045] px-3 py-3 text-sm font-medium text-white">
                     Sin cargos previstos hoy
                   </div>
@@ -344,5 +273,18 @@ export function ExpenseList({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function EmptyDayTarget({ date }: { date: string }) {
+  return (
+    <div
+      data-timeline-date={date}
+      className="animate-[fade-in_220ms_ease-out] rounded-2xl border border-dashed border-white/10 bg-white/[0.016] px-3 py-2 text-xs font-medium text-slate-400 transition"
+    >
+      <span className="capitalize">
+        {format(parseISO(date), "EEEE d", { locale: es })}
+      </span>
+    </div>
   );
 }

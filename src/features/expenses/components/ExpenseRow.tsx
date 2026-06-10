@@ -14,7 +14,7 @@ type ExpenseRowProps = {
   today: string;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
   onScheduleMove: (occurrence: ExpenseOccurrence, dueDate: string) => void;
-  onLiftChange: (lifted: boolean) => void;
+  onLiftChange: (lifted: boolean, occurrence: ExpenseOccurrence) => void;
 };
 
 export function ExpenseRow({
@@ -55,7 +55,7 @@ export function ExpenseRow({
     holdTimer.current = setTimeout(() => {
       const next = { ...dragRef.current, lifted: true };
       setGesture(next);
-      onLiftChange(true);
+      onLiftChange(true, occurrence);
     }, 420);
   }
 
@@ -73,6 +73,14 @@ export function ExpenseRow({
     }
 
     if (Math.abs(x) > 10 || Math.abs(y) > 10) clearHoldTimer();
+
+    if (current.lifted) {
+      if (event.clientY < 132) {
+        window.scrollBy({ top: -18, behavior: "smooth" });
+      } else if (event.clientY > window.innerHeight - 132) {
+        window.scrollBy({ top: 18, behavior: "smooth" });
+      }
+    }
 
     setGesture({
       ...current,
@@ -99,7 +107,7 @@ export function ExpenseRow({
       }
 
       setGesture({ x: 0, y: 0, active: false, lifted: false });
-      onLiftChange(false);
+      onLiftChange(false, occurrence);
       return;
     }
 
@@ -110,7 +118,7 @@ export function ExpenseRow({
     }
 
     setGesture({ x: 0, y: 0, active: false, lifted: false });
-    onLiftChange(false);
+    onLiftChange(false, occurrence);
   }
 
   function cancelGesture(event: PointerEvent<HTMLElement>) {
@@ -119,7 +127,7 @@ export function ExpenseRow({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     setGesture({ x: 0, y: 0, active: false, lifted: false });
-    onLiftChange(false);
+    onLiftChange(false, occurrence);
   }
 
   return (
