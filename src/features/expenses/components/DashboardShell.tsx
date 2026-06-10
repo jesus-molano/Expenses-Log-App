@@ -69,7 +69,7 @@ export function DashboardShell({
               <Link
                 href="/settings"
                 aria-label="Ajustes"
-                className={`grid shrink-0 place-items-center rounded-full bg-white/10 text-white ring-1 ring-white/15 transition hover:bg-lime-300/15 hover:text-lime-100 ${
+                className={`grid shrink-0 place-items-center rounded-full bg-white/10 text-white ring-1 ring-white/15 transition hover:bg-white/15 ${
                   compact ? "size-9" : "size-10"
                 }`}
               >
@@ -89,16 +89,19 @@ export function DashboardShell({
             </div>
           </section>
 
-          <section className="mt-3 hidden rounded-[1.25rem] border border-white/10 bg-lime-300/10 p-4 lg:block">
-            <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100">
-              Sync
+          <section className="mt-3 hidden rounded-[1.25rem] border border-white/10 bg-white/[0.04] p-4 lg:block">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+              Cuenta
             </p>
-            <p className="mt-1 truncate text-sm font-medium">
-              {userEmail ?? (isCloudReady ? "Supabase listo" : "Modo local")}
+            <p className="mt-1 truncate text-sm font-medium text-white">
+              {userEmail ?? "Modo local"}
             </p>
-            <p className="mt-1 text-xs text-slate-300">
-              {userEmail ? "Sesion activa" : "Local-first hasta iniciar sesion"}
-            </p>
+            <Link
+              href="/settings"
+              className="mt-3 inline-flex h-9 items-center rounded-full bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/10"
+            >
+              {userEmail ? "Gestionar" : isCloudReady ? "Configurar cuenta" : "Ajustes"}
+            </Link>
           </section>
         </aside>
 

@@ -113,7 +113,13 @@ export function ExpenseList({
   return (
     <section>
       {sections.length ? (
-        <div className="space-y-5">
+        <div className="relative space-y-5">
+          {sections.some((section) => section.anchorDate < today) ? (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 -top-10 z-10 h-24 bg-gradient-to-b from-[#020617] via-[#020617]/80 to-transparent lg:-top-16 lg:h-36"
+            />
+          ) : null}
           {sections.map((section, index) => {
             const shouldAnchorFocus = index === focusIndex;
 
@@ -161,7 +167,7 @@ export function ExpenseList({
               </header>
 
               {scheduling ? (
-                <div className="mb-2 grid grid-cols-7 gap-1 rounded-2xl border border-white/10 bg-slate-950/72 p-2 shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+                <div className="mb-2 space-y-1.5 rounded-2xl border border-white/10 bg-slate-950/72 px-2 py-2 shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl">
                   {monthDaysBySection.get(section.id)?.map((day) => {
                     const date = parseISO(day);
                     const isToday = day === today;
@@ -171,15 +177,23 @@ export function ExpenseList({
                       <div
                         key={day}
                         data-timeline-date={day}
-                        className={`grid h-9 place-items-center rounded-xl text-[12px] font-semibold ring-1 transition ${
+                        className={`relative ml-1 flex h-9 items-center justify-between rounded-xl px-3 text-[12px] font-semibold ring-1 transition ${
                           isToday
-                            ? "bg-cyan-300 text-slate-950 ring-cyan-200"
+                            ? "bg-cyan-300/16 text-white ring-cyan-200/40"
                             : hasItems
-                              ? "bg-white/12 text-white ring-white/15"
-                              : "bg-white/[0.04] text-slate-300 ring-white/8"
+                              ? "bg-white/10 text-white ring-white/15"
+                              : "bg-white/[0.025] text-slate-300 ring-white/8"
                         }`}
                       >
-                        {format(date, "d", { locale: es })}
+                        <span className="absolute -left-[13px] top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-white/30" />
+                        <span className="capitalize">
+                          {format(date, "EEE d", { locale: es })}
+                        </span>
+                        {hasItems ? (
+                          <span className="text-[11px] font-medium text-slate-400">
+                            ocupado
+                          </span>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -214,12 +228,12 @@ export function ExpenseList({
             </article>
           );
           })}
-          <div className="relative h-28 overflow-hidden">
-            <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-transparent via-slate-950/55 to-slate-950" />
-            <p className="absolute inset-x-0 bottom-8 text-center text-xs font-medium text-slate-400">
-              Hay mas timeline mas adelante
-            </p>
-          </div>
+          {sections.some((section) => section.items.length > 0) ? (
+            <div className="pointer-events-none relative h-24 overflow-hidden" aria-hidden="true">
+              <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-transparent via-[#07111f]/60 to-[#020617]" />
+              <div className="mx-auto mt-8 h-20 w-[86%] rounded-[2rem] border border-cyan-200/10 bg-cyan-200/[0.025] blur-[1px]" />
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="grid place-items-center rounded-[1.25rem] border border-dashed border-white/15 bg-white/[0.04] px-6 py-14 text-center">

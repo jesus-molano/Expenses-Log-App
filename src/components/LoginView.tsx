@@ -29,43 +29,46 @@ export function LoginView() {
   }
 
   return (
-    <main className="grid min-h-dvh bg-slate-100 px-4 py-5 text-slate-950">
+    <main className="grid min-h-dvh bg-[linear-gradient(180deg,#020617_0%,#07111f_52%,#020617_100%)] px-4 py-5 text-white">
       <div className="mx-auto w-full max-w-md">
         <Link
           href="/"
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-3 text-sm font-medium text-slate-700"
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-white/10 px-3 text-sm font-medium text-white ring-1 ring-white/10"
         >
           <ArrowLeft size={18} />
           Gastos
         </Link>
 
-        <form onSubmit={submit} className="mt-4 rounded-2xl bg-white p-5 shadow-sm">
-          <div className="grid size-12 place-items-center rounded-full bg-slate-950 text-white">
+        <form
+          onSubmit={submit}
+          className="mt-4 rounded-[1.35rem] border border-white/10 bg-slate-950/82 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.48)] backdrop-blur-2xl"
+        >
+          <div className="grid size-12 place-items-center rounded-full bg-lime-300 text-slate-950 shadow-[0_0_26px_rgba(132,204,22,0.24)]">
             <Mail size={22} />
           </div>
-          <h1 className="mt-5 text-2xl font-semibold">Entrar</h1>
-          <p className="mt-2 text-sm text-slate-500">
+          <h1 className="mt-5 text-2xl font-semibold text-white">Entrar</h1>
+          <p className="mt-2 text-sm text-slate-300">
             Magic link de Supabase. El modo demo local sigue disponible sin login.
           </p>
 
-          <label className="mt-5 grid gap-1.5 text-sm font-medium text-slate-700">
+          <label className="mt-5 grid gap-1.5 text-sm font-medium text-slate-200">
             Email
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
-              className="h-12 rounded-xl border border-slate-200 px-3 text-base outline-none focus:border-slate-900"
+              className="input-control"
             />
           </label>
 
           <button
             type="submit"
-            className="mt-5 h-12 w-full rounded-xl bg-slate-950 text-base font-semibold text-white"
+            className="mt-5 h-12 w-full rounded-2xl bg-lime-300 text-base font-semibold text-slate-950 shadow-[0_0_32px_rgba(132,204,22,0.24)]"
           >
             Enviar magic link
           </button>
-          {message ? <p className="mt-4 text-sm text-slate-600">{message}</p> : null}
+          {message ? <p className="mt-4 text-sm text-slate-300">{message}</p> : null}
         </form>
       </div>
     </main>
