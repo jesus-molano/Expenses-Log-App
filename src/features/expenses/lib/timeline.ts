@@ -27,7 +27,7 @@ function sectionMeta(
       title: format(dueDate, "EEEE d", { locale: es }),
       subtitle: "Pagado",
       tone: "paid",
-      priority: dueDelta,
+      priority: 0,
     };
   }
 
@@ -37,7 +37,7 @@ function sectionMeta(
       title: "Atrasado",
       subtitle: `Desde ${format(dueDate, "EEEE d", { locale: es })}`,
       tone: "critical",
-      priority: dueDelta,
+      priority: 1,
     };
   }
 
@@ -47,7 +47,7 @@ function sectionMeta(
       title: "Hoy",
       subtitle: "Puede salir de tu cuenta hoy",
       tone: "critical",
-      priority: 0,
+      priority: 2,
     };
   }
 
@@ -63,7 +63,7 @@ function sectionMeta(
       title: `Estimado ${format(estimatedDate, "EEEE d", { locale: es })}`,
       subtitle: `Vence ${format(dueDate, "EEEE d", { locale: es })}`,
       tone: "estimated",
-      priority: estimatedDelta,
+      priority: 3,
     };
   }
 
@@ -75,7 +75,7 @@ function sectionMeta(
         : format(dueDate, "EEEE d", { locale: es }),
       subtitle: isWeekend(dueDate) ? "Vence en fin de semana" : "Esta semana",
       tone: "soon",
-      priority: dueDelta,
+      priority: 4,
     };
   }
 
@@ -84,7 +84,7 @@ function sectionMeta(
     title: format(dueDate, "MMMM yyyy", { locale: es }),
     subtitle: "Mas adelante",
     tone: "later",
-    priority: dueDelta,
+    priority: 5,
   };
 }
 
@@ -134,7 +134,7 @@ export function buildTimelineSections(
       title: "Hoy",
       subtitle: "Punto de control",
       tone: "soon",
-      priority: 0,
+      priority: 2,
       total: 0,
       anchorDate: today,
       items: [],
@@ -142,7 +142,6 @@ export function buildTimelineSections(
   }
 
   return timelineSections.sort((a, b) => {
-    if (a.anchorDate !== b.anchorDate) return a.anchorDate.localeCompare(b.anchorDate);
     return a.priority - b.priority;
   });
 }

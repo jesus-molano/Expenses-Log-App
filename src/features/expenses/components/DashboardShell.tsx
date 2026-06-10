@@ -24,23 +24,29 @@ export function DashboardShell({
     <main className="min-h-dvh bg-[linear-gradient(180deg,#020617_0%,#07111f_46%,#020617_100%)] text-white">
       <div className="mx-auto min-h-dvh w-full max-w-4xl pb-28 lg:grid lg:max-w-7xl lg:grid-cols-[344px_1fr] lg:pb-0">
         <aside
-          className="sticky top-0 z-20 overflow-visible px-3 pb-3 pt-[max(0.6rem,env(safe-area-inset-top))] text-white lg:relative lg:min-h-dvh lg:p-5"
+          className="sticky top-0 z-20 h-[8.7rem] overflow-visible px-3 pb-3 pt-[max(0.6rem,env(safe-area-inset-top))] text-white lg:relative lg:min-h-dvh lg:p-5"
         >
           <section
-            className="relative mx-auto max-w-2xl rounded-[1.35rem] border border-white/10 bg-slate-950/86 p-3.5 shadow-[0_18px_50px_rgba(0,0,0,0.42)] backdrop-blur-2xl transition-[box-shadow,background-color] duration-500 ease-out lg:max-w-none"
+            className={`relative mx-auto h-[7.35rem] max-w-2xl overflow-hidden rounded-[1.35rem] border border-white/10 bg-slate-950/86 p-3.5 shadow-[0_18px_50px_rgba(0,0,0,0.42)] backdrop-blur-2xl transition-[box-shadow,background-color,transform] duration-500 ease-out lg:max-w-none ${
+              compact
+                ? "-translate-y-1 scale-[0.965] bg-slate-950/92 shadow-[0_14px_42px_rgba(0,0,0,0.5),0_0_30px_rgba(132,204,22,0.08)]"
+                : "translate-y-0 scale-100"
+            }`}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p
                   className={`text-xs font-semibold uppercase tracking-wide text-slate-300 transition duration-300 ${
-                    compact ? "opacity-0" : "opacity-100"
+                    compact ? "-translate-y-2 opacity-0" : "translate-y-0 opacity-100"
                   }`}
                 >
                   Por pagar
                 </p>
                 <p
-                  className={`mt-1 text-[30px] font-semibold leading-none transition duration-300 ${
-                    compact ? "scale-[0.72]" : "scale-100"
+                  className={`mt-1 origin-left text-[30px] font-semibold leading-none transition duration-500 ease-out ${
+                    compact
+                      ? "-translate-y-4 scale-[0.72]"
+                      : "translate-y-0 scale-100"
                   }`}
                 >
                   {pendingTotalLabel}
@@ -49,8 +55,8 @@ export function DashboardShell({
               <div
                 className={`flex min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-full bg-white/[0.06] text-sm text-white ring-1 ring-white/10 transition-all duration-500 ease-out ${
                   compact
-                    ? "max-w-full px-3 py-2 opacity-100"
-                    : "max-w-0 px-0 py-2 opacity-0"
+                    ? "translate-y-0 px-3 py-2 opacity-100"
+                    : "translate-y-2 px-3 py-2 opacity-0"
                 }`}
               >
                 <CalendarClock size={16} className="shrink-0 text-lime-200" />
@@ -66,10 +72,10 @@ export function DashboardShell({
             </div>
 
             <div
-              className={`flex items-center gap-2 overflow-hidden rounded-2xl bg-white/[0.06] text-sm text-white ring-1 ring-white/10 transition-all duration-500 ease-out ${
+              className={`absolute inset-x-3.5 bottom-3.5 flex items-center gap-2 overflow-hidden rounded-2xl bg-white/[0.06] px-3 py-2 text-sm text-white ring-1 ring-white/10 transition-all duration-500 ease-out ${
                 compact
-                  ? "mt-3 max-h-12 px-3 py-2 opacity-0"
-                  : "mt-3 max-h-12 px-3 py-2 opacity-100"
+                  ? "translate-y-3 opacity-0"
+                  : "translate-y-0 opacity-100"
               }`}
             >
               <CalendarClock size={17} className="shrink-0 text-lime-200" />

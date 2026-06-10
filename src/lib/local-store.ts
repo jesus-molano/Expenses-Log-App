@@ -6,6 +6,10 @@ import { demoStore } from "@/domain/seed";
 const STORAGE_KEY = "expense-reminders-store-v1";
 
 function withDemoDefaults(store: ExpenseStore): ExpenseStore {
+  if (store.templates.some((template) => template.id === "exp-electricity")) {
+    return demoStore;
+  }
+
   return {
     ...store,
     categories: [

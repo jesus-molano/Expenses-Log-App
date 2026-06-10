@@ -247,12 +247,6 @@ export function ExpenseList({
             </article>
           );
           })}
-          {sections.some((section) => section.items.length > 0) ? (
-            <div className="pointer-events-none relative h-24 overflow-hidden" aria-hidden="true">
-              <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-transparent via-[#07111f]/60 to-[#020617]" />
-              <div className="mx-auto mt-8 h-20 w-[86%] rounded-[2rem] border border-cyan-200/10 bg-cyan-200/[0.025] blur-[1px]" />
-            </div>
-          ) : null}
         </div>
       ) : (
         <div className="grid place-items-center rounded-[1.25rem] border border-dashed border-white/15 bg-white/[0.04] px-6 py-14 text-center">

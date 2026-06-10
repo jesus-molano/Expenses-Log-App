@@ -35,7 +35,7 @@ test("marks an overdue expense as paid with a left swipe", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByText("Atrasado")).toBeVisible();
-  await swipeLeftFromLink(page, "Luz");
+  await swipeLeftFromLink(page, "Movistar");
 
   await expect(page.getByText("Pagado").first()).toBeVisible();
 });

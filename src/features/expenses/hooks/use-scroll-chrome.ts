@@ -11,10 +11,12 @@ export function useScrollChrome() {
     function onScroll() {
       const currentY = window.scrollY;
       const delta = currentY - lastScrollY.current;
+      const nearBottom =
+        window.innerHeight + currentY >= document.documentElement.scrollHeight - 96;
 
       setCompactHeader(currentY > 36);
 
-      if (currentY < 80 || delta < -8) {
+      if (currentY < 80 || nearBottom || delta < -8) {
         setShowBottomBar(true);
       } else if (delta > 8) {
         setShowBottomBar(false);
