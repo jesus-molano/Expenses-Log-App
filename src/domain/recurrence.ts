@@ -104,6 +104,7 @@ export function generateOccurrences(
           estimatedChargeDate: estimate.date,
           estimatedChargeLabel: estimate.label,
           status: override?.status ?? "due",
+          sortOrder: override?.sortOrder ?? 0,
           override,
         } satisfies ExpenseOccurrence;
       }),

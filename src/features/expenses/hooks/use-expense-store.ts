@@ -63,7 +63,11 @@ export function useExpenseStore() {
     persist({ ...store, overrides });
   }
 
-  function moveOccurrence(occurrence: ExpenseOccurrence, dueDate: string) {
+  function moveOccurrence(
+    occurrence: ExpenseOccurrence,
+    dueDate: string,
+    sortOrder?: number,
+  ) {
     const existing = occurrence.override;
     const unchangedDate = dueDate === occurrence.occurrenceDate;
     const nextOverride = {
@@ -72,6 +76,7 @@ export function useExpenseStore() {
       templateId: occurrence.template.id,
       occurrenceDate: occurrence.occurrenceDate,
       dueDate: unchangedDate ? undefined : dueDate,
+      sortOrder,
       status: occurrence.status,
       paidAt: existing?.paidAt,
       amountPaid: existing?.amountPaid,

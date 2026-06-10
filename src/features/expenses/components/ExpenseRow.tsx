@@ -13,9 +13,13 @@ type ExpenseRowProps = {
   category?: ExpenseCategory;
   today: string;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
-  onScheduleMove: (occurrence: ExpenseOccurrence, dueDate: string) => void;
+  onScheduleMove: (
+    occurrence: ExpenseOccurrence,
+    dueDate: string,
+    target?: { date: string; position: "before" | "after"; rowId?: string } | null,
+  ) => void;
   onDropTargetChange: (
-    target: { date: string; position: "before" | "after" } | null,
+    target: { date: string; position: "before" | "after"; rowId?: string } | null,
   ) => void;
   dropPosition?: "before" | "after" | null;
   onLiftChange: (lifted: boolean, occurrence: ExpenseOccurrence) => void;
@@ -102,6 +106,7 @@ export function ExpenseRow({
         onDropTargetChange({
           date: target.dataset.timelineDate,
           position: event.clientY < rect.top + rect.height / 2 ? "before" : "after",
+          rowId: target.dataset.expenseRowId,
         });
       } else {
         onDropTargetChange(null);
@@ -127,9 +132,23 @@ export function ExpenseRow({
         .elementFromPoint(event.clientX, event.clientY)
         ?.closest<HTMLElement>("[data-timeline-date]");
       const targetDate = target?.dataset.timelineDate;
+      const targetRect = target?.getBoundingClientRect();
+      const dropTarget =
+        targetDate && targetRect
+          ? {
+              date: targetDate,
+              position:
+                event.clientY < targetRect.top + targetRect.height / 2
+                  ? ("before" as const)
+                  : ("after" as const),
+              rowId: target.dataset.expenseRowId,
+            }
+          : null;
 
       if (targetDate && targetDate !== occurrence.dueDate) {
-        onScheduleMove(occurrence, targetDate);
+        onScheduleMove(occurrence, targetDate, dropTarget);
+      } else if (targetDate && dropTarget?.rowId) {
+        onScheduleMove(occurrence, targetDate, dropTarget);
       }
 
       setGesture({ x: 0, y: 0, active: false, lifted: false });
@@ -163,6 +182,7 @@ export function ExpenseRow({
     <div
       data-timeline-date={occurrence.dueDate}
       data-expense-row="true"
+      data-expense-row-id={occurrence.id}
       className={`relative overflow-visible rounded-2xl ${
         drag.lifted ? "pointer-events-none z-30" : ""
       }`}
@@ -199,9 +219,11 @@ export function ExpenseRow({
         className={`grid min-h-14 touch-pan-y select-none grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border px-3 py-2.5 backdrop-blur-xl transition-[border-radius,box-shadow,opacity,transform,background] duration-200 ease-out ${
           drag.lifted
             ? "pointer-events-none border-lime-200/50 bg-slate-900/95 shadow-[0_0_46px_rgba(132,204,22,0.36),0_26px_70px_rgba(0,0,0,0.58)]"
+            : swipingLeft || swipingRight
+              ? "border-white/20 bg-slate-800 shadow-[0_16px_40px_rgba(0,0,0,0.36)] ring-1 ring-white/10"
             : paid
-              ? "border-white/10 bg-white/[0.045] opacity-70"
-              : "border-white/12 bg-white/[0.13] shadow-[0_12px_34px_rgba(0,0,0,0.26)] ring-1 ring-white/8"
+              ? "border-white/10 bg-slate-900/80 opacity-70"
+              : "border-white/12 bg-slate-800/95 shadow-[0_12px_34px_rgba(0,0,0,0.26)] ring-1 ring-white/8"
         }`}
       >
         <div className="min-w-0">

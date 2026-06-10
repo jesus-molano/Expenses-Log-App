@@ -55,6 +55,7 @@ export type ExpenseOccurrenceOverride = {
   templateId: string;
   occurrenceDate: string;
   dueDate?: string;
+  sortOrder?: number;
   status: OccurrenceStatus;
   paidAt?: string;
   amountPaid?: number;
@@ -69,6 +70,7 @@ export type ExpenseOccurrence = {
   estimatedChargeDate: string;
   estimatedChargeLabel: string;
   status: OccurrenceStatus;
+  sortOrder: number;
   override?: ExpenseOccurrenceOverride;
 };
 

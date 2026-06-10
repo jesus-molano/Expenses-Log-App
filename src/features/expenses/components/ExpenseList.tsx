@@ -18,15 +18,19 @@ import { ExpenseRow } from "./ExpenseRow";
 type DropTarget = {
   date: string;
   position: "before" | "after";
+  rowId?: string;
 };
 
 type ExpenseListProps = {
   sections: TimelineSection[];
   categories: ExpenseCategory[];
   today: string;
-  onTodayVisibilityChange: (visible: boolean) => void;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
-  onMoveOccurrence: (occurrence: ExpenseOccurrence, dueDate: string) => void;
+  onMoveOccurrence: (
+    occurrence: ExpenseOccurrence,
+    dueDate: string,
+    sortOrder?: number,
+  ) => void;
   onMoveOccurrenceSeries: (occurrence: ExpenseOccurrence, dueDate: string) => void;
 };
 
@@ -34,7 +38,6 @@ export function ExpenseList({
   sections,
   categories,
   today,
-  onTodayVisibilityChange,
   onTogglePaid,
   onMoveOccurrence,
   onMoveOccurrenceSeries,
@@ -49,6 +52,7 @@ export function ExpenseList({
     dueDate: string;
   } | null>(null);
   const focusIndex = sections.findIndex((section) => section.anchorDate >= today);
+  const currentMonth = today.slice(0, 7);
 
   function closeMoveSheet() {
     setPendingMove(null);
@@ -61,8 +65,22 @@ export function ExpenseList({
     setPendingMove(null);
   }
 
-  function scheduleMove(occurrence: ExpenseOccurrence, dueDate: string) {
-    onMoveOccurrence(occurrence, dueDate);
+  function scheduleMove(
+    occurrence: ExpenseOccurrence,
+    dueDate: string,
+    target?: DropTarget | null,
+  ) {
+    const targetOccurrence = sections
+      .flatMap((section) => section.items)
+      .find((item) => item.id === target?.rowId);
+    const targetSortOrder = targetOccurrence?.sortOrder ?? 0;
+    const sortOrder = targetOccurrence
+      ? target?.position === "before"
+        ? targetSortOrder - 0.5
+        : targetSortOrder + 0.5
+      : undefined;
+
+    onMoveOccurrence(occurrence, dueDate, sortOrder);
     setPendingMove({ occurrence, dueDate });
   }
 
@@ -83,27 +101,6 @@ export function ExpenseList({
     });
   }, [sections]);
 
-  useEffect(() => {
-    function updateTodayVisibility() {
-      const todayNode = document.querySelector<HTMLElement>('[data-section-id="today"]');
-      if (!todayNode) {
-        onTodayVisibilityChange(false);
-        return;
-      }
-
-      const rect = todayNode.getBoundingClientRect();
-      onTodayVisibilityChange(rect.top >= 72 && rect.top <= 250);
-    }
-
-    updateTodayVisibility();
-    window.addEventListener("scroll", updateTodayVisibility, { passive: true });
-    window.addEventListener("resize", updateTodayVisibility);
-    return () => {
-      window.removeEventListener("scroll", updateTodayVisibility);
-      window.removeEventListener("resize", updateTodayVisibility);
-    };
-  }, [onTodayVisibilityChange, sections]);
-
   return (
     <section>
       {sections.length ? (
@@ -118,6 +115,8 @@ export function ExpenseList({
             const shouldAnchorFocus = index === focusIndex;
             const expandSection =
               Boolean(draggedOccurrence) &&
+              draggedOccurrence?.dueDate.slice(0, 7) === currentMonth &&
+              section.anchorDate.slice(0, 7) === currentMonth &&
               section.items.some((item) => item.id === draggedOccurrence?.id);
             const sectionDays = expandSection
               ? eachDayOfInterval({
@@ -194,7 +193,10 @@ export function ExpenseList({
                           <EmptyDayTarget
                             key={day}
                             date={day}
-                            active={activeDropTarget?.date === day}
+                            active={
+                              activeDropTarget?.date === day &&
+                              !activeDropTarget.rowId
+                            }
                             label="Soltar aqui"
                           />
                         ))
@@ -212,7 +214,7 @@ export function ExpenseList({
                         onScheduleMove={scheduleMove}
                         onDropTargetChange={setActiveDropTarget}
                         dropPosition={
-                          activeDropTarget?.date === occurrence.dueDate
+                          activeDropTarget?.rowId === occurrence.id
                             ? activeDropTarget.position
                             : null
                         }
@@ -227,7 +229,10 @@ export function ExpenseList({
                           <EmptyDayTarget
                             key={day}
                             date={day}
-                            active={activeDropTarget?.date === day}
+                            active={
+                              activeDropTarget?.date === day &&
+                              !activeDropTarget.rowId
+                            }
                             label="Soltar aqui"
                           />
                         ))

@@ -36,7 +36,6 @@ export function ExpenseDashboard({
   const chrome = useScrollChrome();
   const [draft, setDraft] = useState<DraftExpense>(() => createEmptyDraft());
   const [sheetOpen, setSheetOpen] = useState(initialNewExpense);
-  const [todayInView, setTodayInView] = useState(false);
 
   function openEmptySheet() {
     setDraft(createEmptyDraft());
@@ -67,7 +66,7 @@ export function ExpenseDashboard({
     <DashboardShell
       pendingTotalLabel={filters.pendingTotalLabel}
       nextLabel={nextLabel}
-      compact={chrome.compactHeader && !todayInView}
+      compact={chrome.compactHeader}
       userEmail={userEmail}
       isCloudReady={isCloudReady}
     >
@@ -75,7 +74,6 @@ export function ExpenseDashboard({
         sections={filters.timelineSections}
         categories={store.categories}
         today={filters.today}
-        onTodayVisibilityChange={setTodayInView}
         onTogglePaid={togglePaid}
         onMoveOccurrence={moveOccurrence}
         onMoveOccurrenceSeries={moveOccurrenceSeries}

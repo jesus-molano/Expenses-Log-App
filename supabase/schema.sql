@@ -44,6 +44,7 @@ create table if not exists public.expense_occurrence_overrides (
   template_id uuid not null references public.expense_templates(id) on delete cascade,
   occurrence_date date not null,
   due_date date,
+  sort_order numeric(12, 4),
   status text not null check (status in ('due', 'paid', 'skipped')),
   paid_at timestamptz,
   amount_paid numeric(12, 2),

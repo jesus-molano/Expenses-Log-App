@@ -115,9 +115,13 @@ export function buildTimelineSections(
   const timelineSections = Array.from(sections.values())
     .map((section) => ({
       ...section,
-      items: section.items.sort((a, b) =>
-        a.estimatedChargeDate.localeCompare(b.estimatedChargeDate),
-      ),
+      items: section.items.sort((a, b) => {
+        if (a.estimatedChargeDate !== b.estimatedChargeDate) {
+          return a.estimatedChargeDate.localeCompare(b.estimatedChargeDate);
+        }
+        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+        return a.template.name.localeCompare(b.template.name);
+      }),
     }))
     .sort((a, b) => {
       if (a.anchorDate !== b.anchorDate) return a.anchorDate.localeCompare(b.anchorDate);
