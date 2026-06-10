@@ -1,0 +1,47 @@
+import { NextResponse } from "next/server";
+import webpush from "web-push";
+import { z } from "zod";
+
+const subscriptionSchema = z.object({
+  endpoint: z.string().url(),
+  keys: z.object({
+    p256dh: z.string().min(1),
+    auth: z.string().min(1),
+  }),
+});
+
+export async function POST(request: Request) {
+  const body = await request.json().catch(() => null);
+  const parsed = subscriptionSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Suscripcion push invalida." }, { status: 400 });
+  }
+
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+
+  if (!publicKey || !privateKey) {
+    return NextResponse.json({
+      mode: "demo",
+      message: "Configura VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY para envio real.",
+    });
+  }
+
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT ?? "mailto:expense-reminders@example.com",
+    publicKey,
+    privateKey,
+  );
+
+  await webpush.sendNotification(
+    parsed.data,
+    JSON.stringify({
+      title: "Expense Reminders",
+      body: "Notificacion de prueba lista.",
+      url: "/",
+    }),
+  );
+
+  return NextResponse.json({ ok: true });
+}
