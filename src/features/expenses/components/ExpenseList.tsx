@@ -1,6 +1,7 @@
 "use client";
 
 import { Home } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { formatCurrency } from "@/domain/calendar";
 import type { ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
 import type { TimelineSection } from "../lib/timeline";
@@ -19,12 +20,29 @@ export function ExpenseList({
   today,
   onTogglePaid,
 }: ExpenseListProps) {
+  const focusRef = useRef<HTMLElement | null>(null);
+  const didFocusTimeline = useRef(false);
+  const firstActiveIndex = sections.findIndex((section) => section.tone !== "paid");
+
+  useEffect(() => {
+    if (didFocusTimeline.current || !focusRef.current) return;
+    didFocusTimeline.current = true;
+    focusRef.current.scrollIntoView({ block: "start", behavior: "instant" });
+  }, [sections]);
+
   return (
     <section>
       {sections.length ? (
         <div className="space-y-5">
-          {sections.map((section, index) => (
-            <article key={section.id} className="relative pl-7">
+          {sections.map((section, index) => {
+            const shouldAnchorFocus = index === firstActiveIndex;
+
+            return (
+            <article
+              key={section.id}
+              ref={shouldAnchorFocus ? focusRef : undefined}
+              className="relative scroll-mt-3 pl-7"
+            >
               <span
                 className={`absolute left-2 top-1 size-3 rounded-full shadow-[0_0_28px_currentColor] ring-4 ${
                   section.tone === "critical"
@@ -70,7 +88,8 @@ export function ExpenseList({
                 ))}
               </div>
             </article>
-          ))}
+          );
+          })}
         </div>
       ) : (
         <div className="grid place-items-center rounded-[1.25rem] border border-dashed border-slate-300 bg-white px-6 py-14 text-center">

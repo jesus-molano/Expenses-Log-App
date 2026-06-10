@@ -20,13 +20,13 @@ function sectionMeta(
   const dueDate = parseISO(occurrence.dueDate);
   const dueDelta = daysBetween(today, occurrence.dueDate);
 
-  if (occurrence.status === "paid") {
+  if (occurrence.status === "paid" && dueDelta < 0) {
     return {
       id: `paid-${occurrence.dueDate}`,
       title: format(dueDate, "EEEE d", { locale: es }),
       subtitle: "Pagado",
       tone: "paid",
-      priority: dueDelta < 0 ? 90 : 55,
+      priority: 0,
     };
   }
 
@@ -36,7 +36,7 @@ function sectionMeta(
       title: "Atrasado",
       subtitle: `Desde ${format(dueDate, "EEEE d", { locale: es })}`,
       tone: "critical",
-      priority: 0,
+      priority: 10,
     };
   }
 
@@ -46,7 +46,7 @@ function sectionMeta(
       title: "Hoy",
       subtitle: "Puede salir de tu cuenta hoy",
       tone: "critical",
-      priority: 10,
+      priority: 20,
     };
   }
 
@@ -62,7 +62,7 @@ function sectionMeta(
       title: `Estimado ${format(estimatedDate, "EEEE d", { locale: es })}`,
       subtitle: `Vence ${format(dueDate, "EEEE d", { locale: es })}`,
       tone: "estimated",
-      priority: 20,
+      priority: 30,
     };
   }
 
@@ -74,7 +74,7 @@ function sectionMeta(
         : format(dueDate, "EEEE d", { locale: es }),
       subtitle: isWeekend(dueDate) ? "Vence en fin de semana" : "Esta semana",
       tone: "soon",
-      priority: 30,
+      priority: 40,
     };
   }
 
