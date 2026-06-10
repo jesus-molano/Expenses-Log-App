@@ -1,33 +1,33 @@
 import type { ElementType } from "react";
-import { Bell, CalendarClock, Check, WalletCards } from "lucide-react";
+import { CalendarDays, Check, Clock3, Sparkles } from "lucide-react";
 import type { DraftExpense } from "@/domain/types";
 
-export type SmartList = "today" | "upcoming" | "all" | "paid";
+export type TimelineHorizon = "today" | "week" | "month" | "paid";
 
-export type SmartListDefinition = {
+export type HorizonDefinition = {
   label: string;
   description: string;
   icon: ElementType;
 };
 
-export const smartLists: Record<SmartList, SmartListDefinition> = {
+export const timelineHorizons: Record<TimelineHorizon, HorizonDefinition> = {
   today: {
     label: "Hoy",
-    description: "Vencen o pueden cobrarse hoy",
-    icon: Bell,
+    description: "Cobros de hoy",
+    icon: Sparkles,
   },
-  upcoming: {
-    label: "Proximos",
-    description: "30 dias vista",
-    icon: CalendarClock,
+  week: {
+    label: "7 dias",
+    description: "Esta semana",
+    icon: Clock3,
   },
-  all: {
-    label: "Todos",
-    description: "Gastos activos",
-    icon: WalletCards,
+  month: {
+    label: "Mes",
+    description: "Vista mensual",
+    icon: CalendarDays,
   },
   paid: {
-    label: "Realizados",
+    label: "Pagados",
     description: "Pagos marcados",
     icon: Check,
   },

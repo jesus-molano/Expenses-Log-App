@@ -1,37 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, Settings } from "lucide-react";
-import type { SmartList } from "../lib/dashboard-config";
-import { smartLists } from "../lib/dashboard-config";
+import { CalendarClock, Plus, Settings } from "lucide-react";
 
 type DashboardShellProps = {
-  selectedList: SmartList;
   pendingTotalLabel: string;
+  nextLabel: string;
   userEmail: string | null;
   isCloudReady: boolean;
-  onSelectList: (list: SmartList) => void;
   onNewExpense: () => void;
   children: React.ReactNode;
 };
 
 export function DashboardShell({
-  selectedList,
   pendingTotalLabel,
+  nextLabel,
   userEmail,
   isCloudReady,
-  onSelectList,
   onNewExpense,
   children,
 }: DashboardShellProps) {
   return (
-    <main className="min-h-dvh bg-slate-100 text-slate-950">
-      <div className="mx-auto grid min-h-dvh w-full max-w-7xl grid-cols-1 lg:grid-cols-[336px_1fr]">
-        <aside className="bg-slate-950 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] text-white lg:min-h-dvh lg:p-5">
-          <header className="flex items-center justify-between">
+    <main className="min-h-dvh bg-[linear-gradient(180deg,#edf7ff_0%,#f7f3ff_45%,#fff8ef_100%)] text-slate-950">
+      <div className="mx-auto min-h-dvh w-full max-w-4xl pb-28 lg:grid lg:max-w-7xl lg:grid-cols-[344px_1fr] lg:pb-0">
+        <aside className="relative overflow-hidden bg-[linear-gradient(145deg,#020617_0%,#0f172a_52%,#1e1b4b_100%)] px-4 pb-5 pt-[max(0.875rem,env(safe-area-inset-top))] text-white lg:min-h-dvh lg:p-5">
+          <header className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-cyan-200">Expense Reminders</p>
-              <h1 className="text-3xl font-semibold tracking-normal">Gastos</h1>
+              <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
+                Expense Reminders
+              </p>
+              <h1 className="mt-1 text-[28px] font-semibold leading-none tracking-normal">
+                Timeline
+              </h1>
             </div>
             <div className="flex gap-2">
               <Link
@@ -52,17 +52,20 @@ export function DashboardShell({
             </div>
           </header>
 
-          <section className="mt-6 rounded-[1.25rem] border border-white/10 bg-white/[0.08] p-4 shadow-sm">
+          <section className="relative mt-4 rounded-[1.35rem] border border-white/10 bg-white/[0.08] p-4 shadow-[0_22px_65px_rgba(14,165,233,0.18)]">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
-              Pendiente visible
+              Este mes
             </p>
-            <p className="mt-1 text-4xl font-semibold">{pendingTotalLabel}</p>
-            <p className="mt-2 text-sm text-slate-300">
-              Total segun lista y filtros activos.
+            <p className="mt-1 text-[34px] font-semibold leading-tight">
+              {pendingTotalLabel}
             </p>
+            <div className="mt-3 flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm text-slate-200 ring-1 ring-white/10">
+              <CalendarClock size={17} className="shrink-0 text-cyan-200" />
+              <span className="min-w-0 truncate">{nextLabel}</span>
+            </div>
           </section>
 
-          <section className="mt-3 rounded-[1.25rem] border border-white/10 bg-cyan-300/10 p-4">
+          <section className="mt-3 hidden rounded-[1.25rem] border border-white/10 bg-cyan-300/10 p-4 lg:block">
             <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100">
               Sync
             </p>
@@ -70,52 +73,12 @@ export function DashboardShell({
               {userEmail ?? (isCloudReady ? "Supabase listo" : "Modo local")}
             </p>
             <p className="mt-1 text-xs text-slate-300">
-              {userEmail
-                ? "Sesion activa"
-                : "Local-first hasta iniciar sesion"}
+              {userEmail ? "Sesion activa" : "Local-first hasta iniciar sesion"}
             </p>
           </section>
-
-          <nav className="mt-5 grid grid-cols-2 gap-2 lg:grid-cols-1">
-            {(Object.keys(smartLists) as SmartList[]).map((key) => {
-              const item = smartLists[key];
-              const Icon = item.icon;
-              const active = selectedList === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => onSelectList(key)}
-                  className={`flex min-h-16 items-center gap-3 rounded-[1.1rem] px-3 py-2 text-left transition ${
-                    active
-                      ? "bg-white text-slate-950 shadow-sm"
-                      : "bg-white/[0.08] text-white hover:bg-white/[0.13]"
-                  }`}
-                >
-                  <span
-                    className={`grid size-9 shrink-0 place-items-center rounded-full ${
-                      active ? "bg-slate-100" : "bg-white/10"
-                    }`}
-                  >
-                    <Icon size={18} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold">{item.label}</span>
-                    <span
-                      className={`block truncate text-xs ${
-                        active ? "text-slate-500" : "text-slate-300"
-                      }`}
-                    >
-                      {item.description}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
         </aside>
 
-        <section className="flex min-w-0 flex-1 flex-col px-4 py-4 sm:px-6 lg:px-8">
+        <section className="flex min-w-0 flex-1 flex-col px-3 pb-6 pt-3 sm:px-6 lg:px-8 lg:py-6">
           {children}
         </section>
       </div>

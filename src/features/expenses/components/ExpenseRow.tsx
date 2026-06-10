@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { Check, Circle } from "lucide-react";
-import { formatCurrency, formatShortDate } from "@/domain/calendar";
-import { recurrenceLabel } from "@/domain/recurrence";
+import { formatCurrency } from "@/domain/calendar";
 import type { ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
 import { categoryToneClass, statusLabel } from "../lib/expense-actions";
 
@@ -23,25 +22,25 @@ export function ExpenseRow({
   const paid = occurrence.status === "paid";
 
   return (
-    <article className="grid grid-cols-[44px_1fr_auto] items-center gap-3 border-b border-slate-200 bg-white px-4 py-4 last:border-b-0">
+    <article className="grid min-h-14 grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border border-white/70 bg-white/58 px-2.5 py-2 shadow-[0_10px_28px_rgba(15,23,42,0.06)] backdrop-blur-xl">
       <button
         type="button"
         aria-label={paid ? "Marcar como pendiente" : "Marcar como pagado"}
         onClick={() => onTogglePaid(occurrence)}
-        className={`grid size-10 place-items-center rounded-full border transition ${
+        className={`grid size-9 place-items-center rounded-full border bg-white/75 transition shadow-[0_0_20px_rgba(148,163,184,0.18)] ${
           paid
             ? "border-emerald-500 bg-emerald-500 text-white"
             : "border-slate-300 bg-white text-slate-400 hover:border-emerald-500 hover:text-emerald-600"
         }`}
       >
-        {paid ? <Check size={20} /> : <Circle size={18} />}
+        {paid ? <Check size={19} /> : <Circle size={17} />}
       </button>
 
       <div className="min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <Link
             href={`/expenses/${occurrence.template.id}`}
-            className="truncate text-[15px] font-semibold text-slate-950"
+            className="min-w-0 truncate text-[15px] font-semibold text-slate-950"
           >
             {occurrence.template.name}
           </Link>
@@ -55,28 +54,14 @@ export function ExpenseRow({
             </span>
           ) : null}
         </div>
-        <p className="mt-1 truncate text-sm text-slate-500">
-          {formatShortDate(occurrence.dueDate)} -{" "}
-          {recurrenceLabel(occurrence.template.recurrence)}
-        </p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {occurrence.template.tags.slice(0, 3).map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600"
-            >
-              #{tag}
-            </span>
-          ))}
-        </div>
       </div>
 
-      <div className="text-right">
-        <p className="text-[15px] font-semibold text-slate-950">
+      <div className="shrink-0 text-right">
+        <p className="text-[14px] font-semibold text-slate-950">
           {formatCurrency(occurrence.template.amount)}
         </p>
         <p
-          className={`mt-1 whitespace-nowrap text-xs font-medium ${
+          className={`mt-0.5 whitespace-nowrap text-[11px] font-medium ${
             paid ? "text-emerald-700" : "text-slate-500"
           }`}
         >

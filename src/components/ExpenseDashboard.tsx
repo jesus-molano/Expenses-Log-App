@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { formatShortDate } from "@/domain/calendar";
 import type { DraftExpense } from "@/domain/types";
 import { createEmptyDraft } from "@/features/expenses/lib/dashboard-config";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
 import { ExpenseFormSheet } from "@/features/expenses/components/ExpenseFormSheet";
 import { ExpenseList } from "@/features/expenses/components/ExpenseList";
 import { QuickCapture } from "@/features/expenses/components/QuickCapture";
-import { TagFilter } from "@/features/expenses/components/TagFilter";
 import { useExpenseFilters } from "@/features/expenses/hooks/use-expense-filters";
 import { useExpenseStore } from "@/features/expenses/hooks/use-expense-store";
 import { useQuickExpenseParser } from "@/features/expenses/hooks/use-quick-expense-parser";
@@ -48,37 +48,37 @@ export function ExpenseDashboard({
     setSheetOpen(false);
   }
 
+  const nextLabel = filters.nextOccurrence
+    ? `${filters.nextOccurrence.template.name} - ${formatShortDate(
+        filters.nextOccurrence.estimatedChargeDate,
+      )}`
+    : "Sin cobros pendientes";
+
   return (
     <DashboardShell
-      selectedList={filters.selectedList}
       pendingTotalLabel={filters.pendingTotalLabel}
+      nextLabel={nextLabel}
       userEmail={userEmail}
       isCloudReady={isCloudReady}
-      onSelectList={filters.setSelectedList}
       onNewExpense={openEmptySheet}
     >
-      <QuickCapture
-        query={filters.query}
-        quickText={quickParser.quickText}
-        statusLabel={quickParser.statusLabel}
-        isParsing={quickParser.status === "loading"}
-        onQueryChange={filters.setQuery}
-        onQuickTextChange={quickParser.setQuickText}
-        onAnalyze={analyzeQuickText}
-      />
-
-      <TagFilter
-        tags={filters.tags}
-        selectedTag={filters.selectedTag}
-        onSelectTag={filters.setSelectedTag}
-      />
-
       <ExpenseList
-        selectedList={filters.selectedList}
-        occurrences={filters.visibleOccurrences}
+        sections={filters.timelineSections}
         categories={store.categories}
         today={filters.today}
         onTogglePaid={togglePaid}
+      />
+
+      <QuickCapture
+        value={quickParser.quickText || filters.query}
+        statusLabel={quickParser.statusLabel}
+        isParsing={quickParser.status === "loading"}
+        onValueChange={(value) => {
+          quickParser.setQuickText(value);
+          filters.setQuery(value);
+        }}
+        onAnalyze={analyzeQuickText}
+        onManualAdd={openEmptySheet}
       />
 
       <ExpenseFormSheet

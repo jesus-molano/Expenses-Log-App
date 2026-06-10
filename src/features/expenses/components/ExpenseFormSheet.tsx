@@ -27,26 +27,31 @@ export function ExpenseFormSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end bg-slate-950/35 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6">
+    <div className="fixed inset-0 z-40 flex items-end bg-slate-950/40 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6">
       <form
         onSubmit={submit}
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-[1.5rem] bg-white p-5 shadow-2xl sm:max-w-lg sm:rounded-[1.5rem]"
+        className="max-h-[92dvh] w-full overflow-y-auto rounded-t-[1.65rem] bg-white shadow-2xl sm:max-w-xl sm:rounded-[1.65rem]"
       >
-        <header className="mb-5 flex items-center justify-between">
-          <div>
+        <div className="sticky top-0 z-10 bg-white px-5 pb-3 pt-3">
+          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200 sm:hidden" />
+          <header className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
             <h2 className="text-lg font-semibold text-slate-950">Nuevo gasto</h2>
-            <p className="text-sm text-slate-500">Revisa y guarda el recordatorio.</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
-          >
-            Cerrar
-          </button>
-        </header>
+              <p className="truncate text-sm text-slate-500">
+                Revisa importe, dia y repeticion.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-10 shrink-0 rounded-full px-3 text-sm font-medium text-slate-600 hover:bg-slate-100"
+            >
+              Cerrar
+            </button>
+          </header>
+        </div>
 
-        <div className="grid gap-4">
+        <div className="grid gap-4 px-5 pb-5">
           <Field label="Nombre">
             <input
               value={form.name}
@@ -67,7 +72,7 @@ export function ExpenseFormSheet({
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Importe">
               <input
                 type="number"
@@ -97,7 +102,7 @@ export function ExpenseFormSheet({
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Categoria">
               <input
                 value={form.categoryName}
@@ -132,7 +137,7 @@ export function ExpenseFormSheet({
           </div>
 
           {form.recurrence.frequency === "custom" ? (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Cada">
                 <input
                   type="number"
@@ -182,14 +187,15 @@ export function ExpenseFormSheet({
               className="input-control"
             />
           </Field>
+          <div className="sticky bottom-0 -mx-5 bg-white/95 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
+            <button
+              type="submit"
+              className="h-12 w-full rounded-2xl bg-slate-950 text-base font-semibold text-white shadow-[0_14px_35px_rgba(15,23,42,0.24)] transition hover:bg-slate-800"
+            >
+              Guardar gasto
+            </button>
+          </div>
         </div>
-
-        <button
-          type="submit"
-          className="mt-6 h-12 w-full rounded-2xl bg-slate-950 text-base font-semibold text-white transition hover:bg-slate-800"
-        >
-          Guardar gasto
-        </button>
       </form>
     </div>
   );
