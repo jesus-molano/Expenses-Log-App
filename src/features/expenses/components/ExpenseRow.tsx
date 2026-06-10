@@ -14,6 +14,7 @@ type ExpenseRowProps = {
   today: string;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
   onScheduleMove: (occurrence: ExpenseOccurrence, dueDate: string) => void;
+  onDropTargetChange: (dueDate: string | null) => void;
   onLiftChange: (lifted: boolean, occurrence: ExpenseOccurrence) => void;
 };
 
@@ -23,11 +24,13 @@ export function ExpenseRow({
   today,
   onTogglePaid,
   onScheduleMove,
+  onDropTargetChange,
   onLiftChange,
 }: ExpenseRowProps) {
   const router = useRouter();
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const origin = useRef({ x: 0, y: 0 });
+  const liftOffset = useRef({ x: 0, y: 0 });
   const dragRef = useRef({ x: 0, y: 0, active: false, lifted: false });
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false, lifted: false });
   const paid = occurrence.status === "paid";
@@ -48,11 +51,17 @@ export function ExpenseRow({
   function startGesture(event: PointerEvent<HTMLElement>) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
 
+    const targetElement = event.currentTarget;
     origin.current = { x: event.clientX, y: event.clientY };
     setGesture({ x: 0, y: 0, active: true, lifted: false });
-    event.currentTarget.setPointerCapture(event.pointerId);
+    targetElement.setPointerCapture(event.pointerId);
 
     holdTimer.current = setTimeout(() => {
+      const rect = targetElement.getBoundingClientRect();
+      liftOffset.current = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
       const next = { ...dragRef.current, lifted: true };
       setGesture(next);
       onLiftChange(true, occurrence);
@@ -80,12 +89,17 @@ export function ExpenseRow({
       } else if (event.clientY > window.innerHeight - 132) {
         window.scrollBy({ top: 18, behavior: "smooth" });
       }
+
+      const target = document
+        .elementFromPoint(event.clientX, event.clientY)
+        ?.closest<HTMLElement>("[data-timeline-date]");
+      onDropTargetChange(target?.dataset.timelineDate ?? null);
     }
 
     setGesture({
       ...current,
-      x: current.lifted ? x : Math.max(-108, Math.min(108, x)),
-      y: current.lifted ? y : 0,
+      x: current.lifted ? x - liftOffset.current.x + 36 : Math.max(-108, Math.min(108, x)),
+      y: current.lifted ? y - liftOffset.current.y + 24 : 0,
     });
   }
 
@@ -108,6 +122,7 @@ export function ExpenseRow({
 
       setGesture({ x: 0, y: 0, active: false, lifted: false });
       onLiftChange(false, occurrence);
+      onDropTargetChange(null);
       return;
     }
 
@@ -119,6 +134,7 @@ export function ExpenseRow({
 
     setGesture({ x: 0, y: 0, active: false, lifted: false });
     onLiftChange(false, occurrence);
+    onDropTargetChange(null);
   }
 
   function cancelGesture(event: PointerEvent<HTMLElement>) {
@@ -128,6 +144,7 @@ export function ExpenseRow({
     }
     setGesture({ x: 0, y: 0, active: false, lifted: false });
     onLiftChange(false, occurrence);
+    onDropTargetChange(null);
   }
 
   return (

@@ -38,6 +38,7 @@ export function ExpenseList({
   const didFocusTimeline = useRef(false);
   const [draggedOccurrence, setDraggedOccurrence] =
     useState<ExpenseOccurrence | null>(null);
+  const [activeDropDate, setActiveDropDate] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<{
     occurrence: ExpenseOccurrence;
     dueDate: string;
@@ -48,16 +49,16 @@ export function ExpenseList({
     setPendingMove(null);
   }
 
-  function applyMove(scope: "single" | "series") {
+  function applySeriesMove() {
     if (!pendingMove) return;
 
-    if (scope === "single") {
-      onMoveOccurrence(pendingMove.occurrence, pendingMove.dueDate);
-    } else {
-      onMoveOccurrenceSeries(pendingMove.occurrence, pendingMove.dueDate);
-    }
-
+    onMoveOccurrenceSeries(pendingMove.occurrence, pendingMove.dueDate);
     setPendingMove(null);
+  }
+
+  function scheduleMove(occurrence: ExpenseOccurrence, dueDate: string) {
+    onMoveOccurrence(occurrence, dueDate);
+    setPendingMove({ occurrence, dueDate });
   }
 
   useEffect(() => {
@@ -185,7 +186,12 @@ export function ExpenseList({
                   <>
                     {expandSection
                       ? emptyDaysBefore.map((day) => (
-                          <EmptyDayTarget key={day} date={day} />
+                          <EmptyDayTarget
+                            key={day}
+                            date={day}
+                            active={activeDropDate === day}
+                            label="Soltar aqui"
+                          />
                         ))
                       : null}
                     {section.items.map((occurrence) => (
@@ -198,17 +204,22 @@ export function ExpenseList({
                         )}
                         today={today}
                         onTogglePaid={onTogglePaid}
-                        onScheduleMove={(occurrence, dueDate) =>
-                          setPendingMove({ occurrence, dueDate })
-                        }
-                        onLiftChange={(lifted, occurrence) =>
+                        onScheduleMove={scheduleMove}
+                        onDropTargetChange={setActiveDropDate}
+                        onLiftChange={(lifted, occurrence) => {
                           setDraggedOccurrence(lifted ? occurrence : null)
-                        }
+                          if (!lifted) setActiveDropDate(null);
+                        }}
                       />
                     ))}
                     {expandSection
                       ? emptyDaysAfter.map((day) => (
-                          <EmptyDayTarget key={day} date={day} />
+                          <EmptyDayTarget
+                            key={day}
+                            date={day}
+                            active={activeDropDate === day}
+                            label="Soltar aqui"
+                          />
                         ))
                       : null}
                   </>
@@ -241,50 +252,63 @@ export function ExpenseList({
       {pendingMove ? (
         <div className="fixed inset-x-3 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 mx-auto max-w-md rounded-[1.35rem] border border-white/10 bg-slate-950/94 p-3 text-white shadow-[0_24px_70px_rgba(0,0,0,0.58)] backdrop-blur-2xl">
           <p className="text-sm font-semibold">
-            Mover {pendingMove.occurrence.template.name} al{" "}
+            Movido {pendingMove.occurrence.template.name} al{" "}
             {format(parseISO(pendingMove.dueDate), "d MMMM", { locale: es })}
           </p>
           <p className="mt-1 text-xs text-slate-300">
-            Elige si es un cambio puntual o si actualiza el ciclo del gasto.
+            Se ha aplicado como cambio puntual. Puedes actualizar tambien el loop.
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
             <button
               type="button"
-              onClick={() => applyMove("single")}
-              className="h-11 rounded-2xl bg-white/10 text-sm font-semibold text-white ring-1 ring-white/10"
-            >
-              Solo este
-            </button>
-            <button
-              type="button"
-              onClick={() => applyMove("series")}
+              onClick={applySeriesMove}
               className="h-11 rounded-2xl bg-lime-300 text-sm font-semibold text-slate-950 shadow-[0_0_30px_rgba(132,204,22,0.22)]"
             >
               Este y siguientes
             </button>
+            <button
+              type="button"
+              onClick={closeMoveSheet}
+              className="h-11 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white ring-1 ring-white/10"
+            >
+              Ok
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={closeMoveSheet}
-            className="mt-2 h-10 w-full rounded-2xl text-sm font-medium text-slate-300"
-          >
-            Cancelar
-          </button>
         </div>
       ) : null}
     </section>
   );
 }
 
-function EmptyDayTarget({ date }: { date: string }) {
+function EmptyDayTarget({
+  date,
+  active,
+  label,
+}: {
+  date: string;
+  active: boolean;
+  label: string;
+}) {
   return (
     <div
       data-timeline-date={date}
-      className="animate-[fade-in_220ms_ease-out] rounded-2xl border border-dashed border-white/10 bg-white/[0.016] px-3 py-2 text-xs font-medium text-slate-400 transition"
+      className={`relative animate-[fade-in_220ms_ease-out] rounded-2xl border px-3 py-2 text-xs font-medium transition ${
+        active
+          ? "border-lime-200/70 bg-lime-300/16 text-white shadow-[0_0_28px_rgba(132,204,22,0.28)]"
+          : "border-dashed border-white/10 bg-white/[0.016] text-slate-400"
+      }`}
     >
+      {active ? (
+        <span className="absolute inset-x-4 -top-1 h-0.5 rounded-full bg-lime-200 shadow-[0_0_18px_rgba(190,242,100,0.9)]" />
+      ) : null}
       <span className="capitalize">
         {format(parseISO(date), "EEEE d", { locale: es })}
       </span>
+      {active ? (
+        <span className="float-right text-[11px] font-semibold text-lime-100">
+          {label}
+        </span>
+      ) : null}
     </div>
   );
 }
