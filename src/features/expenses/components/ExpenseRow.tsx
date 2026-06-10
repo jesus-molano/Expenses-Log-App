@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Circle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { type PointerEvent, useRef, useState } from "react";
+import { Check, Circle, Pencil, RotateCcw } from "lucide-react";
 import { formatCurrency } from "@/domain/calendar";
 import type { ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
 import { categoryToneClass, statusLabel } from "../lib/expense-actions";
@@ -11,6 +13,7 @@ type ExpenseRowProps = {
   category?: ExpenseCategory;
   today: string;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
+  onMoveOccurrence: (occurrence: ExpenseOccurrence, dueDate: string) => void;
 };
 
 export function ExpenseRow({
@@ -18,68 +21,194 @@ export function ExpenseRow({
   category,
   today,
   onTogglePaid,
+  onMoveOccurrence,
 }: ExpenseRowProps) {
+  const router = useRouter();
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const origin = useRef({ x: 0, y: 0 });
+  const dragRef = useRef({ x: 0, y: 0, active: false, lifted: false });
+  const [drag, setDrag] = useState({ x: 0, y: 0, active: false, lifted: false });
   const paid = occurrence.status === "paid";
+  const swipingLeft = drag.x < -28 && !drag.lifted;
+  const swipingRight = drag.x > 28 && !drag.lifted;
+
+  function clearHoldTimer() {
+    if (!holdTimer.current) return;
+    clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+  }
+
+  function setGesture(next: typeof drag) {
+    dragRef.current = next;
+    setDrag(next);
+  }
+
+  function startGesture(event: PointerEvent<HTMLElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+
+    origin.current = { x: event.clientX, y: event.clientY };
+    setGesture({ x: 0, y: 0, active: true, lifted: false });
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    holdTimer.current = setTimeout(() => {
+      const next = { ...dragRef.current, lifted: true };
+      setGesture(next);
+    }, 420);
+  }
+
+  function updateGesture(event: PointerEvent<HTMLElement>) {
+    const current = dragRef.current;
+    if (!current.active) return;
+
+    const x = event.clientX - origin.current.x;
+    const y = event.clientY - origin.current.y;
+
+    if (!current.lifted && Math.abs(y) > 14 && Math.abs(y) > Math.abs(x)) {
+      clearHoldTimer();
+      setGesture({ x: 0, y: 0, active: false, lifted: false });
+      return;
+    }
+
+    if (Math.abs(x) > 10 || Math.abs(y) > 10) clearHoldTimer();
+
+    setGesture({
+      ...current,
+      x: current.lifted ? x : Math.max(-108, Math.min(108, x)),
+      y: current.lifted ? y : 0,
+    });
+  }
+
+  function finishGesture(event: PointerEvent<HTMLElement>) {
+    const current = dragRef.current;
+    if (!current.active) return;
+
+    clearHoldTimer();
+    event.currentTarget.releasePointerCapture(event.pointerId);
+
+    if (current.lifted) {
+      const target = document
+        .elementFromPoint(event.clientX, event.clientY)
+        ?.closest<HTMLElement>("[data-timeline-date]");
+      const targetDate = target?.dataset.timelineDate;
+
+      if (targetDate && targetDate !== occurrence.dueDate) {
+        onMoveOccurrence(occurrence, targetDate);
+      }
+
+      setGesture({ x: 0, y: 0, active: false, lifted: false });
+      return;
+    }
+
+    if (current.x < -72) {
+      onTogglePaid(occurrence);
+    } else if (current.x > 72) {
+      router.push(`/expenses/${occurrence.template.id}`);
+    }
+
+    setGesture({ x: 0, y: 0, active: false, lifted: false });
+  }
+
+  function cancelGesture(event: PointerEvent<HTMLElement>) {
+    clearHoldTimer();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setGesture({ x: 0, y: 0, active: false, lifted: false });
+  }
 
   return (
-    <article
-      className={`grid min-h-14 grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border px-2.5 py-2 backdrop-blur-xl ${
-        paid
-          ? "border-white/40 bg-white/32 opacity-70"
-          : "border-white/70 bg-white/58 shadow-[0_10px_28px_rgba(15,23,42,0.06)]"
-      }`}
+    <div
+      className={`relative overflow-visible rounded-2xl ${drag.lifted ? "z-30" : ""}`}
     >
-      <button
-        type="button"
-        aria-label={paid ? "Marcar como pendiente" : "Marcar como pagado"}
-        onClick={() => onTogglePaid(occurrence)}
-        className={`grid size-9 place-items-center rounded-full border bg-white/75 transition shadow-[0_0_20px_rgba(148,163,184,0.18)] ${
-          paid
-            ? "border-emerald-500 bg-emerald-500 text-white"
-            : "border-slate-300 bg-white text-slate-400 hover:border-emerald-500 hover:text-emerald-600"
+      <div
+        aria-hidden="true"
+        className={`absolute inset-0 grid grid-cols-2 rounded-2xl text-xs font-semibold transition-opacity ${
+          swipingLeft || swipingRight ? "opacity-100" : "opacity-0"
         }`}
       >
-        {paid ? <Check size={19} /> : <Circle size={17} />}
-      </button>
-
-      <div className="min-w-0">
-        <div className="flex min-w-0 items-center gap-2">
-          <Link
-            href={`/expenses/${occurrence.template.id}`}
-            className={`min-w-0 truncate text-[15px] font-semibold ${
-              paid ? "text-slate-500 line-through decoration-slate-400" : "text-slate-950"
-            }`}
-          >
-            {occurrence.template.name}
-          </Link>
-          {category ? (
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${categoryToneClass(
-                category.tone,
-              )}`}
-            >
-              {category.name}
-            </span>
-          ) : null}
+        <div className="flex items-center gap-1 rounded-l-2xl bg-orange-400/20 px-4 text-orange-100 ring-1 ring-orange-300/20">
+          <Pencil size={16} />
+          Editar
+        </div>
+        <div className="flex items-center justify-end gap-1 rounded-r-2xl bg-lime-300/20 px-4 text-lime-100 ring-1 ring-lime-200/20">
+          <RotateCcw size={16} />
+          {paid ? "Pendiente" : "Pagado"}
         </div>
       </div>
 
-      <div className="shrink-0 text-right">
-        <p
-          className={`text-[14px] font-semibold ${
-            paid ? "text-slate-500 line-through decoration-slate-400" : "text-slate-950"
+      <article
+        onPointerDown={startGesture}
+        onPointerMove={updateGesture}
+        onPointerUp={finishGesture}
+        onPointerCancel={cancelGesture}
+        style={{
+          transform: `translate3d(${drag.x}px, ${drag.y}px, 0) scale(${
+            drag.lifted ? 1.035 : 1
+          })`,
+        }}
+        className={`grid min-h-14 touch-pan-y select-none grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border px-2.5 py-2 backdrop-blur-xl transition-[border-radius,box-shadow,opacity,transform,background] duration-200 ease-out ${
+          drag.lifted
+            ? "border-lime-200/50 bg-slate-900/95 shadow-[0_0_46px_rgba(132,204,22,0.36),0_26px_70px_rgba(0,0,0,0.58)]"
+            : paid
+              ? "border-white/10 bg-white/[0.045] opacity-70"
+              : "border-white/12 bg-white/[0.105] shadow-[0_12px_34px_rgba(0,0,0,0.22)] ring-1 ring-white/8"
+        }`}
+      >
+        <button
+          type="button"
+          aria-label={paid ? "Marcar como pendiente" : "Marcar como pagado"}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => onTogglePaid(occurrence)}
+          className={`grid size-9 place-items-center rounded-full border transition shadow-[0_0_24px_rgba(132,204,22,0.16)] ${
+            paid
+              ? "border-lime-300 bg-lime-300 text-slate-950"
+              : "border-white/20 bg-white/7 text-slate-200 hover:border-lime-300 hover:text-lime-100"
           }`}
         >
-          {formatCurrency(occurrence.template.amount)}
-        </p>
-        <p
-          className={`mt-0.5 whitespace-nowrap text-[11px] font-medium ${
-            paid ? "text-emerald-700" : "text-slate-500"
-          }`}
-        >
-          {statusLabel(occurrence, today)}
-        </p>
-      </div>
-    </article>
+          {paid ? <Check size={19} /> : <Circle size={17} />}
+        </button>
+
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <Link
+              href={`/expenses/${occurrence.template.id}`}
+              className={`min-w-0 truncate text-[15px] font-semibold ${
+                paid
+                  ? "text-slate-300 line-through decoration-slate-400"
+                  : "text-white"
+              }`}
+            >
+              {occurrence.template.name}
+            </Link>
+            {category ? (
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${categoryToneClass(
+                  category.tone,
+                )}`}
+              >
+                {category.name}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="shrink-0 text-right">
+          <p
+            className={`text-[14px] font-semibold ${
+              paid ? "text-slate-300 line-through decoration-slate-400" : "text-white"
+            }`}
+          >
+            {formatCurrency(occurrence.template.amount)}
+          </p>
+          <p
+            className={`mt-0.5 whitespace-nowrap text-[11px] font-medium ${
+              paid ? "text-lime-200/80" : "text-white"
+            }`}
+          >
+            {statusLabel(occurrence, today)}
+          </p>
+        </div>
+      </article>
+    </div>
   );
 }

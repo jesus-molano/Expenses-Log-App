@@ -27,24 +27,24 @@ export function ExpenseFormSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end bg-slate-950/40 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6">
+    <div className="fixed inset-0 z-40 flex items-end bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6">
       <form
         onSubmit={submit}
-        className="max-h-[92dvh] w-full overflow-y-auto rounded-t-[1.65rem] bg-white shadow-2xl sm:max-w-xl sm:rounded-[1.65rem]"
+        className="max-h-[92dvh] w-full overflow-y-auto rounded-t-[1.65rem] border border-white/10 bg-slate-950 shadow-[0_0_60px_rgba(132,204,22,0.12),0_30px_80px_rgba(0,0,0,0.55)] sm:max-w-xl sm:rounded-[1.65rem]"
       >
-        <div className="sticky top-0 z-10 bg-white px-5 pb-3 pt-3">
-          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200 sm:hidden" />
+        <div className="sticky top-0 z-10 bg-slate-950/92 px-5 pb-3 pt-3 backdrop-blur-xl">
+          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/20 sm:hidden" />
           <header className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-slate-950">Nuevo gasto</h2>
-              <p className="truncate text-sm text-slate-500">
+            <h2 className="text-lg font-semibold text-white">Nuevo gasto</h2>
+              <p className="truncate text-sm text-slate-300">
                 Revisa importe, dia y repeticion.
               </p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="h-10 shrink-0 rounded-full px-3 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              className="h-10 shrink-0 rounded-full px-3 text-sm font-medium text-slate-200 hover:bg-white/10"
             >
               Cerrar
             </button>
@@ -187,10 +187,10 @@ export function ExpenseFormSheet({
               className="input-control"
             />
           </Field>
-          <div className="sticky bottom-0 -mx-5 bg-white/95 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
+          <div className="sticky bottom-0 -mx-5 bg-slate-950/92 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl">
             <button
               type="submit"
-              className="h-12 w-full rounded-2xl bg-slate-950 text-base font-semibold text-white shadow-[0_14px_35px_rgba(15,23,42,0.24)] transition hover:bg-slate-800"
+              className="h-12 w-full rounded-2xl bg-lime-300 text-base font-semibold text-slate-950 shadow-[0_0_34px_rgba(132,204,22,0.28)] transition hover:bg-lime-200"
             >
               Guardar gasto
             </button>
@@ -209,7 +209,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+    <label className="grid gap-1.5 text-sm font-medium text-slate-200">
       {label}
       {children}
     </label>

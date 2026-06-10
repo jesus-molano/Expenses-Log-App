@@ -50,6 +50,10 @@ export function useExpenseStore() {
             userId: "demo",
             templateId: occurrence.template.id,
             occurrenceDate: occurrence.occurrenceDate,
+            dueDate:
+              occurrence.dueDate !== occurrence.occurrenceDate
+                ? occurrence.dueDate
+                : undefined,
             status: "paid" as const,
             paidAt: new Date().toISOString(),
             amountPaid: occurrence.template.amount,
@@ -59,10 +63,40 @@ export function useExpenseStore() {
     persist({ ...store, overrides });
   }
 
+  function moveOccurrence(occurrence: ExpenseOccurrence, dueDate: string) {
+    const existing = occurrence.override;
+    const unchangedDate = dueDate === occurrence.occurrenceDate;
+    const nextOverride = {
+      id: existing?.id ?? createId("ovr"),
+      userId: "demo",
+      templateId: occurrence.template.id,
+      occurrenceDate: occurrence.occurrenceDate,
+      dueDate: unchangedDate ? undefined : dueDate,
+      status: occurrence.status,
+      paidAt: existing?.paidAt,
+      amountPaid: existing?.amountPaid,
+      note: existing?.note,
+    };
+
+    const overrides = [
+      ...store.overrides.filter(
+        (override) =>
+          !(
+            override.templateId === occurrence.template.id &&
+            override.occurrenceDate === occurrence.occurrenceDate
+          ),
+      ),
+      nextOverride,
+    ];
+
+    persist({ ...store, overrides });
+  }
+
   return {
     store,
     persist,
     addExpense,
     togglePaid,
+    moveOccurrence,
   };
 }

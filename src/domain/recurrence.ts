@@ -93,13 +93,14 @@ export function generateOccurrences(
     .flatMap((template) =>
       generateTemplateDates(template, fromDate, toDate).map((date) => {
         const override = overrideByKey.get(`${template.id}:${date}`);
-        const estimate = estimateChargeDate(date);
+        const dueDate = override?.dueDate ?? date;
+        const estimate = estimateChargeDate(dueDate);
 
         return {
           id: `${template.id}:${date}`,
           template,
           occurrenceDate: date,
-          dueDate: date,
+          dueDate,
           estimatedChargeDate: estimate.date,
           estimatedChargeLabel: estimate.label,
           status: override?.status ?? "due",

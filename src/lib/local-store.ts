@@ -5,6 +5,26 @@ import { demoStore } from "@/domain/seed";
 
 const STORAGE_KEY = "expense-reminders-store-v1";
 
+function withDemoDefaults(store: ExpenseStore): ExpenseStore {
+  return {
+    ...store,
+    categories: [
+      ...store.categories,
+      ...demoStore.categories.filter(
+        (category) =>
+          !store.categories.some((existing) => existing.id === category.id),
+      ),
+    ],
+    templates: [
+      ...store.templates,
+      ...demoStore.templates.filter(
+        (template) =>
+          !store.templates.some((existing) => existing.id === template.id),
+      ),
+    ],
+  };
+}
+
 export function loadExpenseStore(): ExpenseStore {
   if (typeof window === "undefined") return demoStore;
 
@@ -12,7 +32,7 @@ export function loadExpenseStore(): ExpenseStore {
   if (!raw) return demoStore;
 
   try {
-    return JSON.parse(raw) as ExpenseStore;
+    return withDemoDefaults(JSON.parse(raw) as ExpenseStore);
   } catch {
     return demoStore;
   }

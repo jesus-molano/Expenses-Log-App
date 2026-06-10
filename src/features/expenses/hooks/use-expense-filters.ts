@@ -44,7 +44,6 @@ export function useExpenseFilters(store: ExpenseStore) {
     .filter(
       (occurrence) =>
         occurrence.status !== "paid" &&
-        occurrence.estimatedChargeDate >= today &&
         occurrence.estimatedChargeDate <= monthEnd,
     )
     .reduce((sum, occurrence) => sum + occurrence.template.amount, 0);

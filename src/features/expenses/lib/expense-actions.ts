@@ -74,12 +74,12 @@ export function buildTemplateFromDraft(
 
 export function categoryToneClass(tone: ExpenseCategory["tone"]): string {
   return {
-    blue: "bg-sky-100 text-sky-700",
-    green: "bg-emerald-100 text-emerald-700",
-    orange: "bg-amber-100 text-amber-800",
-    rose: "bg-rose-100 text-rose-700",
-    violet: "bg-violet-100 text-violet-700",
-    slate: "bg-slate-100 text-slate-700",
+    blue: "bg-cyan-300/18 text-cyan-100 ring-1 ring-cyan-200/35",
+    green: "bg-lime-300/18 text-lime-100 ring-1 ring-lime-200/35",
+    orange: "bg-orange-400/18 text-orange-100 ring-1 ring-orange-200/35",
+    rose: "bg-rose-400/18 text-rose-100 ring-1 ring-rose-200/35",
+    violet: "bg-violet-400/18 text-violet-100 ring-1 ring-violet-200/35",
+    slate: "bg-white/12 text-slate-100 ring-1 ring-white/15",
   }[tone];
 }
 

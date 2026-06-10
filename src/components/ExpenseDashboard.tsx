@@ -11,6 +11,7 @@ import { QuickCapture } from "@/features/expenses/components/QuickCapture";
 import { useExpenseFilters } from "@/features/expenses/hooks/use-expense-filters";
 import { useExpenseStore } from "@/features/expenses/hooks/use-expense-store";
 import { useQuickExpenseParser } from "@/features/expenses/hooks/use-quick-expense-parser";
+import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
 
 type DashboardProps = {
   initialNewExpense?: boolean;
@@ -23,9 +24,10 @@ export function ExpenseDashboard({
   userEmail = null,
   isCloudReady = false,
 }: DashboardProps) {
-  const { store, addExpense, togglePaid } = useExpenseStore();
+  const { store, addExpense, togglePaid, moveOccurrence } = useExpenseStore();
   const filters = useExpenseFilters(store);
   const quickParser = useQuickExpenseParser();
+  const chrome = useScrollChrome();
   const [draft, setDraft] = useState<DraftExpense>(() => createEmptyDraft());
   const [sheetOpen, setSheetOpen] = useState(initialNewExpense);
 
@@ -58,6 +60,7 @@ export function ExpenseDashboard({
     <DashboardShell
       pendingTotalLabel={filters.pendingTotalLabel}
       nextLabel={nextLabel}
+      compact={chrome.compactHeader}
       userEmail={userEmail}
       isCloudReady={isCloudReady}
     >
@@ -66,12 +69,14 @@ export function ExpenseDashboard({
         categories={store.categories}
         today={filters.today}
         onTogglePaid={togglePaid}
+        onMoveOccurrence={moveOccurrence}
       />
 
       <QuickCapture
         value={quickParser.quickText || filters.query}
         statusLabel={quickParser.statusLabel}
         isParsing={quickParser.status === "loading"}
+        visible={chrome.showBottomBar}
         onValueChange={(value) => {
           quickParser.setQuickText(value);
           filters.setQuery(value);
