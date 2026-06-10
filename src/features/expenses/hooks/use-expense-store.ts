@@ -92,11 +92,29 @@ export function useExpenseStore() {
     persist({ ...store, overrides });
   }
 
+  function moveOccurrenceSeries(occurrence: ExpenseOccurrence, dueDate: string) {
+    const day = new Date(`${dueDate}T00:00:00`).getDate();
+
+    persist({
+      ...store,
+      templates: store.templates.map((template) =>
+        template.id === occurrence.template.id
+          ? {
+              ...template,
+              dueDay: day,
+              updatedAt: new Date().toISOString(),
+            }
+          : template,
+      ),
+    });
+  }
+
   return {
     store,
     persist,
     addExpense,
     togglePaid,
     moveOccurrence,
+    moveOccurrenceSeries,
   };
 }

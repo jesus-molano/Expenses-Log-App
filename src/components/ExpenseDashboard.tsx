@@ -24,7 +24,13 @@ export function ExpenseDashboard({
   userEmail = null,
   isCloudReady = false,
 }: DashboardProps) {
-  const { store, addExpense, togglePaid, moveOccurrence } = useExpenseStore();
+  const {
+    store,
+    addExpense,
+    togglePaid,
+    moveOccurrence,
+    moveOccurrenceSeries,
+  } = useExpenseStore();
   const filters = useExpenseFilters(store);
   const quickParser = useQuickExpenseParser();
   const chrome = useScrollChrome();
@@ -72,6 +78,7 @@ export function ExpenseDashboard({
         onTodayVisibilityChange={setTodayInView}
         onTogglePaid={togglePaid}
         onMoveOccurrence={moveOccurrence}
+        onMoveOccurrenceSeries={moveOccurrenceSeries}
       />
 
       <QuickCapture

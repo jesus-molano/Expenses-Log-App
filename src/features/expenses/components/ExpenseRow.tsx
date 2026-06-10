@@ -13,7 +13,8 @@ type ExpenseRowProps = {
   category?: ExpenseCategory;
   today: string;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
-  onMoveOccurrence: (occurrence: ExpenseOccurrence, dueDate: string) => void;
+  onScheduleMove: (occurrence: ExpenseOccurrence, dueDate: string) => void;
+  onLiftChange: (lifted: boolean) => void;
 };
 
 export function ExpenseRow({
@@ -21,7 +22,8 @@ export function ExpenseRow({
   category,
   today,
   onTogglePaid,
-  onMoveOccurrence,
+  onScheduleMove,
+  onLiftChange,
 }: ExpenseRowProps) {
   const router = useRouter();
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,6 +55,7 @@ export function ExpenseRow({
     holdTimer.current = setTimeout(() => {
       const next = { ...dragRef.current, lifted: true };
       setGesture(next);
+      onLiftChange(true);
     }, 420);
   }
 
@@ -92,10 +95,11 @@ export function ExpenseRow({
       const targetDate = target?.dataset.timelineDate;
 
       if (targetDate && targetDate !== occurrence.dueDate) {
-        onMoveOccurrence(occurrence, targetDate);
+        onScheduleMove(occurrence, targetDate);
       }
 
       setGesture({ x: 0, y: 0, active: false, lifted: false });
+      onLiftChange(false);
       return;
     }
 
@@ -106,6 +110,7 @@ export function ExpenseRow({
     }
 
     setGesture({ x: 0, y: 0, active: false, lifted: false });
+    onLiftChange(false);
   }
 
   function cancelGesture(event: PointerEvent<HTMLElement>) {
@@ -114,6 +119,7 @@ export function ExpenseRow({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     setGesture({ x: 0, y: 0, active: false, lifted: false });
+    onLiftChange(false);
   }
 
   return (
