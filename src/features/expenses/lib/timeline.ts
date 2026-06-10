@@ -8,6 +8,7 @@ export type TimelineSection = {
   title: string;
   subtitle: string;
   tone: "critical" | "soon" | "estimated" | "later" | "paid";
+  priority: number;
   total: number;
   items: ExpenseOccurrence[];
 };
@@ -15,14 +16,27 @@ export type TimelineSection = {
 function sectionMeta(
   occurrence: ExpenseOccurrence,
   today: string,
-): Pick<TimelineSection, "id" | "title" | "subtitle" | "tone"> {
+): Pick<TimelineSection, "id" | "title" | "subtitle" | "tone" | "priority"> {
+  const dueDate = parseISO(occurrence.dueDate);
+  const dueDelta = daysBetween(today, occurrence.dueDate);
+
   if (occurrence.status === "paid") {
-    const paidDate = parseISO(occurrence.dueDate);
     return {
       id: `paid-${occurrence.dueDate}`,
-      title: format(paidDate, "EEEE d", { locale: es }),
+      title: format(dueDate, "EEEE d", { locale: es }),
       subtitle: "Pagado",
       tone: "paid",
+      priority: dueDelta < 0 ? 90 : 55,
+    };
+  }
+
+  if (dueDelta < 0) {
+    return {
+      id: "overdue",
+      title: "Atrasado",
+      subtitle: `Desde ${format(dueDate, "EEEE d", { locale: es })}`,
+      tone: "critical",
+      priority: 0,
     };
   }
 
@@ -32,22 +46,12 @@ function sectionMeta(
       title: "Hoy",
       subtitle: "Puede salir de tu cuenta hoy",
       tone: "critical",
+      priority: 10,
     };
   }
 
-  const dueDate = parseISO(occurrence.dueDate);
   const estimatedDate = parseISO(occurrence.estimatedChargeDate);
-  const dueDelta = daysBetween(today, occurrence.dueDate);
   const estimatedDelta = daysBetween(today, occurrence.estimatedChargeDate);
-
-  if (dueDelta < 0) {
-    return {
-      id: "overdue",
-      title: "Atrasado",
-      subtitle: `Desde ${format(dueDate, "EEEE d", { locale: es })}`,
-      tone: "critical",
-    };
-  }
 
   if (
     occurrence.estimatedChargeDate !== occurrence.dueDate &&
@@ -58,6 +62,7 @@ function sectionMeta(
       title: `Estimado ${format(estimatedDate, "EEEE d", { locale: es })}`,
       subtitle: `Vence ${format(dueDate, "EEEE d", { locale: es })}`,
       tone: "estimated",
+      priority: 20,
     };
   }
 
@@ -69,6 +74,7 @@ function sectionMeta(
         : format(dueDate, "EEEE d", { locale: es }),
       subtitle: isWeekend(dueDate) ? "Vence en fin de semana" : "Esta semana",
       tone: "soon",
+      priority: 30,
     };
   }
 
@@ -77,6 +83,7 @@ function sectionMeta(
     title: format(dueDate, "MMMM yyyy", { locale: es }),
     subtitle: "Mas adelante",
     tone: "later",
+    priority: 50,
   };
 }
 
@@ -111,9 +118,7 @@ export function buildTimelineSections(
       ),
     }))
     .sort((a, b) => {
-      const aPaid = a.tone === "paid" ? 1 : 0;
-      const bPaid = b.tone === "paid" ? 1 : 0;
-      if (aPaid !== bPaid) return aPaid - bPaid;
+      if (a.priority !== b.priority) return a.priority - b.priority;
       return a.items[0].estimatedChargeDate.localeCompare(
         b.items[0].estimatedChargeDate,
       );

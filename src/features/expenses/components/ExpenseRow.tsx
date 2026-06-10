@@ -22,7 +22,13 @@ export function ExpenseRow({
   const paid = occurrence.status === "paid";
 
   return (
-    <article className="grid min-h-14 grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border border-white/70 bg-white/58 px-2.5 py-2 shadow-[0_10px_28px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+    <article
+      className={`grid min-h-14 grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border px-2.5 py-2 backdrop-blur-xl ${
+        paid
+          ? "border-white/40 bg-white/32 opacity-70"
+          : "border-white/70 bg-white/58 shadow-[0_10px_28px_rgba(15,23,42,0.06)]"
+      }`}
+    >
       <button
         type="button"
         aria-label={paid ? "Marcar como pendiente" : "Marcar como pagado"}
@@ -40,7 +46,9 @@ export function ExpenseRow({
         <div className="flex min-w-0 items-center gap-2">
           <Link
             href={`/expenses/${occurrence.template.id}`}
-            className="min-w-0 truncate text-[15px] font-semibold text-slate-950"
+            className={`min-w-0 truncate text-[15px] font-semibold ${
+              paid ? "text-slate-500 line-through decoration-slate-400" : "text-slate-950"
+            }`}
           >
             {occurrence.template.name}
           </Link>
@@ -57,7 +65,11 @@ export function ExpenseRow({
       </div>
 
       <div className="shrink-0 text-right">
-        <p className="text-[14px] font-semibold text-slate-950">
+        <p
+          className={`text-[14px] font-semibold ${
+            paid ? "text-slate-500 line-through decoration-slate-400" : "text-slate-950"
+          }`}
+        >
           {formatCurrency(occurrence.template.amount)}
         </p>
         <p
