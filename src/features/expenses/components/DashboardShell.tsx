@@ -30,7 +30,7 @@ export function DashboardShell({
           {activeTab === "expenses" ? (
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-full z-0 h-20 bg-gradient-to-b from-[#020617]/92 via-[#020617]/52 to-transparent backdrop-blur-[2px] lg:hidden"
+              className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[calc(100%+4.25rem)] bg-gradient-to-b from-[#020617]/96 via-[#020617]/86 to-transparent backdrop-blur-[2px] [mask-image:linear-gradient(to_bottom,#000_0%,#000_68%,transparent_100%)] lg:hidden"
             />
           ) : null}
           <section
@@ -91,7 +91,7 @@ export function DashboardShell({
 
         <section
           className={`flex min-w-0 flex-1 flex-col px-3 pb-16 sm:px-6 lg:px-8 lg:py-6 ${
-            activeTab === "expenses" ? "pt-12" : "pt-5"
+            activeTab === "expenses" ? "pt-10" : "pt-5"
           }`}
         >
           {children}
