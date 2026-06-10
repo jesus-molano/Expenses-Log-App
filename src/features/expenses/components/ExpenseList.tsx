@@ -42,18 +42,34 @@ export function ExpenseList({
     dueDate: string;
   } | null>(null);
   const focusIndex = sections.findIndex((section) => section.anchorDate >= today);
-  const monthDaysBySection = useMemo(() => {
-    return new Map(
-      sections.map((section) => {
-        const anchor = parseISO(section.anchorDate);
-        const days = eachDayOfInterval({
-          start: startOfMonth(anchor),
-          end: endOfMonth(anchor),
-        });
+  const schedulingDays = useMemo(() => {
+    const monthKeys = Array.from(
+      new Set(sections.map((section) => section.anchorDate.slice(0, 7))),
+    ).sort();
+    const occurrencesByDate = new Map<string, ExpenseOccurrence[]>();
 
-        return [section.id, days.map((day) => format(day, "yyyy-MM-dd"))];
-      }),
-    );
+    for (const section of sections) {
+      for (const item of section.items) {
+        const items = occurrencesByDate.get(item.dueDate) ?? [];
+        items.push(item);
+        occurrencesByDate.set(item.dueDate, items);
+      }
+    }
+
+    return monthKeys.flatMap((monthKey) => {
+      const month = parseISO(`${monthKey}-01`);
+      return eachDayOfInterval({
+        start: startOfMonth(month),
+        end: endOfMonth(month),
+      }).map((date) => {
+        const dateKey = format(date, "yyyy-MM-dd");
+
+        return {
+          date: dateKey,
+          items: occurrencesByDate.get(dateKey) ?? [],
+        };
+      });
+    });
   }, [sections]);
 
   function closeMoveSheet() {
@@ -120,7 +136,89 @@ export function ExpenseList({
               className="pointer-events-none absolute inset-x-0 -top-10 z-10 h-24 bg-gradient-to-b from-[#020617] via-[#020617]/80 to-transparent lg:-top-16 lg:h-36"
             />
           ) : null}
-          {sections.map((section, index) => {
+          {scheduling ? schedulingDays.map((day) => {
+            const isToday = day.date === today;
+            const isPast = day.date < today;
+
+            return (
+              <article
+                key={day.date}
+                data-section-id={isToday ? "today" : undefined}
+                data-timeline-date={day.date}
+                className={`relative scroll-mt-24 pl-4 transition duration-300 ${
+                  day.items.length ? "opacity-100" : "animate-[fade-in_240ms_ease-out] opacity-80"
+                }`}
+              >
+                <span
+                  className={`absolute left-0 top-1.5 size-2 rounded-full ring-2 ${
+                    isToday
+                      ? "bg-cyan-200 text-cyan-200 shadow-[0_0_18px_currentColor] ring-cyan-200/30"
+                      : day.items.length
+                        ? "bg-white/55 ring-white/15"
+                        : "bg-white/18 ring-white/8"
+                  }`}
+                />
+                <span className="absolute bottom-[-1.25rem] left-[3px] top-5 w-px bg-white/12" />
+                {isToday ? (
+                  <div className="absolute -left-2 -top-2 bottom-[-1.25rem] w-[3px] rounded-full bg-cyan-200 shadow-[0_0_24px_rgba(103,232,249,0.9)]" />
+                ) : null}
+
+                <header
+                  className={`mb-1.5 flex items-end justify-between gap-3 ${
+                    isPast ? "opacity-60" : ""
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <h2
+                      className={`truncate font-semibold capitalize leading-tight text-white ${
+                        isToday ? "text-[19px]" : "text-[15px]"
+                      }`}
+                    >
+                      {isToday ? "Hoy" : format(parseISO(day.date), "EEEE d", { locale: es })}
+                    </h2>
+                    <p className="mt-0.5 text-xs text-slate-300">
+                      {day.items.length ? "Con gastos" : "Disponible"}
+                    </p>
+                  </div>
+                  {day.items.length ? (
+                    <p className="shrink-0 text-sm font-semibold text-white">
+                      {formatCurrency(
+                        day.items.reduce(
+                          (sum, item) =>
+                            sum +
+                            (item.status === "paid" ? 0 : item.template.amount),
+                          0,
+                        ),
+                      )}
+                    </p>
+                  ) : null}
+                </header>
+
+                <div className="space-y-1.5">
+                  {day.items.length ? (
+                    day.items.map((occurrence) => (
+                      <ExpenseRow
+                        key={occurrence.id}
+                        occurrence={occurrence}
+                        category={categories.find(
+                          (category) =>
+                            category.id === occurrence.template.categoryId,
+                        )}
+                        today={today}
+                        onTogglePaid={onTogglePaid}
+                        onScheduleMove={(occurrence, dueDate) =>
+                          setPendingMove({ occurrence, dueDate })
+                        }
+                        onLiftChange={setScheduling}
+                      />
+                    ))
+                  ) : (
+                    <div className="h-8 rounded-2xl border border-dashed border-white/10 bg-white/[0.018]" />
+                  )}
+                </div>
+              </article>
+            );
+          }) : sections.map((section, index) => {
             const shouldAnchorFocus = index === focusIndex;
 
             return (
@@ -165,40 +263,6 @@ export function ExpenseList({
                   </p>
                 ) : null}
               </header>
-
-              {scheduling ? (
-                <div className="mb-2 space-y-1.5 rounded-2xl border border-white/10 bg-slate-950/72 px-2 py-2 shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-                  {monthDaysBySection.get(section.id)?.map((day) => {
-                    const date = parseISO(day);
-                    const isToday = day === today;
-                    const hasItems = section.items.some((item) => item.dueDate === day);
-
-                    return (
-                      <div
-                        key={day}
-                        data-timeline-date={day}
-                        className={`relative ml-1 flex h-9 items-center justify-between rounded-xl px-3 text-[12px] font-semibold ring-1 transition ${
-                          isToday
-                            ? "bg-cyan-300/16 text-white ring-cyan-200/40"
-                            : hasItems
-                              ? "bg-white/10 text-white ring-white/15"
-                              : "bg-white/[0.025] text-slate-300 ring-white/8"
-                        }`}
-                      >
-                        <span className="absolute -left-[13px] top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-white/30" />
-                        <span className="capitalize">
-                          {format(date, "EEE d", { locale: es })}
-                        </span>
-                        {hasItems ? (
-                          <span className="text-[11px] font-medium text-slate-400">
-                            ocupado
-                          </span>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
 
               <div
                 className={`space-y-1.5 transition ${
