@@ -60,7 +60,6 @@ export function ExpenseDashboard({
       nextLabel={nextLabel}
       userEmail={userEmail}
       isCloudReady={isCloudReady}
-      onNewExpense={openEmptySheet}
     >
       <ExpenseList
         sections={filters.timelineSections}

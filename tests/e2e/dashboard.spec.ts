@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("creates and pays a parsed recurring expense", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
+  await expect(page.getByText("Este mes")).toBeVisible();
   await page
     .getByPlaceholder("Netflix 15,99 mensual dia 12")
     .fill("Spotify 10,99 mensual el dia 12 musica");
