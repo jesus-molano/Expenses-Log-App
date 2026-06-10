@@ -30,6 +30,7 @@ export type RecurrenceRule = {
   interval?: number;
   unit?: CustomRecurrenceUnit;
   rrule?: string;
+  annualMonth?: number;
 };
 
 export type ExpenseTemplate = {
@@ -84,8 +85,58 @@ export type DraftExpense = {
   recurrence: RecurrenceRule;
 };
 
+export type IncomeSource = {
+  id: string;
+  userId: string;
+  name: string;
+  amount: number;
+  currency: "EUR";
+  dayOfMonth: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type IncomeEvent = {
+  id: string;
+  userId: string;
+  name: string;
+  amount: number;
+  currency: "EUR";
+  receivedAt: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AllocationSettings = {
+  sabadellAccountName: string;
+  bbvaSavingsAccountName: string;
+  bbvaMainAccountName: string;
+  monthlySavingsTarget: number;
+};
+
+export type FinanceStore = {
+  incomeSources: IncomeSource[];
+  incomeEvents: IncomeEvent[];
+  allocation: AllocationSettings;
+};
+
+export type MonthlyMoneyPlan = {
+  month: string;
+  incomeTotal: number;
+  recurringIncomeTotal: number;
+  extraIncomeTotal: number;
+  fixedExpensesTotal: number;
+  sabadellContribution: number;
+  bbvaSavingsContribution: number;
+  bbvaMainContribution: number;
+  shortfall: number;
+};
+
 export type ExpenseStore = {
   categories: ExpenseCategory[];
   templates: ExpenseTemplate[];
   overrides: ExpenseOccurrenceOverride[];
+  finance: FinanceStore;
 };

@@ -17,7 +17,7 @@ export const timelineHorizons: Record<TimelineHorizon, HorizonDefinition> = {
     icon: Sparkles,
   },
   week: {
-    label: "7 dias",
+    label: "7 días",
     description: "Esta semana",
     icon: Clock3,
   },

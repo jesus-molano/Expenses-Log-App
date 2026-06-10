@@ -88,9 +88,9 @@ export function statusLabel(occurrence: ExpenseOccurrence, today: string): strin
 
   const delta = daysBetween(today, occurrence.dueDate);
   if (delta === 0) return "vence hoy";
-  if (delta < 0) return `hace ${Math.abs(delta)} dias`;
+  if (delta < 0) return `hace ${Math.abs(delta)} días`;
   if (occurrence.estimatedChargeDate !== occurrence.dueDate) {
     return occurrence.estimatedChargeLabel;
   }
-  return `en ${delta} dias`;
+  return `en ${delta} días`;
 }

@@ -1,6 +1,23 @@
 "use client";
 
 import {
+  DndContext,
+  DragEndEvent,
+  DragMoveEvent,
+  DragOverlay,
+  DragStartEvent,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  pointerWithin,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import {
   eachDayOfInterval,
   endOfMonth,
   format,
@@ -51,8 +68,27 @@ export function ExpenseList({
     occurrence: ExpenseOccurrence;
     dueDate: string;
   } | null>(null);
+  const [activeOccurrence, setActiveOccurrence] =
+    useState<ExpenseOccurrence | null>(null);
   const focusIndex = sections.findIndex((section) => section.anchorDate >= today);
   const currentMonth = today.slice(0, 7);
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        delay: 220,
+        tolerance: 6,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 260,
+        tolerance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   function closeMoveSheet() {
     setPendingMove(null);
@@ -84,24 +120,108 @@ export function ExpenseList({
     setPendingMove({ occurrence, dueDate });
   }
 
+  function handleDragStart(event: DragStartEvent) {
+    const occurrence = event.active.data.current?.occurrence as
+      | ExpenseOccurrence
+      | undefined;
+    if (!occurrence) return;
+
+    document.documentElement.classList.add("is-dragging-expense");
+    setActiveOccurrence(occurrence);
+    setDraggedOccurrence(occurrence);
+  }
+
+  function targetFromEvent(event: DragMoveEvent | DragEndEvent): DropTarget | null {
+    const over = event.over;
+    if (!over?.data.current) return null;
+
+    const data = over.data.current as {
+      date?: string;
+      rowId?: string;
+      type?: string;
+    };
+    if (!data.date) return null;
+
+    const overRect = over.rect;
+    const activeTop = event.active.rect.current.translated?.top;
+    const activeHeight = event.active.rect.current.translated?.height ?? 0;
+    const activeCenter = activeTop === undefined
+      ? overRect.top
+      : activeTop + activeHeight / 2;
+
+    return {
+      date: data.date,
+      rowId: data.rowId,
+      position: activeCenter < overRect.top + overRect.height / 2
+        ? "before"
+        : "after",
+    };
+  }
+
+  function handleDragMove(event: DragMoveEvent) {
+    setActiveDropTarget(targetFromEvent(event));
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const target = targetFromEvent(event);
+    const occurrence = activeOccurrence;
+
+    document.documentElement.classList.remove("is-dragging-expense");
+    setActiveOccurrence(null);
+    setDraggedOccurrence(null);
+    setActiveDropTarget(null);
+
+    if (!occurrence || !target) return;
+    if (target.date !== occurrence.dueDate || target.rowId) {
+      scheduleMove(occurrence, target.date, target);
+    }
+  }
+
+  function handleDragCancel() {
+    document.documentElement.classList.remove("is-dragging-expense");
+    setActiveOccurrence(null);
+    setDraggedOccurrence(null);
+    setActiveDropTarget(null);
+  }
+
   useEffect(() => {
     if (didFocusTimeline.current || !focusRef.current) return;
     didFocusTimeline.current = true;
 
     window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
       if (!focusRef.current) return;
 
-      const headerOffset = 170;
+      const chromeRect = document
+        .querySelector<HTMLElement>("[data-app-chrome]")
+        ?.getBoundingClientRect();
+      const desiredTop = Math.max((chromeRect?.bottom ?? 0) + 72, 220);
       const targetTop =
         focusRef.current.getBoundingClientRect().top +
         window.scrollY -
-        headerOffset;
+        desiredTop;
+      const maxScroll =
+        document.documentElement.scrollHeight - window.innerHeight;
 
-      window.scrollTo({ top: Math.max(0, targetTop), behavior: "auto" });
+      if (maxScroll <= 0) return;
+
+      window.scrollTo({
+        top: Math.max(0, Math.min(targetTop, maxScroll)),
+        behavior: "auto",
+      });
+      });
     });
   }, [sections]);
 
   return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={pointerWithin}
+      onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
     <section>
       {sections.length ? (
         <div className="relative space-y-5 pb-8">
@@ -191,7 +311,7 @@ export function ExpenseList({
                               activeDropTarget?.date === day &&
                               !activeDropTarget.rowId
                             }
-                            label="Soltar aqui"
+                            label="Soltar aquí"
                           />
                         ))
                       : null}
@@ -205,17 +325,12 @@ export function ExpenseList({
                         )}
                         today={today}
                         onTogglePaid={onTogglePaid}
-                        onScheduleMove={scheduleMove}
-                        onDropTargetChange={setActiveDropTarget}
                         dropPosition={
                           activeDropTarget?.rowId === occurrence.id
                             ? activeDropTarget.position
                             : null
                         }
-                        onLiftChange={(lifted, occurrence) => {
-                          setDraggedOccurrence(lifted ? occurrence : null)
-                          if (!lifted) setActiveDropTarget(null);
-                        }}
+                        dragging={activeOccurrence?.id === occurrence.id}
                       />
                     ))}
                     {expandSection
@@ -227,7 +342,7 @@ export function ExpenseList({
                               activeDropTarget?.date === day &&
                               !activeDropTarget.rowId
                             }
-                            label="Soltar aqui"
+                            label="Soltar aquí"
                           />
                         ))
                       : null}
@@ -259,7 +374,7 @@ export function ExpenseList({
             {format(parseISO(pendingMove.dueDate), "d MMMM", { locale: es })}
           </p>
           <p className="mt-1 text-xs text-slate-300">
-            Se ha aplicado como cambio puntual. Puedes actualizar tambien el loop.
+            Se ha aplicado como cambio puntual. Puedes actualizar también el loop.
           </p>
           <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
             <button
@@ -280,6 +395,19 @@ export function ExpenseList({
         </div>
       ) : null}
     </section>
+    <DragOverlay dropAnimation={null}>
+      {activeOccurrence ? (
+        <div className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-lime-200/50 bg-slate-900/95 px-3 py-2.5 text-white shadow-[0_0_46px_rgba(132,204,22,0.36),0_26px_70px_rgba(0,0,0,0.58)]">
+          <p className="truncate text-[15px] font-semibold">
+            {activeOccurrence.template.name}
+          </p>
+          <p className="text-[14px] font-semibold">
+            {formatCurrency(activeOccurrence.template.amount)}
+          </p>
+        </div>
+      ) : null}
+    </DragOverlay>
+    </DndContext>
   );
 }
 
@@ -292,8 +420,14 @@ function EmptyDayTarget({
   active: boolean;
   label: string;
 }) {
+  const { setNodeRef } = useDroppable({
+    id: `day:${date}`,
+    data: { date, type: "day" },
+  });
+
   return (
     <div
+      ref={setNodeRef}
       data-timeline-date={date}
       className={`relative animate-[fade-in_220ms_ease-out] rounded-2xl border px-3 py-2 text-xs font-medium transition ${
         active

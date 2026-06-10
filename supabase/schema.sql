@@ -11,6 +11,7 @@ create table if not exists public.profiles (
 
 create table if not exists public.expense_categories (
   id uuid primary key default gen_random_uuid(),
+  external_id text,
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
   icon text not null default 'WalletCards',
@@ -21,8 +22,12 @@ create table if not exists public.expense_categories (
 create unique index if not exists expense_categories_user_name_idx
   on public.expense_categories (user_id, lower(name));
 
+alter table public.expense_categories
+  add column if not exists external_id text;
+
 create table if not exists public.expense_templates (
   id uuid primary key default gen_random_uuid(),
+  external_id text,
   user_id uuid not null references auth.users(id) on delete cascade,
   category_id uuid references public.expense_categories(id) on delete set null,
   name text not null,
@@ -38,8 +43,12 @@ create table if not exists public.expense_templates (
   updated_at timestamptz not null default now()
 );
 
+alter table public.expense_templates
+  add column if not exists external_id text;
+
 create table if not exists public.expense_occurrence_overrides (
   id uuid primary key default gen_random_uuid(),
+  external_id text,
   user_id uuid not null references auth.users(id) on delete cascade,
   template_id uuid not null references public.expense_templates(id) on delete cascade,
   occurrence_date date not null,
@@ -54,6 +63,9 @@ create table if not exists public.expense_occurrence_overrides (
   unique (template_id, occurrence_date)
 );
 
+alter table public.expense_occurrence_overrides
+  add column if not exists external_id text;
+
 create table if not exists public.push_subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -64,11 +76,19 @@ create table if not exists public.push_subscriptions (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.app_stores (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  store jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table public.profiles enable row level security;
 alter table public.expense_categories enable row level security;
 alter table public.expense_templates enable row level security;
 alter table public.expense_occurrence_overrides enable row level security;
 alter table public.push_subscriptions enable row level security;
+alter table public.app_stores enable row level security;
 
 create policy "profiles own rows" on public.profiles
   for all using (auth.uid() = id) with check (auth.uid() = id);
@@ -83,4 +103,7 @@ create policy "overrides own rows" on public.expense_occurrence_overrides
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "push own rows" on public.push_subscriptions
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "app stores own rows" on public.app_stores
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

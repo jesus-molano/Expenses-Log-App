@@ -34,7 +34,7 @@ export function QuickCapture({
         <input
           value={value}
           onChange={(event) => onValueChange(event.target.value)}
-          placeholder="Netflix 15,99 mensual dia 12"
+          placeholder="Netflix 15,99 mensual día 12"
           className="h-12 min-w-0 flex-1 bg-transparent text-[15px] text-white outline-none placeholder:text-slate-500"
         />
       </div>

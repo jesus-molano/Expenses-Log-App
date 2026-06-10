@@ -42,6 +42,36 @@ describe("recurrence", () => {
     ).toEqual(["2026-01-12", "2026-04-12", "2026-07-12", "2026-10-12"]);
   });
 
+  it("generates annual occurrences on the configured month and day", () => {
+    expect(
+      generateTemplateDates(
+        {
+          ...baseTemplate,
+          startDate: "2026-05-18",
+          dueDay: 18,
+          recurrence: { frequency: "yearly", annualMonth: 5 },
+        },
+        "2026-01-01",
+        "2026-12-31",
+      ),
+    ).toEqual(["2026-05-18"]);
+  });
+
+  it("clips annual due day to the configured month end", () => {
+    expect(
+      generateTemplateDates(
+        {
+          ...baseTemplate,
+          startDate: "2026-02-01",
+          dueDay: 31,
+          recurrence: { frequency: "yearly", annualMonth: 2 },
+        },
+        "2026-01-01",
+        "2026-12-31",
+      ),
+    ).toEqual(["2026-02-28"]);
+  });
+
   it("moves weekend estimates to Monday", () => {
     expect(estimateChargeDate("2026-06-13")).toMatchObject({
       date: "2026-06-15",

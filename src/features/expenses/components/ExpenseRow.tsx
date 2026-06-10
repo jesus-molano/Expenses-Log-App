@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type PointerEvent, useRef, useState } from "react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { Pencil, RotateCcw } from "lucide-react";
 import { formatCurrency } from "@/domain/calendar";
 import type { ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
@@ -13,16 +14,8 @@ type ExpenseRowProps = {
   category?: ExpenseCategory;
   today: string;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
-  onScheduleMove: (
-    occurrence: ExpenseOccurrence,
-    dueDate: string,
-    target?: { date: string; position: "before" | "after"; rowId?: string } | null,
-  ) => void;
-  onDropTargetChange: (
-    target: { date: string; position: "before" | "after"; rowId?: string } | null,
-  ) => void;
   dropPosition?: "before" | "after" | null;
-  onLiftChange: (lifted: boolean, occurrence: ExpenseOccurrence) => void;
+  dragging?: boolean;
 };
 
 export function ExpenseRow({
@@ -30,25 +23,38 @@ export function ExpenseRow({
   category,
   today,
   onTogglePaid,
-  onScheduleMove,
-  onDropTargetChange,
   dropPosition = null,
-  onLiftChange,
+  dragging = false,
 }: ExpenseRowProps) {
   const router = useRouter();
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const origin = useRef({ x: 0, y: 0 });
-  const liftOffset = useRef({ x: 0, y: 0 });
-  const dragRef = useRef({ x: 0, y: 0, active: false, lifted: false });
-  const [drag, setDrag] = useState({ x: 0, y: 0, active: false, lifted: false });
+  const dragRef = useRef({ x: 0, active: false, blocked: false });
+  const [drag, setDrag] = useState({ x: 0, active: false, blocked: false });
+  const { setNodeRef: setDropRef } = useDroppable({
+    id: `row:${occurrence.id}`,
+    data: {
+      date: occurrence.dueDate,
+      rowId: occurrence.id,
+      type: "row",
+    },
+  });
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    transform,
+    isDragging,
+  } = useDraggable({
+    id: occurrence.id,
+    data: { occurrence },
+  });
   const paid = occurrence.status === "paid";
-  const swipingLeft = drag.x < -28 && !drag.lifted;
-  const swipingRight = drag.x > 28 && !drag.lifted;
+  const swipingLeft = drag.x < -28;
+  const swipingRight = drag.x > 28;
 
-  function clearHoldTimer() {
-    if (!holdTimer.current) return;
-    clearTimeout(holdTimer.current);
-    holdTimer.current = null;
+  function setRefs(node: HTMLDivElement | null) {
+    setDropRef(node);
+    setDragRef(node);
   }
 
   function setGesture(next: typeof drag) {
@@ -59,103 +65,32 @@ export function ExpenseRow({
   function startGesture(event: PointerEvent<HTMLElement>) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
 
-    const targetElement = event.currentTarget;
     origin.current = { x: event.clientX, y: event.clientY };
-    setGesture({ x: 0, y: 0, active: true, lifted: false });
-    targetElement.setPointerCapture(event.pointerId);
-
-    holdTimer.current = setTimeout(() => {
-      const rect = targetElement.getBoundingClientRect();
-      liftOffset.current = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      };
-      const next = { ...dragRef.current, lifted: true };
-      setGesture(next);
-      onLiftChange(true, occurrence);
-    }, 420);
+    setGesture({ x: 0, active: true, blocked: false });
   }
 
   function updateGesture(event: PointerEvent<HTMLElement>) {
+    if (isDragging || dragging) return;
     const current = dragRef.current;
     if (!current.active) return;
 
     const x = event.clientX - origin.current.x;
     const y = event.clientY - origin.current.y;
 
-    if (!current.lifted && Math.abs(y) > 14 && Math.abs(y) > Math.abs(x)) {
-      clearHoldTimer();
-      setGesture({ x: 0, y: 0, active: false, lifted: false });
+    if (Math.abs(y) > 12 && Math.abs(y) > Math.abs(x)) {
+      setGesture({ x: 0, active: false, blocked: true });
       return;
-    }
-
-    if (Math.abs(x) > 10 || Math.abs(y) > 10) clearHoldTimer();
-
-    if (current.lifted) {
-      if (event.clientY < 132) {
-        window.scrollBy({ top: -18, behavior: "smooth" });
-      } else if (event.clientY > window.innerHeight - 132) {
-        window.scrollBy({ top: 18, behavior: "smooth" });
-      }
-
-      const target = document
-        .elementFromPoint(event.clientX, event.clientY)
-        ?.closest<HTMLElement>("[data-timeline-date]");
-      if (target?.dataset.timelineDate) {
-        const rect = target.getBoundingClientRect();
-        onDropTargetChange({
-          date: target.dataset.timelineDate,
-          position: event.clientY < rect.top + rect.height / 2 ? "before" : "after",
-          rowId: target.dataset.expenseRowId,
-        });
-      } else {
-        onDropTargetChange(null);
-      }
     }
 
     setGesture({
       ...current,
-      x: current.lifted ? x - liftOffset.current.x + 36 : Math.max(-108, Math.min(108, x)),
-      y: current.lifted ? y - liftOffset.current.y + 24 : 0,
+      x: Math.max(-108, Math.min(108, x)),
     });
   }
 
-  function finishGesture(event: PointerEvent<HTMLElement>) {
+  function finishGesture() {
     const current = dragRef.current;
     if (!current.active) return;
-
-    clearHoldTimer();
-    event.currentTarget.releasePointerCapture(event.pointerId);
-
-    if (current.lifted) {
-      const target = document
-        .elementFromPoint(event.clientX, event.clientY)
-        ?.closest<HTMLElement>("[data-timeline-date]");
-      const targetDate = target?.dataset.timelineDate;
-      const targetRect = target?.getBoundingClientRect();
-      const dropTarget =
-        targetDate && targetRect
-          ? {
-              date: targetDate,
-              position:
-                event.clientY < targetRect.top + targetRect.height / 2
-                  ? ("before" as const)
-                  : ("after" as const),
-              rowId: target.dataset.expenseRowId,
-            }
-          : null;
-
-      if (targetDate && targetDate !== occurrence.dueDate) {
-        onScheduleMove(occurrence, targetDate, dropTarget);
-      } else if (targetDate && dropTarget?.rowId) {
-        onScheduleMove(occurrence, targetDate, dropTarget);
-      }
-
-      setGesture({ x: 0, y: 0, active: false, lifted: false });
-      onLiftChange(false, occurrence);
-      onDropTargetChange(null);
-      return;
-    }
 
     if (current.x < -72) {
       onTogglePaid(occurrence);
@@ -163,28 +98,25 @@ export function ExpenseRow({
       router.push(`/expenses/${occurrence.template.id}`);
     }
 
-    setGesture({ x: 0, y: 0, active: false, lifted: false });
-    onLiftChange(false, occurrence);
-    onDropTargetChange(null);
+    setGesture({ x: 0, active: false, blocked: false });
   }
 
-  function cancelGesture(event: PointerEvent<HTMLElement>) {
-    clearHoldTimer();
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    setGesture({ x: 0, y: 0, active: false, lifted: false });
-    onLiftChange(false, occurrence);
-    onDropTargetChange(null);
+  function cancelGesture() {
+    setGesture({ x: 0, active: false, blocked: false });
   }
+
+  const dragTransform = transform ? CSS.Translate.toString(transform) : null;
 
   return (
     <div
+      ref={setRefs}
+      {...attributes}
+      {...listeners}
       data-timeline-date={occurrence.dueDate}
       data-expense-row="true"
       data-expense-row-id={occurrence.id}
       className={`relative overflow-visible rounded-2xl ${
-        drag.lifted ? "pointer-events-none z-30" : ""
+        isDragging || dragging ? "z-30 opacity-45" : ""
       }`}
     >
       {dropPosition === "before" ? (
@@ -212,13 +144,11 @@ export function ExpenseRow({
         onPointerUp={finishGesture}
         onPointerCancel={cancelGesture}
         style={{
-          transform: `translate3d(${drag.x}px, ${drag.y}px, 0) scale(${
-            drag.lifted ? 1.035 : 1
-          })`,
+          transform: dragTransform ?? `translate3d(${drag.x}px, 0, 0)`,
         }}
         className={`grid min-h-14 touch-pan-y select-none grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border px-3 py-2.5 backdrop-blur-xl transition-[border-radius,box-shadow,opacity,transform,background] duration-200 ease-out ${
-          drag.lifted
-            ? "pointer-events-none border-lime-200/50 bg-slate-900/95 shadow-[0_0_46px_rgba(132,204,22,0.36),0_26px_70px_rgba(0,0,0,0.58)]"
+          isDragging || dragging
+            ? "border-lime-200/50 bg-slate-900/95 shadow-[0_0_46px_rgba(132,204,22,0.36),0_26px_70px_rgba(0,0,0,0.58)]"
             : swipingLeft || swipingRight
               ? "border-white/20 bg-slate-800 shadow-[0_16px_40px_rgba(0,0,0,0.36)] ring-1 ring-white/10"
             : paid
@@ -228,8 +158,7 @@ export function ExpenseRow({
       >
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <Link
-              href={`/expenses/${occurrence.template.id}`}
+            <span
               className={`min-w-0 truncate text-[15px] font-semibold ${
                 paid
                   ? "text-slate-300 line-through decoration-slate-400"
@@ -237,7 +166,7 @@ export function ExpenseRow({
               }`}
             >
               {occurrence.template.name}
-            </Link>
+            </span>
             {category ? (
               <span
                 className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${categoryToneClass(

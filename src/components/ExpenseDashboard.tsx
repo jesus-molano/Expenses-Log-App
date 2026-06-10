@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { formatShortDate } from "@/domain/calendar";
 import type { DraftExpense } from "@/domain/types";
 import { createEmptyDraft } from "@/features/expenses/lib/dashboard-config";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
@@ -56,17 +55,11 @@ export function ExpenseDashboard({
     setSheetOpen(false);
   }
 
-  const nextLabel = filters.nextOccurrence
-    ? `${filters.nextOccurrence.template.name} - ${formatShortDate(
-        filters.nextOccurrence.estimatedChargeDate,
-      )}`
-    : "Sin cobros pendientes";
-
   return (
     <DashboardShell
-      pendingTotalLabel={filters.pendingTotalLabel}
-      nextLabel={nextLabel}
-      compact={chrome.compactHeader}
+      headlineLabel={filters.pendingTotalLabel}
+      headlineTitle="Por pagar"
+      activeTab="expenses"
       userEmail={userEmail}
       isCloudReady={isCloudReady}
     >

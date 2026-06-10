@@ -69,7 +69,7 @@ function sectionMeta(
   return {
     id: `future-${occurrence.dueDate}`,
     title: isSameDay(dueDate, addDays(parseISO(today), 1))
-      ? "Manana"
+      ? "Mañana"
       : format(dueDate, "EEEE d", { locale: es }),
     subtitle: isWeekend(dueDate) ? "Vence en fin de semana" : "Pendiente",
     tone: dueDelta <= 7 ? "soon" : "later",

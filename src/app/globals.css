@@ -44,6 +44,13 @@ textarea {
   -webkit-tap-highlight-color: transparent;
 }
 
+.is-dragging-expense,
+.is-dragging-expense * {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .input-control {
   height: 3rem;
   border-radius: 1rem;

@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-async function swipeLeftFromLink(page: import("@playwright/test").Page, name: string) {
-  const link = page.getByRole("link", { name }).first();
-  await link.scrollIntoViewIfNeeded();
-  const box = await link.boundingBox();
+async function swipeLeftFromRow(page: import("@playwright/test").Page, name: string) {
+  const row = page.locator('[data-expense-row="true"]').filter({ hasText: name }).first();
+  await row.scrollIntoViewIfNeeded();
+  const box = await row.boundingBox();
   expect(box).not.toBeNull();
 
   const y = box!.y + box!.height / 2;
@@ -19,15 +19,17 @@ test("creates and pays a parsed recurring expense", async ({ page }) => {
 
   await expect(page.getByText("Por pagar")).toBeVisible();
   await page
-    .getByPlaceholder("Netflix 15,99 mensual dia 12")
+    .getByPlaceholder("Netflix 15,99 mensual día 12")
     .fill("Spotify 10,99 mensual el dia 12 musica");
   await page.getByRole("button", { name: "Analizar texto" }).click();
 
   await expect(page.getByRole("heading", { name: "Nuevo gasto" })).toBeVisible();
   await page.getByRole("button", { name: "Guardar gasto" }).click();
 
-  await expect(page.getByRole("link", { name: "Spotify el musica" }).first()).toBeVisible();
-  await swipeLeftFromLink(page, "Spotify el musica");
+  await expect(
+    page.locator('[data-expense-row="true"]').filter({ hasText: "Spotify el musica" }).first(),
+  ).toBeVisible();
+  await swipeLeftFromRow(page, "Spotify el musica");
   await expect(page.getByText("pagado").first()).toBeVisible();
 });
 
@@ -35,7 +37,19 @@ test("marks an overdue expense as paid with a left swipe", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByText("Atrasado")).toBeVisible();
-  await swipeLeftFromLink(page, "Movistar");
+  await swipeLeftFromRow(page, "Movistar");
 
   await expect(page.getByText("Pagado").first()).toBeVisible();
+});
+
+test("opens money plan and configuration sheet", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("link", { name: "Dinero" }).click();
+  await expect(page).toHaveURL(/\/money$/);
+  await expect(page.getByText("Reparto del mes")).toBeVisible();
+  await expect(page.getByText("Ingreso puntual")).toBeVisible();
+
+  await page.getByRole("button", { name: "Configurar" }).click();
+  await expect(page.getByRole("heading", { name: "Configurar dinero" })).toBeVisible();
 });

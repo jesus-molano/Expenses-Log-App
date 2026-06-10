@@ -13,6 +13,7 @@ export const draftExpenseSchema = z.object({
     interval: z.number().int().positive().optional(),
     unit: z.enum(["day", "week", "month", "year"]).optional(),
     rrule: z.string().optional(),
+    annualMonth: z.number().int().min(1).max(12).optional(),
   }),
 });
 
@@ -21,11 +22,11 @@ export const parseExpensesResponseSchema = z.object({
 });
 
 const categoryHints: Array<[string, string, string[]]> = [
-  ["Vivienda", "Casa", ["alquiler", "hipoteca", "comunidad", "luz", "agua"]],
-  ["Suscripciones", "Sub", ["netflix", "spotify", "icloud", "prime", "hbo"]],
-  ["Transporte", "Coche", ["gasolina", "parking", "seguro", "bono", "bus"]],
+  ["Casa", "Casa", ["alquiler", "hipoteca", "comunidad", "luz", "agua", "compra", "gatos"]],
+  ["Suscripciones", "Suscripciones", ["netflix", "spotify", "icloud", "prime", "hbo"]],
+  ["Transporte", "Transporte", ["gasolina", "parking", "seguro", "bono", "bus", "coche"]],
   ["Salud", "Salud", ["seguro medico", "farmacia", "dentista", "gimnasio"]],
-  ["Servicios", "Servicio", ["internet", "movil", "telefono", "fibra"]],
+  ["Servicios", "Servicios", ["internet", "móvil", "movil", "telefono", "fibra"]],
 ];
 
 function detectRecurrence(text: string): RecurrenceRule {
@@ -35,7 +36,9 @@ function detectRecurrence(text: string): RecurrenceRule {
   if (/anual|ano|año|yearly/i.test(text)) {
     return { frequency: "yearly" };
   }
-  const customMatch = text.match(/cada\s+(\d+)\s+(dia|dias|día|días|semana|semanas|mes|meses)/i);
+  const customMatch = text.match(
+    /cada\s+(\d+)\s+(dia|dias|día|días|semana|semanas|mes|meses)/i,
+  );
   if (customMatch) {
     const unitToken = customMatch[2].toLowerCase();
     const unit = unitToken.startsWith("sem")

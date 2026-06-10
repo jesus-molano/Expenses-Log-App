@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { toDateOnly } from "@/domain/calendar";
+import {
+  createIncomeEvent,
+  updateSalarySource,
+} from "@/domain/finance";
 import { demoStore } from "@/domain/seed";
 import type { DraftExpense, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
 import { loadExpenseStore, saveExpenseStore } from "@/lib/local-store";
@@ -123,6 +127,73 @@ export function useExpenseStore() {
     });
   }
 
+  function updateSalary(amount: number, dayOfMonth: number) {
+    persist({
+      ...store,
+      finance: {
+        ...store.finance,
+        incomeSources: updateSalarySource(
+          store.finance.incomeSources,
+          amount,
+          dayOfMonth,
+        ),
+      },
+    });
+  }
+
+  function updateSavingsTarget(amount: number) {
+    persist({
+      ...store,
+      finance: {
+        ...store.finance,
+        allocation: {
+          ...store.finance.allocation,
+          monthlySavingsTarget: Math.max(Number(amount), 0),
+        },
+      },
+    });
+  }
+
+  function updateAllocationNames(input: {
+    sabadellAccountName: string;
+    bbvaSavingsAccountName: string;
+    bbvaMainAccountName: string;
+  }) {
+    persist({
+      ...store,
+      finance: {
+        ...store.finance,
+        allocation: {
+          ...store.finance.allocation,
+          sabadellAccountName:
+            input.sabadellAccountName.trim() || "Sabadell gastos",
+          bbvaSavingsAccountName:
+            input.bbvaSavingsAccountName.trim() || "BBVA ahorro",
+          bbvaMainAccountName:
+            input.bbvaMainAccountName.trim() || "BBVA principal",
+        },
+      },
+    });
+  }
+
+  function addIncomeEvent(input: {
+    name: string;
+    amount: number;
+    receivedAt: string;
+    note?: string;
+  }) {
+    persist({
+      ...store,
+      finance: {
+        ...store.finance,
+        incomeEvents: [
+          createIncomeEvent(input),
+          ...store.finance.incomeEvents,
+        ],
+      },
+    });
+  }
+
   return {
     store,
     persist,
@@ -130,5 +201,9 @@ export function useExpenseStore() {
     togglePaid,
     moveOccurrence,
     moveOccurrenceSeries,
+    updateSalary,
+    updateSavingsTarget,
+    updateAllocationNames,
+    addIncomeEvent,
   };
 }

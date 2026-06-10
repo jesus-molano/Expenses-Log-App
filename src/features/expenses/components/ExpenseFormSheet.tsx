@@ -38,7 +38,7 @@ export function ExpenseFormSheet({
             <div className="min-w-0">
             <h2 className="text-lg font-semibold text-white">Nuevo gasto</h2>
               <p className="truncate text-sm text-slate-300">
-                Revisa importe, dia y repeticion.
+                Revisa importe, día y repetición.
               </p>
             </div>
             <button
@@ -61,7 +61,7 @@ export function ExpenseFormSheet({
             />
           </Field>
 
-          <Field label="Descripcion">
+          <Field label="Descripción">
             <textarea
               value={form.description}
               onChange={(event) =>
@@ -113,7 +113,7 @@ export function ExpenseFormSheet({
               />
             </Field>
 
-            <Field label="Repeticion">
+            <Field label="Repetición">
               <select
                 value={form.recurrence.frequency}
                 onChange={(event) => {
@@ -123,6 +123,13 @@ export function ExpenseFormSheet({
                     recurrence:
                       frequency === "custom"
                         ? { frequency, interval: 2, unit: "month" }
+                        : frequency === "yearly"
+                          ? {
+                              frequency,
+                              annualMonth:
+                                form.recurrence.annualMonth ??
+                                new Date().getMonth() + 1,
+                            }
                         : { frequency },
                   });
                 }}
@@ -172,10 +179,47 @@ export function ExpenseFormSheet({
                   <option value="day">Dias</option>
                   <option value="week">Semanas</option>
                   <option value="month">Meses</option>
-                  <option value="year">Anos</option>
+                  <option value="year">Años</option>
                 </select>
               </Field>
             </div>
+          ) : null}
+
+          {form.recurrence.frequency === "yearly" ? (
+            <Field label="Mes anual">
+              <select
+                value={form.recurrence.annualMonth ?? new Date().getMonth() + 1}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    recurrence: {
+                      ...form.recurrence,
+                      annualMonth: Number(event.target.value),
+                    },
+                  })
+                }
+                className="input-control"
+              >
+                {[
+                  "Enero",
+                  "Febrero",
+                  "Marzo",
+                  "Abril",
+                  "Mayo",
+                  "Junio",
+                  "Julio",
+                  "Agosto",
+                  "Septiembre",
+                  "Octubre",
+                  "Noviembre",
+                  "Diciembre",
+                ].map((month, index) => (
+                  <option key={month} value={index + 1}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+            </Field>
           ) : null}
 
           <Field label="Tags separados por coma">

@@ -13,7 +13,7 @@ describe("parseExpenseTextLocally", () => {
       categoryName: "Suscripciones",
       recurrence: { frequency: "monthly" },
     });
-    expect(expense.tags).toContain("sub");
+    expect(expense.tags).toContain("suscripciones");
   });
 
   it("detects custom recurrence", () => {

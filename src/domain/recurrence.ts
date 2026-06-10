@@ -3,6 +3,7 @@ import {
   addMonths,
   addWeeks,
   addYears,
+  getYear,
   isAfter,
   isBefore,
   parseISO,
@@ -42,6 +43,28 @@ function rruleDates(template: ExpenseTemplate, from: Date, to: Date): Date[] {
   );
 }
 
+function annualTemplateDates(
+  template: ExpenseTemplate,
+  from: Date,
+  to: Date,
+): string[] {
+  const dates: string[] = [];
+  const start = parseISO(template.startDate);
+  const annualMonth = Math.min(
+    Math.max(template.recurrence.annualMonth ?? start.getMonth() + 1, 1),
+    12,
+  );
+
+  for (let year = getYear(from) - 1; year <= getYear(to) + 1; year += 1) {
+    const candidate = buildDateWithDay(new Date(year, annualMonth - 1, 1), template.dueDay);
+    if (!isBefore(candidate, from) && !isAfter(candidate, to) && !isBefore(candidate, start)) {
+      dates.push(toDateOnly(candidate));
+    }
+  }
+
+  return dates;
+}
+
 export function generateTemplateDates(
   template: ExpenseTemplate,
   fromDate: string,
@@ -53,6 +76,10 @@ export function generateTemplateDates(
 
   if (template.recurrence.frequency === "rrule") {
     return rruleDates(template, from, to).map(toDateOnly);
+  }
+
+  if (template.recurrence.frequency === "yearly") {
+    return annualTemplateDates(template, from, to);
   }
 
   const dates: string[] = [];
@@ -121,10 +148,10 @@ export function recurrenceLabel(rule: RecurrenceRule): string {
   const interval = rule.interval ?? 1;
   const unit = rule.unit ?? "month";
   const units = {
-    day: "dias",
+    day: "días",
     week: "semanas",
     month: "meses",
-    year: "anos",
+    year: "años",
   };
 
   return `Cada ${interval} ${units[unit]}`;
