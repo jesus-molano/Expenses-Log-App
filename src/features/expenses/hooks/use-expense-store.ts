@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toDateOnly } from "@/domain/calendar";
+import { demoStore } from "@/domain/seed";
 import type { DraftExpense, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
 import { loadExpenseStore, saveExpenseStore } from "@/lib/local-store";
 import {
@@ -11,7 +12,15 @@ import {
 } from "../lib/expense-actions";
 
 export function useExpenseStore() {
-  const [store, setStore] = useState<ExpenseStore>(() => loadExpenseStore());
+  const [store, setStore] = useState<ExpenseStore>(() => demoStore);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setStore(loadExpenseStore());
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   function persist(nextStore: ExpenseStore) {
     saveExpenseStore(nextStore);

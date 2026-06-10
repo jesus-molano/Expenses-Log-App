@@ -51,7 +51,6 @@ function sectionMeta(
     };
   }
 
-  const estimatedDate = parseISO(occurrence.estimatedChargeDate);
   const estimatedDelta = daysBetween(today, occurrence.estimatedChargeDate);
 
   if (
@@ -59,32 +58,22 @@ function sectionMeta(
     estimatedDelta <= 7
   ) {
     return {
-      id: `estimated-${occurrence.estimatedChargeDate}`,
-      title: `Estimado ${format(estimatedDate, "EEEE d", { locale: es })}`,
-      subtitle: `Vence ${format(dueDate, "EEEE d", { locale: es })}`,
+      id: `future-${occurrence.dueDate}`,
+      title: format(dueDate, "EEEE d", { locale: es }),
+      subtitle: `Estimado ${format(parseISO(occurrence.estimatedChargeDate), "EEEE d", { locale: es })}`,
       tone: "estimated",
       priority: 3,
     };
   }
 
-  if (dueDelta <= 7) {
-    return {
-      id: `week-${occurrence.dueDate}`,
-      title: isSameDay(dueDate, addDays(parseISO(today), 1))
-        ? "Manana"
-        : format(dueDate, "EEEE d", { locale: es }),
-      subtitle: isWeekend(dueDate) ? "Vence en fin de semana" : "Esta semana",
-      tone: "soon",
-      priority: 4,
-    };
-  }
-
   return {
-    id: `later-${format(dueDate, "yyyy-MM")}`,
-    title: format(dueDate, "MMMM yyyy", { locale: es }),
-    subtitle: "Mas adelante",
-    tone: "later",
-    priority: 5,
+    id: `future-${occurrence.dueDate}`,
+    title: isSameDay(dueDate, addDays(parseISO(today), 1))
+      ? "Manana"
+      : format(dueDate, "EEEE d", { locale: es }),
+    subtitle: isWeekend(dueDate) ? "Vence en fin de semana" : "Pendiente",
+    tone: dueDelta <= 7 ? "soon" : "later",
+    priority: 3,
   };
 }
 
@@ -123,10 +112,7 @@ export function buildTimelineSections(
         return a.template.name.localeCompare(b.template.name);
       }),
     }))
-    .sort((a, b) => {
-      if (a.anchorDate !== b.anchorDate) return a.anchorDate.localeCompare(b.anchorDate);
-      return a.priority - b.priority;
-    });
+    .sort((a, b) => sortSections(a, b, today));
 
   if (!timelineSections.some((section) => section.id === "today")) {
     timelineSections.push({
@@ -141,7 +127,18 @@ export function buildTimelineSections(
     });
   }
 
-  return timelineSections.sort((a, b) => {
-    return a.priority - b.priority;
-  });
+  return timelineSections.sort((a, b) => sortSections(a, b, today));
+}
+
+function sortSections(
+  a: TimelineSection,
+  b: TimelineSection,
+  today: string,
+): number {
+  const aDate = a.id === "overdue" ? today : a.anchorDate;
+  const bDate = b.id === "overdue" ? today : b.anchorDate;
+
+  if (a.priority !== b.priority) return a.priority - b.priority;
+  if (aDate !== bDate) return aDate.localeCompare(bDate);
+  return a.title.localeCompare(b.title);
 }

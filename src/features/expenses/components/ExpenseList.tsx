@@ -91,7 +91,7 @@ export function ExpenseList({
     window.requestAnimationFrame(() => {
       if (!focusRef.current) return;
 
-      const headerOffset = 156;
+      const headerOffset = 170;
       const targetTop =
         focusRef.current.getBoundingClientRect().top +
         window.scrollY -
@@ -104,13 +104,7 @@ export function ExpenseList({
   return (
     <section>
       {sections.length ? (
-        <div className="relative space-y-5">
-          {sections.some((section) => section.anchorDate < today) ? (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 -top-10 z-10 h-24 bg-gradient-to-b from-[#020617] via-[#020617]/80 to-transparent lg:-top-16 lg:h-36"
-            />
-          ) : null}
+        <div className="relative space-y-5 pb-8">
           {sections.map((section, index) => {
             const shouldAnchorFocus = index === focusIndex;
             const expandSection =
@@ -144,7 +138,7 @@ export function ExpenseList({
               ref={shouldAnchorFocus ? focusRef : undefined}
               data-section-id={section.id}
               data-timeline-date={section.anchorDate}
-              className="relative scroll-mt-24 pl-4"
+              className="relative scroll-mt-32 pl-4"
             >
               <span
                 className={`absolute left-0 top-1.5 size-2 rounded-full shadow-[0_0_14px_currentColor] ring-2 ${

@@ -1,6 +1,6 @@
 "use client";
 
-import { addMonths, endOfMonth, startOfMonth, subMonths } from "date-fns";
+import { endOfMonth, startOfMonth } from "date-fns";
 import { useMemo, useState } from "react";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
 import { generateOccurrences } from "@/domain/recurrence";
@@ -11,8 +11,8 @@ export function useExpenseFilters(store: ExpenseStore) {
   const [query, setQuery] = useState("");
 
   const today = toDateOnly(new Date());
-  const windowStart = toDateOnly(startOfMonth(subMonths(new Date(), 1)));
-  const windowEnd = toDateOnly(endOfMonth(addMonths(new Date(), 1)));
+  const windowStart = toDateOnly(startOfMonth(new Date()));
+  const windowEnd = toDateOnly(endOfMonth(new Date()));
 
   const occurrences = useMemo(
     () =>
@@ -39,12 +39,11 @@ export function useExpenseFilters(store: ExpenseStore) {
     });
   }, [occurrences, query]);
 
-  const monthEnd = toDateOnly(endOfMonth(new Date()));
   const pendingTotal = visibleOccurrences
     .filter(
       (occurrence) =>
         occurrence.status !== "paid" &&
-        occurrence.estimatedChargeDate <= monthEnd,
+        occurrence.estimatedChargeDate <= windowEnd,
     )
     .reduce((sum, occurrence) => sum + occurrence.template.amount, 0);
   const timelineSections = buildTimelineSections(visibleOccurrences, today);
