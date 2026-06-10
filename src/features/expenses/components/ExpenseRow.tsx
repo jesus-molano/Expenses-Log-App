@@ -14,7 +14,10 @@ type ExpenseRowProps = {
   today: string;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
   onScheduleMove: (occurrence: ExpenseOccurrence, dueDate: string) => void;
-  onDropTargetChange: (dueDate: string | null) => void;
+  onDropTargetChange: (
+    target: { date: string; position: "before" | "after" } | null,
+  ) => void;
+  dropPosition?: "before" | "after" | null;
   onLiftChange: (lifted: boolean, occurrence: ExpenseOccurrence) => void;
 };
 
@@ -25,6 +28,7 @@ export function ExpenseRow({
   onTogglePaid,
   onScheduleMove,
   onDropTargetChange,
+  dropPosition = null,
   onLiftChange,
 }: ExpenseRowProps) {
   const router = useRouter();
@@ -93,7 +97,15 @@ export function ExpenseRow({
       const target = document
         .elementFromPoint(event.clientX, event.clientY)
         ?.closest<HTMLElement>("[data-timeline-date]");
-      onDropTargetChange(target?.dataset.timelineDate ?? null);
+      if (target?.dataset.timelineDate) {
+        const rect = target.getBoundingClientRect();
+        onDropTargetChange({
+          date: target.dataset.timelineDate,
+          position: event.clientY < rect.top + rect.height / 2 ? "before" : "after",
+        });
+      } else {
+        onDropTargetChange(null);
+      }
     }
 
     setGesture({
@@ -149,8 +161,15 @@ export function ExpenseRow({
 
   return (
     <div
-      className={`relative overflow-visible rounded-2xl ${drag.lifted ? "z-30" : ""}`}
+      data-timeline-date={occurrence.dueDate}
+      data-expense-row="true"
+      className={`relative overflow-visible rounded-2xl ${
+        drag.lifted ? "pointer-events-none z-30" : ""
+      }`}
     >
+      {dropPosition === "before" ? (
+        <DropLine label="Antes" position="before" />
+      ) : null}
       <div
         aria-hidden="true"
         className={`absolute inset-0 grid grid-cols-2 rounded-2xl text-xs font-semibold transition-opacity ${
@@ -179,7 +198,7 @@ export function ExpenseRow({
         }}
         className={`grid min-h-14 touch-pan-y select-none grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border px-3 py-2.5 backdrop-blur-xl transition-[border-radius,box-shadow,opacity,transform,background] duration-200 ease-out ${
           drag.lifted
-            ? "border-lime-200/50 bg-slate-900/95 shadow-[0_0_46px_rgba(132,204,22,0.36),0_26px_70px_rgba(0,0,0,0.58)]"
+            ? "pointer-events-none border-lime-200/50 bg-slate-900/95 shadow-[0_0_46px_rgba(132,204,22,0.36),0_26px_70px_rgba(0,0,0,0.58)]"
             : paid
               ? "border-white/10 bg-white/[0.045] opacity-70"
               : "border-white/12 bg-white/[0.13] shadow-[0_12px_34px_rgba(0,0,0,0.26)] ring-1 ring-white/8"
@@ -226,6 +245,31 @@ export function ExpenseRow({
           </p>
         </div>
       </article>
+      {dropPosition === "after" ? (
+        <DropLine label="Despues" position="after" />
+      ) : null}
+    </div>
+  );
+}
+
+function DropLine({
+  label,
+  position,
+}: {
+  label: string;
+  position: "before" | "after";
+}) {
+  return (
+    <div
+      className={`pointer-events-none absolute inset-x-4 z-20 flex items-center gap-2 ${
+        position === "before" ? "-top-1" : "-bottom-1"
+      }`}
+    >
+      <span className="h-0.5 flex-1 rounded-full bg-lime-200 shadow-[0_0_18px_rgba(190,242,100,0.9)]" />
+      <span className="rounded-full bg-lime-300 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-950">
+        {label}
+      </span>
+      <span className="h-0.5 flex-1 rounded-full bg-lime-200 shadow-[0_0_18px_rgba(190,242,100,0.9)]" />
     </div>
   );
 }

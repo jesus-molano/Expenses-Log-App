@@ -15,6 +15,11 @@ import type { ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
 import type { TimelineSection } from "../lib/timeline";
 import { ExpenseRow } from "./ExpenseRow";
 
+type DropTarget = {
+  date: string;
+  position: "before" | "after";
+};
+
 type ExpenseListProps = {
   sections: TimelineSection[];
   categories: ExpenseCategory[];
@@ -38,7 +43,7 @@ export function ExpenseList({
   const didFocusTimeline = useRef(false);
   const [draggedOccurrence, setDraggedOccurrence] =
     useState<ExpenseOccurrence | null>(null);
-  const [activeDropDate, setActiveDropDate] = useState<string | null>(null);
+  const [activeDropTarget, setActiveDropTarget] = useState<DropTarget | null>(null);
   const [pendingMove, setPendingMove] = useState<{
     occurrence: ExpenseOccurrence;
     dueDate: string;
@@ -189,7 +194,7 @@ export function ExpenseList({
                           <EmptyDayTarget
                             key={day}
                             date={day}
-                            active={activeDropDate === day}
+                            active={activeDropTarget?.date === day}
                             label="Soltar aqui"
                           />
                         ))
@@ -205,10 +210,15 @@ export function ExpenseList({
                         today={today}
                         onTogglePaid={onTogglePaid}
                         onScheduleMove={scheduleMove}
-                        onDropTargetChange={setActiveDropDate}
+                        onDropTargetChange={setActiveDropTarget}
+                        dropPosition={
+                          activeDropTarget?.date === occurrence.dueDate
+                            ? activeDropTarget.position
+                            : null
+                        }
                         onLiftChange={(lifted, occurrence) => {
                           setDraggedOccurrence(lifted ? occurrence : null)
-                          if (!lifted) setActiveDropDate(null);
+                          if (!lifted) setActiveDropTarget(null);
                         }}
                       />
                     ))}
@@ -217,7 +227,7 @@ export function ExpenseList({
                           <EmptyDayTarget
                             key={day}
                             date={day}
-                            active={activeDropDate === day}
+                            active={activeDropTarget?.date === day}
                             label="Soltar aqui"
                           />
                         ))
