@@ -11,6 +11,7 @@ type ExpenseListProps = {
   sections: TimelineSection[];
   categories: ExpenseCategory[];
   today: string;
+  onTodayVisibilityChange: (visible: boolean) => void;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
   onMoveOccurrence: (occurrence: ExpenseOccurrence, dueDate: string) => void;
 };
@@ -19,12 +20,13 @@ export function ExpenseList({
   sections,
   categories,
   today,
+  onTodayVisibilityChange,
   onTogglePaid,
   onMoveOccurrence,
 }: ExpenseListProps) {
   const focusRef = useRef<HTMLElement | null>(null);
   const didFocusTimeline = useRef(false);
-  const firstActiveIndex = sections.findIndex((section) => section.tone !== "paid");
+  const focusIndex = sections.findIndex((section) => section.anchorDate >= today);
 
   useEffect(() => {
     if (didFocusTimeline.current || !focusRef.current) return;
@@ -43,34 +45,56 @@ export function ExpenseList({
     });
   }, [sections]);
 
+  useEffect(() => {
+    function updateTodayVisibility() {
+      const todayNode = document.querySelector<HTMLElement>('[data-section-id="today"]');
+      if (!todayNode) {
+        onTodayVisibilityChange(false);
+        return;
+      }
+
+      const rect = todayNode.getBoundingClientRect();
+      onTodayVisibilityChange(rect.top >= 72 && rect.top <= 250);
+    }
+
+    updateTodayVisibility();
+    window.addEventListener("scroll", updateTodayVisibility, { passive: true });
+    window.addEventListener("resize", updateTodayVisibility);
+    return () => {
+      window.removeEventListener("scroll", updateTodayVisibility);
+      window.removeEventListener("resize", updateTodayVisibility);
+    };
+  }, [onTodayVisibilityChange, sections]);
+
   return (
     <section>
       {sections.length ? (
         <div className="space-y-5">
           {sections.map((section, index) => {
-            const shouldAnchorFocus = index === firstActiveIndex;
+            const shouldAnchorFocus = index === focusIndex;
 
             return (
             <article
               key={section.id}
               ref={shouldAnchorFocus ? focusRef : undefined}
-              data-timeline-date={section.items[0]?.dueDate}
-              className="relative scroll-mt-24 pl-7"
+              data-section-id={section.id}
+              data-timeline-date={section.anchorDate}
+              className="relative scroll-mt-24 pl-4"
             >
               <span
-                className={`absolute left-2 top-1 size-3 rounded-full shadow-[0_0_28px_currentColor] ring-4 ${
+                className={`absolute left-0 top-1.5 size-2 rounded-full shadow-[0_0_14px_currentColor] ring-2 ${
                   section.tone === "critical"
-                    ? "bg-orange-400 text-orange-400 ring-orange-300/20"
+                    ? "bg-orange-400 text-orange-400 ring-orange-300/15"
                     : section.tone === "estimated"
-                      ? "bg-yellow-300 text-yellow-300 ring-yellow-300/20"
+                      ? "bg-yellow-300 text-yellow-300 ring-yellow-300/15"
                       : section.tone === "paid"
-                        ? "bg-lime-400 text-lime-400 ring-lime-300/20"
-                        : "bg-cyan-300 text-cyan-300 ring-cyan-300/20"
+                        ? "bg-lime-400/70 text-lime-400/70 ring-lime-300/10"
+                        : "bg-cyan-300 text-cyan-300 ring-cyan-300/15"
                 }`}
               />
-              <span className="absolute bottom-[-1.25rem] left-[13px] top-5 w-px bg-gradient-to-b from-lime-300 via-cyan-300 to-transparent shadow-[0_0_18px_rgba(132,204,22,0.55)]" />
+              <span className="absolute bottom-[-1.25rem] left-[3px] top-5 w-px bg-white/12" />
 
-              <header className={`mb-1.5 flex items-end justify-between gap-3 ${index > 2 ? "opacity-85" : ""}`}>
+              <header className={`mb-1.5 flex items-end justify-between gap-3 ${section.anchorDate < today ? "opacity-70" : ""}`}>
                 <div className="min-w-0">
                   <h2 className="truncate text-[16px] font-semibold capitalize leading-tight text-white">
                     {section.title}
@@ -89,7 +113,7 @@ export function ExpenseList({
                   index === 0 ? "drop-shadow-[0_20px_35px_rgba(132,204,22,0.22)]" : ""
                 } ${index > 2 ? "opacity-90" : ""}`}
               >
-                {section.items.map((occurrence) => (
+                {section.items.length ? section.items.map((occurrence) => (
                   <ExpenseRow
                     key={occurrence.id}
                     occurrence={occurrence}
@@ -100,7 +124,11 @@ export function ExpenseList({
                     onTogglePaid={onTogglePaid}
                     onMoveOccurrence={onMoveOccurrence}
                   />
-                ))}
+                )) : (
+                  <div className="rounded-2xl border border-cyan-200/16 bg-white/[0.045] px-3 py-3 text-sm font-medium text-white">
+                    Sin cargos previstos hoy
+                  </div>
+                )}
               </div>
             </article>
           );

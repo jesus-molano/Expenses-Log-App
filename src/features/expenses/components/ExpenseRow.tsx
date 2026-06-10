@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type PointerEvent, useRef, useState } from "react";
-import { Check, Circle, Pencil, RotateCcw } from "lucide-react";
+import { Pencil, RotateCcw } from "lucide-react";
 import { formatCurrency } from "@/domain/calendar";
 import type { ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
 import { categoryToneClass, statusLabel } from "../lib/expense-actions";
@@ -146,28 +146,14 @@ export function ExpenseRow({
             drag.lifted ? 1.035 : 1
           })`,
         }}
-        className={`grid min-h-14 touch-pan-y select-none grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border px-2.5 py-2 backdrop-blur-xl transition-[border-radius,box-shadow,opacity,transform,background] duration-200 ease-out ${
+        className={`grid min-h-14 touch-pan-y select-none grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border px-3 py-2.5 backdrop-blur-xl transition-[border-radius,box-shadow,opacity,transform,background] duration-200 ease-out ${
           drag.lifted
             ? "border-lime-200/50 bg-slate-900/95 shadow-[0_0_46px_rgba(132,204,22,0.36),0_26px_70px_rgba(0,0,0,0.58)]"
             : paid
               ? "border-white/10 bg-white/[0.045] opacity-70"
-              : "border-white/12 bg-white/[0.105] shadow-[0_12px_34px_rgba(0,0,0,0.22)] ring-1 ring-white/8"
+              : "border-white/12 bg-white/[0.13] shadow-[0_12px_34px_rgba(0,0,0,0.26)] ring-1 ring-white/8"
         }`}
       >
-        <button
-          type="button"
-          aria-label={paid ? "Marcar como pendiente" : "Marcar como pagado"}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={() => onTogglePaid(occurrence)}
-          className={`grid size-9 place-items-center rounded-full border transition shadow-[0_0_24px_rgba(132,204,22,0.16)] ${
-            paid
-              ? "border-lime-300 bg-lime-300 text-slate-950"
-              : "border-white/20 bg-white/7 text-slate-200 hover:border-lime-300 hover:text-lime-100"
-          }`}
-        >
-          {paid ? <Check size={19} /> : <Circle size={17} />}
-        </button>
-
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
             <Link

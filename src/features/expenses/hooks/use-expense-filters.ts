@@ -49,7 +49,12 @@ export function useExpenseFilters(store: ExpenseStore) {
     .reduce((sum, occurrence) => sum + occurrence.template.amount, 0);
   const timelineSections = buildTimelineSections(visibleOccurrences, today);
   const nextOccurrence =
-    visibleOccurrences.find((occurrence) => occurrence.status !== "paid") ?? null;
+    visibleOccurrences.find(
+      (occurrence) =>
+        occurrence.status !== "paid" && occurrence.estimatedChargeDate >= today,
+    ) ??
+    visibleOccurrences.find((occurrence) => occurrence.status !== "paid") ??
+    null;
 
   return {
     query,

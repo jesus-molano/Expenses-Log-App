@@ -11,6 +11,7 @@ export type TimelineSection = {
   priority: number;
   total: number;
   items: ExpenseOccurrence[];
+  anchorDate: string;
 };
 
 function sectionMeta(
@@ -26,7 +27,7 @@ function sectionMeta(
       title: format(dueDate, "EEEE d", { locale: es }),
       subtitle: "Pagado",
       tone: "paid",
-      priority: 0,
+      priority: dueDelta,
     };
   }
 
@@ -36,7 +37,7 @@ function sectionMeta(
       title: "Atrasado",
       subtitle: `Desde ${format(dueDate, "EEEE d", { locale: es })}`,
       tone: "critical",
-      priority: 10,
+      priority: dueDelta,
     };
   }
 
@@ -46,7 +47,7 @@ function sectionMeta(
       title: "Hoy",
       subtitle: "Puede salir de tu cuenta hoy",
       tone: "critical",
-      priority: 20,
+      priority: 0,
     };
   }
 
@@ -62,7 +63,7 @@ function sectionMeta(
       title: `Estimado ${format(estimatedDate, "EEEE d", { locale: es })}`,
       subtitle: `Vence ${format(dueDate, "EEEE d", { locale: es })}`,
       tone: "estimated",
-      priority: 30,
+      priority: estimatedDelta,
     };
   }
 
@@ -74,7 +75,7 @@ function sectionMeta(
         : format(dueDate, "EEEE d", { locale: es }),
       subtitle: isWeekend(dueDate) ? "Vence en fin de semana" : "Esta semana",
       tone: "soon",
-      priority: 40,
+      priority: dueDelta,
     };
   }
 
@@ -83,7 +84,7 @@ function sectionMeta(
     title: format(dueDate, "MMMM yyyy", { locale: es }),
     subtitle: "Mas adelante",
     tone: "later",
-    priority: 50,
+    priority: dueDelta,
   };
 }
 
@@ -105,12 +106,13 @@ export function buildTimelineSections(
 
     sections.set(meta.id, {
       ...meta,
+      anchorDate: occurrence.dueDate,
       total: occurrence.status === "paid" ? 0 : occurrence.template.amount,
       items: [occurrence],
     });
   }
 
-  return Array.from(sections.values())
+  const timelineSections = Array.from(sections.values())
     .map((section) => ({
       ...section,
       items: section.items.sort((a, b) =>
@@ -118,9 +120,25 @@ export function buildTimelineSections(
       ),
     }))
     .sort((a, b) => {
-      if (a.priority !== b.priority) return a.priority - b.priority;
-      return a.items[0].estimatedChargeDate.localeCompare(
-        b.items[0].estimatedChargeDate,
-      );
+      if (a.anchorDate !== b.anchorDate) return a.anchorDate.localeCompare(b.anchorDate);
+      return a.priority - b.priority;
     });
+
+  if (!timelineSections.some((section) => section.id === "today")) {
+    timelineSections.push({
+      id: "today",
+      title: "Hoy",
+      subtitle: "Punto de control",
+      tone: "soon",
+      priority: 0,
+      total: 0,
+      anchorDate: today,
+      items: [],
+    });
+  }
+
+  return timelineSections.sort((a, b) => {
+    if (a.anchorDate !== b.anchorDate) return a.anchorDate.localeCompare(b.anchorDate);
+    return a.priority - b.priority;
+  });
 }

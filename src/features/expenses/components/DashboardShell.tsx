@@ -21,7 +21,7 @@ export function DashboardShell({
   children,
 }: DashboardShellProps) {
   return (
-    <main className="min-h-dvh bg-[radial-gradient(circle_at_50%_-12%,rgba(132,204,22,0.18),transparent_30%),radial-gradient(circle_at_95%_18%,rgba(249,115,22,0.14),transparent_28%),linear-gradient(180deg,#020617_0%,#04111f_42%,#020617_100%)] text-white">
+    <main className="min-h-dvh bg-[linear-gradient(180deg,#020617_0%,#07111f_46%,#020617_100%)] text-white">
       <div className="mx-auto min-h-dvh w-full max-w-4xl pb-28 lg:grid lg:max-w-7xl lg:grid-cols-[344px_1fr] lg:pb-0">
         <aside
           className={`sticky top-0 z-20 overflow-visible px-3 pt-[max(0.6rem,env(safe-area-inset-top))] text-white transition-[padding] duration-300 lg:relative lg:min-h-dvh lg:p-5 ${
@@ -29,7 +29,7 @@ export function DashboardShell({
           }`}
         >
           <section
-            className={`relative mx-auto max-w-2xl border border-lime-300/20 bg-slate-950/78 shadow-[0_0_42px_rgba(132,204,22,0.18),0_18px_40px_rgba(0,0,0,0.38)] backdrop-blur-2xl transition-all duration-500 ease-out lg:max-w-none ${
+            className={`relative mx-auto max-w-2xl border border-white/10 bg-slate-950/86 shadow-[0_18px_50px_rgba(0,0,0,0.42)] backdrop-blur-2xl transition-all duration-500 ease-out lg:max-w-none ${
               compact
                 ? "rounded-[1.35rem] px-3 py-2"
                 : "rounded-[1.35rem] p-3.5"
@@ -57,7 +57,7 @@ export function DashboardShell({
                 </p>
               </div>
               <div
-                className={`flex min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-full bg-lime-300/10 text-sm text-white ring-1 ring-lime-300/15 transition-all duration-500 ease-out ${
+                className={`flex min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-full bg-white/[0.06] text-sm text-white ring-1 ring-white/10 transition-all duration-500 ease-out ${
                   compact
                     ? "max-w-full px-3 py-2 opacity-100"
                     : "max-w-0 px-0 py-2 opacity-0"
@@ -78,7 +78,7 @@ export function DashboardShell({
             </div>
 
             <div
-              className={`flex items-center gap-2 overflow-hidden rounded-2xl bg-lime-300/10 text-sm text-white ring-1 ring-lime-300/20 transition-all duration-500 ease-out ${
+              className={`flex items-center gap-2 overflow-hidden rounded-2xl bg-white/[0.06] text-sm text-white ring-1 ring-white/10 transition-all duration-500 ease-out ${
                 compact
                   ? "mt-0 max-h-0 px-3 py-0 opacity-0"
                   : "mt-3 max-h-12 px-3 py-2 opacity-100"
