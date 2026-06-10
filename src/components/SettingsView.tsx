@@ -5,12 +5,11 @@ import {
   ArrowLeft,
   Bell,
   Cloud,
-  Database,
   Download,
   LogIn,
   LogOut,
-  RotateCcw,
   Upload,
+  WalletCards,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
@@ -153,7 +152,7 @@ export function SettingsView() {
               description={
                 user
                   ? `Último sync: ${lastSync ?? "pendiente"}`
-                  : "Inicia sesión para guardar en Supabase."
+                  : "Entra con Google para guardar en Supabase."
               }
               action={
                 user ? (
@@ -181,17 +180,19 @@ export function SettingsView() {
                     className="inline-flex h-10 items-center gap-2 rounded-xl bg-lime-300 px-3 text-sm font-semibold text-slate-950"
                   >
                     <LogIn size={17} />
-                    Entrar
+                    Google
                   </Link>
                 )
               }
             />
 
-            <SettingCard
-              icon={<Database size={20} />}
-              title="Reparto mensual"
-              description={`${store.finance.allocation.sabadellAccountName}, ${store.finance.allocation.bbvaSavingsAccountName} y ${store.finance.allocation.bbvaMainAccountName}.`}
-            />
+            <Link href="/money" className="block">
+              <SettingCard
+                icon={<WalletCards size={20} />}
+                title="Reparto mensual"
+                description="Editar bancos, sueldo, ahorro e ingresos puntuales."
+              />
+            </Link>
 
             <SettingCard
               icon={<Bell size={20} />}
@@ -206,12 +207,6 @@ export function SettingsView() {
                   Activar
                 </button>
               }
-            />
-
-            <SettingCard
-              icon={<RotateCcw size={20} />}
-              title="IA"
-              description="El análisis de texto solo se llama cuando pulsas Analizar texto."
             />
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
