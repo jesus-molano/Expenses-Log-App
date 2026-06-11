@@ -10,6 +10,7 @@ const baseSnapshot = {
   documentHeight: 2400,
   headerHeight: 140,
   todayTop: 400,
+  allowHeaderCompact: true,
 };
 
 describe("scroll chrome state", () => {
@@ -46,6 +47,17 @@ describe("scroll chrome state", () => {
       scrollY: 300,
     });
 
+    expect(state.compactHeader).toBe(false);
+  });
+
+  it("keeps the header expanded for restored or programmatic scroll", () => {
+    const state = reduceScrollChromeState(createInitialScrollChromeState(), {
+      ...baseSnapshot,
+      allowHeaderCompact: false,
+      scrollY: 300,
+    });
+
+    expect(state.showBottomBar).toBe(false);
     expect(state.compactHeader).toBe(false);
   });
 

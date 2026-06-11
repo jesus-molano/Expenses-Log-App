@@ -5,6 +5,7 @@ export type ScrollChromeSnapshot = {
   documentHeight: number;
   headerHeight: number;
   todayTop: number;
+  allowHeaderCompact?: boolean;
 };
 
 export type ScrollChromeState = {
@@ -58,7 +59,7 @@ export function reduceScrollChromeState(
   }
 
   let compactHeader = previous.compactHeader;
-  if (!isMobileChrome || atTop || nearBottom) {
+  if (!isMobileChrome || atTop || nearBottom || !snapshot.allowHeaderCompact) {
     compactHeader = false;
   } else if (delta >= SCROLL_CHROME_THRESHOLDS.hideDelta) {
     compactHeader = true;
