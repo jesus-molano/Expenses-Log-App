@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Expense Reminders",
-    short_name: "Gastos",
+    short_name: "Expense Log",
     description: "Seguimiento de gastos recurrentes con recordatorios.",
     start_url: "/",
     scope: "/",
@@ -13,9 +13,21 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: "portrait",
     icons: [
       {
-        src: "/icon.svg",
-        sizes: "any",
-        type: "image/svg+xml",
+        src: "/icon-192.png?v=4",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-512.png?v=4",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-512.png?v=4",
+        sizes: "512x512",
+        type: "image/png",
         purpose: "maskable",
       },
     ],

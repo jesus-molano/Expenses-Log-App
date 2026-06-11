@@ -71,8 +71,12 @@ export function generateTemplateDates(
   toDate: string,
 ): string[] {
   const from = parseISO(fromDate);
-  const to = parseISO(toDate);
+  const configuredTo = parseISO(toDate);
+  const end = template.endDate ? parseISO(template.endDate) : configuredTo;
+  const to = isBefore(end, configuredTo) ? end : configuredTo;
   const start = parseISO(template.startDate);
+
+  if (isBefore(to, from) || isBefore(to, start)) return [];
 
   if (template.recurrence.frequency === "rrule") {
     return rruleDates(template, from, to).map(toDateOnly);

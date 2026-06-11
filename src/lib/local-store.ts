@@ -3,8 +3,49 @@
 import type { ExpenseStore } from "@/domain/types";
 import { emptyStore } from "@/domain/seed";
 import { emptyFinanceStore } from "@/domain/finance";
+import type { AllocationSettings, FinanceStore } from "@/domain/types";
 
-const STORAGE_KEY = "expense-reminders-store-v1";
+const STORAGE_KEY = "expense-reminders-store-v3";
+const LEGACY_STORAGE_KEYS = [
+  "expense-reminders-store-v1",
+  "expense-reminders-store-v2",
+];
+
+function purgeLegacyLocalStores() {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  for (const key of LEGACY_STORAGE_KEYS) {
+    window.localStorage.removeItem(key);
+  }
+}
+
+function normalizeAllocationSettings(
+  allocation?: Partial<AllocationSettings> | null,
+): AllocationSettings {
+  return {
+    expensesAccountName:
+      allocation?.expensesAccountName ??
+      emptyFinanceStore.allocation.expensesAccountName,
+    savingsAccountName:
+      allocation?.savingsAccountName ??
+      emptyFinanceStore.allocation.savingsAccountName,
+    primaryAccountName:
+      allocation?.primaryAccountName ??
+      emptyFinanceStore.allocation.primaryAccountName,
+    monthlySavingsTarget:
+      allocation?.monthlySavingsTarget ??
+      emptyFinanceStore.allocation.monthlySavingsTarget,
+  };
+}
+
+function normalizeFinanceStore(finance?: Partial<FinanceStore> | null): FinanceStore {
+  return {
+    incomeSources: finance?.incomeSources ?? [],
+    incomeEvents: finance?.incomeEvents ?? [],
+    allocation: normalizeAllocationSettings(
+      finance?.allocation,
+    ),
+  };
+}
 
 function withStoreDefaults(store: ExpenseStore): ExpenseStore {
   return {
@@ -12,17 +53,22 @@ function withStoreDefaults(store: ExpenseStore): ExpenseStore {
     categories: store.categories ?? [],
     templates: store.templates ?? [],
     overrides: store.overrides ?? [],
-    finance: store.finance ?? emptyFinanceStore,
+    finance: normalizeFinanceStore(store.finance),
+    preferences: {
+      theme: store.preferences?.theme ?? "legacy",
+      language: store.preferences?.language ?? "es",
+    },
   };
 }
 
 export function loadExpenseStore(): ExpenseStore {
-  if (typeof window === "undefined") return emptyStore;
-
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return emptyStore;
-
   try {
+    if (typeof window === "undefined" || !window.localStorage) return emptyStore;
+    purgeLegacyLocalStores();
+
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return emptyStore;
+
     return withStoreDefaults(JSON.parse(raw) as ExpenseStore);
   } catch {
     return emptyStore;
@@ -30,7 +76,25 @@ export function loadExpenseStore(): ExpenseStore {
 }
 
 export function saveExpenseStore(store: ExpenseStore): void {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  try {
+    if (!window.localStorage) return;
+    purgeLegacyLocalStores();
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    window.dispatchEvent(new Event("expense-store-updated"));
+  } catch {
+    window.dispatchEvent(new Event("expense-store-updated"));
+  }
+}
+
+export function clearExpenseLocalData(): void {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    window.localStorage.removeItem(STORAGE_KEY);
+    purgeLegacyLocalStores();
+    window.dispatchEvent(new Event("expense-store-updated"));
+  } catch {
+    window.dispatchEvent(new Event("expense-store-updated"));
+  }
 }
 
 export function mergeExpenseStores(
@@ -44,10 +108,10 @@ export function mergeExpenseStores(
     templates: mergeById(cloudStore.templates, localStore.templates),
     overrides: mergeById(cloudStore.overrides, localStore.overrides),
     finance: {
-      allocation: {
+      allocation: normalizeAllocationSettings({
         ...cloudStore.finance?.allocation,
         ...localStore.finance?.allocation,
-      },
+      }),
       incomeSources: mergeById(
         cloudStore.finance?.incomeSources ?? [],
         localStore.finance?.incomeSources ?? [],
@@ -56,6 +120,16 @@ export function mergeExpenseStores(
         cloudStore.finance?.incomeEvents ?? [],
         localStore.finance?.incomeEvents ?? [],
       ),
+    },
+    preferences: {
+      theme:
+        localStore.preferences?.theme ??
+        cloudStore.preferences?.theme ??
+        "legacy",
+      language:
+        localStore.preferences?.language ??
+        cloudStore.preferences?.language ??
+        "es",
     },
   };
 }

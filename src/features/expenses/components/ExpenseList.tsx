@@ -24,11 +24,13 @@ import {
   parseISO,
   startOfMonth,
 } from "date-fns";
-import { es } from "date-fns/locale";
+import type { Locale } from "date-fns";
+import { enUS, es } from "date-fns/locale";
 import { Home } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { formatCurrency } from "@/domain/calendar";
-import type { ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
+import type { AppLanguage, ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
+import { t } from "@/lib/i18n";
 import type { TimelineSection } from "../lib/timeline";
 import { ExpenseRow } from "./ExpenseRow";
 
@@ -42,6 +44,7 @@ type ExpenseListProps = {
   sections: TimelineSection[];
   categories: ExpenseCategory[];
   today: string;
+  language?: AppLanguage;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
   onMoveOccurrence: (
     occurrence: ExpenseOccurrence,
@@ -55,6 +58,7 @@ export function ExpenseList({
   sections,
   categories,
   today,
+  language = "es",
   onTogglePaid,
   onMoveOccurrence,
   onMoveOccurrenceSeries,
@@ -72,6 +76,7 @@ export function ExpenseList({
     useState<ExpenseOccurrence | null>(null);
   const focusIndex = sections.findIndex((section) => section.anchorDate >= today);
   const currentMonth = today.slice(0, 7);
+  const locale = language === "en" ? enUS : es;
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
@@ -261,20 +266,20 @@ export function ExpenseList({
               className="relative scroll-mt-32 pl-4"
             >
               <span
-                className={`absolute left-0 top-1.5 size-2 rounded-full shadow-[0_0_14px_currentColor] ring-2 ${
+                className={`app-timeline-dot absolute left-0 top-1.5 size-2 rounded-full shadow-[0_0_14px_currentColor] ring-2 ${
                   section.tone === "critical"
-                    ? "bg-orange-400 text-orange-400 ring-orange-300/15"
+                    ? "app-timeline-dot-critical"
                     : section.tone === "estimated"
-                      ? "bg-yellow-300 text-yellow-300 ring-yellow-300/15"
+                      ? "app-timeline-dot-estimated"
                       : section.tone === "paid"
-                        ? "bg-lime-400/70 text-lime-400/70 ring-lime-300/10"
-                        : "bg-cyan-300 text-cyan-300 ring-cyan-300/15"
+                        ? "app-timeline-dot-paid"
+                        : ""
                 }`}
               />
               <span className="absolute bottom-[-1.25rem] left-[3px] top-5 w-px bg-white/12" />
 
               {section.id === "today" ? (
-                <div className="absolute -left-2 -top-2 bottom-[-1.25rem] w-[3px] rounded-full bg-cyan-200 shadow-[0_0_24px_rgba(103,232,249,0.9)]" />
+                <div className="app-today-line absolute -left-2 -top-2 bottom-[-1.25rem] w-[3px] rounded-full" />
               ) : null}
 
               <header className={`mb-1.5 flex items-end justify-between gap-3 ${section.anchorDate < today ? "opacity-70" : ""}`}>
@@ -311,7 +316,8 @@ export function ExpenseList({
                               activeDropTarget?.date === day &&
                               !activeDropTarget.rowId
                             }
-                            label="Soltar aquí"
+                            label={t("expenses.dropHere", language)}
+                            locale={locale}
                           />
                         ))
                       : null}
@@ -324,6 +330,7 @@ export function ExpenseList({
                             category.id === occurrence.template.categoryId,
                         )}
                         today={today}
+                        language={language}
                         onTogglePaid={onTogglePaid}
                         dropPosition={
                           activeDropTarget?.rowId === occurrence.id
@@ -342,14 +349,15 @@ export function ExpenseList({
                               activeDropTarget?.date === day &&
                               !activeDropTarget.rowId
                             }
-                            label="Soltar aquí"
+                            label={t("expenses.dropHere", language)}
+                            locale={locale}
                           />
                         ))
                       : null}
                   </>
                 ) : (
                   <div className="rounded-2xl border border-cyan-200/16 bg-white/[0.045] px-3 py-3 text-sm font-medium text-white">
-                    Sin cargos previstos hoy
+                    {t("expenses.todayEmpty", language)}
                   </div>
                 )}
               </div>
@@ -360,9 +368,11 @@ export function ExpenseList({
       ) : (
         <div className="grid place-items-center rounded-[1.25rem] border border-dashed border-white/15 bg-white/[0.04] px-6 py-14 text-center">
           <Home size={32} className="text-slate-500" />
-          <p className="mt-3 font-semibold text-white">Nada pendiente</p>
+          <p className="mt-3 font-semibold text-white">
+            {t("expenses.emptyTitle", language)}
+          </p>
           <p className="mt-1 max-w-xs text-sm text-slate-400">
-            Usa el campo superior para encontrar un gasto o crear uno nuevo en segundos.
+            {t("expenses.emptyBody", language)}
           </p>
         </div>
       )}
@@ -370,11 +380,11 @@ export function ExpenseList({
       {pendingMove ? (
         <div className="fixed inset-x-3 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 mx-auto max-w-md rounded-[1.35rem] border border-white/10 bg-slate-950/94 p-3 text-white shadow-[0_24px_70px_rgba(0,0,0,0.58)] backdrop-blur-2xl">
           <p className="text-sm font-semibold">
-            Movido {pendingMove.occurrence.template.name} al{" "}
-            {format(parseISO(pendingMove.dueDate), "d MMMM", { locale: es })}
+            {t("expenses.moved", language)} {pendingMove.occurrence.template.name}{" "}
+            {format(parseISO(pendingMove.dueDate), "d MMMM", { locale })}
           </p>
           <p className="mt-1 text-xs text-slate-300">
-            Se ha aplicado como cambio puntual. Puedes actualizar también el loop.
+            {t("expenses.movedDetail", language)}
           </p>
           <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
             <button
@@ -382,14 +392,14 @@ export function ExpenseList({
               onClick={applySeriesMove}
               className="h-11 rounded-2xl bg-lime-300 text-sm font-semibold text-slate-950 shadow-[0_0_30px_rgba(132,204,22,0.22)]"
             >
-              Este y siguientes
+              {t("expenses.thisAndNext", language)}
             </button>
             <button
               type="button"
               onClick={closeMoveSheet}
               className="h-11 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white ring-1 ring-white/10"
             >
-              Ok
+              {t("common.ok", language)}
             </button>
           </div>
         </div>
@@ -415,10 +425,12 @@ function EmptyDayTarget({
   date,
   active,
   label,
+  locale,
 }: {
   date: string;
   active: boolean;
   label: string;
+  locale: Locale;
 }) {
   const { setNodeRef } = useDroppable({
     id: `day:${date}`,
@@ -439,7 +451,7 @@ function EmptyDayTarget({
         <span className="absolute inset-x-4 -top-1 h-0.5 rounded-full bg-lime-200 shadow-[0_0_18px_rgba(190,242,100,0.9)]" />
       ) : null}
       <span className="capitalize">
-        {format(parseISO(date), "EEEE d", { locale: es })}
+        {format(parseISO(date), "EEEE d", { locale })}
       </span>
       {active ? (
         <span className="float-right text-[11px] font-semibold text-lime-100">

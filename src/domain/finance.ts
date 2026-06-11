@@ -36,9 +36,9 @@ export const defaultFinanceStore: FinanceStore = {
     },
   ],
   allocation: {
-    sabadellAccountName: "Sabadell gastos",
-    bbvaSavingsAccountName: "BBVA ahorro",
-    bbvaMainAccountName: "BBVA principal",
+    expensesAccountName: "Cuenta gastos",
+    savingsAccountName: "Cuenta ahorro",
+    primaryAccountName: "Cuenta principal",
     monthlySavingsTarget: 300,
   },
 };
@@ -47,9 +47,9 @@ export const emptyFinanceStore: FinanceStore = {
   incomeSources: [],
   incomeEvents: [],
   allocation: {
-    sabadellAccountName: "Cuenta gastos",
-    bbvaSavingsAccountName: "Cuenta ahorro",
-    bbvaMainAccountName: "Cuenta principal",
+    expensesAccountName: "Cuenta gastos",
+    savingsAccountName: "Cuenta ahorro",
+    primaryAccountName: "Cuenta principal",
     monthlySavingsTarget: 0,
   },
 };
@@ -76,14 +76,14 @@ export function buildMonthlyMoneyPlan({
   const fixedExpensesTotal = occurrences
     .filter((occurrence) => occurrence.dueDate >= monthStart && occurrence.dueDate <= monthEnd)
     .reduce((sum, occurrence) => sum + occurrence.template.amount, 0);
-  const sabadellContribution = Math.min(incomeTotal, fixedExpensesTotal);
-  const afterExpenses = incomeTotal - sabadellContribution;
-  const bbvaSavingsContribution = Math.min(
+  const expensesContribution = Math.min(incomeTotal, fixedExpensesTotal);
+  const afterExpenses = incomeTotal - expensesContribution;
+  const savingsContribution = Math.min(
     Math.max(afterExpenses, 0),
     finance.allocation.monthlySavingsTarget,
   );
-  const bbvaMainContribution = Math.max(
-    afterExpenses - bbvaSavingsContribution,
+  const primaryContribution = Math.max(
+    afterExpenses - savingsContribution,
     0,
   );
   const shortfall = Math.max(fixedExpensesTotal - incomeTotal, 0);
@@ -94,16 +94,16 @@ export function buildMonthlyMoneyPlan({
     recurringIncomeTotal,
     extraIncomeTotal,
     fixedExpensesTotal,
-    sabadellContribution,
-    bbvaSavingsContribution,
-    bbvaMainContribution,
+    expensesContribution,
+    savingsContribution,
+    primaryContribution,
     shortfall,
   };
 }
 
 export function financeSummaryLabel(plan: MonthlyMoneyPlan): string {
   if (plan.shortfall > 0) return `Faltan ${formatCurrency(plan.shortfall)}`;
-  return `${formatCurrency(plan.bbvaMainContribution)} libres`;
+  return `${formatCurrency(plan.primaryContribution)} libres`;
 }
 
 export function createIncomeEvent(input: {

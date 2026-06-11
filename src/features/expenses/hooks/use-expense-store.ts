@@ -2,19 +2,29 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { toDateOnly } from "@/domain/calendar";
+import { startOfMonth } from "date-fns";
+import { buildDateWithDay, toDateOnly } from "@/domain/calendar";
 import {
   createIncomeEvent,
   updateSalarySource,
 } from "@/domain/finance";
 import { emptyStore } from "@/domain/seed";
-import type { DraftExpense, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
+import type {
+  AppLanguage,
+  AppTheme,
+  CreateExpenseOptions,
+  DraftExpense,
+  ExpenseOccurrence,
+  ExpenseStore,
+} from "@/domain/types";
 import { loadCloudStore, saveCloudStore } from "@/lib/cloud-store";
 import {
   loadExpenseStore,
   mergeExpenseStores,
   saveExpenseStore,
 } from "@/lib/local-store";
+import { persistLanguagePreference, readLanguageCookie, t } from "@/lib/i18n";
+import { applyAppTheme, readThemeCookie } from "@/lib/theme";
 import { createClient } from "@/utils/supabase/client";
 import {
   buildTemplateFromDraft,
@@ -24,13 +34,31 @@ import {
 
 type SyncStatus = "local" | "syncing" | "synced" | "error";
 
+function applyRuntimePreferences(store: ExpenseStore): ExpenseStore {
+  const theme = readThemeCookie();
+  const language = readLanguageCookie();
+
+  if (!theme && !language) return store;
+
+  return {
+    ...store,
+    preferences: {
+      ...store.preferences,
+      theme: theme ?? store.preferences?.theme ?? "legacy",
+      language: language ?? store.preferences?.language ?? "es",
+    },
+  };
+}
+
 export function useExpenseStore() {
   const [store, setStore] = useState<ExpenseStore>(() => emptyStore);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("local");
-  const [syncMessage, setSyncMessage] = useState("Modo local");
+  const [syncMessage, setSyncMessage] = useState(() => t("common.localMode"));
+  const [isHydrated, setIsHydrated] = useState(false);
   const supabaseRef = useRef<SupabaseClient | null>(null);
   const userRef = useRef<User | null>(null);
   const hydratedRef = useRef(false);
+  const localRevisionRef = useRef(0);
   const saveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -39,11 +67,13 @@ export function useExpenseStore() {
     supabaseRef.current = supabase;
 
     async function hydrate() {
-      const localStore = loadExpenseStore();
+      const localStore = applyRuntimePreferences(loadExpenseStore());
+      saveExpenseStore(localStore);
       if (active) setStore(localStore);
 
       if (!supabase) {
         hydratedRef.current = true;
+        setIsHydrated(true);
         return;
       }
 
@@ -51,39 +81,49 @@ export function useExpenseStore() {
       const user = data.user;
       if (!active || !user) {
         hydratedRef.current = true;
+        setIsHydrated(true);
         setSyncStatus("local");
-        setSyncMessage("Modo local");
+        setSyncMessage(t("common.localMode"));
         return;
       }
 
       userRef.current = user;
       setSyncStatus("syncing");
-      setSyncMessage("Preparando nube");
+      setSyncMessage(t("settings.preparingCloud"));
 
       try {
         const cloud = await loadCloudStore(supabase, user);
         if (!active) return;
 
-        const merged = mergeExpenseStores(localStore, cloud.store);
+        const currentRevision = localRevisionRef.current;
+        const latestLocalStore =
+          currentRevision > 0
+            ? applyRuntimePreferences(loadExpenseStore())
+            : localStore;
+        const merged = mergeExpenseStores(latestLocalStore, cloud.store);
         saveExpenseStore(merged);
-        setStore(merged);
+        if (active && localRevisionRef.current === currentRevision) {
+          setStore(merged);
+        }
         hydratedRef.current = true;
+        setIsHydrated(true);
 
         const saved = await saveCloudStore(supabase, user, merged);
         if (!active) return;
         setSyncStatus("synced");
         setSyncMessage(
           saved.mode === "table"
-            ? "Sincronizado en la nube"
-            : "Guardado en este dispositivo",
+            ? t("settings.syncedCloud")
+            : t("settings.savedDevice"),
         );
       } catch (error) {
         hydratedRef.current = true;
+        setIsHydrated(true);
         setSyncStatus("error");
         setSyncMessage(
           error instanceof Error
             ? error.message
-            : "No se pudo sincronizar con la nube.",
+            : t("settings.cloudSyncError"),
         );
       }
     }
@@ -98,6 +138,7 @@ export function useExpenseStore() {
   }, []);
 
   function persist(nextStore: ExpenseStore) {
+    localRevisionRef.current += 1;
     saveExpenseStore(nextStore);
     setStore(nextStore);
     queueCloudSave(nextStore);
@@ -111,14 +152,14 @@ export function useExpenseStore() {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
       setSyncStatus("syncing");
-      setSyncMessage("Guardando cambios");
+      setSyncMessage(t("settings.savingChanges"));
       void saveCloudStore(supabase, user, nextStore)
         .then((result) => {
           setSyncStatus("synced");
           setSyncMessage(
             result.mode === "table"
-              ? "Sincronizado en la nube"
-              : "Guardado localmente",
+              ? t("settings.syncedCloud")
+              : t("settings.savedLocal"),
           );
         })
         .catch((error: unknown) => {
@@ -126,24 +167,83 @@ export function useExpenseStore() {
           setSyncMessage(
             error instanceof Error
               ? error.message
-              : "No se pudo guardar en la nube.",
+              : t("settings.cloudSaveError"),
           );
         });
     }, 350);
   }
 
-  function addExpense(draft: DraftExpense) {
+  function addExpense(draft: DraftExpense, options: CreateExpenseOptions = {}) {
     const categoryResult = findOrCreateCategory(store, draft.categoryName);
+    const startDate = toDateOnly(startOfMonth(new Date()));
     const template = buildTemplateFromDraft(
       draft,
       categoryResult.categoryId,
-      toDateOnly(new Date()),
+      startDate,
     );
+    const occurrenceDate = toDateOnly(buildDateWithDay(new Date(), draft.dueDay));
+    const initialOverrides =
+      options.initialStatus === "paid"
+        ? [
+            {
+              id: createId("ovr"),
+              userId: "demo",
+              templateId: template.id,
+              occurrenceDate,
+              status: "paid" as const,
+              paidAt: new Date().toISOString(),
+              amountPaid: template.amount,
+            },
+          ]
+        : [];
 
     persist({
       ...categoryResult.store,
       templates: [...categoryResult.store.templates, template],
+      overrides: [...categoryResult.store.overrides, ...initialOverrides],
     });
+  }
+
+  function deleteExpense(templateId: string) {
+    persist({
+      ...store,
+      templates: store.templates.filter((template) => template.id !== templateId),
+      overrides: store.overrides.filter(
+        (override) => override.templateId !== templateId,
+      ),
+    });
+  }
+
+  async function clearExpenses() {
+    const nextStore = {
+      ...store,
+      categories: [],
+      templates: [],
+      overrides: [],
+    };
+    const supabase = supabaseRef.current;
+    const user = userRef.current;
+
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
+    if (hydratedRef.current && supabase && user) {
+      setSyncStatus("syncing");
+      setSyncMessage(t("settings.clearingCloudExpenses"));
+      const result = await saveCloudStore(supabase, user, nextStore);
+      setSyncStatus("synced");
+      setSyncMessage(
+        result.mode === "table"
+          ? t("settings.syncedCloud")
+          : t("settings.savedLocal"),
+      );
+    }
+
+    localRevisionRef.current += 1;
+    saveExpenseStore(nextStore);
+    setStore(nextStore);
   }
 
   function togglePaid(occurrence: ExpenseOccurrence) {
@@ -256,9 +356,9 @@ export function useExpenseStore() {
   }
 
   function updateAllocationNames(input: {
-    sabadellAccountName: string;
-    bbvaSavingsAccountName: string;
-    bbvaMainAccountName: string;
+    expensesAccountName: string;
+    savingsAccountName: string;
+    primaryAccountName: string;
   }) {
     persist({
       ...store,
@@ -266,12 +366,12 @@ export function useExpenseStore() {
         ...store.finance,
         allocation: {
           ...store.finance.allocation,
-          sabadellAccountName:
-            input.sabadellAccountName.trim() || "Sabadell gastos",
-          bbvaSavingsAccountName:
-            input.bbvaSavingsAccountName.trim() || "BBVA ahorro",
-          bbvaMainAccountName:
-            input.bbvaMainAccountName.trim() || "BBVA principal",
+          expensesAccountName:
+            input.expensesAccountName.trim() || "Cuenta gastos",
+          savingsAccountName:
+            input.savingsAccountName.trim() || "Cuenta ahorro",
+          primaryAccountName:
+            input.primaryAccountName.trim() || "Cuenta principal",
         },
       },
     });
@@ -281,9 +381,9 @@ export function useExpenseStore() {
     salaryAmount: number;
     salaryDay: number;
     savingsTarget: number;
-    sabadellAccountName: string;
-    bbvaSavingsAccountName: string;
-    bbvaMainAccountName: string;
+    expensesAccountName: string;
+    savingsAccountName: string;
+    primaryAccountName: string;
   }) {
     persist({
       ...store,
@@ -297,12 +397,12 @@ export function useExpenseStore() {
         allocation: {
           ...store.finance.allocation,
           monthlySavingsTarget: Math.max(Number(input.savingsTarget), 0),
-          sabadellAccountName:
-            input.sabadellAccountName.trim() || "Sabadell gastos",
-          bbvaSavingsAccountName:
-            input.bbvaSavingsAccountName.trim() || "BBVA ahorro",
-          bbvaMainAccountName:
-            input.bbvaMainAccountName.trim() || "BBVA principal",
+          expensesAccountName:
+            input.expensesAccountName.trim() || "Cuenta gastos",
+          savingsAccountName:
+            input.savingsAccountName.trim() || "Cuenta ahorro",
+          primaryAccountName:
+            input.primaryAccountName.trim() || "Cuenta principal",
         },
       },
     });
@@ -326,10 +426,47 @@ export function useExpenseStore() {
     });
   }
 
+  function deleteIncomeEvent(eventId: string) {
+    persist({
+      ...store,
+      finance: {
+        ...store.finance,
+        incomeEvents: store.finance.incomeEvents.filter(
+          (event) => event.id !== eventId,
+        ),
+      },
+    });
+  }
+
+  function updateTheme(theme: AppTheme) {
+    applyAppTheme(theme);
+    persist({
+      ...store,
+      preferences: {
+        ...store.preferences,
+        theme,
+      },
+    });
+  }
+
+  function updateLanguage(language: AppLanguage) {
+    persistLanguagePreference(language);
+    persist({
+      ...store,
+      preferences: {
+        ...store.preferences,
+        theme: store.preferences?.theme ?? "legacy",
+        language,
+      },
+    });
+  }
+
   return {
     store,
     persist,
     addExpense,
+    deleteExpense,
+    clearExpenses,
     togglePaid,
     moveOccurrence,
     moveOccurrenceSeries,
@@ -338,7 +475,11 @@ export function useExpenseStore() {
     updateAllocationNames,
     updateMoneySettings,
     addIncomeEvent,
+    deleteIncomeEvent,
+    updateTheme,
+    updateLanguage,
     syncStatus,
     syncMessage,
+    isHydrated,
   };
 }

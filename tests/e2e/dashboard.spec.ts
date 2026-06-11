@@ -18,17 +18,21 @@ async function clearStore(page: import("@playwright/test").Page) {
   }, storageKey);
 }
 
-async function swipeLeftFromRow(page: import("@playwright/test").Page, name: string) {
+async function swipeRow(
+  page: import("@playwright/test").Page,
+  name: string,
+  distance: number,
+) {
   const row = page.locator('[data-expense-row="true"]').filter({ hasText: name }).first();
   await row.scrollIntoViewIfNeeded();
   const box = await row.boundingBox();
   expect(box).not.toBeNull();
 
+  const startX = Math.min(box!.x + 300, 354);
   const y = box!.y + box!.height / 2;
-  await page.mouse.move(Math.min(box!.x + 260, 354), y);
+  await page.mouse.move(startX, y);
   await page.mouse.down();
-  await page.mouse.move(Math.min(box!.x + 150, 280), y, { steps: 6 });
-  await page.mouse.move(Math.max(box!.x + 20, 48), y, { steps: 6 });
+  await page.mouse.move(startX - distance, y, { steps: 8 });
   await page.mouse.up();
 }
 
@@ -40,7 +44,7 @@ test("starts empty for a new local user", async ({ page }) => {
   await expect(page.getByText("0,00 €").first()).toBeVisible();
   await expect(page.getByText("Sin cargos previstos hoy")).toBeVisible();
 
-  await page.getByRole("link", { name: "Dinero" }).click();
+  await page.getByRole("link", { name: "Plan" }).click();
   await expect(page.getByText("Ingresos 0,00 €")).toBeVisible();
   await expect(page.getByText("Objetivo: 0,00 €")).toBeVisible();
 });
@@ -51,7 +55,7 @@ test("creates and pays a parsed recurring expense", async ({ page }) => {
 
   await expect(page.getByText("Por pagar")).toBeVisible();
   await page
-    .getByPlaceholder("Netflix 15,99 mensual día 12")
+    .getByPlaceholder("Ej: Luz 64,75 mensual día 8")
     .fill("Spotify 10,99 mensual el dia 12 musica");
   await page.getByRole("button", { name: "Analizar texto" }).click();
 
@@ -61,27 +65,31 @@ test("creates and pays a parsed recurring expense", async ({ page }) => {
   await expect(
     page.locator('[data-expense-row="true"]').filter({ hasText: "Spotify el musica" }).first(),
   ).toBeVisible();
-  await swipeLeftFromRow(page, "Spotify el musica");
+  await swipeRow(page, "Spotify el musica", 240);
   await expect(page.getByText("pagado").first()).toBeVisible();
 });
 
-test("marks an overdue expense as paid with a left swipe", async ({ page }) => {
+test("requires a full left swipe before paying an expense", async ({ page }) => {
   await loadDemoStore(page);
   await page.goto("/");
 
   await expect(page.getByText("Atrasado")).toBeVisible();
-  await swipeLeftFromRow(page, "Movistar");
+  await swipeRow(page, "Movistar", 72);
+  await expect(
+    page.locator('[data-expense-row="true"]').filter({ hasText: "Movistar" }).first(),
+  ).toContainText("hace");
 
+  await swipeRow(page, "Movistar", 240);
   await expect(page.getByText("Pagado").first()).toBeVisible();
 });
 
-test("opens money plan and configuration sheet", async ({ page }) => {
+test("opens plan and configuration sheet", async ({ page }) => {
   await loadDemoStore(page);
   await page.goto("/");
 
-  await page.getByRole("link", { name: "Dinero" }).click();
+  await page.getByRole("link", { name: "Plan" }).click();
   await expect(page).toHaveURL(/\/money$/);
-  await expect(page.getByText("Reparto del mes")).toBeVisible();
+  await expect(page.getByText("Plan del mes")).toBeVisible();
   await expect(page.getByText("Ingreso puntual")).toBeVisible();
 
   await page.getByRole("button", { name: "Configurar" }).click();

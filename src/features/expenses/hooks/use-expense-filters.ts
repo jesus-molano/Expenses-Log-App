@@ -4,10 +4,10 @@ import { endOfMonth, startOfMonth } from "date-fns";
 import { useMemo, useState } from "react";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
 import { generateOccurrences } from "@/domain/recurrence";
-import type { ExpenseStore } from "@/domain/types";
+import type { AppLanguage, ExpenseStore } from "@/domain/types";
 import { buildTimelineSections } from "../lib/timeline";
 
-export function useExpenseFilters(store: ExpenseStore) {
+export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
   const [query, setQuery] = useState("");
 
   const today = toDateOnly(new Date());
@@ -46,7 +46,11 @@ export function useExpenseFilters(store: ExpenseStore) {
         occurrence.estimatedChargeDate <= windowEnd,
     )
     .reduce((sum, occurrence) => sum + occurrence.template.amount, 0);
-  const timelineSections = buildTimelineSections(visibleOccurrences, today);
+  const timelineSections = buildTimelineSections(
+    visibleOccurrences,
+    today,
+    language,
+  );
   const nextOccurrence =
     visibleOccurrences.find(
       (occurrence) =>

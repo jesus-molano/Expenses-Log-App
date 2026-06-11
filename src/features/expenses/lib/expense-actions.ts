@@ -1,12 +1,16 @@
 import { daysBetween } from "@/domain/calendar";
 import { resolvePresetCategory } from "@/domain/categories";
+import { format, parseISO } from "date-fns";
+import { enUS, es } from "date-fns/locale";
 import type {
+  AppLanguage,
   DraftExpense,
   ExpenseCategory,
   ExpenseOccurrence,
   ExpenseStore,
   ExpenseTemplate,
 } from "@/domain/types";
+import { t } from "@/lib/i18n";
 
 export function createId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
@@ -59,13 +63,14 @@ export function buildTemplateFromDraft(
   return {
     id: createId("exp"),
     userId: "demo",
-    name: draft.name.trim() || "Nuevo gasto",
+    name: draft.name.trim() || t("expenses.newExpense"),
     description: draft.description.trim(),
     amount: Number(draft.amount),
     currency: "EUR",
     categoryId,
     tags: draft.tags,
     startDate,
+    endDate: draft.endDate || undefined,
     dueDay: draft.dueDay,
     recurrence: draft.recurrence,
     active: true,
@@ -76,23 +81,37 @@ export function buildTemplateFromDraft(
 
 export function categoryToneClass(tone: ExpenseCategory["tone"]): string {
   return {
-    blue: "bg-cyan-300/18 text-cyan-100 ring-1 ring-cyan-200/35",
-    green: "bg-lime-300/18 text-lime-100 ring-1 ring-lime-200/35",
-    orange: "bg-orange-400/18 text-orange-100 ring-1 ring-orange-200/35",
-    rose: "bg-rose-400/18 text-rose-100 ring-1 ring-rose-200/35",
-    violet: "bg-violet-400/18 text-violet-100 ring-1 ring-violet-200/35",
-    slate: "bg-white/12 text-slate-100 ring-1 ring-white/15",
+    blue: "app-chip app-chip-blue",
+    green: "app-chip app-chip-green",
+    orange: "app-chip app-chip-orange",
+    rose: "app-chip app-chip-rose",
+    violet: "app-chip app-chip-violet",
+    slate: "app-chip app-chip-slate",
   }[tone];
 }
 
-export function statusLabel(occurrence: ExpenseOccurrence, today: string): string {
-  if (occurrence.status === "paid") return "pagado";
+export function statusLabel(
+  occurrence: ExpenseOccurrence,
+  today: string,
+  language: AppLanguage = "es",
+): string {
+  if (occurrence.status === "paid") return t("expenses.statusPaid", language);
 
   const delta = daysBetween(today, occurrence.dueDate);
-  if (delta === 0) return "vence hoy";
-  if (delta < 0) return `hace ${Math.abs(delta)} días`;
-  if (occurrence.estimatedChargeDate !== occurrence.dueDate) {
-    return occurrence.estimatedChargeLabel;
+  if (delta === 0) return t("expenses.statusDueToday", language);
+  if (delta < 0) {
+    const days = Math.abs(delta);
+    return language === "en"
+      ? `${days} ${days === 1 ? t("expenses.day", language) : t("expenses.days", language)} ago`
+      : `${t("expenses.daysAgo", language)} ${days} ${days === 1 ? t("expenses.day", language) : t("expenses.days", language)}`;
   }
-  return `en ${delta} días`;
+  if (occurrence.estimatedChargeDate !== occurrence.dueDate) {
+    const locale = language === "en" ? enUS : es;
+    return `${t("expenses.estimated", language).toLowerCase()} ${format(
+      parseISO(occurrence.estimatedChargeDate),
+      "EEEE d",
+      { locale },
+    )}`;
+  }
+  return `${t("expenses.daysAhead", language)} ${delta} ${delta === 1 ? t("expenses.day", language) : t("expenses.days", language)}`;
 }

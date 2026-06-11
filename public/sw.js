@@ -1,23 +1,63 @@
+const CACHE_NAME = "expense-reminders-v4";
+const APP_SHELL_ASSETS = [
+  "/manifest.webmanifest?v=4",
+  "/icon-192.png?v=4",
+  "/icon-512.png?v=4",
+  "/apple-touch-icon.png?v=4",
+  "/favicon.ico?v=4",
+];
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open("expense-reminders-v1").then((cache) =>
-      cache.addAll(["/", "/manifest.webmanifest", "/icon.svg"]),
-    ),
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL_ASSETS)),
   );
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key !== CACHE_NAME)
+            .map((key) => caches.delete(key)),
+        ),
+      )
+      .then(() => self.clients.claim()),
+  );
 });
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
+  if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request).catch(() => caches.match("/")));
+    return;
+  }
+
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith("/_next/")) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        if (response.ok && url.origin === self.location.origin) {
+          event.waitUntil(
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)),
+          );
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
+      .then((cached) => {
       if (cached) return cached;
-      return fetch(event.request).catch(() => caches.match("/"));
+      return caches.match("/");
     }),
   );
 });
@@ -32,8 +72,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icon.svg",
-      badge: "/icon.svg",
+      icon: "/icon-192.png?v=4",
+      badge: "/icon-192.png?v=4",
       data: { url: data.url ?? "/" },
     }),
   );

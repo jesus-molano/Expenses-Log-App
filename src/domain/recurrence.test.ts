@@ -57,6 +57,22 @@ describe("recurrence", () => {
     ).toEqual(["2026-05-18"]);
   });
 
+  it("includes the configured end month and excludes later monthly charges", () => {
+    expect(
+      generateTemplateDates(
+        {
+          ...baseTemplate,
+          startDate: "2026-05-20",
+          endDate: "2026-06-20",
+          dueDay: 20,
+          recurrence: { frequency: "monthly" },
+        },
+        "2026-05-01",
+        "2026-07-31",
+      ),
+    ).toEqual(["2026-05-20", "2026-06-20"]);
+  });
+
   it("clips annual due day to the configured month end", () => {
     expect(
       generateTemplateDates(

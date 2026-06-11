@@ -1,0 +1,658 @@
+{
+  "categories": [
+    {
+      "id": "cat-home",
+      "userId": "demo",
+      "name": "Casa",
+      "icon": "Home",
+      "tone": "green"
+    },
+    {
+      "id": "cat-subscriptions",
+      "userId": "demo",
+      "name": "Suscripciones",
+      "icon": "Sparkles",
+      "tone": "violet"
+    },
+    {
+      "id": "cat-services",
+      "userId": "demo",
+      "name": "Servicios",
+      "icon": "WalletCards",
+      "tone": "blue"
+    },
+    {
+      "id": "cat-transport",
+      "userId": "demo",
+      "name": "Transporte",
+      "icon": "Car",
+      "tone": "orange"
+    },
+    {
+      "id": "cat-debt",
+      "userId": "demo",
+      "name": "Deudas",
+      "icon": "CreditCard",
+      "tone": "rose"
+    },
+    {
+      "id": "cat-personal",
+      "userId": "demo",
+      "name": "Personal",
+      "icon": "HeartPulse",
+      "tone": "green"
+    },
+    {
+      "id": "cat-general",
+      "userId": "demo",
+      "name": "General",
+      "icon": "WalletCards",
+      "tone": "slate"
+    }
+  ],
+  "templates": [
+    {
+      "id": "exp-home-expenses",
+      "userId": "demo",
+      "name": "Gastos de casa",
+      "description": "Piso, gatos y compra unificados",
+      "amount": 660,
+      "currency": "EUR",
+      "categoryId": "cat-home",
+      "tags": [
+        "casa",
+        "piso",
+        "compra",
+        "gatos"
+      ],
+      "startDate": "2026-05-01",
+      "dueDay": 1,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-movistar",
+      "userId": "demo",
+      "name": "Movistar",
+      "description": "Linea y fibra",
+      "amount": 60,
+      "currency": "EUR",
+      "categoryId": "cat-services",
+      "tags": [
+        "servicios",
+        "internet"
+      ],
+      "startDate": "2026-05-08",
+      "dueDay": 8,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-game-pass",
+      "userId": "demo",
+      "name": "Game Pass",
+      "description": "Suscripcion gaming",
+      "amount": 12,
+      "currency": "EUR",
+      "categoryId": "cat-subscriptions",
+      "tags": [
+        "suscripciones",
+        "ocio"
+      ],
+      "startDate": "2026-05-12",
+      "dueDay": 12,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-deudas-sam",
+      "userId": "demo",
+      "name": "Deudas Sam",
+      "description": "Pago mensual",
+      "amount": 60,
+      "currency": "EUR",
+      "categoryId": "cat-debt",
+      "tags": [
+        "deudas"
+      ],
+      "startDate": "2026-05-01",
+      "dueDay": 1,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-parking",
+      "userId": "demo",
+      "name": "Parking",
+      "description": "Garaje",
+      "amount": 30,
+      "currency": "EUR",
+      "categoryId": "cat-transport",
+      "tags": [
+        "transporte",
+        "coche"
+      ],
+      "startDate": "2026-05-01",
+      "dueDay": 1,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-gasolina",
+      "userId": "demo",
+      "name": "Gasolina",
+      "description": "Estimacion mensual",
+      "amount": 65,
+      "currency": "EUR",
+      "categoryId": "cat-transport",
+      "tags": [
+        "transporte",
+        "coche"
+      ],
+      "startDate": "2026-05-01",
+      "dueDay": 1,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-car-loan",
+      "userId": "demo",
+      "name": "Coche",
+      "description": "Ultima letra del coche",
+      "amount": 272,
+      "currency": "EUR",
+      "categoryId": "cat-transport",
+      "tags": [
+        "transporte",
+        "coche",
+        "deudas"
+      ],
+      "startDate": "2026-05-01",
+      "endDate": "2026-06-30",
+      "dueDay": 1,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-1password",
+      "userId": "demo",
+      "name": "1password",
+      "description": "Password manager",
+      "amount": 4,
+      "currency": "EUR",
+      "categoryId": "cat-subscriptions",
+      "tags": [
+        "suscripciones",
+        "personal"
+      ],
+      "startDate": "2026-05-15",
+      "dueDay": 15,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-icloud",
+      "userId": "demo",
+      "name": "iCloud",
+      "description": "Almacenamiento",
+      "amount": 3.99,
+      "currency": "EUR",
+      "categoryId": "cat-subscriptions",
+      "tags": [
+        "suscripciones",
+        "servicios"
+      ],
+      "startDate": "2026-05-15",
+      "dueDay": 15,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-dazn",
+      "userId": "demo",
+      "name": "Dazn",
+      "description": "Deportes",
+      "amount": 15,
+      "currency": "EUR",
+      "categoryId": "cat-subscriptions",
+      "tags": [
+        "suscripciones",
+        "ocio"
+      ],
+      "startDate": "2026-05-15",
+      "dueDay": 15,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-macrofactor",
+      "userId": "demo",
+      "name": "Macrofactor",
+      "description": "App nutricion",
+      "amount": 12,
+      "currency": "EUR",
+      "categoryId": "cat-personal",
+      "tags": [
+        "salud",
+        "personal"
+      ],
+      "startDate": "2026-05-10",
+      "dueDay": 10,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-codex",
+      "userId": "demo",
+      "name": "Codex",
+      "description": "AI coding",
+      "amount": 90,
+      "currency": "EUR",
+      "categoryId": "cat-subscriptions",
+      "tags": [
+        "suscripciones",
+        "personal"
+      ],
+      "startDate": "2026-05-06",
+      "dueDay": 6,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-youtube",
+      "userId": "demo",
+      "name": "Youtube",
+      "description": "Premium",
+      "amount": 15,
+      "currency": "EUR",
+      "categoryId": "cat-subscriptions",
+      "tags": [
+        "suscripciones",
+        "ocio"
+      ],
+      "startDate": "2026-05-02",
+      "dueDay": 2,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-el-corte-ingles",
+      "userId": "demo",
+      "name": "El corte ingles",
+      "description": "Compra financiada",
+      "amount": 90,
+      "currency": "EUR",
+      "categoryId": "cat-general",
+      "tags": [
+        "deudas",
+        "compra"
+      ],
+      "startDate": "2026-05-01",
+      "dueDay": 1,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-netflix",
+      "userId": "demo",
+      "name": "Netflix",
+      "description": "Streaming",
+      "amount": 25,
+      "currency": "EUR",
+      "categoryId": "cat-subscriptions",
+      "tags": [
+        "suscripciones",
+        "ocio"
+      ],
+      "startDate": "2026-05-01",
+      "dueDay": 1,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-gym",
+      "userId": "demo",
+      "name": "Gym",
+      "description": "Gimnasio",
+      "amount": 50,
+      "currency": "EUR",
+      "categoryId": "cat-personal",
+      "tags": [
+        "salud",
+        "personal"
+      ],
+      "startDate": "2026-05-01",
+      "dueDay": 1,
+      "recurrence": {
+        "frequency": "monthly"
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    },
+    {
+      "id": "exp-car-insurance",
+      "userId": "demo",
+      "name": "Seguro coche",
+      "description": "Seguro anual del coche",
+      "amount": 148.5,
+      "currency": "EUR",
+      "categoryId": "cat-transport",
+      "tags": [
+        "transporte",
+        "coche",
+        "anual"
+      ],
+      "startDate": "2026-05-18",
+      "dueDay": 18,
+      "recurrence": {
+        "frequency": "yearly",
+        "annualMonth": 5
+      },
+      "active": true,
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z"
+    }
+  ],
+  "overrides": [
+    {
+      "id": "ovr-car-loan-may",
+      "userId": "demo",
+      "templateId": "exp-car-loan",
+      "occurrenceDate": "2026-05-01",
+      "status": "paid",
+      "paidAt": "2026-05-01T12:00:00.000Z",
+      "amountPaid": 272
+    },
+    {
+      "id": "ovr-deudas-sam-may",
+      "userId": "demo",
+      "templateId": "exp-deudas-sam",
+      "occurrenceDate": "2026-05-01",
+      "status": "paid",
+      "paidAt": "2026-05-01T12:00:00.000Z",
+      "amountPaid": 60
+    },
+    {
+      "id": "ovr-el-corte-ingles-may",
+      "userId": "demo",
+      "templateId": "exp-el-corte-ingles",
+      "occurrenceDate": "2026-05-01",
+      "status": "paid",
+      "paidAt": "2026-05-01T12:00:00.000Z",
+      "amountPaid": 90
+    },
+    {
+      "id": "ovr-gasolina-may",
+      "userId": "demo",
+      "templateId": "exp-gasolina",
+      "occurrenceDate": "2026-05-01",
+      "status": "paid",
+      "paidAt": "2026-05-01T12:00:00.000Z",
+      "amountPaid": 65
+    },
+    {
+      "id": "ovr-gym-may",
+      "userId": "demo",
+      "templateId": "exp-gym",
+      "occurrenceDate": "2026-05-01",
+      "status": "paid",
+      "paidAt": "2026-05-01T12:00:00.000Z",
+      "amountPaid": 50
+    },
+    {
+      "id": "ovr-home-expenses-may",
+      "userId": "demo",
+      "templateId": "exp-home-expenses",
+      "occurrenceDate": "2026-05-01",
+      "status": "paid",
+      "paidAt": "2026-05-01T12:00:00.000Z",
+      "amountPaid": 660
+    },
+    {
+      "id": "ovr-netflix-may",
+      "userId": "demo",
+      "templateId": "exp-netflix",
+      "occurrenceDate": "2026-05-01",
+      "status": "paid",
+      "paidAt": "2026-05-01T12:00:00.000Z",
+      "amountPaid": 25
+    },
+    {
+      "id": "ovr-parking-may",
+      "userId": "demo",
+      "templateId": "exp-parking",
+      "occurrenceDate": "2026-05-01",
+      "status": "paid",
+      "paidAt": "2026-05-01T12:00:00.000Z",
+      "amountPaid": 30
+    },
+    {
+      "id": "ovr-youtube-may",
+      "userId": "demo",
+      "templateId": "exp-youtube",
+      "occurrenceDate": "2026-05-02",
+      "status": "paid",
+      "paidAt": "2026-05-02T12:00:00.000Z",
+      "amountPaid": 15
+    },
+    {
+      "id": "ovr-codex-may",
+      "userId": "demo",
+      "templateId": "exp-codex",
+      "occurrenceDate": "2026-05-06",
+      "status": "paid",
+      "paidAt": "2026-05-06T12:00:00.000Z",
+      "amountPaid": 90
+    },
+    {
+      "id": "ovr-movistar-may",
+      "userId": "demo",
+      "templateId": "exp-movistar",
+      "occurrenceDate": "2026-05-08",
+      "status": "paid",
+      "paidAt": "2026-05-08T12:00:00.000Z",
+      "amountPaid": 60
+    },
+    {
+      "id": "ovr-macrofactor-may",
+      "userId": "demo",
+      "templateId": "exp-macrofactor",
+      "occurrenceDate": "2026-05-10",
+      "status": "paid",
+      "paidAt": "2026-05-10T12:00:00.000Z",
+      "amountPaid": 12
+    },
+    {
+      "id": "ovr-game-pass-may",
+      "userId": "demo",
+      "templateId": "exp-game-pass",
+      "occurrenceDate": "2026-05-12",
+      "status": "paid",
+      "paidAt": "2026-05-12T12:00:00.000Z",
+      "amountPaid": 12
+    },
+    {
+      "id": "ovr-1password-may",
+      "userId": "demo",
+      "templateId": "exp-1password",
+      "occurrenceDate": "2026-05-15",
+      "status": "paid",
+      "paidAt": "2026-05-15T12:00:00.000Z",
+      "amountPaid": 4
+    },
+    {
+      "id": "ovr-dazn-may",
+      "userId": "demo",
+      "templateId": "exp-dazn",
+      "occurrenceDate": "2026-05-15",
+      "status": "paid",
+      "paidAt": "2026-05-15T12:00:00.000Z",
+      "amountPaid": 15
+    },
+    {
+      "id": "ovr-icloud-may",
+      "userId": "demo",
+      "templateId": "exp-icloud",
+      "occurrenceDate": "2026-05-15",
+      "status": "paid",
+      "paidAt": "2026-05-15T12:00:00.000Z",
+      "amountPaid": 3.99
+    },
+    {
+      "id": "ovr-car-insurance-may",
+      "userId": "demo",
+      "templateId": "exp-car-insurance",
+      "occurrenceDate": "2026-05-18",
+      "status": "paid",
+      "paidAt": "2026-05-18T12:00:00.000Z",
+      "amountPaid": 148.5
+    },
+    {
+      "id": "ovr-car-loan-jun",
+      "userId": "demo",
+      "templateId": "exp-car-loan",
+      "occurrenceDate": "2026-06-01",
+      "status": "paid",
+      "paidAt": "2026-06-01T12:00:00.000Z",
+      "amountPaid": 272
+    },
+    {
+      "id": "ovr-el-corte-ingles-jun",
+      "userId": "demo",
+      "templateId": "exp-el-corte-ingles",
+      "occurrenceDate": "2026-06-01",
+      "status": "paid",
+      "paidAt": "2026-06-01T12:00:00.000Z",
+      "amountPaid": 90
+    },
+    {
+      "id": "ovr-gym-jun",
+      "userId": "demo",
+      "templateId": "exp-gym",
+      "occurrenceDate": "2026-06-01",
+      "status": "paid",
+      "paidAt": "2026-06-01T12:00:00.000Z",
+      "amountPaid": 50
+    },
+    {
+      "id": "ovr-home-expenses-jun",
+      "userId": "demo",
+      "templateId": "exp-home-expenses",
+      "occurrenceDate": "2026-06-01",
+      "status": "paid",
+      "paidAt": "2026-06-01T12:00:00.000Z",
+      "amountPaid": 660
+    },
+    {
+      "id": "ovr-netflix-jun",
+      "userId": "demo",
+      "templateId": "exp-netflix",
+      "occurrenceDate": "2026-06-01",
+      "status": "paid",
+      "paidAt": "2026-06-01T12:00:00.000Z",
+      "amountPaid": 25
+    },
+    {
+      "id": "ovr-youtube-jun",
+      "userId": "demo",
+      "templateId": "exp-youtube",
+      "occurrenceDate": "2026-06-02",
+      "status": "paid",
+      "paidAt": "2026-06-02T12:00:00.000Z",
+      "amountPaid": 15
+    },
+    {
+      "id": "ovr-codex-jun",
+      "userId": "demo",
+      "templateId": "exp-codex",
+      "occurrenceDate": "2026-06-06",
+      "status": "paid",
+      "paidAt": "2026-06-06T12:00:00.000Z",
+      "amountPaid": 90
+    },
+    {
+      "id": "ovr-macrofactor-jun",
+      "userId": "demo",
+      "templateId": "exp-macrofactor",
+      "occurrenceDate": "2026-06-10",
+      "status": "paid",
+      "paidAt": "2026-06-10T12:00:00.000Z",
+      "amountPaid": 12
+    }
+  ],
+  "finance": {
+    "incomeSources": [],
+    "incomeEvents": [],
+    "allocation": {
+      "expensesAccountName": "Cuenta gastos",
+      "savingsAccountName": "Cuenta ahorro",
+      "primaryAccountName": "Cuenta principal",
+      "monthlySavingsTarget": 0
+    }
+  },
+  "preferences": {
+    "theme": "legacy",
+    "language": "es"
+  }
+}

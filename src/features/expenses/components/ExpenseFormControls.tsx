@@ -18,10 +18,13 @@ import {
   PRESET_EXPENSE_TAGS,
 } from "@/domain/categories";
 import type {
+  AppLanguage,
   CustomRecurrenceUnit,
   RecurrenceFrequency,
   RecurrenceRule,
 } from "@/domain/types";
+import { categoryLabel, tagLabel } from "@/lib/category-labels";
+import { t } from "@/lib/i18n";
 import { categoryToneClass } from "../lib/expense-actions";
 
 const MONTHS = [
@@ -38,25 +41,39 @@ const MONTHS = [
   "Nov",
   "Dic",
 ];
+const MONTHS_EN = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 const RECURRENCE_OPTIONS: Array<{
   value: RecurrenceFrequency;
-  label: string;
+  labelKey: "monthly" | "quarterly" | "yearly" | "custom";
 }> = [
-  { value: "monthly", label: "Mensual" },
-  { value: "quarterly", label: "Trimestral" },
-  { value: "yearly", label: "Anual" },
-  { value: "custom", label: "Custom" },
+  { value: "monthly", labelKey: "monthly" },
+  { value: "quarterly", labelKey: "quarterly" },
+  { value: "yearly", labelKey: "yearly" },
+  { value: "custom", labelKey: "custom" },
 ];
 
 const CUSTOM_UNITS: Array<{
   value: CustomRecurrenceUnit;
-  label: string;
+  labelKey: "daysUnit" | "weeksUnit" | "monthsUnit" | "yearsUnit";
 }> = [
-  { value: "day", label: "Días" },
-  { value: "week", label: "Semanas" },
-  { value: "month", label: "Meses" },
-  { value: "year", label: "Años" },
+  { value: "day", labelKey: "daysUnit" },
+  { value: "week", labelKey: "weeksUnit" },
+  { value: "month", labelKey: "monthsUnit" },
+  { value: "year", labelKey: "yearsUnit" },
 ];
 
 export function ExpenseField({
@@ -77,10 +94,12 @@ export function ExpenseField({
 export function DayOfMonthPicker({
   value,
   onChange,
-  label = "Día de cobro",
+  language = "es",
+  label,
 }: {
   value: number;
   onChange: (day: number) => void;
+  language?: AppLanguage;
   label?: string;
 }) {
   return (
@@ -88,10 +107,10 @@ export function DayOfMonthPicker({
       <div className="mb-2 flex items-center justify-between gap-3 text-sm font-semibold text-white">
         <span className="inline-flex items-center gap-2">
           <CalendarDays size={17} className="text-lime-200" />
-          {label}
+          {label ?? t("expenses.dueDay", language)}
         </span>
         <span className="rounded-full bg-lime-300/16 px-2.5 py-1 text-xs text-lime-100">
-          Día {value}
+          {t("expenses.dayPrefix", language)} {value}
         </span>
       </div>
       <div className="grid grid-cols-7 gap-1">
@@ -118,9 +137,11 @@ export function DayOfMonthPicker({
 export function RecurrencePicker({
   value,
   onChange,
+  language = "es",
 }: {
   value: RecurrenceRule;
   onChange: (rule: RecurrenceRule) => void;
+  language?: AppLanguage;
 }) {
   function changeFrequency(frequency: RecurrenceFrequency) {
     if (frequency === "custom") {
@@ -147,7 +168,7 @@ export function RecurrencePicker({
     <div className="rounded-[1.15rem] border border-white/10 bg-white/[0.035] p-3">
       <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
         <RotateCcw size={17} className="text-cyan-200" />
-        Repetición
+        {t("expenses.recurrence", language)}
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {RECURRENCE_OPTIONS.map((option) => (
@@ -162,7 +183,7 @@ export function RecurrencePicker({
                 : "bg-white/[0.055] text-slate-200 hover:bg-white/10"
             }`}
           >
-            {option.label}
+            {t(`expenses.${option.labelKey}`, language)}
           </button>
         ))}
       </div>
@@ -179,7 +200,7 @@ export function RecurrencePicker({
               })
             }
             className="input-control"
-            aria-label="Intervalo de repetición"
+            aria-label={t("expenses.recurrenceInterval", language)}
           />
           <div className="grid grid-cols-2 gap-2">
             {CUSTOM_UNITS.map((unit) => (
@@ -194,7 +215,7 @@ export function RecurrencePicker({
                     : "bg-white/[0.055] text-slate-200"
                 }`}
               >
-                {unit.label}
+                {t(`expenses.${unit.labelKey}`, language)}
               </button>
             ))}
           </div>
@@ -203,7 +224,7 @@ export function RecurrencePicker({
 
       {value.frequency === "yearly" ? (
         <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
-          {MONTHS.map((month, index) => {
+          {(language === "en" ? MONTHS_EN : MONTHS).map((month, index) => {
             const monthNumber = index + 1;
             return (
               <button
@@ -230,13 +251,17 @@ export function RecurrencePicker({
 export function CategoryPicker({
   value,
   onChange,
+  language = "es",
 }: {
   value: string;
   onChange: (categoryName: string) => void;
+  language?: AppLanguage;
 }) {
   return (
     <div className="rounded-[1.15rem] border border-white/10 bg-white/[0.035] p-3">
-      <p className="mb-2 text-sm font-semibold text-white">Categoría</p>
+      <p className="mb-2 text-sm font-semibold text-white">
+        {t("expenses.category", language)}
+      </p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {PRESET_EXPENSE_CATEGORIES.map((category) => {
           const Icon = categoryIconMap[category.icon] ?? WalletCards;
@@ -254,7 +279,9 @@ export function CategoryPicker({
               }`}
             >
               <Icon size={16} />
-              <span className="truncate">{category.name}</span>
+              <span className="truncate">
+                {categoryLabel(category.name, language)}
+              </span>
             </button>
           );
         })}
@@ -266,9 +293,11 @@ export function CategoryPicker({
 export function TagPicker({
   value,
   onChange,
+  language = "es",
 }: {
   value: string[];
   onChange: (tags: string[]) => void;
+  language?: AppLanguage;
 }) {
   function toggleTag(tag: string) {
     if (value.includes(tag)) {
@@ -281,7 +310,9 @@ export function TagPicker({
 
   return (
     <div className="rounded-[1.15rem] border border-white/10 bg-white/[0.035] p-3">
-      <p className="mb-2 text-sm font-semibold text-white">Tags</p>
+      <p className="mb-2 text-sm font-semibold text-white">
+        {t("expenses.tags", language)}
+      </p>
       <div className="flex flex-wrap gap-2">
         {PRESET_EXPENSE_TAGS.map((tag) => {
           const selected = value.includes(tag);
@@ -297,7 +328,7 @@ export function TagPicker({
                   : "bg-white/[0.055] text-slate-200 ring-1 ring-white/10"
               }`}
             >
-              #{tag}
+              #{tagLabel(tag, language)}
             </button>
           );
         })}
@@ -307,18 +338,23 @@ export function TagPicker({
 }
 
 export function parseEuroInput(value: string): number {
-  const normalized = value
-    .trim()
-    .replace(/\s/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".");
+  const clean = value.trim().replace(/\s/g, "");
+  const commaIndex = clean.lastIndexOf(",");
+  const dotIndex = clean.lastIndexOf(".");
+  const decimalSeparator =
+    commaIndex > dotIndex ? "," : dotIndex > commaIndex ? "." : null;
+  const normalized = decimalSeparator
+    ? clean
+        .replace(new RegExp(`\\${decimalSeparator === "," ? "." : ","}`, "g"), "")
+        .replace(decimalSeparator, ".")
+    : clean;
 
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function formatEuroInput(value: number): string {
-  return new Intl.NumberFormat("es-ES", {
+export function formatEuroInput(value: number, language: AppLanguage = "es"): string {
+  return new Intl.NumberFormat(language === "en" ? "en-US" : "es-ES", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(value);

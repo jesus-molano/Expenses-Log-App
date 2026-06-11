@@ -43,6 +43,7 @@ export type ExpenseTemplate = {
   categoryId: string;
   tags: string[];
   startDate: string;
+  endDate?: string;
   dueDay: number;
   recurrence: RecurrenceRule;
   active: boolean;
@@ -82,7 +83,12 @@ export type DraftExpense = {
   categoryName: string;
   tags: string[];
   dueDay: number;
+  endDate?: string;
   recurrence: RecurrenceRule;
+};
+
+export type CreateExpenseOptions = {
+  initialStatus?: Extract<OccurrenceStatus, "due" | "paid">;
 };
 
 export type IncomeSource = {
@@ -110,9 +116,9 @@ export type IncomeEvent = {
 };
 
 export type AllocationSettings = {
-  sabadellAccountName: string;
-  bbvaSavingsAccountName: string;
-  bbvaMainAccountName: string;
+  expensesAccountName: string;
+  savingsAccountName: string;
+  primaryAccountName: string;
   monthlySavingsTarget: number;
 };
 
@@ -122,15 +128,18 @@ export type FinanceStore = {
   allocation: AllocationSettings;
 };
 
+export type AppTheme = "legacy" | "rose-pine" | "catppuccin" | "light";
+export type AppLanguage = "es" | "en";
+
 export type MonthlyMoneyPlan = {
   month: string;
   incomeTotal: number;
   recurringIncomeTotal: number;
   extraIncomeTotal: number;
   fixedExpensesTotal: number;
-  sabadellContribution: number;
-  bbvaSavingsContribution: number;
-  bbvaMainContribution: number;
+  expensesContribution: number;
+  savingsContribution: number;
+  primaryContribution: number;
   shortfall: number;
 };
 
@@ -139,4 +148,8 @@ export type ExpenseStore = {
   templates: ExpenseTemplate[];
   overrides: ExpenseOccurrenceOverride[];
   finance: FinanceStore;
+  preferences?: {
+    theme: AppTheme;
+    language?: AppLanguage;
+  };
 };

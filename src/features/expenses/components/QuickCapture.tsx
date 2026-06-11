@@ -1,12 +1,15 @@
 "use client";
 
 import { Pencil, Sparkles } from "lucide-react";
+import type { AppLanguage } from "@/domain/types";
+import { t } from "@/lib/i18n";
 
 type QuickCaptureProps = {
   value: string;
   statusLabel: string;
   isParsing: boolean;
   visible: boolean;
+  language: AppLanguage;
   onValueChange: (value: string) => void;
   onAnalyze: () => void;
   onManualAdd: () => void;
@@ -17,6 +20,7 @@ export function QuickCapture({
   statusLabel,
   isParsing,
   visible,
+  language,
   onValueChange,
   onAnalyze,
   onManualAdd,
@@ -34,7 +38,7 @@ export function QuickCapture({
         <input
           value={value}
           onChange={(event) => onValueChange(event.target.value)}
-          placeholder="Netflix 15,99 mensual día 12"
+          placeholder={t("expenses.quickPlaceholder", language)}
           className="h-12 min-w-0 flex-1 bg-transparent text-[15px] text-white outline-none placeholder:text-slate-500"
         />
       </div>
@@ -46,7 +50,9 @@ export function QuickCapture({
           className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-lime-300 px-4 text-sm font-semibold text-slate-950 shadow-[0_0_28px_rgba(132,204,22,0.25)] transition hover:bg-lime-200 disabled:bg-white/10 disabled:text-slate-500"
         >
           <Sparkles size={17} />
-          {isParsing ? "Analizando" : "Analizar texto"}
+          {isParsing
+            ? t("expenses.analyzing", language)
+            : t("expenses.analyzeText", language)}
         </button>
         <button
           type="button"
@@ -54,7 +60,7 @@ export function QuickCapture({
           className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-white/8 px-4 text-sm font-semibold text-white ring-1 ring-white/10"
         >
           <Pencil size={17} />
-          Manual
+          {t("expenses.manual", language)}
         </button>
       </div>
       {statusLabel ? (

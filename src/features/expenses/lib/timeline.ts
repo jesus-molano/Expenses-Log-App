@@ -1,7 +1,8 @@
 import { addDays, format, isSameDay, isWeekend, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
-import type { ExpenseOccurrence } from "@/domain/types";
+import { enUS, es } from "date-fns/locale";
 import { daysBetween } from "@/domain/calendar";
+import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
+import { t } from "@/lib/i18n";
 
 export type TimelineSection = {
   id: string;
@@ -17,15 +18,18 @@ export type TimelineSection = {
 function sectionMeta(
   occurrence: ExpenseOccurrence,
   today: string,
+  language: AppLanguage,
 ): Pick<TimelineSection, "id" | "title" | "subtitle" | "tone" | "priority"> {
   const dueDate = parseISO(occurrence.dueDate);
   const dueDelta = daysBetween(today, occurrence.dueDate);
+  const locale = language === "en" ? enUS : es;
+  const dayLabel = (date: Date) => format(date, "EEEE d", { locale });
 
-  if (occurrence.status === "paid" && dueDelta < 0) {
+  if (occurrence.status === "paid") {
     return {
       id: `paid-${occurrence.dueDate}`,
-      title: format(dueDate, "EEEE d", { locale: es }),
-      subtitle: "Pagado",
+      title: dayLabel(dueDate),
+      subtitle: t("expenses.paid", language),
       tone: "paid",
       priority: 0,
     };
@@ -34,8 +38,8 @@ function sectionMeta(
   if (dueDelta < 0) {
     return {
       id: "overdue",
-      title: "Atrasado",
-      subtitle: `Desde ${format(dueDate, "EEEE d", { locale: es })}`,
+      title: t("expenses.overdue", language),
+      subtitle: `${t("expenses.from", language)} ${dayLabel(dueDate)}`,
       tone: "critical",
       priority: 1,
     };
@@ -44,8 +48,8 @@ function sectionMeta(
   if (occurrence.dueDate === today || occurrence.estimatedChargeDate === today) {
     return {
       id: "today",
-      title: "Hoy",
-      subtitle: "Puede salir de tu cuenta hoy",
+      title: t("expenses.today", language),
+      subtitle: t("expenses.canLeaveToday", language),
       tone: "critical",
       priority: 2,
     };
@@ -59,8 +63,8 @@ function sectionMeta(
   ) {
     return {
       id: `future-${occurrence.dueDate}`,
-      title: format(dueDate, "EEEE d", { locale: es }),
-      subtitle: `Estimado ${format(parseISO(occurrence.estimatedChargeDate), "EEEE d", { locale: es })}`,
+      title: dayLabel(dueDate),
+      subtitle: `${t("expenses.estimated", language)} ${dayLabel(parseISO(occurrence.estimatedChargeDate))}`,
       tone: "estimated",
       priority: 3,
     };
@@ -69,9 +73,11 @@ function sectionMeta(
   return {
     id: `future-${occurrence.dueDate}`,
     title: isSameDay(dueDate, addDays(parseISO(today), 1))
-      ? "Mañana"
-      : format(dueDate, "EEEE d", { locale: es }),
-    subtitle: isWeekend(dueDate) ? "Vence en fin de semana" : "Pendiente",
+      ? t("expenses.tomorrow", language)
+      : dayLabel(dueDate),
+    subtitle: isWeekend(dueDate)
+      ? t("expenses.weekendDue", language)
+      : t("expenses.pending", language),
     tone: dueDelta <= 7 ? "soon" : "later",
     priority: 3,
   };
@@ -80,11 +86,12 @@ function sectionMeta(
 export function buildTimelineSections(
   occurrences: ExpenseOccurrence[],
   today: string,
+  language: AppLanguage = "es",
 ): TimelineSection[] {
   const sections = new Map<string, TimelineSection>();
 
   for (const occurrence of occurrences) {
-    const meta = sectionMeta(occurrence, today);
+    const meta = sectionMeta(occurrence, today, language);
     const existing = sections.get(meta.id);
 
     if (existing) {
@@ -117,8 +124,8 @@ export function buildTimelineSections(
   if (!timelineSections.some((section) => section.id === "today")) {
     timelineSections.push({
       id: "today",
-      title: "Hoy",
-      subtitle: "Punto de control",
+      title: t("expenses.today", language),
+      subtitle: t("expenses.controlPoint", language),
       tone: "soon",
       priority: 2,
       total: 0,

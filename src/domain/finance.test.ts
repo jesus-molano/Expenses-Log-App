@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildMonthlyMoneyPlan, defaultFinanceStore } from "./finance";
+import { generateOccurrences } from "./recurrence";
 import type { ExpenseOccurrence } from "./types";
 
 function occurrence(name: string, amount: number, dueDate: string): ExpenseOccurrence {
@@ -38,9 +39,9 @@ describe("finance", () => {
       occurrences: [occurrence("Gastos de casa", 660, "2026-06-01")],
     });
 
-    expect(plan.sabadellContribution).toBe(660);
-    expect(plan.bbvaSavingsContribution).toBe(300);
-    expect(plan.bbvaMainContribution).toBe(1280);
+    expect(plan.expensesContribution).toBe(660);
+    expect(plan.savingsContribution).toBe(300);
+    expect(plan.primaryContribution).toBe(1280);
   });
 
   it("reports shortfall when income cannot cover fixed expenses", () => {
@@ -54,8 +55,43 @@ describe("finance", () => {
       occurrences: [occurrence("Gastos de casa", 660, "2026-06-01")],
     });
 
-    expect(plan.sabadellContribution).toBe(500);
+    expect(plan.expensesContribution).toBe(500);
     expect(plan.shortfall).toBe(160);
-    expect(plan.bbvaMainContribution).toBe(0);
+    expect(plan.primaryContribution).toBe(0);
+  });
+
+  it("includes annual expenses only in their due month", () => {
+    const templates = [
+      {
+        id: "exp-car-insurance",
+        userId: "demo",
+        name: "Seguro coche",
+        description: "",
+        amount: 148.5,
+        currency: "EUR" as const,
+        categoryId: "cat",
+        tags: ["anual"],
+        startDate: "2026-05-18",
+        dueDay: 18,
+        recurrence: { frequency: "yearly" as const, annualMonth: 5 },
+        active: true,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+
+    const mayPlan = buildMonthlyMoneyPlan({
+      monthDate: new Date("2026-05-01"),
+      finance: defaultFinanceStore,
+      occurrences: generateOccurrences(templates, [], "2026-05-01", "2026-05-31"),
+    });
+    const junePlan = buildMonthlyMoneyPlan({
+      monthDate: new Date("2026-06-01"),
+      finance: defaultFinanceStore,
+      occurrences: generateOccurrences(templates, [], "2026-06-01", "2026-06-30"),
+    });
+
+    expect(mayPlan.fixedExpensesTotal).toBe(148.5);
+    expect(junePlan.fixedExpensesTotal).toBe(0);
   });
 });

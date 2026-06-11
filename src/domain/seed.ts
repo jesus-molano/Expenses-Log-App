@@ -6,6 +6,10 @@ export const emptyStore: ExpenseStore = {
   templates: [],
   overrides: [],
   finance: emptyFinanceStore,
+  preferences: {
+    theme: "legacy",
+    language: "es",
+  },
 };
 
 export const demoStore: ExpenseStore = {
@@ -384,4 +388,8 @@ export const demoStore: ExpenseStore = {
     },
   ],
   finance: defaultFinanceStore,
+  preferences: {
+    theme: "legacy",
+    language: "es",
+  },
 };
