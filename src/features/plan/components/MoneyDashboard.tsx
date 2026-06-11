@@ -55,7 +55,7 @@ export function MoneyDashboard() {
       }
       activeTab="money"
       language={language}
-      compactHeader={chrome.compactHeader}
+      topChrome={chrome.topChrome}
     >
       <section className="grid w-full min-w-0 max-w-full gap-3 overflow-hidden pb-8 pt-2">
         <PlanHeader

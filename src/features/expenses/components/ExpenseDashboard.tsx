@@ -61,7 +61,7 @@ export function ExpenseDashboard({
       headlineTitle={t("common.due", language)}
       activeTab="expenses"
       language={language}
-      compactHeader={chrome.compactHeader}
+      topChrome={chrome.topChrome}
     >
       <ExpenseList
         sections={filters.timelineSections}
@@ -81,7 +81,7 @@ export function ExpenseDashboard({
         value={quickParser.quickText}
         statusLabel={quickParser.statusLabel}
         isParsing={quickParser.status === "loading"}
-        visible={chrome.showBottomBar}
+        visible={chrome.bottomChrome === "visible"}
         language={language}
         onValueChange={(value) => {
           quickParser.setQuickText(value);

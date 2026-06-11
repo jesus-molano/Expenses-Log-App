@@ -8,9 +8,7 @@ const baseSnapshot = {
   viewportHeight: 800,
   viewportWidth: 390,
   documentHeight: 2400,
-  headerHeight: 140,
-  todayTop: 400,
-  allowHeaderCompact: true,
+  allowChromeReaction: true,
 };
 
 describe("scroll chrome state", () => {
@@ -20,15 +18,15 @@ describe("scroll chrome state", () => {
       scrollY: 300,
     });
 
-    expect(state.showBottomBar).toBe(false);
-    expect(state.compactHeader).toBe(true);
+    expect(state.bottomChrome).toBe("hidden");
+    expect(state.topChrome).toBe("compact");
   });
 
   it("shows bottom bar and expands header when scrolling up", () => {
     const previous = {
       ...createInitialScrollChromeState(),
-      showBottomBar: false,
-      compactHeader: true,
+      bottomChrome: "hidden" as const,
+      topChrome: "compact" as const,
       lastScrollY: 500,
     };
     const state = reduceScrollChromeState(previous, {
@@ -36,8 +34,8 @@ describe("scroll chrome state", () => {
       scrollY: 460,
     });
 
-    expect(state.showBottomBar).toBe(true);
-    expect(state.compactHeader).toBe(false);
+    expect(state.bottomChrome).toBe("visible");
+    expect(state.topChrome).toBe("expanded");
   });
 
   it("keeps the header expanded on desktop", () => {
@@ -47,18 +45,18 @@ describe("scroll chrome state", () => {
       scrollY: 300,
     });
 
-    expect(state.compactHeader).toBe(false);
+    expect(state.topChrome).toBe("expanded");
   });
 
-  it("keeps the header expanded for restored or programmatic scroll", () => {
+  it("keeps chrome expanded and visible for restored or programmatic scroll", () => {
     const state = reduceScrollChromeState(createInitialScrollChromeState(), {
       ...baseSnapshot,
-      allowHeaderCompact: false,
+      allowChromeReaction: false,
       scrollY: 300,
     });
 
-    expect(state.showBottomBar).toBe(false);
-    expect(state.compactHeader).toBe(false);
+    expect(state.bottomChrome).toBe("visible");
+    expect(state.topChrome).toBe("expanded");
   });
 
   it("uses hysteresis around the bottom edge", () => {
@@ -67,7 +65,7 @@ describe("scroll chrome state", () => {
       scrollY: 1510,
     });
     expect(nearBottom.nearBottom).toBe(true);
-    expect(nearBottom.showBottomBar).toBe(true);
+    expect(nearBottom.bottomChrome).toBe("visible");
 
     const leavingBottom = reduceScrollChromeState(nearBottom, {
       ...baseSnapshot,
@@ -85,8 +83,8 @@ describe("scroll chrome state", () => {
   it("expands the header near the bottom like the bottom bar", () => {
     const previous = {
       ...createInitialScrollChromeState(),
-      compactHeader: true,
-      showBottomBar: false,
+      topChrome: "compact" as const,
+      bottomChrome: "hidden" as const,
       lastScrollY: 1300,
     };
     const state = reduceScrollChromeState(previous, {
@@ -95,7 +93,7 @@ describe("scroll chrome state", () => {
     });
 
     expect(state.nearBottom).toBe(true);
-    expect(state.showBottomBar).toBe(true);
-    expect(state.compactHeader).toBe(false);
+    expect(state.bottomChrome).toBe("visible");
+    expect(state.topChrome).toBe("expanded");
   });
 });

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Landmark, Settings, WalletCards } from "lucide-react";
 import { useEffect } from "react";
 import type { AppLanguage } from "@/domain/types";
+import type { TopChromeState } from "@/features/expenses/lib/scroll-chrome-state";
 import { t } from "@/shared/i18n";
 
 type DashboardShellProps = {
@@ -11,7 +12,7 @@ type DashboardShellProps = {
   headlineTitle: string;
   activeTab: "expenses" | "money";
   language: AppLanguage;
-  compactHeader?: boolean;
+  topChrome?: TopChromeState;
   children: React.ReactNode;
 };
 
@@ -20,14 +21,14 @@ export function DashboardShell({
   headlineTitle,
   activeTab,
   language,
-  compactHeader = false,
+  topChrome = "expanded",
   children,
 }: DashboardShellProps) {
   useEffect(() => {
     sessionStorage.setItem("expense-last-tab", activeTab);
   }, [activeTab]);
 
-  const mobileCompact = compactHeader;
+  const mobileCompact = topChrome === "compact";
 
   return (
     <main className="app-page-bg min-h-dvh text-white">

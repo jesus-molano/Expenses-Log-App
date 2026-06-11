@@ -23,25 +23,21 @@ export function useScrollChrome() {
       const viewportOffsetTop = viewport?.offsetTop ?? 0;
       const header = document.querySelector<HTMLElement>("[data-app-chrome]");
       const headerHeight = header?.getBoundingClientRect().height ?? 96;
-      const todaySection = document.querySelector<HTMLElement>(
-        '[data-section-id="today"]',
-      );
       const snapshot = {
         scrollY: window.scrollY,
         viewportHeight,
         viewportWidth: window.innerWidth,
         documentHeight: document.documentElement.scrollHeight,
-        headerHeight,
-        todayTop: todaySection?.getBoundingClientRect().top ?? Infinity,
-        allowHeaderCompact: hasUserScrollIntentRef.current,
+        allowChromeReaction: hasUserScrollIntentRef.current,
       };
       const nextState = hasScrollBaselineRef.current
         ? reduceScrollChromeState(stateRef.current, snapshot)
         : {
             ...stateRef.current,
-            compactHeader: false,
-            showBottomBar: true,
+            topChrome: "expanded" as const,
+            bottomChrome: "visible" as const,
             lastScrollY: snapshot.scrollY,
+            direction: "idle" as const,
           };
 
       document.documentElement.style.setProperty(
@@ -114,7 +110,7 @@ export function useScrollChrome() {
   }, []);
 
   return {
-    compactHeader: chromeState.compactHeader,
-    showBottomBar: chromeState.showBottomBar,
+    topChrome: chromeState.topChrome,
+    bottomChrome: chromeState.bottomChrome,
   };
 }

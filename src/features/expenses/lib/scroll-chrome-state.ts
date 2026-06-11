@@ -3,16 +3,19 @@ export type ScrollChromeSnapshot = {
   viewportHeight: number;
   viewportWidth?: number;
   documentHeight: number;
-  headerHeight: number;
-  todayTop: number;
-  allowHeaderCompact?: boolean;
+  allowChromeReaction?: boolean;
 };
 
+export type ScrollDirection = "up" | "down" | "idle";
+export type TopChromeState = "expanded" | "compact";
+export type BottomChromeState = "visible" | "hidden";
+
 export type ScrollChromeState = {
-  showBottomBar: boolean;
-  compactHeader: boolean;
+  topChrome: TopChromeState;
+  bottomChrome: BottomChromeState;
   nearBottom: boolean;
   lastScrollY: number;
+  direction: ScrollDirection;
 };
 
 export const SCROLL_CHROME_THRESHOLDS = {
@@ -27,10 +30,11 @@ export const SCROLL_CHROME_THRESHOLDS = {
 
 export function createInitialScrollChromeState(): ScrollChromeState {
   return {
-    showBottomBar: true,
-    compactHeader: false,
+    topChrome: "expanded",
+    bottomChrome: "visible",
     nearBottom: false,
     lastScrollY: 0,
+    direction: "idle",
   };
 }
 
@@ -39,6 +43,7 @@ export function reduceScrollChromeState(
   snapshot: ScrollChromeSnapshot,
 ): ScrollChromeState {
   const delta = snapshot.scrollY - previous.lastScrollY;
+  const direction = getScrollDirection(delta);
   const distanceFromBottom =
     snapshot.documentHeight - (snapshot.viewportHeight + snapshot.scrollY);
   const nearBottom =
@@ -49,28 +54,74 @@ export function reduceScrollChromeState(
   const isMobileChrome =
     (snapshot.viewportWidth ?? SCROLL_CHROME_THRESHOLDS.mobileMaxWidth) <=
     SCROLL_CHROME_THRESHOLDS.mobileMaxWidth;
-  let showBottomBar = previous.showBottomBar;
-  if (snapshot.scrollY < SCROLL_CHROME_THRESHOLDS.top || nearBottom) {
-    showBottomBar = true;
-  } else if (delta <= SCROLL_CHROME_THRESHOLDS.showDelta) {
-    showBottomBar = true;
-  } else if (delta >= SCROLL_CHROME_THRESHOLDS.hideDelta) {
-    showBottomBar = false;
-  }
-
-  let compactHeader = previous.compactHeader;
-  if (!isMobileChrome || atTop || nearBottom || !snapshot.allowHeaderCompact) {
-    compactHeader = false;
-  } else if (delta >= SCROLL_CHROME_THRESHOLDS.hideDelta) {
-    compactHeader = true;
-  } else if (delta <= SCROLL_CHROME_THRESHOLDS.showDelta) {
-    compactHeader = false;
-  }
+  const canReactToScroll = Boolean(snapshot.allowChromeReaction);
+  const bottomChrome = reduceBottomChrome(previous, {
+    atPageTop: snapshot.scrollY < SCROLL_CHROME_THRESHOLDS.top,
+    canReactToScroll,
+    direction,
+    nearBottom,
+  });
+  const topChrome = reduceTopChrome(previous, {
+    atTop,
+    canReactToScroll,
+    direction,
+    isMobileChrome,
+    nearBottom,
+  });
 
   return {
-    showBottomBar,
-    compactHeader,
+    topChrome,
+    bottomChrome,
     nearBottom,
     lastScrollY: snapshot.scrollY,
+    direction,
   };
+}
+
+function getScrollDirection(delta: number): ScrollDirection {
+  if (delta >= SCROLL_CHROME_THRESHOLDS.hideDelta) return "down";
+  if (delta <= SCROLL_CHROME_THRESHOLDS.showDelta) return "up";
+  return "idle";
+}
+
+function reduceTopChrome(
+  previous: ScrollChromeState,
+  context: {
+    atTop: boolean;
+    canReactToScroll: boolean;
+    direction: ScrollDirection;
+    isMobileChrome: boolean;
+    nearBottom: boolean;
+  },
+): TopChromeState {
+  if (
+    !context.isMobileChrome ||
+    context.atTop ||
+    context.nearBottom ||
+    !context.canReactToScroll
+  ) {
+    return "expanded";
+  }
+
+  if (context.direction === "down") return "compact";
+  if (context.direction === "up") return "expanded";
+  return previous.topChrome;
+}
+
+function reduceBottomChrome(
+  previous: ScrollChromeState,
+  context: {
+    atPageTop: boolean;
+    canReactToScroll: boolean;
+    direction: ScrollDirection;
+    nearBottom: boolean;
+  },
+): BottomChromeState {
+  if (context.atPageTop || context.nearBottom || !context.canReactToScroll) {
+    return "visible";
+  }
+
+  if (context.direction === "down") return "hidden";
+  if (context.direction === "up") return "visible";
+  return previous.bottomChrome;
 }
