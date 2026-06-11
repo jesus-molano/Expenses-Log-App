@@ -7,7 +7,7 @@ import {
   createIncomeEvent,
   updateSalarySource,
 } from "@/domain/finance";
-import { demoStore } from "@/domain/seed";
+import { emptyStore } from "@/domain/seed";
 import type { DraftExpense, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
 import { loadCloudStore, saveCloudStore } from "@/lib/cloud-store";
 import {
@@ -25,7 +25,7 @@ import {
 type SyncStatus = "local" | "syncing" | "synced" | "error";
 
 export function useExpenseStore() {
-  const [store, setStore] = useState<ExpenseStore>(() => demoStore);
+  const [store, setStore] = useState<ExpenseStore>(() => emptyStore);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("local");
   const [syncMessage, setSyncMessage] = useState("Modo local");
   const supabaseRef = useRef<SupabaseClient | null>(null);

@@ -43,6 +43,17 @@ export const defaultFinanceStore: FinanceStore = {
   },
 };
 
+export const emptyFinanceStore: FinanceStore = {
+  incomeSources: [],
+  incomeEvents: [],
+  allocation: {
+    sabadellAccountName: "Cuenta gastos",
+    bbvaSavingsAccountName: "Cuenta ahorro",
+    bbvaMainAccountName: "Cuenta principal",
+    monthlySavingsTarget: 0,
+  },
+};
+
 export function buildMonthlyMoneyPlan({
   monthDate,
   finance,

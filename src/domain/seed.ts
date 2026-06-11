@@ -1,5 +1,12 @@
 import type { ExpenseStore } from "./types";
-import { defaultFinanceStore } from "./finance";
+import { defaultFinanceStore, emptyFinanceStore } from "./finance";
+
+export const emptyStore: ExpenseStore = {
+  categories: [],
+  templates: [],
+  overrides: [],
+  finance: emptyFinanceStore,
+};
 
 export const demoStore: ExpenseStore = {
   categories: [

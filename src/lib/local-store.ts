@@ -1,46 +1,31 @@
 "use client";
 
 import type { ExpenseStore } from "@/domain/types";
-import { demoStore } from "@/domain/seed";
-import { defaultFinanceStore } from "@/domain/finance";
+import { emptyStore } from "@/domain/seed";
+import { emptyFinanceStore } from "@/domain/finance";
 
 const STORAGE_KEY = "expense-reminders-store-v1";
 
-function withDemoDefaults(store: ExpenseStore): ExpenseStore {
-  if (store.templates.some((template) => template.id === "exp-electricity")) {
-    return demoStore;
-  }
-
+function withStoreDefaults(store: ExpenseStore): ExpenseStore {
   return {
     ...store,
-    finance: store.finance ?? defaultFinanceStore,
-    categories: [
-      ...store.categories,
-      ...demoStore.categories.filter(
-        (category) =>
-          !store.categories.some((existing) => existing.id === category.id),
-      ),
-    ],
-    templates: [
-      ...store.templates,
-      ...demoStore.templates.filter(
-        (template) =>
-          !store.templates.some((existing) => existing.id === template.id),
-      ),
-    ],
+    categories: store.categories ?? [],
+    templates: store.templates ?? [],
+    overrides: store.overrides ?? [],
+    finance: store.finance ?? emptyFinanceStore,
   };
 }
 
 export function loadExpenseStore(): ExpenseStore {
-  if (typeof window === "undefined") return demoStore;
+  if (typeof window === "undefined") return emptyStore;
 
   const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return demoStore;
+  if (!raw) return emptyStore;
 
   try {
-    return withDemoDefaults(JSON.parse(raw) as ExpenseStore);
+    return withStoreDefaults(JSON.parse(raw) as ExpenseStore);
   } catch {
-    return demoStore;
+    return emptyStore;
   }
 }
 
