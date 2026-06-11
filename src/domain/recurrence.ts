@@ -1,4 +1,4 @@
-import {
+﻿import {
   addDays,
   addMonths,
   addWeeks,
@@ -121,11 +121,12 @@ export function generateOccurrences(
 
   return templates
     .filter((template) => template.active)
-    .flatMap((template) =>
+    .flatMap((template, templateIndex) =>
       generateTemplateDates(template, fromDate, toDate).map((date) => {
         const override = overrideByKey.get(`${template.id}:${date}`);
         const dueDate = override?.dueDate ?? date;
         const estimate = estimateChargeDate(dueDate);
+        const defaultSortOrder = templateIndex * 1024;
 
         return {
           id: `${template.id}:${date}`,
@@ -135,7 +136,7 @@ export function generateOccurrences(
           estimatedChargeDate: estimate.date,
           estimatedChargeLabel: estimate.label,
           status: override?.status ?? "due",
-          sortOrder: override?.sortOrder ?? 0,
+          sortOrder: override?.sortOrder ?? defaultSortOrder,
           override,
         } satisfies ExpenseOccurrence;
       }),
@@ -160,3 +161,4 @@ export function recurrenceLabel(rule: RecurrenceRule): string {
 
   return `Cada ${interval} ${units[unit]}`;
 }
+

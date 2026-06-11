@@ -1,0 +1,66 @@
+"use client";
+
+import { CompactMenu } from "./CompactMenu";
+
+export type SelectMenuOption<T extends string | number> = {
+  value: T;
+  label: string;
+  detail?: string;
+  leading?: React.ReactNode;
+};
+
+type SelectMenuProps<T extends string | number> = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  value: T;
+  options: Array<SelectMenuOption<T>>;
+  onChange: (value: T) => void;
+  label?: string;
+  align?: "left" | "right";
+};
+
+export function SelectMenu<T extends string | number>({
+  open,
+  onOpenChange,
+  value,
+  options,
+  onChange,
+  label,
+  align,
+}: SelectMenuProps<T>) {
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <CompactMenu
+      open={open}
+      onOpenChange={onOpenChange}
+      label={label ?? selected?.label ?? String(value)}
+      leading={selected?.leading}
+      align={align}
+    >
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => {
+            onChange(option.value);
+            onOpenChange(false);
+          }}
+          className={`flex h-9 w-full items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-semibold ${
+            value === option.value
+              ? "bg-[var(--app-accent)] text-[var(--app-accent-contrast)]"
+              : "text-[var(--app-text)] hover:bg-[var(--app-panel-soft-alpha)]"
+          }`}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            {option.leading}
+            <span className="truncate">{option.label}</span>
+          </span>
+          {option.detail ? (
+            <span className="shrink-0 text-xs opacity-75">{option.detail}</span>
+          ) : null}
+        </button>
+      ))}
+    </CompactMenu>
+  );
+}

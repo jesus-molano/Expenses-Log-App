@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { clearOversizedMetadata } from "@/lib/cloud-store";
+﻿import { NextResponse } from "next/server";
+import { clearOversizedMetadata } from "@/data/persistence/cloud-store";
 import { createClient } from "@/utils/supabase/server";
 
 export async function GET() {
@@ -51,3 +51,4 @@ export async function GET() {
     },
   );
 }
+

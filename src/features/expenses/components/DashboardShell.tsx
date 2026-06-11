@@ -1,17 +1,15 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { Landmark, Settings, WalletCards } from "lucide-react";
 import { useEffect } from "react";
 import type { AppLanguage } from "@/domain/types";
-import { t } from "@/lib/i18n";
+import { t } from "@/shared/i18n";
 
 type DashboardShellProps = {
   headlineLabel: string;
   headlineTitle: string;
   activeTab: "expenses" | "money";
-  userEmail: string | null;
-  isCloudReady: boolean;
   language: AppLanguage;
   children: React.ReactNode;
 };
@@ -20,8 +18,6 @@ export function DashboardShell({
   headlineLabel,
   headlineTitle,
   activeTab,
-  userEmail,
-  isCloudReady,
   language,
   children,
 }: DashboardShellProps) {
@@ -34,7 +30,8 @@ export function DashboardShell({
       <div className="mx-auto min-h-dvh w-full max-w-4xl pb-28 lg:grid lg:max-w-7xl lg:grid-cols-[344px_1fr] lg:pb-0">
         <aside
           data-app-chrome="true"
-          className="sticky top-0 z-40 h-[9.15rem] overflow-visible px-3 pt-[max(0.6rem,env(safe-area-inset-top))] text-white lg:relative lg:min-h-dvh lg:p-5"
+          style={{ viewTransitionName: "app-chrome" }}
+          className="sticky top-0 z-40 h-[9.15rem] overflow-visible px-3 pt-[max(0.6rem,env(safe-area-inset-top))] text-white lg:h-dvh lg:p-5"
         >
           {activeTab === "expenses" ? (
             <div
@@ -81,25 +78,6 @@ export function DashboardShell({
               />
             </nav>
           </section>
-
-          <section className="mt-3 hidden rounded-[1.25rem] border border-white/10 bg-white/[0.04] p-4 lg:block">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
-              Cuenta
-            </p>
-            <p className="mt-1 truncate text-sm font-medium text-white">
-              {userEmail ?? t("common.localMode", language)}
-            </p>
-            <Link
-              href={`/settings?from=${activeTab}`}
-              className="mt-3 inline-flex h-9 items-center rounded-full bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/10"
-            >
-              {userEmail
-                ? t("common.manage", language)
-                : isCloudReady
-                  ? t("common.configureAccount", language)
-                  : t("common.settings", language)}
-            </Link>
-          </section>
         </aside>
 
         <section
@@ -139,3 +117,4 @@ function ChromeTab({
     </Link>
   );
 }
+

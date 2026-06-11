@@ -1,31 +1,36 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  createInitialScrollChromeState,
+  reduceScrollChromeState,
+  type ScrollChromeState,
+} from "../lib/scroll-chrome-state";
 
 export function useScrollChrome() {
-  const [showBottomBar, setShowBottomBar] = useState(true);
-  const [compactHeader, setCompactHeader] = useState(false);
-  const lastScrollY = useRef(0);
+  const [chromeState, setChromeState] = useState<ScrollChromeState>(() =>
+    createInitialScrollChromeState(),
+  );
+  const stateRef = useRef(chromeState);
   const frameRef = useRef<number | null>(null);
 
   useEffect(() => {
     function updateChrome() {
-      const currentY = window.scrollY;
-      const delta = currentY - lastScrollY.current;
       const viewport = window.visualViewport;
       const viewportHeight = viewport?.height ?? window.innerHeight;
       const viewportOffsetTop = viewport?.offsetTop ?? 0;
-      const nearBottom =
-        viewportHeight + currentY >= document.documentElement.scrollHeight - 96;
       const header = document.querySelector<HTMLElement>("[data-app-chrome]");
       const headerHeight = header?.getBoundingClientRect().height ?? 96;
       const todaySection = document.querySelector<HTMLElement>(
         '[data-section-id="today"]',
       );
-      const todayTop = todaySection?.getBoundingClientRect().top ?? Infinity;
-      const todayAnchored =
-        todayTop >= headerHeight + 28 && todayTop <= headerHeight + 128;
-      const atTop = currentY < 20;
+      const nextState = reduceScrollChromeState(stateRef.current, {
+        scrollY: window.scrollY,
+        viewportHeight,
+        documentHeight: document.documentElement.scrollHeight,
+        headerHeight,
+        todayTop: todaySection?.getBoundingClientRect().top ?? Infinity,
+      });
 
       document.documentElement.style.setProperty(
         "--app-viewport-height",
@@ -40,15 +45,8 @@ export function useScrollChrome() {
         `${headerHeight}px`,
       );
 
-      setCompactHeader(!atTop && !todayAnchored);
-
-      if (currentY < 80 || nearBottom || delta < -8) {
-        setShowBottomBar(true);
-      } else if (delta > 8) {
-        setShowBottomBar(false);
-      }
-
-      lastScrollY.current = currentY;
+      stateRef.current = nextState;
+      setChromeState(nextState);
     }
 
     function scheduleUpdate() {
@@ -75,5 +73,8 @@ export function useScrollChrome() {
     };
   }, []);
 
-  return { compactHeader, showBottomBar };
+  return {
+    compactHeader: chromeState.compactHeader,
+    showBottomBar: chromeState.showBottomBar,
+  };
 }

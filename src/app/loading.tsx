@@ -1,6 +1,6 @@
-import { cookies } from "next/headers";
+﻿import { cookies } from "next/headers";
 import type { AppLanguage } from "@/domain/types";
-import { t } from "@/lib/i18n";
+import { t } from "@/shared/i18n";
 
 function readCookieLanguage(value: string | undefined): AppLanguage {
   return value === "en" ? "en" : "es";
@@ -21,3 +21,4 @@ export default async function Loading() {
     </main>
   );
 }
+

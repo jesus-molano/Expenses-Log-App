@@ -22,15 +22,15 @@ export function CompactMenu({
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
-        className="inline-flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/10"
+        className="inline-flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-xl bg-[var(--app-panel-soft-alpha)] px-3 text-sm font-semibold text-[var(--app-text)] ring-1 ring-[var(--app-border)]"
       >
         {leading}
         <span className="min-w-0 truncate">{label}</span>
-        <span className="shrink-0 text-xs text-slate-300">v</span>
+        <span className="shrink-0 text-xs text-[var(--app-text-muted)]">v</span>
       </button>
       {open ? (
         <div
-          className={`absolute top-10 z-20 grid min-w-full gap-0.5 rounded-2xl border border-white/10 bg-slate-950/96 p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.42)] backdrop-blur-2xl ${
+          className={`absolute top-10 z-20 grid min-w-full gap-0.5 rounded-2xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface)_96%,transparent)] p-1.5 shadow-[var(--app-shadow)] backdrop-blur-2xl ${
             align === "left" ? "left-0" : "right-0"
           }`}
         >

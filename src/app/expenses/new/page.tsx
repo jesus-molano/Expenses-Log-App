@@ -1,13 +1,5 @@
-import { ExpenseDashboard } from "@/components/ExpenseDashboard";
-import { getAppSession } from "@/features/auth/server/session";
+import { ExpenseDashboard } from "@/features/expenses/components/ExpenseDashboard";
 
-export default async function NewExpensePage() {
-  const session = await getAppSession();
-  return (
-    <ExpenseDashboard
-      initialNewExpense
-      userEmail={session.userEmail}
-      isCloudReady={session.isCloudReady}
-    />
-  );
+export default function NewExpensePage() {
+  return <ExpenseDashboard initialNewExpense />;
 }

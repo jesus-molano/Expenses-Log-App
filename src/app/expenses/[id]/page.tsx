@@ -1,4 +1,4 @@
-import { ExpenseDetail } from "@/components/ExpenseDetail";
+import { ExpenseDetail } from "@/features/expenses/components/ExpenseDetail";
 
 export default async function ExpenseDetailPage({
   params,

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* Theme tokens */
 :root {
   --app-bg: #020617;
   --app-bg-soft: #06101d;
@@ -31,6 +32,10 @@
   --app-backdrop: rgb(2 6 23 / 0.72);
   --app-shadow: 0 24px 70px rgb(0 0 0 / 0.48);
   --app-glow: 0 0 42px rgb(132 204 22 / 0.14);
+  --motion-fast: 150ms;
+  --motion-medium: 240ms;
+  --motion-slow: 360ms;
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
   --background: var(--app-bg);
   --foreground: var(--app-text);
   --accent: var(--app-accent);
@@ -165,6 +170,7 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* App shell */
 html,
 body {
   max-width: 100%;
@@ -206,6 +212,7 @@ main {
   box-shadow: var(--app-glow), 0 18px 40px rgb(0 0 0 / 0.34);
 }
 
+/* Swipe actions */
 .app-swipe-edit {
   background: color-mix(in srgb, var(--app-action-edit) 22%, transparent);
   color: color-mix(in srgb, var(--app-action-edit) 82%, var(--app-text));
@@ -218,6 +225,15 @@ main {
   border-color: color-mix(in srgb, var(--app-action-paid) 30%, transparent);
 }
 
+.app-expense-row-card {
+  isolation: isolate;
+}
+
+.app-expense-row-card-swiping {
+  background: var(--app-surface) !important;
+}
+
+/* Timeline */
 .app-timeline-dot {
   background: var(--app-timeline-default);
   color: var(--app-timeline-default);
@@ -263,6 +279,8 @@ main {
   box-shadow: 0 0 34px color-mix(in srgb, var(--app-accent) 34%, transparent);
 }
 
+/* Legacy Tailwind color adapters.
+   New components should prefer semantic app-* classes/tokens instead. */
 :root[data-theme] .bg-slate-950,
 :root[data-theme] .bg-slate-900,
 :root[data-theme] .bg-slate-800,
@@ -496,8 +514,33 @@ main {
   background-color: color-mix(in srgb, var(--app-surface) 92%, var(--app-bg-soft)) !important;
 }
 
+/* Motion and view transitions */
 * {
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-timing-function: var(--ease-smooth);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-group(*) {
+  z-index: 1;
+  animation-duration: var(--motion-slow);
+  animation-timing-function: var(--ease-smooth);
+}
+
+::view-transition-group(app-chrome) {
+  z-index: 20;
+  animation-duration: var(--motion-slow);
+  animation-timing-function: var(--ease-smooth);
+}
+
+::view-transition-old(*),
+::view-transition-new(*) {
+  mix-blend-mode: normal;
+  animation-duration: var(--motion-slow);
+  animation-timing-function: var(--ease-smooth);
 }
 
 @keyframes fade-in {
@@ -512,6 +555,8 @@ main {
   }
 }
 
+
+/* Interaction and accessibility */
 button,
 a,
 input,
@@ -559,6 +604,7 @@ textarea {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 18%, transparent);
 }
 
+/* Platform behavior */
 @media (display-mode: standalone) {
   body {
     overscroll-behavior-y: none;

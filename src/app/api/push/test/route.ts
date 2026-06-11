@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const parsed = subscriptionSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Suscripcion push invalida." }, { status: 400 });
+    return NextResponse.json({ error: "Suscripción push inválida." }, { status: 400 });
   }
 
   const publicKey = process.env.VAPID_PUBLIC_KEY;
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   if (!publicKey || !privateKey) {
     return NextResponse.json({
       mode: "demo",
-      message: "Configura VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY para envio real.",
+      message: "Configura VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY para envío real.",
     });
   }
 
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     parsed.data,
     JSON.stringify({
       title: "Expense Reminders",
-      body: "Notificacion de prueba lista.",
+      body: "Notificación de prueba lista.",
       url: "/",
     }),
   );

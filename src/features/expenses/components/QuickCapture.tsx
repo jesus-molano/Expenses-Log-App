@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { Pencil, Sparkles } from "lucide-react";
 import type { AppLanguage } from "@/domain/types";
-import { t } from "@/lib/i18n";
+import { t } from "@/shared/i18n";
 
 type QuickCaptureProps = {
   value: string;
@@ -69,3 +69,4 @@ export function QuickCapture({
     </section>
   );
 }
+

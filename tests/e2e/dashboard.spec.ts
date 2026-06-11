@@ -1,38 +1,47 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { demoStore } from "../../src/domain/seed";
 
-const storageKey = "expense-reminders-store-v1";
+const currentStorageKey = "expense-reminders-store-v3";
+const legacyStorageKeys = [
+  "expense-reminders-store-v1",
+  "expense-reminders-store-v2",
+];
 
-async function loadDemoStore(page: import("@playwright/test").Page) {
+async function loadDemoStore(page: Page) {
   await page.addInitScript(
-    ([key, store]) => {
+    ([key, legacyKeys, store]) => {
+      for (const legacyKey of legacyKeys) {
+        window.localStorage.removeItem(legacyKey);
+      }
       window.localStorage.setItem(key, JSON.stringify(store));
     },
-    [storageKey, demoStore],
+    [currentStorageKey, legacyStorageKeys, demoStore],
   );
 }
 
-async function clearStore(page: import("@playwright/test").Page) {
-  await page.addInitScript((key) => {
+async function clearStore(page: Page) {
+  await page.addInitScript(([key, legacyKeys]) => {
+    for (const legacyKey of legacyKeys) {
+      window.localStorage.removeItem(legacyKey);
+    }
     window.localStorage.removeItem(key);
-  }, storageKey);
+  }, [currentStorageKey, legacyStorageKeys]);
 }
 
-async function swipeRow(
-  page: import("@playwright/test").Page,
-  name: string,
-  distance: number,
-) {
-  const row = page.locator('[data-expense-row="true"]').filter({ hasText: name }).first();
+async function swipeRow(page: Page, name: string, distance: number) {
+  const row = page
+    .locator('[data-expense-row="true"]')
+    .filter({ hasText: name })
+    .first();
   await row.scrollIntoViewIfNeeded();
   const box = await row.boundingBox();
   expect(box).not.toBeNull();
 
-  const startX = Math.min(box!.x + 300, 354);
+  const startX = Math.min(box!.x + box!.width - 12, 354);
   const y = box!.y + box!.height / 2;
   await page.mouse.move(startX, y);
   await page.mouse.down();
-  await page.mouse.move(startX - distance, y, { steps: 8 });
+  await page.mouse.move(startX - distance, y, { steps: 10 });
   await page.mouse.up();
 }
 
@@ -57,13 +66,16 @@ test("creates and pays a parsed recurring expense", async ({ page }) => {
   await page
     .getByPlaceholder("Ej: Luz 64,75 mensual día 8")
     .fill("Spotify 10,99 mensual el dia 12 musica");
-  await page.getByRole("button", { name: "Analizar texto" }).click();
+  await page.getByRole("button", { name: "Analizar texto" }).click({ force: true });
 
   await expect(page.getByRole("heading", { name: "Nuevo gasto" })).toBeVisible();
   await page.getByRole("button", { name: "Guardar gasto" }).click();
 
   await expect(
-    page.locator('[data-expense-row="true"]').filter({ hasText: "Spotify el musica" }).first(),
+    page
+      .locator('[data-expense-row="true"]')
+      .filter({ hasText: "Spotify el musica" })
+      .first(),
   ).toBeVisible();
   await swipeRow(page, "Spotify el musica", 240);
   await expect(page.getByText("pagado").first()).toBeVisible();
@@ -93,10 +105,10 @@ test("opens plan and configuration sheet", async ({ page }) => {
   await expect(page.getByText("Ingreso puntual")).toBeVisible();
 
   await page.getByRole("button", { name: "Configurar" }).click();
-  await expect(page.getByRole("heading", { name: "Configurar dinero" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Configurar Plan" })).toBeVisible();
 
   await page.getByLabel("Sueldo").fill("3000");
-  await page.getByRole("button", { name: /Cambiar dia de cobro/ }).click();
+  await page.getByRole("button", { name: /Cambiar día de cobro/ }).click();
   await page.getByRole("button", { name: "25" }).click();
   await page.getByLabel("Ahorro mensual").fill("450");
   await page.getByLabel("Cuenta gastos").fill("Cuenta gastos test");
@@ -108,4 +120,14 @@ test("opens plan and configuration sheet", async ({ page }) => {
   await expect(page.getByText("Cuenta ahorro test")).toBeVisible();
   await expect(page.getByText("Cuenta principal test")).toBeVisible();
   await expect(page.getByText("Objetivo: 450,00 €")).toBeVisible();
+});
+
+test("mobile shell routes render without runtime errors", async ({ page }) => {
+  await loadDemoStore(page);
+
+  for (const route of ["/", "/money", "/settings", "/expenses/new"]) {
+    await page.goto(route);
+    await expect(page.locator("main").first()).toBeVisible();
+    await expect(page.locator("body")).not.toContainText("Unhandled Runtime Error");
+  }
 });

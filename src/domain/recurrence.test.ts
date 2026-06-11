@@ -116,4 +116,39 @@ describe("recurrence", () => {
 
     expect(occurrence.status).toBe("paid");
   });
+
+  it("gives same-day generated occurrences stable sortable gaps", () => {
+    const occurrences = generateOccurrences(
+      [
+        {
+          ...baseTemplate,
+          id: "exp-a",
+          name: "A",
+          startDate: "2026-06-15",
+          dueDay: 15,
+        },
+        {
+          ...baseTemplate,
+          id: "exp-b",
+          name: "B",
+          startDate: "2026-06-15",
+          dueDay: 15,
+        },
+        {
+          ...baseTemplate,
+          id: "exp-c",
+          name: "C",
+          startDate: "2026-06-15",
+          dueDay: 15,
+        },
+      ],
+      [],
+      "2026-06-01",
+      "2026-06-30",
+    );
+
+    expect(occurrences.map((occurrence) => occurrence.sortOrder)).toEqual([
+      0, 1024, 2048,
+    ]);
+  });
 });

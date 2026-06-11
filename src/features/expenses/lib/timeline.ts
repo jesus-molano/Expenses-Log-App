@@ -1,8 +1,8 @@
-import { addDays, format, isSameDay, isWeekend, parseISO } from "date-fns";
+﻿import { addDays, format, isSameDay, isWeekend, parseISO } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import { daysBetween } from "@/domain/calendar";
 import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
-import { t } from "@/lib/i18n";
+import { t } from "@/shared/i18n";
 
 export type TimelineSection = {
   id: string;
@@ -149,3 +149,4 @@ function sortSections(
   if (aDate !== bDate) return aDate.localeCompare(bDate);
   return a.title.localeCompare(b.title);
 }
+

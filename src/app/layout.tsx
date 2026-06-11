@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
-import { PwaRegister } from "@/components/PwaRegister";
-import { ThemeApplier } from "@/components/ThemeApplier";
+import { PwaRegister } from "@/app/providers/PwaRegister";
+import { ThemeApplier } from "@/app/providers/ThemeApplier";
 import type { AppLanguage, AppTheme } from "@/domain/types";
 import "./globals.css";
 

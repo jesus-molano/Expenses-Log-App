@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useState } from "react";
 import type {
@@ -7,15 +7,11 @@ import type {
   DraftExpense,
   OccurrenceStatus,
 } from "@/domain/types";
-import { t } from "@/lib/i18n";
+import { t } from "@/shared/i18n";
+import { ExpenseForm } from "./ExpenseForm";
 import {
-  CategoryPicker,
-  DayOfMonthPicker,
-  ExpenseField,
   formatEuroInput,
   parseEuroInput,
-  RecurrencePicker,
-  TagPicker,
 } from "./ExpenseFormControls";
 
 type ExpenseFormSheetProps = {
@@ -86,68 +82,13 @@ export function ExpenseFormSheet({
         </div>
 
         <div className="grid gap-4 px-5 pb-5">
-          <ExpenseField label={t("expenses.name", language)}>
-            <input
-              value={form.name}
-              onChange={(event) => setForm({ ...form, name: event.target.value })}
-              required
-              className="input-control"
-              placeholder={t("expenses.namePlaceholder", language)}
-            />
-          </ExpenseField>
-
-          <ExpenseField label={t("expenses.description", language)}>
-            <textarea
-              value={form.description}
-              onChange={(event) =>
-                setForm({ ...form, description: event.target.value })
-              }
-              rows={3}
-              className="input-control min-h-24 py-2"
-              placeholder={t("expenses.descriptionPlaceholder", language)}
-            />
-          </ExpenseField>
-
-          <ExpenseField label={t("expenses.amount", language)}>
-            <input
-              inputMode="decimal"
-              value={amountText}
-              onChange={(event) => setAmountText(event.target.value)}
-              required
-              className="input-control"
-              placeholder={t("expenses.amountPlaceholder", language)}
-            />
-          </ExpenseField>
-
-          <CategoryPicker
-            value={form.categoryName}
+          <ExpenseForm
+            form={form}
+            amountText={amountText}
             language={language}
-            onChange={(categoryName) => setForm({ ...form, categoryName })}
+            onFormChange={setForm}
+            onAmountTextChange={setAmountText}
           />
-
-          <DayOfMonthPicker
-            value={form.dueDay}
-            language={language}
-            onChange={(dueDay) => setForm({ ...form, dueDay })}
-          />
-
-          <ExpenseField label={t("expenses.endDate", language)}>
-            <input
-              type="date"
-              value={form.endDate ?? ""}
-              onChange={(event) =>
-                setForm({
-                  ...form,
-                  endDate: event.target.value || undefined,
-                })
-              }
-              className="input-control"
-              aria-label={t("expenses.endDate", language)}
-            />
-            <span className="text-xs font-medium text-slate-400">
-              {t("expenses.endDateHelp", language)}
-            </span>
-          </ExpenseField>
 
           {isPastCurrentMonthDay ? (
             <div className="rounded-[1.15rem] border border-orange-300/20 bg-orange-400/10 p-3">
@@ -184,18 +125,6 @@ export function ExpenseFormSheet({
             </div>
           ) : null}
 
-          <RecurrencePicker
-            value={form.recurrence}
-            language={language}
-            onChange={(recurrence) => setForm({ ...form, recurrence })}
-          />
-
-          <TagPicker
-            value={form.tags}
-            language={language}
-            onChange={(tags) => setForm({ ...form, tags })}
-          />
-
           <div className="sticky bottom-0 -mx-5 bg-slate-950/92 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl">
             <button
               type="submit"
@@ -209,3 +138,4 @@ export function ExpenseFormSheet({
     </div>
   );
 }
+

@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { createSupabaseServiceClient } from "@/lib/supabase";
+﻿import { NextResponse } from "next/server";
+import { createSupabaseServiceClient } from "@/data/supabase/admin-client";
 import { createClient } from "@/utils/supabase/server";
 
 const USER_SCOPED_TABLES: Array<{ table: string; column: string }> = [
@@ -57,3 +57,4 @@ export async function DELETE() {
   }
   return NextResponse.json({ ok: true });
 }
+

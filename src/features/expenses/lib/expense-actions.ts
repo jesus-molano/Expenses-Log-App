@@ -1,4 +1,4 @@
-import { daysBetween } from "@/domain/calendar";
+﻿import { daysBetween } from "@/domain/calendar";
 import { resolvePresetCategory } from "@/domain/categories";
 import { format, parseISO } from "date-fns";
 import { enUS, es } from "date-fns/locale";
@@ -10,7 +10,7 @@ import type {
   ExpenseStore,
   ExpenseTemplate,
 } from "@/domain/types";
-import { t } from "@/lib/i18n";
+import { t } from "@/shared/i18n";
 
 export function createId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
@@ -115,3 +115,4 @@ export function statusLabel(
   }
   return `${t("expenses.daysAhead", language)} ${delta} ${delta === 1 ? t("expenses.day", language) : t("expenses.days", language)}`;
 }
+

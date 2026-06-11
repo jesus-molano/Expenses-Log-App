@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createSupabaseServiceClient } from "@/lib/supabase";
+import { createSupabaseServiceClient } from "@/data/supabase/admin-client";
 
 const subscriptionSchema = z.object({
   endpoint: z.string().url(),
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const parsed = subscriptionSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Suscripcion push invalida." }, { status: 400 });
+    return NextResponse.json({ error: "Suscripción push inválida." }, { status: 400 });
   }
 
   const supabase = createSupabaseServiceClient();
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   if (!supabase) {
     return NextResponse.json({
       mode: "demo",
-      message: "Suscripcion recibida. Configura Supabase para guardarla.",
+      message: "Suscripción recibida. Configura Supabase para guardarla.",
     });
   }
 
@@ -41,3 +41,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true });
 }
+

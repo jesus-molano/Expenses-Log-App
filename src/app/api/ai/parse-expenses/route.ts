@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
   if (!parsedRequest.success) {
     return NextResponse.json(
-      { error: "Texto invalido para analizar." },
+      { error: "Texto inválido para analizar." },
       { status: 400 },
     );
   }
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({
       provider: "local",
-      warning: "La IA no respondio con un formato valido. Use parser local.",
+      warning: "La IA no respondió con un formato válido. Use parser local.",
       expenses: parseExpenseTextLocally(parsedRequest.data.text),
     });
   }

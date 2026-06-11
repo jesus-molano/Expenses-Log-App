@@ -1,12 +1,5 @@
-import { MoneyDashboard } from "@/components/MoneyDashboard";
-import { getAppSession } from "@/features/auth/server/session";
+import { MoneyDashboard } from "@/features/plan/components/MoneyDashboard";
 
-export default async function MoneyPage() {
-  const session = await getAppSession();
-  return (
-    <MoneyDashboard
-      userEmail={session.userEmail}
-      isCloudReady={session.isCloudReady}
-    />
-  );
+export default function MoneyPage() {
+  return <MoneyDashboard />;
 }
