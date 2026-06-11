@@ -10,23 +10,16 @@ import {
   LogOut,
   Upload,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import type { ExpenseStore } from "@/domain/types";
-import {
-  loadExpenseStore,
-  mergeExpenseStores,
-  saveExpenseStore,
-} from "@/lib/local-store";
+import { useExpenseStore } from "@/features/expenses/hooks/use-expense-store";
 import { createClient } from "@/utils/supabase/client";
 
 export function SettingsView() {
-  const [store, setStore] = useState<ExpenseStore>(() => loadExpenseStore());
+  const { store, persist, syncStatus, syncMessage } = useExpenseStore();
   const [message, setMessage] = useState("");
   const [user, setUser] = useState<User | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [lastSync, setLastSync] = useState<string | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     if (!supabase) return;
@@ -57,48 +50,6 @@ export function SettingsView() {
     setMessage("Notificaciones habilitadas en este dispositivo.");
   }
 
-  async function syncNow() {
-    if (!supabase || !user) {
-      setMessage("Inicia sesión para sincronizar.");
-      return;
-    }
-
-    setSyncing(true);
-    setMessage("");
-    const localStore = loadExpenseStore();
-    const { data, error } = await supabase
-      .from("app_stores")
-      .select("store")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (error) {
-      setMessage(syncErrorMessage(error.message));
-      setSyncing(false);
-      return;
-    }
-
-    const merged = mergeExpenseStores(
-      localStore,
-      (data?.store as ExpenseStore | null) ?? null,
-    );
-    const { error: upsertError } = await supabase.from("app_stores").upsert({
-      user_id: user.id,
-      store: merged,
-      updated_at: new Date().toISOString(),
-    });
-
-    if (upsertError) {
-      setMessage(syncErrorMessage(upsertError.message));
-    } else {
-      saveExpenseStore(merged);
-      setStore(merged);
-      setLastSync(new Date().toLocaleString("es-ES"));
-      setMessage("Datos fusionados y sincronizados.");
-    }
-    setSyncing(false);
-  }
-
   async function signOut() {
     if (!supabase) return;
     await supabase.auth.signOut();
@@ -121,10 +72,8 @@ export function SettingsView() {
   async function importData(file: File | undefined) {
     if (!file) return;
     const text = await file.text();
-    const imported = JSON.parse(text) as ExpenseStore;
-    saveExpenseStore(imported);
-    setStore(imported);
-    setMessage("Datos importados en este dispositivo.");
+    persist(JSON.parse(text));
+    setMessage("Datos importados. Se guardarán automáticamente en la nube.");
   }
 
   return (
@@ -141,7 +90,7 @@ export function SettingsView() {
         <section className="mt-4 rounded-[1.35rem] border border-white/10 bg-slate-950/82 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.48)] backdrop-blur-2xl">
           <h1 className="text-2xl font-semibold text-white">Ajustes</h1>
           <p className="mt-2 text-sm text-slate-300">
-            EUR · Atlantic/Canary · sincronización opcional.
+            EUR · Atlantic/Canary · sincronización automática.
           </p>
 
           <div className="mt-5 grid gap-3">
@@ -150,29 +99,19 @@ export function SettingsView() {
               title={user ? user.email ?? "Cuenta conectada" : "Modo local"}
               description={
                 user
-                  ? `Último sync: ${lastSync ?? "pendiente"}`
+                  ? syncDescription(syncStatus, syncMessage)
                   : "Entra con Google para guardar tus datos."
               }
               action={
                 user ? (
-                  <div className="grid grid-cols-[1fr_auto] gap-2 sm:flex">
-                    <button
-                      type="button"
-                      onClick={syncNow}
-                      disabled={syncing}
-                      className="h-10 rounded-xl bg-lime-300 px-3 text-sm font-semibold text-slate-950 disabled:opacity-60"
-                    >
-                      {syncing ? "Sync" : "Sincronizar"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={signOut}
-                      className="grid size-10 place-items-center rounded-xl bg-white/10 ring-1 ring-white/10"
-                      aria-label="Cerrar sesión"
-                    >
-                      <LogOut size={17} />
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={signOut}
+                    className="grid size-10 place-items-center rounded-xl bg-white/10 ring-1 ring-white/10"
+                    aria-label="Cerrar sesión"
+                  >
+                    <LogOut size={17} />
+                  </button>
                 ) : (
                   <Link
                     href="/login"
@@ -233,16 +172,11 @@ export function SettingsView() {
   );
 }
 
-function syncErrorMessage(message: string) {
-  if (
-    message.includes("app_stores") ||
-    message.includes("schema cache") ||
-    message.includes("PGRST205")
-  ) {
-    return "Falta crear la tabla de sincronización en Supabase. Ejecuta supabase/migrations/20260611000000_app_store_sync.sql en el SQL Editor y vuelve a pulsar Sincronizar.";
-  }
-
-  return message;
+function syncDescription(status: string, message: string) {
+  if (status === "syncing") return "Sincronizando automáticamente...";
+  if (status === "synced") return message;
+  if (status === "error") return `Error de nube: ${message}`;
+  return "Los cambios se guardan en este dispositivo.";
 }
 
 function SettingCard({

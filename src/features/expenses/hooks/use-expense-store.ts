@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { toDateOnly } from "@/domain/calendar";
 import {
   createIncomeEvent,
@@ -8,27 +9,127 @@ import {
 } from "@/domain/finance";
 import { demoStore } from "@/domain/seed";
 import type { DraftExpense, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
-import { loadExpenseStore, saveExpenseStore } from "@/lib/local-store";
+import { loadCloudStore, saveCloudStore } from "@/lib/cloud-store";
+import {
+  loadExpenseStore,
+  mergeExpenseStores,
+  saveExpenseStore,
+} from "@/lib/local-store";
+import { createClient } from "@/utils/supabase/client";
 import {
   buildTemplateFromDraft,
   createId,
   findOrCreateCategory,
 } from "../lib/expense-actions";
 
+type SyncStatus = "local" | "syncing" | "synced" | "error";
+
 export function useExpenseStore() {
   const [store, setStore] = useState<ExpenseStore>(() => demoStore);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("local");
+  const [syncMessage, setSyncMessage] = useState("Modo local");
+  const supabaseRef = useRef<SupabaseClient | null>(null);
+  const userRef = useRef<User | null>(null);
+  const hydratedRef = useRef(false);
+  const saveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      setStore(loadExpenseStore());
-    });
+    let active = true;
+    const supabase = createClient();
+    supabaseRef.current = supabase;
 
-    return () => window.cancelAnimationFrame(frame);
+    async function hydrate() {
+      const localStore = loadExpenseStore();
+      if (active) setStore(localStore);
+
+      if (!supabase) {
+        hydratedRef.current = true;
+        return;
+      }
+
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+      if (!active || !user) {
+        hydratedRef.current = true;
+        setSyncStatus("local");
+        setSyncMessage("Modo local");
+        return;
+      }
+
+      userRef.current = user;
+      setSyncStatus("syncing");
+      setSyncMessage("Preparando nube");
+
+      try {
+        const cloud = await loadCloudStore(supabase, user);
+        if (!active) return;
+
+        const merged = mergeExpenseStores(localStore, cloud.store);
+        saveExpenseStore(merged);
+        setStore(merged);
+        hydratedRef.current = true;
+
+        const saved = await saveCloudStore(supabase, user, merged);
+        if (!active) return;
+        setSyncStatus("synced");
+        setSyncMessage(
+          saved.mode === "table"
+            ? "Sincronizado en la nube"
+            : "Nube pendiente de preparar",
+        );
+      } catch (error) {
+        hydratedRef.current = true;
+        setSyncStatus("error");
+        setSyncMessage(
+          error instanceof Error
+            ? error.message
+            : "No se pudo sincronizar con la nube.",
+        );
+      }
+    }
+
+    const frame = window.requestAnimationFrame(() => void hydrate());
+
+    return () => {
+      active = false;
+      window.cancelAnimationFrame(frame);
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    };
   }, []);
 
   function persist(nextStore: ExpenseStore) {
     saveExpenseStore(nextStore);
     setStore(nextStore);
+    queueCloudSave(nextStore);
+  }
+
+  function queueCloudSave(nextStore: ExpenseStore) {
+    const supabase = supabaseRef.current;
+    const user = userRef.current;
+    if (!hydratedRef.current || !supabase || !user) return;
+
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      setSyncStatus("syncing");
+      setSyncMessage("Guardando cambios");
+      void saveCloudStore(supabase, user, nextStore)
+        .then((result) => {
+          setSyncStatus("synced");
+          setSyncMessage(
+            result.mode === "table"
+              ? "Sincronizado en la nube"
+              : "Guardado localmente",
+          );
+        })
+        .catch((error: unknown) => {
+          setSyncStatus("error");
+          setSyncMessage(
+            error instanceof Error
+              ? error.message
+              : "No se pudo guardar en la nube.",
+          );
+        });
+    }, 350);
   }
 
   function addExpense(draft: DraftExpense) {
@@ -176,6 +277,37 @@ export function useExpenseStore() {
     });
   }
 
+  function updateMoneySettings(input: {
+    salaryAmount: number;
+    salaryDay: number;
+    savingsTarget: number;
+    sabadellAccountName: string;
+    bbvaSavingsAccountName: string;
+    bbvaMainAccountName: string;
+  }) {
+    persist({
+      ...store,
+      finance: {
+        ...store.finance,
+        incomeSources: updateSalarySource(
+          store.finance.incomeSources,
+          input.salaryAmount,
+          input.salaryDay,
+        ),
+        allocation: {
+          ...store.finance.allocation,
+          monthlySavingsTarget: Math.max(Number(input.savingsTarget), 0),
+          sabadellAccountName:
+            input.sabadellAccountName.trim() || "Sabadell gastos",
+          bbvaSavingsAccountName:
+            input.bbvaSavingsAccountName.trim() || "BBVA ahorro",
+          bbvaMainAccountName:
+            input.bbvaMainAccountName.trim() || "BBVA principal",
+        },
+      },
+    });
+  }
+
   function addIncomeEvent(input: {
     name: string;
     amount: number;
@@ -204,6 +336,9 @@ export function useExpenseStore() {
     updateSalary,
     updateSavingsTarget,
     updateAllocationNames,
+    updateMoneySettings,
     addIncomeEvent,
+    syncStatus,
+    syncMessage,
   };
 }

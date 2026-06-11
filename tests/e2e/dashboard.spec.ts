@@ -52,4 +52,16 @@ test("opens money plan and configuration sheet", async ({ page }) => {
 
   await page.getByRole("button", { name: "Configurar" }).click();
   await expect(page.getByRole("heading", { name: "Configurar dinero" })).toBeVisible();
+
+  await page.getByLabel("Sueldo").fill("3000");
+  await page.getByLabel("Ahorro mensual BBVA").fill("450");
+  await page.getByLabel("Cuenta gastos").fill("Cuenta gastos test");
+  await page.getByLabel("Cuenta ahorro").fill("Cuenta ahorro test");
+  await page.getByLabel("Cuenta principal").fill("Cuenta principal test");
+  await page.getByRole("button", { name: "Guardar configuración" }).click();
+
+  await expect(page.getByText("Cuenta gastos test")).toBeVisible();
+  await expect(page.getByText("Cuenta ahorro test")).toBeVisible();
+  await expect(page.getByText("Cuenta principal test")).toBeVisible();
+  await expect(page.getByText("Objetivo: 450,00 €")).toBeVisible();
 });

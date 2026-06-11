@@ -21,14 +21,15 @@ export function MoneyDashboard({
 }: MoneyDashboardProps) {
   const {
     store,
-    updateSalary,
-    updateSavingsTarget,
-    updateAllocationNames,
+    updateMoneySettings,
     addIncomeEvent,
   } = useExpenseStore();
   useScrollChrome();
+
   const today = useMemo(() => new Date(), []);
-  const salary = store.finance.incomeSources.find((source) => source.id === "inc-salary");
+  const salary = store.finance.incomeSources.find(
+    (source) => source.id === "inc-salary",
+  );
   const [salaryAmount, setSalaryAmount] = useState(salary?.amount ?? 0);
   const [salaryDay, setSalaryDay] = useState(salary?.dayOfMonth ?? 28);
   const [savingsTarget, setSavingsTarget] = useState(
@@ -42,6 +43,18 @@ export function MoneyDashboard({
   const [extraName, setExtraName] = useState("Bizum");
   const [extraAmount, setExtraAmount] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  function openSettings() {
+    setSalaryAmount(salary?.amount ?? 0);
+    setSalaryDay(salary?.dayOfMonth ?? 28);
+    setSavingsTarget(store.finance.allocation.monthlySavingsTarget);
+    setAccountNames({
+      sabadellAccountName: store.finance.allocation.sabadellAccountName,
+      bbvaSavingsAccountName: store.finance.allocation.bbvaSavingsAccountName,
+      bbvaMainAccountName: store.finance.allocation.bbvaMainAccountName,
+    });
+    setSettingsOpen(true);
+  }
 
   const occurrences = useMemo(
     () =>
@@ -61,9 +74,12 @@ export function MoneyDashboard({
 
   function savePlan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    updateSalary(salaryAmount, salaryDay);
-    updateSavingsTarget(savingsTarget);
-    updateAllocationNames(accountNames);
+    updateMoneySettings({
+      salaryAmount,
+      salaryDay,
+      savingsTarget,
+      ...accountNames,
+    });
     setSettingsOpen(false);
   }
 
@@ -98,7 +114,7 @@ export function MoneyDashboard({
           </div>
           <button
             type="button"
-            onClick={() => setSettingsOpen(true)}
+            onClick={openSettings}
             className="inline-flex h-11 items-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white ring-1 ring-white/10"
           >
             <Settings2 size={17} />
@@ -201,7 +217,7 @@ export function MoneyDashboard({
                   className="input-control"
                 />
               </MoneyField>
-              <MoneyField label="Dia cobro">
+              <MoneyField label="Día cobro">
                 <input
                   type="number"
                   min="1"
