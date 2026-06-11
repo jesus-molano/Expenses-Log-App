@@ -22,6 +22,9 @@ create table if not exists public.expense_categories (
 create unique index if not exists expense_categories_user_name_idx
   on public.expense_categories (user_id, lower(name));
 
+create index if not exists expense_categories_user_id_idx
+  on public.expense_categories (user_id);
+
 alter table public.expense_categories
   add column if not exists external_id text;
 
@@ -46,6 +49,12 @@ create table if not exists public.expense_templates (
 alter table public.expense_templates
   add column if not exists external_id text;
 
+create index if not exists expense_templates_user_id_idx
+  on public.expense_templates (user_id);
+
+create index if not exists expense_templates_category_id_idx
+  on public.expense_templates (category_id);
+
 create table if not exists public.expense_occurrence_overrides (
   id uuid primary key default gen_random_uuid(),
   external_id text,
@@ -66,6 +75,12 @@ create table if not exists public.expense_occurrence_overrides (
 alter table public.expense_occurrence_overrides
   add column if not exists external_id text;
 
+create index if not exists expense_occurrence_overrides_user_id_idx
+  on public.expense_occurrence_overrides (user_id);
+
+create index if not exists expense_occurrence_overrides_template_id_idx
+  on public.expense_occurrence_overrides (template_id);
+
 create table if not exists public.push_subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -75,6 +90,9 @@ create table if not exists public.push_subscriptions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create index if not exists push_subscriptions_user_id_idx
+  on public.push_subscriptions (user_id);
 
 create table if not exists public.app_stores (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -91,19 +109,19 @@ alter table public.push_subscriptions enable row level security;
 alter table public.app_stores enable row level security;
 
 create policy "profiles own rows" on public.profiles
-  for all using (auth.uid() = id) with check (auth.uid() = id);
+  for all using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
 
 create policy "categories own rows" on public.expense_categories
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 create policy "templates own rows" on public.expense_templates
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 create policy "overrides own rows" on public.expense_occurrence_overrides
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 create policy "push own rows" on public.push_subscriptions
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 create policy "app stores own rows" on public.app_stores
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
