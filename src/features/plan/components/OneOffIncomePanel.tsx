@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage, IncomeEvent } from "@/domain/types";
 import { t } from "@/shared/i18n";
-import { IncomeEventRow } from "./PlanCards";
+import { IncomeEventRow } from "./IncomeEventRow";
 
 type OneOffIncomePanelProps = {
   language: AppLanguage;
@@ -33,35 +33,39 @@ export function OneOffIncomePanel({
   return (
     <form
       onSubmit={onSubmit}
-      className="rounded-[1.35rem] border border-[var(--app-border)] bg-[var(--app-panel-alpha)] p-3 sm:p-4"
+      className="rounded-[1.2rem] border border-[var(--app-border)] bg-[var(--app-panel-alpha)] p-3"
     >
-      <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--app-text)]">
-        <Plus size={18} />
-        {t("money.oneOffIncome", language)}
-      </h2>
-      <p className="mt-1 text-sm text-[var(--app-text-muted)]">
-        {t("money.extrasThisMonth", language)}:{" "}
-        {formatCurrency(extraIncomeTotal)}
-      </p>
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_7rem]">
+      <header className="flex min-w-0 items-center justify-between gap-3">
+        <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold text-[var(--app-text)]">
+          <Plus size={17} />
+          <span className="truncate">{t("money.oneOffIncome", language)}</span>
+        </h2>
+        <p className="shrink-0 text-right text-xs font-semibold text-[var(--app-text-muted)]">
+          {formatCurrency(extraIncomeTotal)}
+        </p>
+      </header>
+
+      <div className="mt-3 grid gap-2">
         <input
           value={extraName}
           onChange={(event) => onExtraNameChange(event.target.value)}
           className="input-control"
           placeholder={t("money.extraNamePlaceholder", language)}
         />
-        <input
-          value={extraAmount}
-          inputMode="decimal"
-          onChange={(event) => onExtraAmountChange(event.target.value)}
-          className="input-control"
-          placeholder={t("money.extraAmountPlaceholder", language)}
-        />
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <input
+            value={extraAmount}
+            inputMode="decimal"
+            onChange={(event) => onExtraAmountChange(event.target.value)}
+            className="input-control min-w-0"
+            placeholder={t("money.extraAmountPlaceholder", language)}
+          />
+          <button className="h-12 rounded-2xl bg-[var(--app-panel-soft-alpha)] px-4 text-sm font-semibold text-[var(--app-text)] ring-1 ring-[var(--app-border)] transition hover:bg-[color-mix(in_srgb,var(--app-text)_10%,transparent)]">
+            {t("money.addIncome", language)}
+          </button>
+        </div>
       </div>
-      <button className="mt-3 h-12 w-full rounded-2xl bg-[var(--app-panel-soft-alpha)] text-sm font-semibold text-[var(--app-text)] ring-1 ring-[var(--app-border)]">
-        {t("money.addIncome", language)}
-      </button>
-      <div className="mt-4 grid gap-2">
+      <div className="mt-3 grid gap-2">
         {incomeEvents.length ? (
           incomeEvents.map((event) => (
             <IncomeEventRow

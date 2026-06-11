@@ -39,7 +39,9 @@ export const defaultFinanceStore: FinanceStore = {
     expensesAccountName: "Cuenta gastos",
     savingsAccountName: "Cuenta ahorro",
     primaryAccountName: "Cuenta principal",
-    monthlySavingsTarget: 300,
+    monthlySavingsTargets: {
+      "2026-06": 300,
+    },
   },
 };
 
@@ -50,9 +52,41 @@ export const emptyFinanceStore: FinanceStore = {
     expensesAccountName: "Cuenta gastos",
     savingsAccountName: "Cuenta ahorro",
     primaryAccountName: "Cuenta principal",
-    monthlySavingsTarget: 0,
+    monthlySavingsTargets: {},
   },
 };
+
+export function toMonthId(monthDate: Date | string | null | undefined): string {
+  if (typeof monthDate === "string") {
+    const trimmed = monthDate.trim();
+    if (/^\d{4}-\d{2}/.test(trimmed)) return trimmed.slice(0, 7);
+
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return toDateOnly(startOfMonth(parsed)).slice(0, 7);
+    }
+
+    return toDateOnly(startOfMonth(new Date())).slice(0, 7);
+  }
+
+  if (!monthDate || Number.isNaN(monthDate.getTime())) {
+    return toDateOnly(startOfMonth(new Date())).slice(0, 7);
+  }
+
+  return toDateOnly(startOfMonth(monthDate)).slice(0, 7);
+}
+
+export function getMonthlySavingsTarget(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): number {
+  const monthlyTargets = finance.allocation.monthlySavingsTargets ?? {};
+
+  return Math.max(
+    Number(monthlyTargets[toMonthId(monthDate)] ?? 0),
+    0,
+  );
+}
 
 export function buildMonthlyMoneyPlan({
   monthDate,
@@ -66,6 +100,7 @@ export function buildMonthlyMoneyPlan({
   const monthStart = toDateOnly(startOfMonth(monthDate));
   const monthEnd = toDateOnly(endOfMonth(monthDate));
   const month = monthStart.slice(0, 7);
+  const monthlySavingsTarget = getMonthlySavingsTarget(finance, month);
   const recurringIncomeTotal = finance.incomeSources
     .filter((source) => source.active)
     .reduce((sum, source) => sum + source.amount, 0);
@@ -85,7 +120,7 @@ export function buildMonthlyMoneyPlan({
   const afterExpenses = incomeTotal - expensesContribution;
   const savingsContribution = Math.min(
     Math.max(afterExpenses, 0),
-    finance.allocation.monthlySavingsTarget,
+    monthlySavingsTarget,
   );
   const primaryContribution = Math.max(
     afterExpenses - savingsContribution,

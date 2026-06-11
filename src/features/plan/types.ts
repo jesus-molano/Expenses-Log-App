@@ -9,3 +9,9 @@ export type MoneySeriesItem = {
   shortfall: number;
   hasRecords: boolean;
 };
+
+export type PlanAccountNames = {
+  expensesAccountName: string;
+  savingsAccountName: string;
+  primaryAccountName: string;
+};

@@ -3,7 +3,7 @@
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage, IncomeEvent } from "@/domain/types";
 import { t } from "@/shared/i18n";
-import { IncomeEventRow } from "./PlanCards";
+import { IncomeEventRow } from "./IncomeEventRow";
 import { PlanEmptyLine, PlanSectionList } from "./PlanSectionList";
 
 type MonthlyIncomeEventsListProps = {

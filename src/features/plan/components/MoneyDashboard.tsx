@@ -2,19 +2,21 @@
 
 import { useState } from "react";
 import { formatCurrency } from "@/domain/calendar";
-import type { AppLanguage } from "@/domain/types";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
 import { t } from "@/shared/i18n";
 import { useMoneyDashboardData } from "../hooks/use-money-dashboard-data";
+import { useMonthlySavingsTargetEditor } from "../hooks/use-monthly-savings-target-editor";
 import { useOneOffIncomeForm } from "../hooks/use-one-off-income-form";
 import { usePlanSettingsForm } from "../hooks/use-plan-settings-form";
 import { useSkipOccurrenceConfirmation } from "../hooks/use-skip-occurrence-confirmation";
 import { AccountAllocationCards } from "./AccountAllocationCards";
 import { MonthlyComparisonSection } from "./MonthlyComparisonSection";
+import { MonthlySavingsTargetDialog } from "./MonthlySavingsTargetDialog";
 import { MonthlyTrendSection } from "./MonthlyTrendSection";
 import { OneOffIncomePanel } from "./OneOffIncomePanel";
+import { PlanAnalyticsDivider } from "./PlanAnalyticsDivider";
 import { PlanHeader } from "./PlanHeader";
 import { PlanSettingsSheet } from "./PlanSettingsSheet";
 import { PlanShortfallBanner } from "./PlanShortfallBanner";
@@ -24,6 +26,7 @@ export function MoneyDashboard() {
   const {
     store,
     updateMoneySettings,
+    updateMonthlySavingsTarget,
     addIncomeEvent,
     deleteIncomeEvent,
     skipOccurrence,
@@ -35,6 +38,7 @@ export function MoneyDashboard() {
   const settingsForm = usePlanSettingsForm({
     finance: store.finance,
     language,
+    savingsMonthId: money.currentMonthId,
     onSave: updateMoneySettings,
   });
   const oneOffIncome = useOneOffIncomeForm({
@@ -42,6 +46,13 @@ export function MoneyDashboard() {
     onAddIncome: addIncomeEvent,
   });
   const skipDialog = useSkipOccurrenceConfirmation(skipOccurrence);
+  const savingsEditor = useMonthlySavingsTargetEditor({
+    finance: store.finance,
+    language,
+    monthId: money.selectedMonthSummary.id,
+    monthLabel: money.selectedMonthSummary.monthLong,
+    onSave: updateMonthlySavingsTarget,
+  });
   const [yearMenuOpen, setYearMenuOpen] = useState(false);
   const [monthMenuOpen, setMonthMenuOpen] = useState(false);
 
@@ -72,7 +83,7 @@ export function MoneyDashboard() {
           expensesContribution={money.plan.expensesContribution}
           fixedExpensesTotal={money.plan.fixedExpensesTotal}
           savingsContribution={money.plan.savingsContribution}
-          monthlySavingsTarget={store.finance.allocation.monthlySavingsTarget}
+          monthlySavingsTarget={money.currentMonthSavingsTarget}
           primaryContribution={money.plan.primaryContribution}
         />
 
@@ -110,6 +121,7 @@ export function MoneyDashboard() {
           availableYears={money.availableYears}
           selectedYear={money.selectedYear}
           selectedMonthSummary={money.selectedMonthSummary}
+          selectedMonthIsPast={money.selectedMonthIsPast}
           yearMenuOpen={yearMenuOpen}
           monthMenuOpen={monthMenuOpen}
           incomeEvents={money.selectedMonthIncomeEvents}
@@ -121,6 +133,7 @@ export function MoneyDashboard() {
           onMonthOpenChange={setMonthMenuOpen}
           onSelectYear={money.selectYear}
           onSelectMonth={money.selectMonth}
+          onEditSavings={savingsEditor.openEditor}
           onToggleExpanded={() =>
             money.setSelectedExpensesExpanded((expanded) => !expanded)
           }
@@ -147,6 +160,17 @@ export function MoneyDashboard() {
         />
       ) : null}
 
+      {savingsEditor.open ? (
+        <MonthlySavingsTargetDialog
+          language={language}
+          monthLabel={savingsEditor.monthLabel}
+          amount={savingsEditor.amount}
+          onAmountChange={savingsEditor.setAmount}
+          onClose={savingsEditor.closeEditor}
+          onSubmit={savingsEditor.submit}
+        />
+      ) : null}
+
       <SkipOccurrenceDialog
         occurrence={skipDialog.occurrenceToSkip}
         language={language}
@@ -156,18 +180,4 @@ export function MoneyDashboard() {
     </DashboardShell>
   );
 }
-
-function PlanAnalyticsDivider({ language }: { language: AppLanguage }) {
-  return (
-    <div className="my-2 flex items-center gap-3 px-1">
-      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--app-border)] to-transparent" />
-      <span className="rounded-full border border-[var(--app-border)] bg-[var(--app-panel-soft-alpha)] px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--app-text-muted)]">
-        {t("money.analytics", language)}
-      </span>
-      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--app-border)] to-transparent" />
-    </div>
-  );
-}
-
-
 

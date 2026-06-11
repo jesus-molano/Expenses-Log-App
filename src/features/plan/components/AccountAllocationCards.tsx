@@ -4,7 +4,7 @@ import { Landmark, PiggyBank, WalletCards } from "lucide-react";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
-import { MoneyCard } from "./PlanCards";
+import { MoneyCard } from "./MoneyCard";
 
 type AccountAllocationCardsProps = {
   language: AppLanguage;
@@ -35,13 +35,17 @@ export function AccountAllocationCards({
         icon={<WalletCards size={18} />}
         label={expensesAccountName}
         value={formatCurrency(expensesContribution)}
-        detail={`${t("money.expensesPrefix", language)}: ${formatCurrency(fixedExpensesTotal)}`}
+        detail={
+          fixedExpensesTotal > 0
+            ? t("money.monthlyExpenseCoverage", language)
+            : t("money.noFixedExpenses", language)
+        }
       />
       <MoneyCard
         icon={<PiggyBank size={18} />}
         label={savingsAccountName}
         value={formatCurrency(savingsContribution)}
-        detail={`${t("money.targetPrefix", language)}: ${formatCurrency(monthlySavingsTarget)}`}
+        detail={`${t("money.thisMonthTarget", language)}: ${formatCurrency(monthlySavingsTarget)}`}
       />
       <MoneyCard
         icon={<Landmark size={18} />}

@@ -24,9 +24,14 @@ import {
   togglePaidInStore,
   updateLanguageInStore,
   updateMoneySettingsInStore,
+  updateMonthlySavingsTargetInStore,
   updateThemeInStore,
 } from "./store-commands";
-import type { IncomeEventInput, MoneySettingsInput } from "./store-types";
+import type {
+  IncomeEventInput,
+  MoneySettingsInput,
+  MonthlySavingsTargetInput,
+} from "./store-types";
 import { useStorePersistence } from "./use-store-persistence";
 
 export function useExpenseStore() {
@@ -84,6 +89,10 @@ export function useExpenseStore() {
     persist(updateMoneySettingsInStore(store, input));
   }
 
+  function updateMonthlySavingsTarget(input: MonthlySavingsTargetInput) {
+    persist(updateMonthlySavingsTargetInStore(store, input));
+  }
+
   function addIncomeEvent(input: IncomeEventInput) {
     persist(addIncomeEventToStore(store, input));
   }
@@ -113,6 +122,7 @@ export function useExpenseStore() {
     moveOccurrence,
     moveOccurrenceSeries,
     updateMoneySettings,
+    updateMonthlySavingsTarget,
     addIncomeEvent,
     deleteIncomeEvent,
     updateTheme,

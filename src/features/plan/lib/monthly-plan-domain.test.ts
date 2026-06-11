@@ -37,7 +37,10 @@ const finance: FinanceStore = {
     expensesAccountName: "Gastos",
     savingsAccountName: "Ahorro",
     primaryAccountName: "Principal",
-    monthlySavingsTarget: 300,
+    monthlySavingsTargets: {
+      "2026-05": 300,
+      "2026-06": 300,
+    },
   },
 };
 

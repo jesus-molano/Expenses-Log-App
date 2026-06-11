@@ -3,11 +3,13 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import type { AppLanguage, FinanceStore } from "@/domain/types";
+import { getMonthlySavingsTarget } from "@/domain/finance";
 import { formatMoneyInput, parseMoneyInput } from "../lib/money-input";
 
 export type PlanSettingsInput = {
   salaryAmount: number;
   salaryDay: number;
+  savingsMonthId: string;
   savingsTarget: number;
   expensesAccountName: string;
   savingsAccountName: string;
@@ -17,10 +19,12 @@ export type PlanSettingsInput = {
 export function usePlanSettingsForm({
   finance,
   language,
+  savingsMonthId,
   onSave,
 }: {
   finance: FinanceStore;
   language: AppLanguage;
+  savingsMonthId: string;
   onSave: (input: PlanSettingsInput) => void;
 }) {
   const salary = finance.incomeSources.find(
@@ -31,7 +35,7 @@ export function usePlanSettingsForm({
   );
   const [salaryDay, setSalaryDay] = useState(salary?.dayOfMonth ?? 28);
   const [savingsTarget, setSavingsTarget] = useState(
-    formatMoneyInput(finance.allocation.monthlySavingsTarget, language),
+    formatMoneyInput(getMonthlySavingsTarget(finance, savingsMonthId), language),
   );
   const [accountNames, setAccountNames] = useState({
     expensesAccountName: finance.allocation.expensesAccountName,
@@ -45,7 +49,7 @@ export function usePlanSettingsForm({
     setSalaryAmount(formatMoneyInput(salary?.amount ?? 0, language));
     setSalaryDay(salary?.dayOfMonth ?? 28);
     setSavingsTarget(
-      formatMoneyInput(finance.allocation.monthlySavingsTarget, language),
+      formatMoneyInput(getMonthlySavingsTarget(finance, savingsMonthId), language),
     );
     setAccountNames({
       expensesAccountName: finance.allocation.expensesAccountName,
@@ -70,6 +74,7 @@ export function usePlanSettingsForm({
     onSave({
       salaryAmount: parseMoneyInput(salaryAmount),
       salaryDay,
+      savingsMonthId,
       savingsTarget: parseMoneyInput(savingsTarget),
       ...accountNames,
     });

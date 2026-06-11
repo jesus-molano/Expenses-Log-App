@@ -6,7 +6,7 @@ import type {
   ExpenseOccurrence,
 } from "@/domain/types";
 import { t } from "@/shared/i18n";
-import { MonthlyExpenseRow } from "./PlanCards";
+import { MonthlyExpenseRow } from "./MonthlyExpenseRow";
 import { PlanEmptyLine, PlanSectionList } from "./PlanSectionList";
 
 type MonthlyExpenseBreakdownProps = {

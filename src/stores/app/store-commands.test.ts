@@ -13,6 +13,7 @@ import {
   togglePaidInStore,
   updateLanguageInStore,
   updateMoneySettingsInStore,
+  updateMonthlySavingsTargetInStore,
   updateThemeInStore,
 } from "./store-commands";
 
@@ -94,6 +95,7 @@ describe("store commands", () => {
     const financeStore = updateMoneySettingsInStore(emptyStore, {
       salaryAmount: 1800,
       salaryDay: 25,
+      savingsMonthId: "2026-06",
       savingsTarget: 250,
       expensesAccountName: "Gastos",
       savingsAccountName: "Ahorro",
@@ -108,7 +110,9 @@ describe("store commands", () => {
       expensesAccountName: "Gastos",
       savingsAccountName: "Ahorro",
       primaryAccountName: "Principal",
-      monthlySavingsTarget: 250,
+      monthlySavingsTargets: {
+        "2026-06": 250,
+      },
     });
 
     expect(updateThemeInStore(emptyStore, "catppuccin").preferences?.theme).toBe(
@@ -116,6 +120,36 @@ describe("store commands", () => {
     );
     expect(updateLanguageInStore(emptyStore, "en").preferences?.language).toBe(
       "en",
+    );
+  });
+
+  it("updates only the savings target for a selected month", () => {
+    const withSettings = updateMoneySettingsInStore(emptyStore, {
+      salaryAmount: 1800,
+      salaryDay: 25,
+      savingsMonthId: "2026-06-01",
+      savingsTarget: 250,
+      expensesAccountName: "Gastos",
+      savingsAccountName: "Ahorro",
+      primaryAccountName: "Principal",
+    });
+
+    const updated = updateMonthlySavingsTargetInStore(withSettings, {
+      monthId: "2026-07-01",
+      savingsTarget: 800,
+    });
+
+    expect(updated.finance.allocation).toMatchObject({
+      expensesAccountName: "Gastos",
+      savingsAccountName: "Ahorro",
+      primaryAccountName: "Principal",
+      monthlySavingsTargets: {
+        "2026-06": 250,
+        "2026-07": 800,
+      },
+    });
+    expect(updated.finance.incomeSources).toEqual(
+      withSettings.finance.incomeSources,
     );
   });
 });

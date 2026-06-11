@@ -21,6 +21,7 @@ type MonthlyComparisonSectionProps = {
   availableYears: number[];
   selectedYear: number;
   selectedMonthSummary: MoneySeriesItem;
+  selectedMonthIsPast: boolean;
   yearMenuOpen: boolean;
   monthMenuOpen: boolean;
   incomeEvents: IncomeEvent[];
@@ -33,6 +34,7 @@ type MonthlyComparisonSectionProps = {
   onSelectYear: (year: number) => void;
   onSelectMonth: (monthId: string) => void;
   onToggleExpanded: () => void;
+  onEditSavings: () => void;
   onDeleteIncomeEvent: (id: string) => void;
   onSkipOccurrence: (occurrence: ExpenseOccurrence) => void;
 };
@@ -44,6 +46,7 @@ export function MonthlyComparisonSection({
   availableYears,
   selectedYear,
   selectedMonthSummary,
+  selectedMonthIsPast,
   yearMenuOpen,
   monthMenuOpen,
   incomeEvents,
@@ -56,6 +59,7 @@ export function MonthlyComparisonSection({
   onSelectYear,
   onSelectMonth,
   onToggleExpanded,
+  onEditSavings,
   onDeleteIncomeEvent,
   onSkipOccurrence,
 }: MonthlyComparisonSectionProps) {
@@ -91,6 +95,8 @@ export function MonthlyComparisonSection({
       <MonthlyComparisonStats
         language={language}
         summary={selectedMonthSummary}
+        canEditSavings={selectedMonthIsPast}
+        onEditSavings={onEditSavings}
       />
 
       <MonthlyIncomeEventsList

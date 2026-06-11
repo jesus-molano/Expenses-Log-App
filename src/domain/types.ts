@@ -119,7 +119,8 @@ export type AllocationSettings = {
   expensesAccountName: string;
   savingsAccountName: string;
   primaryAccountName: string;
-  monthlySavingsTarget: number;
+  monthlySavingsTargets: Record<string, number>;
+  monthlySavingsTarget?: number;
 };
 
 export type FinanceStore = {

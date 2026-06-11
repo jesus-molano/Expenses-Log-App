@@ -2,7 +2,7 @@
 
 import type { ExpenseStore } from "@/domain/types";
 import { emptyStore } from "@/domain/seed";
-import { emptyFinanceStore } from "@/domain/finance";
+import { emptyFinanceStore, toMonthId } from "@/domain/finance";
 import type { AllocationSettings, FinanceStore } from "@/domain/types";
 
 const STORAGE_KEY = "expense-reminders-store-v3";
@@ -21,6 +21,19 @@ function purgeLegacyLocalStores() {
 function normalizeAllocationSettings(
   allocation?: Partial<AllocationSettings> | null,
 ): AllocationSettings {
+  const monthlySavingsTargets = normalizeMonthlySavingsTargets(
+    allocation?.monthlySavingsTargets,
+  );
+  if (
+    allocation?.monthlySavingsTarget !== undefined &&
+    Object.keys(monthlySavingsTargets).length === 0
+  ) {
+    monthlySavingsTargets[toMonthId(new Date())] = Math.max(
+      Number(allocation.monthlySavingsTarget),
+      0,
+    );
+  }
+
   return {
     expensesAccountName:
       allocation?.expensesAccountName ??
@@ -31,10 +44,20 @@ function normalizeAllocationSettings(
     primaryAccountName:
       allocation?.primaryAccountName ??
       emptyFinanceStore.allocation.primaryAccountName,
-    monthlySavingsTarget:
-      allocation?.monthlySavingsTarget ??
-      emptyFinanceStore.allocation.monthlySavingsTarget,
+    monthlySavingsTargets,
   };
+}
+
+function normalizeMonthlySavingsTargets(
+  targets?: Record<string, number> | null,
+): Record<string, number> {
+  const normalized: Record<string, number> = {};
+  for (const [monthId, amount] of Object.entries(targets ?? {})) {
+    if (/^\d{4}-\d{2}$/.test(monthId)) {
+      normalized[monthId] = Math.max(Number(amount), 0);
+    }
+  }
+  return normalized;
 }
 
 function normalizeFinanceStore(finance?: Partial<FinanceStore> | null): FinanceStore {
@@ -111,6 +134,10 @@ export function mergeExpenseStores(
       allocation: normalizeAllocationSettings({
         ...cloudStore.finance?.allocation,
         ...localStore.finance?.allocation,
+        monthlySavingsTargets: {
+          ...cloudStore.finance?.allocation?.monthlySavingsTargets,
+          ...localStore.finance?.allocation?.monthlySavingsTargets,
+        },
       }),
       incomeSources: mergeById(
         cloudStore.finance?.incomeSources ?? [],

@@ -1,9 +1,14 @@
 import {
   createIncomeEvent,
+  toMonthId,
   updateSalarySource,
 } from "@/domain/finance";
 import type { ExpenseStore } from "@/domain/types";
-import type { IncomeEventInput, MoneySettingsInput } from "./store-types";
+import type {
+  IncomeEventInput,
+  MoneySettingsInput,
+  MonthlySavingsTargetInput,
+} from "./store-types";
 
 export function updateMoneySettingsInStore(
   store: ExpenseStore,
@@ -20,13 +25,38 @@ export function updateMoneySettingsInStore(
       ),
       allocation: {
         ...store.finance.allocation,
-        monthlySavingsTarget: Math.max(Number(input.savingsTarget), 0),
+        monthlySavingsTargets: {
+          ...(store.finance.allocation.monthlySavingsTargets ?? {}),
+          [toMonthId(input.savingsMonthId)]: Math.max(
+            Number(input.savingsTarget),
+            0,
+          ),
+        },
         expensesAccountName:
           input.expensesAccountName.trim() || "Cuenta gastos",
         savingsAccountName:
           input.savingsAccountName.trim() || "Cuenta ahorro",
         primaryAccountName:
           input.primaryAccountName.trim() || "Cuenta principal",
+      },
+    },
+  };
+}
+
+export function updateMonthlySavingsTargetInStore(
+  store: ExpenseStore,
+  input: MonthlySavingsTargetInput,
+): ExpenseStore {
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      allocation: {
+        ...store.finance.allocation,
+        monthlySavingsTargets: {
+          ...(store.finance.allocation.monthlySavingsTargets ?? {}),
+          [toMonthId(input.monthId)]: Math.max(Number(input.savingsTarget), 0),
+        },
       },
     },
   };

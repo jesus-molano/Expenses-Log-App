@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { startOfMonth } from "date-fns";
 import { toDateOnly } from "@/domain/calendar";
+import { getMonthlySavingsTarget, toMonthId } from "@/domain/finance";
 import type {
   AppLanguage,
   ExpenseOccurrence,
@@ -41,8 +42,11 @@ export function useMoneyDashboardData(
     selectedMonth,
     selectedExpensesExpanded,
   });
-  const annual = useAnnualPlanSummary(store, today);
+  const annual = useAnnualPlanSummary(store, selectedYear, today);
   const isCompactChart = useCompactChart();
+  const currentMonthId = toMonthId(today);
+  const selectedMonthIsPast =
+    toMonthId(comparison.selectedMonthSummary.id) < currentMonthId;
 
   function selectYear(year: number) {
     setSelectedYear(year);
@@ -57,11 +61,17 @@ export function useMoneyDashboardData(
   return {
     today,
     todayDateOnly: toDateOnly(today),
+    currentMonthId,
     plan: currentMonth.plan,
+    currentMonthSavingsTarget: getMonthlySavingsTarget(
+      store.finance,
+      currentMonthId,
+    ),
     moneySeries,
     availableYears,
     selectedYear,
     selectedMonthSummary: comparison.selectedMonthSummary,
+    selectedMonthIsPast,
     selectedMonthIncomeEvents: comparison.selectedMonthIncomeEvents,
     selectedMonthOccurrences: comparison.selectedMonthOccurrences,
     visibleSelectedMonthOccurrences:

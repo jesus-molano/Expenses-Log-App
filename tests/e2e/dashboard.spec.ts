@@ -55,7 +55,7 @@ test("starts empty for a new local user", async ({ page }) => {
 
   await page.getByRole("link", { name: "Plan" }).click();
   await expect(page.getByText("Ingresos 0,00 €")).toBeVisible();
-  await expect(page.getByText("Objetivo: 0,00 €")).toBeVisible();
+  await expect(page.getByText("Meta este mes: 0,00 €")).toBeVisible();
 });
 
 test("creates and pays a parsed recurring expense", async ({ page }) => {
@@ -110,7 +110,7 @@ test("opens plan and configuration sheet", async ({ page }) => {
   await page.getByLabel("Sueldo").fill("3000");
   await page.getByRole("button", { name: /Cambiar día de cobro/ }).click();
   await page.getByRole("button", { name: "25" }).click();
-  await page.getByLabel("Ahorro mensual").fill("450");
+  await page.getByLabel("Ahorro este mes").fill("450");
   await page.getByLabel("Cuenta gastos").fill("Cuenta gastos test");
   await page.getByLabel("Cuenta ahorro").fill("Cuenta ahorro test");
   await page.getByLabel("Cuenta principal").fill("Cuenta principal test");
@@ -119,7 +119,7 @@ test("opens plan and configuration sheet", async ({ page }) => {
   await expect(page.getByText("Cuenta gastos test")).toBeVisible();
   await expect(page.getByText("Cuenta ahorro test")).toBeVisible();
   await expect(page.getByText("Cuenta principal test")).toBeVisible();
-  await expect(page.getByText("Objetivo: 450,00 €")).toBeVisible();
+  await expect(page.getByText("Meta este mes: 450,00 €")).toBeVisible();
 });
 
 test("deletes an expense from the edit screen", async ({ page }) => {
