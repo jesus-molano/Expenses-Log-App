@@ -1,4 +1,5 @@
 import { daysBetween } from "@/domain/calendar";
+import { resolvePresetCategory } from "@/domain/categories";
 import type {
   DraftExpense,
   ExpenseCategory,
@@ -23,7 +24,8 @@ export function findOrCreateCategory(
   store: ExpenseStore,
   categoryName: string,
 ): { store: ExpenseStore; categoryId: string } {
-  const normalizedName = categoryName.trim() || "General";
+  const presetCategory = resolvePresetCategory(categoryName);
+  const normalizedName = presetCategory.name;
   const existing = store.categories.find(
     (category) => category.name.toLowerCase() === normalizedName.toLowerCase(),
   );
@@ -34,8 +36,8 @@ export function findOrCreateCategory(
     id: createId("cat"),
     userId: "demo",
     name: normalizedName,
-    icon: "WalletCards",
-    tone: "slate",
+    icon: presetCategory.icon,
+    tone: presetCategory.tone,
   };
 
   return {

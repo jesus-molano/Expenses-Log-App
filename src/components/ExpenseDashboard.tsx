@@ -86,7 +86,7 @@ export function ExpenseDashboard({
       />
 
       <ExpenseFormSheet
-        key={`${draft.name}:${draft.description}:${draft.amount}:${sheetOpen}`}
+        key={`${draft.name}:${draft.description}:${draft.amount}:${draft.categoryName}:${draft.dueDay}:${draft.tags.join(",")}:${sheetOpen}`}
         open={sheetOpen}
         draft={draft}
         onClose={() => setSheetOpen(false)}

@@ -1,8 +1,16 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import type { DraftExpense, RecurrenceFrequency } from "@/domain/types";
-import { normalizeTags } from "../lib/expense-actions";
+import type { DraftExpense } from "@/domain/types";
+import {
+  CategoryPicker,
+  DayOfMonthPicker,
+  ExpenseField,
+  formatEuroInput,
+  parseEuroInput,
+  RecurrencePicker,
+  TagPicker,
+} from "./ExpenseFormControls";
 
 type ExpenseFormSheetProps = {
   open: boolean;
@@ -18,12 +26,16 @@ export function ExpenseFormSheet({
   onSave,
 }: ExpenseFormSheetProps) {
   const [form, setForm] = useState(draft);
+  const [amountText, setAmountText] = useState(() => formatEuroInput(draft.amount));
 
   if (!open) return null;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onSave(form);
+    onSave({
+      ...form,
+      amount: Math.max(parseEuroInput(amountText), 0.01),
+    });
   }
 
   return (
@@ -36,7 +48,7 @@ export function ExpenseFormSheet({
           <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/20 sm:hidden" />
           <header className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-white">Nuevo gasto</h2>
+              <h2 className="text-lg font-semibold text-white">Nuevo gasto</h2>
               <p className="truncate text-sm text-slate-300">
                 Revisa importe, día y repetición.
               </p>
@@ -52,16 +64,17 @@ export function ExpenseFormSheet({
         </div>
 
         <div className="grid gap-4 px-5 pb-5">
-          <Field label="Nombre">
+          <ExpenseField label="Nombre">
             <input
               value={form.name}
               onChange={(event) => setForm({ ...form, name: event.target.value })}
               required
               className="input-control"
+              placeholder="Netflix, alquiler, seguro..."
             />
-          </Field>
+          </ExpenseField>
 
-          <Field label="Descripción">
+          <ExpenseField label="Descripción">
             <textarea
               value={form.description}
               onChange={(event) =>
@@ -69,168 +82,42 @@ export function ExpenseFormSheet({
               }
               rows={3}
               className="input-control min-h-24 py-2"
+              placeholder="Notas internas, cuenta, condiciones..."
             />
-          </Field>
+          </ExpenseField>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Importe">
+          <div className="grid grid-cols-1 gap-3">
+            <ExpenseField label="Importe">
               <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={form.amount}
-                onChange={(event) =>
-                  setForm({ ...form, amount: Number(event.target.value) })
-                }
+                inputMode="decimal"
+                value={amountText}
+                onChange={(event) => setAmountText(event.target.value)}
                 required
                 className="input-control"
+                placeholder="15,99"
               />
-            </Field>
-
-            <Field label="Dia cobro">
-              <input
-                type="number"
-                min="1"
-                max="31"
-                value={form.dueDay}
-                onChange={(event) =>
-                  setForm({ ...form, dueDay: Number(event.target.value) })
-                }
-                required
-                className="input-control"
-              />
-            </Field>
+            </ExpenseField>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Categoria">
-              <input
-                value={form.categoryName}
-                onChange={(event) =>
-                  setForm({ ...form, categoryName: event.target.value })
-                }
-                className="input-control"
-              />
-            </Field>
+          <CategoryPicker
+            value={form.categoryName}
+            onChange={(categoryName) => setForm({ ...form, categoryName })}
+          />
 
-            <Field label="Repetición">
-              <select
-                value={form.recurrence.frequency}
-                onChange={(event) => {
-                  const frequency = event.target.value as RecurrenceFrequency;
-                  setForm({
-                    ...form,
-                    recurrence:
-                      frequency === "custom"
-                        ? { frequency, interval: 2, unit: "month" }
-                        : frequency === "yearly"
-                          ? {
-                              frequency,
-                              annualMonth:
-                                form.recurrence.annualMonth ??
-                                new Date().getMonth() + 1,
-                            }
-                        : { frequency },
-                  });
-                }}
-                className="input-control"
-              >
-                <option value="monthly">Mensual</option>
-                <option value="quarterly">Trimestral</option>
-                <option value="yearly">Anual</option>
-                <option value="custom">Custom</option>
-              </select>
-            </Field>
-          </div>
+          <DayOfMonthPicker
+            value={form.dueDay}
+            onChange={(dueDay) => setForm({ ...form, dueDay })}
+          />
 
-          {form.recurrence.frequency === "custom" ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Cada">
-                <input
-                  type="number"
-                  min="1"
-                  value={form.recurrence.interval ?? 1}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      recurrence: {
-                        ...form.recurrence,
-                        interval: Number(event.target.value),
-                      },
-                    })
-                  }
-                  className="input-control"
-                />
-              </Field>
-              <Field label="Unidad">
-                <select
-                  value={form.recurrence.unit ?? "month"}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      recurrence: {
-                        ...form.recurrence,
-                        unit: event.target.value as DraftExpense["recurrence"]["unit"],
-                      },
-                    })
-                  }
-                  className="input-control"
-                >
-                  <option value="day">Dias</option>
-                  <option value="week">Semanas</option>
-                  <option value="month">Meses</option>
-                  <option value="year">Años</option>
-                </select>
-              </Field>
-            </div>
-          ) : null}
+          <RecurrencePicker
+            value={form.recurrence}
+            onChange={(recurrence) => setForm({ ...form, recurrence })}
+          />
 
-          {form.recurrence.frequency === "yearly" ? (
-            <Field label="Mes anual">
-              <select
-                value={form.recurrence.annualMonth ?? new Date().getMonth() + 1}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    recurrence: {
-                      ...form.recurrence,
-                      annualMonth: Number(event.target.value),
-                    },
-                  })
-                }
-                className="input-control"
-              >
-                {[
-                  "Enero",
-                  "Febrero",
-                  "Marzo",
-                  "Abril",
-                  "Mayo",
-                  "Junio",
-                  "Julio",
-                  "Agosto",
-                  "Septiembre",
-                  "Octubre",
-                  "Noviembre",
-                  "Diciembre",
-                ].map((month, index) => (
-                  <option key={month} value={index + 1}>
-                    {month}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          ) : null}
-
-          <Field label="Tags separados por coma">
-            <input
-              value={form.tags.join(", ")}
-              onChange={(event) =>
-                setForm({ ...form, tags: normalizeTags(event.target.value) })
-              }
-              className="input-control"
-            />
-          </Field>
+          <TagPicker
+            value={form.tags}
+            onChange={(tags) => setForm({ ...form, tags })}
+          />
           <div className="sticky bottom-0 -mx-5 bg-slate-950/92 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl">
             <button
               type="submit"
@@ -242,20 +129,5 @@ export function ExpenseFormSheet({
         </div>
       </form>
     </div>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="grid gap-1.5 text-sm font-medium text-slate-200">
-      {label}
-      {children}
-    </label>
   );
 }
