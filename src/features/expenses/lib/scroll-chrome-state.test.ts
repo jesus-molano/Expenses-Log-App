@@ -22,6 +22,39 @@ describe("scroll chrome state", () => {
     expect(state.topChrome).toBe("compact");
   });
 
+  it("changes top and bottom together after slow accumulated downward scroll", () => {
+    const firstSmallScroll = reduceScrollChromeState(
+      createInitialScrollChromeState(),
+      {
+        ...baseSnapshot,
+        scrollY: 10,
+      },
+    );
+    expect(firstSmallScroll.bottomChrome).toBe("visible");
+    expect(firstSmallScroll.topChrome).toBe("expanded");
+
+    const secondSmallScroll = reduceScrollChromeState(firstSmallScroll, {
+      ...baseSnapshot,
+      scrollY: 18,
+    });
+    expect(secondSmallScroll.bottomChrome).toBe("visible");
+    expect(secondSmallScroll.topChrome).toBe("expanded");
+
+    const thirdSmallScroll = reduceScrollChromeState(secondSmallScroll, {
+      ...baseSnapshot,
+      scrollY: 30,
+    });
+    expect(thirdSmallScroll.bottomChrome).toBe("visible");
+    expect(thirdSmallScroll.topChrome).toBe("expanded");
+
+    const fourthSmallScroll = reduceScrollChromeState(thirdSmallScroll, {
+      ...baseSnapshot,
+      scrollY: 44,
+    });
+    expect(fourthSmallScroll.bottomChrome).toBe("hidden");
+    expect(fourthSmallScroll.topChrome).toBe("compact");
+  });
+
   it("shows bottom bar and expands header when scrolling up", () => {
     const previous = {
       ...createInitialScrollChromeState(),
@@ -36,6 +69,35 @@ describe("scroll chrome state", () => {
 
     expect(state.bottomChrome).toBe("visible");
     expect(state.topChrome).toBe("expanded");
+  });
+
+  it("changes top and bottom together after slow accumulated upward scroll", () => {
+    const previous = {
+      ...createInitialScrollChromeState(),
+      bottomChrome: "hidden" as const,
+      topChrome: "compact" as const,
+      lastScrollY: 500,
+    };
+    const firstSmallScroll = reduceScrollChromeState(previous, {
+      ...baseSnapshot,
+      scrollY: 492,
+    });
+    expect(firstSmallScroll.bottomChrome).toBe("hidden");
+    expect(firstSmallScroll.topChrome).toBe("compact");
+
+    const secondSmallScroll = reduceScrollChromeState(firstSmallScroll, {
+      ...baseSnapshot,
+      scrollY: 484,
+    });
+    expect(secondSmallScroll.bottomChrome).toBe("hidden");
+    expect(secondSmallScroll.topChrome).toBe("compact");
+
+    const thirdSmallScroll = reduceScrollChromeState(secondSmallScroll, {
+      ...baseSnapshot,
+      scrollY: 476,
+    });
+    expect(thirdSmallScroll.bottomChrome).toBe("visible");
+    expect(thirdSmallScroll.topChrome).toBe("expanded");
   });
 
   it("keeps the header expanded on desktop", () => {
@@ -95,5 +157,19 @@ describe("scroll chrome state", () => {
     expect(state.nearBottom).toBe(true);
     expect(state.bottomChrome).toBe("visible");
     expect(state.topChrome).toBe("expanded");
+  });
+
+  it("keeps chrome stable when a short scroll immediately approaches the bottom", () => {
+    const state = reduceScrollChromeState(createInitialScrollChromeState(), {
+      ...baseSnapshot,
+      documentHeight: 980,
+      viewportHeight: 800,
+      scrollY: 60,
+    });
+
+    expect(state.nearBottom).toBe(false);
+    expect(state.bottomChrome).toBe("visible");
+    expect(state.topChrome).toBe("expanded");
+    expect(state.intentDistance).toBe(0);
   });
 });

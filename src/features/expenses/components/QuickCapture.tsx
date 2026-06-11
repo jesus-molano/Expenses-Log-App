@@ -27,11 +27,8 @@ export function QuickCapture({
 }: QuickCaptureProps) {
   return (
     <section
-      className={`fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 mx-auto max-w-2xl rounded-[1.35rem] border border-white/10 bg-[var(--app-surface-strong)] p-2.5 shadow-[0_18px_55px_rgba(0,0,0,0.45),0_0_38px_rgba(132,204,22,0.08)] transition duration-300 lg:static lg:mx-0 lg:mt-4 lg:max-w-none lg:translate-y-0 lg:opacity-100 ${
-        visible
-          ? "translate-y-0 opacity-100"
-          : "translate-y-[calc(100%+1.5rem)] opacity-0"
-      }`}
+      data-state={visible ? "visible" : "hidden"}
+      className="quick-capture-shell fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 mx-auto max-w-2xl rounded-[1.35rem] border border-white/10 bg-[var(--app-surface-strong)] p-2.5 shadow-[0_18px_55px_rgba(0,0,0,0.45),0_0_38px_rgba(132,204,22,0.08)] lg:static lg:mx-0 lg:mt-4 lg:max-w-none"
     >
       <div className="flex min-h-13 items-center gap-2 rounded-[1rem] bg-[var(--app-surface-muted)] px-3 ring-1 ring-white/10">
         <Sparkles size={18} className="shrink-0 text-lime-200" />

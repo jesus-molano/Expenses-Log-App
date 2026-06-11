@@ -45,17 +45,17 @@ export function DashboardShell({
             />
           ) : null}
           <section
-            className={`app-shell-card relative z-10 mx-auto overflow-hidden border transition-[max-width,border-radius,padding,box-shadow,transform] duration-300 ease-out lg:max-w-none lg:rounded-[1.45rem] lg:p-3.5 ${
+            className={`app-shell-card relative z-10 mx-auto overflow-visible border transition-[max-width,border-radius,padding,box-shadow,transform] duration-300 ease-out lg:max-w-none lg:rounded-[1.45rem] lg:p-3.5 ${
               mobileCompact
                 ? "max-w-[15.5rem] rounded-[1.4rem] p-2"
                 : "max-w-2xl rounded-[1.45rem] p-3.5"
             }`}
           >
             <div
-              className={`flex items-start justify-between gap-3 overflow-hidden transition-[max-height,opacity,transform,margin] duration-300 ease-out lg:max-h-16 lg:opacity-100 lg:translate-y-0 ${
+              className={`flex items-start justify-between gap-3 transition-[max-height,opacity,transform,margin] duration-300 ease-out lg:max-h-16 lg:translate-y-0 lg:overflow-visible lg:opacity-100 ${
                 mobileCompact
-                  ? "max-h-0 -translate-y-1 opacity-0"
-                  : "max-h-16 translate-y-0 opacity-100"
+                  ? "max-h-0 -translate-y-1 overflow-hidden opacity-0"
+                  : "max-h-16 translate-y-0 overflow-visible opacity-100"
               }`}
             >
               <div className="min-w-0">

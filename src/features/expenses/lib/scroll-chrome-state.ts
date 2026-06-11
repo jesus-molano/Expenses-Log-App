@@ -16,14 +16,13 @@ export type ScrollChromeState = {
   nearBottom: boolean;
   lastScrollY: number;
   direction: ScrollDirection;
+  intentDistance: number;
 };
 
 export const SCROLL_CHROME_THRESHOLDS = {
-  top: 80,
-  compactTop: 20,
+  pageEdge: 20,
+  reactionDistance: 24,
   mobileMaxWidth: 1023,
-  showDelta: -10,
-  hideDelta: 12,
   nearBottomEnter: 96,
   nearBottomExit: 220,
 };
@@ -35,6 +34,7 @@ export function createInitialScrollChromeState(): ScrollChromeState {
     nearBottom: false,
     lastScrollY: 0,
     direction: "idle",
+    intentDistance: 0,
   };
 }
 
@@ -43,31 +43,38 @@ export function reduceScrollChromeState(
   snapshot: ScrollChromeSnapshot,
 ): ScrollChromeState {
   const delta = snapshot.scrollY - previous.lastScrollY;
-  const direction = getScrollDirection(delta);
   const distanceFromBottom =
     snapshot.documentHeight - (snapshot.viewportHeight + snapshot.scrollY);
   const nearBottom =
     distanceFromBottom <= SCROLL_CHROME_THRESHOLDS.nearBottomEnter ||
     (previous.nearBottom &&
       distanceFromBottom <= SCROLL_CHROME_THRESHOLDS.nearBottomExit);
-  const atTop = snapshot.scrollY < SCROLL_CHROME_THRESHOLDS.compactTop;
+  const approachingBottom =
+    distanceFromBottom <= SCROLL_CHROME_THRESHOLDS.nearBottomExit;
+  const atPageTop = snapshot.scrollY < SCROLL_CHROME_THRESHOLDS.pageEdge;
   const isMobileChrome =
     (snapshot.viewportWidth ?? SCROLL_CHROME_THRESHOLDS.mobileMaxWidth) <=
     SCROLL_CHROME_THRESHOLDS.mobileMaxWidth;
   const canReactToScroll = Boolean(snapshot.allowChromeReaction);
+  const isPinnedByPageEdge =
+    atPageTop || approachingBottom || !canReactToScroll;
+  const intentDistance = isPinnedByPageEdge
+    ? 0
+    : getNextIntentDistance(previous.intentDistance, delta);
+  const direction = getScrollDirection(intentDistance);
   const bottomChrome = reduceBottomChrome(previous, {
-    atPageTop: snapshot.scrollY < SCROLL_CHROME_THRESHOLDS.top,
-    canReactToScroll,
+    isPinnedByPageEdge,
     direction,
-    nearBottom,
   });
   const topChrome = reduceTopChrome(previous, {
-    atTop,
-    canReactToScroll,
+    isPinnedByPageEdge,
     direction,
     isMobileChrome,
-    nearBottom,
   });
+  const nextIntentDistance =
+    topChrome !== previous.topChrome || bottomChrome !== previous.bottomChrome
+      ? 0
+      : intentDistance;
 
   return {
     topChrome,
@@ -75,31 +82,43 @@ export function reduceScrollChromeState(
     nearBottom,
     lastScrollY: snapshot.scrollY,
     direction,
+    intentDistance: nextIntentDistance,
   };
 }
 
-function getScrollDirection(delta: number): ScrollDirection {
-  if (delta >= SCROLL_CHROME_THRESHOLDS.hideDelta) return "down";
-  if (delta <= SCROLL_CHROME_THRESHOLDS.showDelta) return "up";
+function getNextIntentDistance(previousDistance: number, delta: number) {
+  if (delta > 0) {
+    return Math.max(0, previousDistance) + delta;
+  }
+
+  if (delta < 0) {
+    return Math.min(0, previousDistance) + delta;
+  }
+
+  return previousDistance;
+}
+
+function getScrollDirection(intentDistance: number): ScrollDirection {
+  if (intentDistance >= SCROLL_CHROME_THRESHOLDS.reactionDistance) {
+    return "down";
+  }
+
+  if (intentDistance <= -SCROLL_CHROME_THRESHOLDS.reactionDistance) {
+    return "up";
+  }
+
   return "idle";
 }
 
 function reduceTopChrome(
   previous: ScrollChromeState,
   context: {
-    atTop: boolean;
-    canReactToScroll: boolean;
     direction: ScrollDirection;
+    isPinnedByPageEdge: boolean;
     isMobileChrome: boolean;
-    nearBottom: boolean;
   },
 ): TopChromeState {
-  if (
-    !context.isMobileChrome ||
-    context.atTop ||
-    context.nearBottom ||
-    !context.canReactToScroll
-  ) {
+  if (!context.isMobileChrome || context.isPinnedByPageEdge) {
     return "expanded";
   }
 
@@ -111,13 +130,11 @@ function reduceTopChrome(
 function reduceBottomChrome(
   previous: ScrollChromeState,
   context: {
-    atPageTop: boolean;
-    canReactToScroll: boolean;
     direction: ScrollDirection;
-    nearBottom: boolean;
+    isPinnedByPageEdge: boolean;
   },
 ): BottomChromeState {
-  if (context.atPageTop || context.nearBottom || !context.canReactToScroll) {
+  if (context.isPinnedByPageEdge) {
     return "visible";
   }
 

@@ -224,6 +224,41 @@ main {
   box-shadow: var(--app-glow), 0 18px 40px rgb(0 0 0 / 0.34);
 }
 
+/* Quick capture chrome */
+.quick-capture-shell {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0) scale(1);
+  transition:
+    transform var(--motion-slow) var(--ease-smooth),
+    opacity var(--motion-medium) ease-out,
+    box-shadow var(--motion-medium) var(--ease-smooth),
+    border-color var(--motion-medium) var(--ease-smooth);
+  will-change: transform, opacity;
+}
+
+.quick-capture-shell[data-state="hidden"] {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, calc(100% + 1.25rem), 0) scale(0.985);
+}
+
+.quick-capture-shell[data-state="visible"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+@media (min-width: 1024px) {
+  .quick-capture-shell,
+  .quick-capture-shell[data-state="hidden"],
+  .quick-capture-shell[data-state="visible"] {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+}
+
 /* Swipe actions */
 .app-swipe-edit {
   background: color-mix(in srgb, var(--app-action-edit) 22%, transparent);
