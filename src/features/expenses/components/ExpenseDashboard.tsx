@@ -6,7 +6,10 @@ import { createEmptyDraft } from "@/features/expenses/lib/dashboard-config";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
 import { ExpenseFormSheet } from "@/features/expenses/components/ExpenseFormSheet";
 import { ExpenseList } from "@/features/expenses/components/ExpenseList";
-import { QuickCapture } from "@/features/expenses/components/QuickCapture";
+import {
+  AddExpenseButton,
+  QuickCapture,
+} from "@/features/expenses/components/QuickCapture";
 import { useExpenseFilters } from "@/features/expenses/hooks/use-expense-filters";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { useQuickExpenseParser } from "@/features/expenses/hooks/use-quick-expense-parser";
@@ -35,9 +38,11 @@ export function ExpenseDashboard({
   const runViewTransition = useViewTransitionAction();
   const [draft, setDraft] = useState<DraftExpense>(() => createEmptyDraft());
   const [sheetOpen, setSheetOpen] = useState(initialNewExpense);
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
 
   function openEmptySheet() {
     setDraft(createEmptyDraft());
+    setAddSheetOpen(false);
     setSheetOpen(true);
   }
 
@@ -46,6 +51,7 @@ export function ExpenseDashboard({
     if (!parsedDraft) return;
 
     setDraft(parsedDraft);
+    setAddSheetOpen(false);
     setSheetOpen(true);
   }
 
@@ -61,7 +67,7 @@ export function ExpenseDashboard({
       headlineTitle={t("common.due", language)}
       activeTab="expenses"
       language={language}
-      topChrome={chrome.topChrome}
+      panelChrome={chrome.panelChrome}
     >
       <ExpenseList
         sections={filters.timelineSections}
@@ -77,12 +83,19 @@ export function ExpenseDashboard({
         }
       />
 
+      <AddExpenseButton
+        language={language}
+        visible={!addSheetOpen && !sheetOpen}
+        onClick={() => setAddSheetOpen(true)}
+      />
+
       <QuickCapture
+        open={addSheetOpen}
         value={quickParser.quickText}
         statusLabel={quickParser.statusLabel}
         isParsing={quickParser.status === "loading"}
-        visible={chrome.bottomChrome === "visible"}
         language={language}
+        onClose={() => setAddSheetOpen(false)}
         onValueChange={(value) => {
           quickParser.setQuickText(value);
         }}

@@ -54,7 +54,8 @@ test("starts empty for a new local user", async ({ page }) => {
   await expect(page.getByText("Sin cargos previstos hoy")).toBeVisible();
 
   await page.getByRole("link", { name: "Plan" }).click();
-  await expect(page.getByText("Ingresos 0,00 €")).toBeVisible();
+  await expect(page.getByText("Ingresos").first()).toBeVisible();
+  await expect(page.getByText("0,00 €").first()).toBeVisible();
   await expect(page.getByText("Meta este mes: 0,00 €")).toBeVisible();
 });
 
@@ -63,6 +64,7 @@ test("creates and pays a parsed recurring expense", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByText("Por pagar")).toBeVisible();
+  await page.getByRole("button", { name: "Añadir gasto" }).click();
   await page
     .getByPlaceholder("Ej: Luz 64,75 mensual día 8")
     .fill("Spotify 10,99 mensual el dia 12 musica");

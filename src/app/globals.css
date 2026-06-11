@@ -218,45 +218,36 @@ main {
   backdrop-filter: blur(12px);
 }
 
+.app-top-chrome {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform var(--motion-slow) var(--ease-smooth),
+    opacity var(--motion-medium) ease-out;
+  will-change: transform, opacity;
+}
+
+.app-top-chrome[data-state="hidden"] {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, calc(-100% - 0.75rem), 0);
+}
+
+.app-top-chrome[data-state="visible"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+}
+
 .app-shell-card {
   background: var(--app-surface-strong);
   border-color: var(--app-border-strong);
   box-shadow: var(--app-glow), 0 18px 40px rgb(0 0 0 / 0.34);
-}
-
-/* Quick capture chrome */
-.quick-capture-shell {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translate3d(0, 0, 0) scale(1);
   transition:
-    transform var(--motion-slow) var(--ease-smooth),
-    opacity var(--motion-medium) ease-out,
+    border-color var(--motion-medium) var(--ease-smooth),
     box-shadow var(--motion-medium) var(--ease-smooth),
-    border-color var(--motion-medium) var(--ease-smooth);
-  will-change: transform, opacity;
-}
-
-.quick-capture-shell[data-state="hidden"] {
-  opacity: 0;
-  pointer-events: none;
-  transform: translate3d(0, calc(100% + 1.25rem), 0) scale(0.985);
-}
-
-.quick-capture-shell[data-state="visible"] {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translate3d(0, 0, 0) scale(1);
-}
-
-@media (min-width: 1024px) {
-  .quick-capture-shell,
-  .quick-capture-shell[data-state="hidden"],
-  .quick-capture-shell[data-state="visible"] {
-    opacity: 1;
-    pointer-events: auto;
-    transform: none;
-  }
+    background-color var(--motion-medium) var(--ease-smooth);
 }
 
 /* Swipe actions */
@@ -282,32 +273,32 @@ main {
 
 /* Timeline */
 .app-timeline-dot {
-  background: var(--app-timeline-default);
-  color: var(--app-timeline-default);
-  --tw-ring-color: color-mix(in srgb, var(--app-timeline-default) 18%, transparent);
+  background: color-mix(in srgb, var(--app-accent) 82%, var(--app-accent-2));
+  color: color-mix(in srgb, var(--app-accent) 82%, var(--app-accent-2));
+  --tw-ring-color: color-mix(in srgb, var(--app-accent) 18%, transparent);
 }
 
 .app-timeline-dot-critical {
-  background: var(--app-timeline-critical);
-  color: var(--app-timeline-critical);
-  --tw-ring-color: color-mix(in srgb, var(--app-timeline-critical) 18%, transparent);
+  background: var(--app-danger);
+  color: var(--app-danger);
+  --tw-ring-color: color-mix(in srgb, var(--app-danger) 18%, transparent);
 }
 
 .app-timeline-dot-estimated {
-  background: var(--app-timeline-estimated);
-  color: var(--app-timeline-estimated);
-  --tw-ring-color: color-mix(in srgb, var(--app-timeline-estimated) 18%, transparent);
+  background: var(--app-warning);
+  color: var(--app-warning);
+  --tw-ring-color: color-mix(in srgb, var(--app-warning) 18%, transparent);
 }
 
 .app-timeline-dot-paid {
-  background: var(--app-timeline-paid);
-  color: var(--app-timeline-paid);
-  --tw-ring-color: color-mix(in srgb, var(--app-timeline-paid) 14%, transparent);
+  background: var(--app-success);
+  color: var(--app-success);
+  --tw-ring-color: color-mix(in srgb, var(--app-success) 14%, transparent);
 }
 
 .app-today-line {
-  background: var(--app-timeline-today);
-  box-shadow: 0 0 24px color-mix(in srgb, var(--app-timeline-today) 80%, transparent);
+  background: color-mix(in srgb, var(--app-accent) 88%, var(--app-accent-2));
+  box-shadow: 0 0 24px color-mix(in srgb, var(--app-accent) 44%, transparent);
 }
 
 .app-drop-line {

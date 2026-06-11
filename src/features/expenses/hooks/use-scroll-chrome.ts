@@ -14,7 +14,6 @@ export function useScrollChrome() {
   const stateRef = useRef(chromeState);
   const frameRef = useRef<number | null>(null);
   const hasScrollBaselineRef = useRef(false);
-  const hasUserScrollIntentRef = useRef(false);
 
   useEffect(() => {
     function updateChrome() {
@@ -28,14 +27,13 @@ export function useScrollChrome() {
         viewportHeight,
         viewportWidth: window.innerWidth,
         documentHeight: document.documentElement.scrollHeight,
-        allowChromeReaction: hasUserScrollIntentRef.current,
+        allowChromeReaction: hasScrollBaselineRef.current,
       };
       const nextState = hasScrollBaselineRef.current
         ? reduceScrollChromeState(stateRef.current, snapshot)
         : {
             ...stateRef.current,
-            topChrome: "expanded" as const,
-            bottomChrome: "visible" as const,
+            panelChrome: "visible" as const,
             lastScrollY: snapshot.scrollY,
             direction: "idle" as const,
           };
@@ -68,30 +66,7 @@ export function useScrollChrome() {
     }
 
     scheduleUpdate();
-    const markUserScrollIntent = () => {
-      hasUserScrollIntentRef.current = true;
-    };
-    const markKeyboardScrollIntent = (event: KeyboardEvent) => {
-      if (
-        [
-          "ArrowDown",
-          "ArrowUp",
-          "PageDown",
-          "PageUp",
-          "Home",
-          "End",
-          " ",
-        ].includes(event.key)
-      ) {
-        hasUserScrollIntentRef.current = true;
-      }
-    };
 
-    window.addEventListener("wheel", markUserScrollIntent, { passive: true });
-    window.addEventListener("touchmove", markUserScrollIntent, {
-      passive: true,
-    });
-    window.addEventListener("keydown", markKeyboardScrollIntent);
     window.addEventListener("scroll", scheduleUpdate, { passive: true });
     window.addEventListener("resize", scheduleUpdate);
     window.visualViewport?.addEventListener("resize", scheduleUpdate);
@@ -99,9 +74,6 @@ export function useScrollChrome() {
 
     return () => {
       if (frameRef.current) window.cancelAnimationFrame(frameRef.current);
-      window.removeEventListener("wheel", markUserScrollIntent);
-      window.removeEventListener("touchmove", markUserScrollIntent);
-      window.removeEventListener("keydown", markKeyboardScrollIntent);
       window.removeEventListener("scroll", scheduleUpdate);
       window.removeEventListener("resize", scheduleUpdate);
       window.visualViewport?.removeEventListener("resize", scheduleUpdate);
@@ -110,7 +82,6 @@ export function useScrollChrome() {
   }, []);
 
   return {
-    topChrome: chromeState.topChrome,
-    bottomChrome: chromeState.bottomChrome,
+    panelChrome: chromeState.panelChrome,
   };
 }

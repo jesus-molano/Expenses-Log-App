@@ -7,12 +7,10 @@ export type ScrollChromeSnapshot = {
 };
 
 export type ScrollDirection = "up" | "down" | "idle";
-export type TopChromeState = "expanded" | "compact";
-export type BottomChromeState = "visible" | "hidden";
+export type PanelChromeState = "visible" | "hidden";
 
 export type ScrollChromeState = {
-  topChrome: TopChromeState;
-  bottomChrome: BottomChromeState;
+  panelChrome: PanelChromeState;
   nearBottom: boolean;
   lastScrollY: number;
   direction: ScrollDirection;
@@ -21,7 +19,7 @@ export type ScrollChromeState = {
 
 export const SCROLL_CHROME_THRESHOLDS = {
   pageEdge: 20,
-  reactionDistance: 24,
+  reactionDistance: 28,
   mobileMaxWidth: 1023,
   nearBottomEnter: 96,
   nearBottomExit: 220,
@@ -29,8 +27,7 @@ export const SCROLL_CHROME_THRESHOLDS = {
 
 export function createInitialScrollChromeState(): ScrollChromeState {
   return {
-    topChrome: "expanded",
-    bottomChrome: "visible",
+    panelChrome: "visible",
     nearBottom: false,
     lastScrollY: 0,
     direction: "idle",
@@ -57,28 +54,20 @@ export function reduceScrollChromeState(
     SCROLL_CHROME_THRESHOLDS.mobileMaxWidth;
   const canReactToScroll = Boolean(snapshot.allowChromeReaction);
   const isPinnedByPageEdge =
-    atPageTop || approachingBottom || !canReactToScroll;
+    atPageTop || approachingBottom || !canReactToScroll || !isMobileChrome;
   const intentDistance = isPinnedByPageEdge
     ? 0
     : getNextIntentDistance(previous.intentDistance, delta);
   const direction = getScrollDirection(intentDistance);
-  const bottomChrome = reduceBottomChrome(previous, {
+  const panelChrome = reducePanelChrome(previous, {
     isPinnedByPageEdge,
     direction,
-  });
-  const topChrome = reduceTopChrome(previous, {
-    isPinnedByPageEdge,
-    direction,
-    isMobileChrome,
   });
   const nextIntentDistance =
-    topChrome !== previous.topChrome || bottomChrome !== previous.bottomChrome
-      ? 0
-      : intentDistance;
+    panelChrome !== previous.panelChrome ? 0 : intentDistance;
 
   return {
-    topChrome,
-    bottomChrome,
+    panelChrome,
     nearBottom,
     lastScrollY: snapshot.scrollY,
     direction,
@@ -110,35 +99,18 @@ function getScrollDirection(intentDistance: number): ScrollDirection {
   return "idle";
 }
 
-function reduceTopChrome(
-  previous: ScrollChromeState,
-  context: {
-    direction: ScrollDirection;
-    isPinnedByPageEdge: boolean;
-    isMobileChrome: boolean;
-  },
-): TopChromeState {
-  if (!context.isMobileChrome || context.isPinnedByPageEdge) {
-    return "expanded";
-  }
-
-  if (context.direction === "down") return "compact";
-  if (context.direction === "up") return "expanded";
-  return previous.topChrome;
-}
-
-function reduceBottomChrome(
+function reducePanelChrome(
   previous: ScrollChromeState,
   context: {
     direction: ScrollDirection;
     isPinnedByPageEdge: boolean;
   },
-): BottomChromeState {
+): PanelChromeState {
   if (context.isPinnedByPageEdge) {
     return "visible";
   }
 
   if (context.direction === "down") return "hidden";
   if (context.direction === "up") return "visible";
-  return previous.bottomChrome;
+  return previous.panelChrome;
 }

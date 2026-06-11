@@ -64,7 +64,7 @@ export function MonthlyComparisonSection({
   onSkipOccurrence,
 }: MonthlyComparisonSectionProps) {
   return (
-    <div className="mt-4 rounded-[1.15rem] border border-[var(--app-border)] bg-[var(--app-panel-soft-alpha)] p-3">
+    <div className="mt-4 rounded-[1.15rem] border border-[color-mix(in_srgb,var(--app-border)_70%,transparent)] bg-[color-mix(in_srgb,var(--app-panel-soft-alpha)_72%,transparent)] p-3">
       <header>
         <h3 className="text-sm font-semibold text-[var(--app-text)]">
           {t("money.compareMonths", language)}

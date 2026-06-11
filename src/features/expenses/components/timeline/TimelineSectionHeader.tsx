@@ -26,7 +26,7 @@ export function TimelineSectionHeader({
         </h2>
         <p className="mt-0.5 text-xs text-slate-300">{section.subtitle}</p>
       </div>
-      {section.total > 0 ? (
+      {section.items.length > 1 && section.total > 0 ? (
         <p className="shrink-0 text-sm font-semibold text-white">
           {formatCurrency(section.total)}
         </p>

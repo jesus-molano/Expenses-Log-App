@@ -1,27 +1,21 @@
 "use client";
 
 import { Settings2 } from "lucide-react";
-import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 
 type PlanHeaderProps = {
   language: AppLanguage;
-  incomeTotal: number;
   onOpenSettings: () => void;
 };
 
 export function PlanHeader({
   language,
-  incomeTotal,
   onOpenSettings,
 }: PlanHeaderProps) {
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
       <div className="min-w-0">
-        <p className="text-sm font-medium text-[var(--app-text-muted)]">
-          {t("money.income", language)} {formatCurrency(incomeTotal)}
-        </p>
         <h1 className="text-xl font-semibold text-[var(--app-text)]">
           {t("money.monthlyPlan", language)}
         </h1>

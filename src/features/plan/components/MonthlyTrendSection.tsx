@@ -20,7 +20,7 @@ export function MonthlyTrendSection({
   annualSavingsEstimateLabel,
 }: MonthlyTrendSectionProps) {
   return (
-    <section className="min-w-0 overflow-hidden rounded-[1.35rem] border border-[var(--app-border)] bg-[var(--app-panel-alpha)] p-3 sm:p-4">
+    <section className="min-w-0 overflow-hidden rounded-[1.35rem] border border-[color-mix(in_srgb,var(--app-border)_72%,transparent)] bg-[color-mix(in_srgb,var(--app-panel-alpha)_78%,transparent)] p-3 shadow-[0_10px_28px_rgba(0,0,0,0.16)] sm:p-4">
       <header>
         <h2 className="text-lg font-semibold text-[var(--app-text)]">
           {t("money.trendTitle", language)}

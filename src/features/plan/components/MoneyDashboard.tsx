@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { formatCurrency } from "@/domain/calendar";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
-import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
+import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { t } from "@/shared/i18n";
 import { useMoneyDashboardData } from "../hooks/use-money-dashboard-data";
 import { useMonthlySavingsTargetEditor } from "../hooks/use-monthly-savings-target-editor";
@@ -20,6 +20,7 @@ import { PlanAnalyticsDivider } from "./PlanAnalyticsDivider";
 import { PlanHeader } from "./PlanHeader";
 import { PlanSettingsSheet } from "./PlanSettingsSheet";
 import { PlanShortfallBanner } from "./PlanShortfallBanner";
+import { PlanSummaryStats } from "./PlanSummaryStats";
 import { SkipOccurrenceDialog } from "./SkipOccurrenceDialog";
 
 export function MoneyDashboard() {
@@ -66,13 +67,20 @@ export function MoneyDashboard() {
       }
       activeTab="money"
       language={language}
-      topChrome={chrome.topChrome}
+      panelChrome={chrome.panelChrome}
     >
       <section className="grid w-full min-w-0 max-w-full gap-3 overflow-hidden pb-8 pt-2">
         <PlanHeader
           language={language}
-          incomeTotal={money.plan.incomeTotal}
           onOpenSettings={settingsForm.openSettings}
+        />
+
+        <PlanSummaryStats
+          language={language}
+          incomeTotal={money.plan.incomeTotal}
+          fixedExpensesTotal={money.plan.fixedExpensesTotal}
+          savingsContribution={money.plan.savingsContribution}
+          primaryContribution={money.plan.primaryContribution}
         />
 
         <AccountAllocationCards

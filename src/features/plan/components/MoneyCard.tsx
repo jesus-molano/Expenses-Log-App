@@ -10,7 +10,7 @@ export function MoneyCard({
   detail: string;
 }) {
   return (
-    <article className="min-w-0 overflow-hidden rounded-[1.15rem] border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface)_84%,transparent)] p-3 shadow-[0_14px_42px_rgba(0,0,0,0.32)] sm:p-4">
+    <article className="min-w-0 overflow-hidden rounded-[1.15rem] border border-[color-mix(in_srgb,var(--app-border)_72%,transparent)] bg-[color-mix(in_srgb,var(--app-surface)_76%,transparent)] p-3 shadow-[0_10px_28px_rgba(0,0,0,0.18)] sm:p-4">
       <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--app-accent)]">
         {icon}
         <span className="min-w-0 truncate">{label}</span>

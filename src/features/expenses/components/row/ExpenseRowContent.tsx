@@ -4,6 +4,7 @@ import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage, ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
 import { categoryLabel } from "@/shared/category-labels";
 import { categoryToneClass, statusLabel } from "../../lib/expense-actions";
+import { expenseStatusToneClass } from "../../lib/expense-visual-state";
 
 type ExpenseRowContentProps = {
   occurrence: ExpenseOccurrence;
@@ -19,6 +20,7 @@ export function ExpenseRowContent({
   language,
 }: ExpenseRowContentProps) {
   const paid = occurrence.status === "paid";
+  const statusToneClass = expenseStatusToneClass(occurrence, today);
 
   return (
     <>
@@ -54,9 +56,7 @@ export function ExpenseRowContent({
           {formatCurrency(occurrence.template.amount)}
         </p>
         <p
-          className={`mt-0.5 whitespace-nowrap text-[11px] font-medium ${
-            paid ? "app-paid-status" : "text-white"
-          }`}
+          className={`mt-1 inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusToneClass}`}
         >
           {statusLabel(occurrence, today, language)}
         </p>

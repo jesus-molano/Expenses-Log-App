@@ -1,14 +1,17 @@
 ﻿import { addDays, format, isSameDay, isWeekend, parseISO } from "date-fns";
 import { enUS, es } from "date-fns/locale";
-import { daysBetween } from "@/domain/calendar";
 import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
 import { t } from "@/shared/i18n";
+import {
+  resolveExpenseVisualState,
+  type ExpenseVisualState,
+} from "./expense-visual-state";
 
 export type TimelineSection = {
   id: string;
   title: string;
   subtitle: string;
-  tone: "critical" | "soon" | "estimated" | "later" | "paid";
+  tone: ExpenseVisualState;
   priority: number;
   total: number;
   items: ExpenseOccurrence[];
@@ -21,26 +24,26 @@ function sectionMeta(
   language: AppLanguage,
 ): Pick<TimelineSection, "id" | "title" | "subtitle" | "tone" | "priority"> {
   const dueDate = parseISO(occurrence.dueDate);
-  const dueDelta = daysBetween(today, occurrence.dueDate);
   const locale = language === "en" ? enUS : es;
   const dayLabel = (date: Date) => format(date, "EEEE d", { locale });
+  const visualState = resolveExpenseVisualState(occurrence, today);
 
-  if (occurrence.status === "paid") {
+  if (visualState === "paid") {
     return {
       id: `paid-${occurrence.dueDate}`,
       title: dayLabel(dueDate),
       subtitle: t("expenses.paid", language),
-      tone: "paid",
+      tone: visualState,
       priority: 0,
     };
   }
 
-  if (dueDelta < 0) {
+  if (visualState === "overdue") {
     return {
       id: "overdue",
       title: t("expenses.overdue", language),
       subtitle: `${t("expenses.from", language)} ${dayLabel(dueDate)}`,
-      tone: "critical",
+      tone: visualState,
       priority: 1,
     };
   }
@@ -50,22 +53,17 @@ function sectionMeta(
       id: "today",
       title: t("expenses.today", language),
       subtitle: t("expenses.canLeaveToday", language),
-      tone: "critical",
+      tone: visualState,
       priority: 2,
     };
   }
 
-  const estimatedDelta = daysBetween(today, occurrence.estimatedChargeDate);
-
-  if (
-    occurrence.estimatedChargeDate !== occurrence.dueDate &&
-    estimatedDelta <= 7
-  ) {
+  if (visualState === "estimated") {
     return {
       id: `future-${occurrence.dueDate}`,
       title: dayLabel(dueDate),
       subtitle: `${t("expenses.estimated", language)} ${dayLabel(parseISO(occurrence.estimatedChargeDate))}`,
-      tone: "estimated",
+      tone: visualState,
       priority: 3,
     };
   }
@@ -78,7 +76,7 @@ function sectionMeta(
     subtitle: isWeekend(dueDate)
       ? t("expenses.weekendDue", language)
       : t("expenses.pending", language),
-    tone: dueDelta <= 7 ? "soon" : "later",
+    tone: visualState,
     priority: 3,
   };
 }
@@ -126,7 +124,7 @@ export function buildTimelineSections(
       id: "today",
       title: t("expenses.today", language),
       subtitle: t("expenses.controlPoint", language),
-      tone: "soon",
+      tone: "pending",
       priority: 2,
       total: 0,
       anchorDate: today,

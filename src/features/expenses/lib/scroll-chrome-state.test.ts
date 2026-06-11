@@ -12,17 +12,16 @@ const baseSnapshot = {
 };
 
 describe("scroll chrome state", () => {
-  it("hides bottom bar on downward scroll away from top and bottom", () => {
+  it("hides the top panel on downward mobile scroll away from edges", () => {
     const state = reduceScrollChromeState(createInitialScrollChromeState(), {
       ...baseSnapshot,
       scrollY: 300,
     });
 
-    expect(state.bottomChrome).toBe("hidden");
-    expect(state.topChrome).toBe("compact");
+    expect(state.panelChrome).toBe("hidden");
   });
 
-  it("changes top and bottom together after slow accumulated downward scroll", () => {
+  it("waits for accumulated scroll intent before hiding the panel", () => {
     const firstSmallScroll = reduceScrollChromeState(
       createInitialScrollChromeState(),
       {
@@ -30,36 +29,31 @@ describe("scroll chrome state", () => {
         scrollY: 10,
       },
     );
-    expect(firstSmallScroll.bottomChrome).toBe("visible");
-    expect(firstSmallScroll.topChrome).toBe("expanded");
+    expect(firstSmallScroll.panelChrome).toBe("visible");
 
     const secondSmallScroll = reduceScrollChromeState(firstSmallScroll, {
       ...baseSnapshot,
       scrollY: 18,
     });
-    expect(secondSmallScroll.bottomChrome).toBe("visible");
-    expect(secondSmallScroll.topChrome).toBe("expanded");
+    expect(secondSmallScroll.panelChrome).toBe("visible");
 
     const thirdSmallScroll = reduceScrollChromeState(secondSmallScroll, {
       ...baseSnapshot,
       scrollY: 30,
     });
-    expect(thirdSmallScroll.bottomChrome).toBe("visible");
-    expect(thirdSmallScroll.topChrome).toBe("expanded");
+    expect(thirdSmallScroll.panelChrome).toBe("visible");
 
     const fourthSmallScroll = reduceScrollChromeState(thirdSmallScroll, {
       ...baseSnapshot,
-      scrollY: 44,
+      scrollY: 46,
     });
-    expect(fourthSmallScroll.bottomChrome).toBe("hidden");
-    expect(fourthSmallScroll.topChrome).toBe("compact");
+    expect(fourthSmallScroll.panelChrome).toBe("hidden");
   });
 
-  it("shows bottom bar and expands header when scrolling up", () => {
+  it("shows the top panel when scrolling up", () => {
     const previous = {
       ...createInitialScrollChromeState(),
-      bottomChrome: "hidden" as const,
-      topChrome: "compact" as const,
+      panelChrome: "hidden" as const,
       lastScrollY: 500,
     };
     const state = reduceScrollChromeState(previous, {
@@ -67,58 +61,27 @@ describe("scroll chrome state", () => {
       scrollY: 460,
     });
 
-    expect(state.bottomChrome).toBe("visible");
-    expect(state.topChrome).toBe("expanded");
+    expect(state.panelChrome).toBe("visible");
   });
 
-  it("changes top and bottom together after slow accumulated upward scroll", () => {
-    const previous = {
-      ...createInitialScrollChromeState(),
-      bottomChrome: "hidden" as const,
-      topChrome: "compact" as const,
-      lastScrollY: 500,
-    };
-    const firstSmallScroll = reduceScrollChromeState(previous, {
-      ...baseSnapshot,
-      scrollY: 492,
-    });
-    expect(firstSmallScroll.bottomChrome).toBe("hidden");
-    expect(firstSmallScroll.topChrome).toBe("compact");
-
-    const secondSmallScroll = reduceScrollChromeState(firstSmallScroll, {
-      ...baseSnapshot,
-      scrollY: 484,
-    });
-    expect(secondSmallScroll.bottomChrome).toBe("hidden");
-    expect(secondSmallScroll.topChrome).toBe("compact");
-
-    const thirdSmallScroll = reduceScrollChromeState(secondSmallScroll, {
-      ...baseSnapshot,
-      scrollY: 476,
-    });
-    expect(thirdSmallScroll.bottomChrome).toBe("visible");
-    expect(thirdSmallScroll.topChrome).toBe("expanded");
-  });
-
-  it("keeps the header expanded on desktop", () => {
+  it("keeps the top panel visible on desktop", () => {
     const state = reduceScrollChromeState(createInitialScrollChromeState(), {
       ...baseSnapshot,
       viewportWidth: 1280,
       scrollY: 300,
     });
 
-    expect(state.topChrome).toBe("expanded");
+    expect(state.panelChrome).toBe("visible");
   });
 
-  it("keeps chrome expanded and visible for restored or programmatic scroll", () => {
+  it("keeps chrome visible for restored or programmatic scroll", () => {
     const state = reduceScrollChromeState(createInitialScrollChromeState(), {
       ...baseSnapshot,
       allowChromeReaction: false,
       scrollY: 300,
     });
 
-    expect(state.bottomChrome).toBe("visible");
-    expect(state.topChrome).toBe("expanded");
+    expect(state.panelChrome).toBe("visible");
   });
 
   it("uses hysteresis around the bottom edge", () => {
@@ -127,7 +90,7 @@ describe("scroll chrome state", () => {
       scrollY: 1510,
     });
     expect(nearBottom.nearBottom).toBe(true);
-    expect(nearBottom.bottomChrome).toBe("visible");
+    expect(nearBottom.panelChrome).toBe("visible");
 
     const leavingBottom = reduceScrollChromeState(nearBottom, {
       ...baseSnapshot,
@@ -142,23 +105,6 @@ describe("scroll chrome state", () => {
     expect(awayFromBottom.nearBottom).toBe(false);
   });
 
-  it("expands the header near the bottom like the bottom bar", () => {
-    const previous = {
-      ...createInitialScrollChromeState(),
-      topChrome: "compact" as const,
-      bottomChrome: "hidden" as const,
-      lastScrollY: 1300,
-    };
-    const state = reduceScrollChromeState(previous, {
-      ...baseSnapshot,
-      scrollY: 1510,
-    });
-
-    expect(state.nearBottom).toBe(true);
-    expect(state.bottomChrome).toBe("visible");
-    expect(state.topChrome).toBe("expanded");
-  });
-
   it("keeps chrome stable when a short scroll immediately approaches the bottom", () => {
     const state = reduceScrollChromeState(createInitialScrollChromeState(), {
       ...baseSnapshot,
@@ -168,8 +114,7 @@ describe("scroll chrome state", () => {
     });
 
     expect(state.nearBottom).toBe(false);
-    expect(state.bottomChrome).toBe("visible");
-    expect(state.topChrome).toBe("expanded");
+    expect(state.panelChrome).toBe("visible");
     expect(state.intentDistance).toBe(0);
   });
 });
