@@ -30,10 +30,12 @@ export function MoneyDashboard({
   const salary = store.finance.incomeSources.find(
     (source) => source.id === "inc-salary",
   );
-  const [salaryAmount, setSalaryAmount] = useState(salary?.amount ?? 0);
+  const [salaryAmount, setSalaryAmount] = useState(
+    formatMoneyInput(salary?.amount ?? 0),
+  );
   const [salaryDay, setSalaryDay] = useState(salary?.dayOfMonth ?? 28);
   const [savingsTarget, setSavingsTarget] = useState(
-    store.finance.allocation.monthlySavingsTarget,
+    formatMoneyInput(store.finance.allocation.monthlySavingsTarget),
   );
   const [accountNames, setAccountNames] = useState({
     sabadellAccountName: store.finance.allocation.sabadellAccountName,
@@ -43,16 +45,18 @@ export function MoneyDashboard({
   const [extraName, setExtraName] = useState("Bizum");
   const [extraAmount, setExtraAmount] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
 
   function openSettings() {
-    setSalaryAmount(salary?.amount ?? 0);
+    setSalaryAmount(formatMoneyInput(salary?.amount ?? 0));
     setSalaryDay(salary?.dayOfMonth ?? 28);
-    setSavingsTarget(store.finance.allocation.monthlySavingsTarget);
+    setSavingsTarget(formatMoneyInput(store.finance.allocation.monthlySavingsTarget));
     setAccountNames({
       sabadellAccountName: store.finance.allocation.sabadellAccountName,
       bbvaSavingsAccountName: store.finance.allocation.bbvaSavingsAccountName,
       bbvaMainAccountName: store.finance.allocation.bbvaMainAccountName,
     });
+    setDayPickerOpen(false);
     setSettingsOpen(true);
   }
 
@@ -75,11 +79,12 @@ export function MoneyDashboard({
   function savePlan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     updateMoneySettings({
-      salaryAmount,
+      salaryAmount: parseMoneyInput(salaryAmount),
       salaryDay,
-      savingsTarget,
+      savingsTarget: parseMoneyInput(savingsTarget),
       ...accountNames,
     });
+    setDayPickerOpen(false);
     setSettingsOpen(false);
   }
 
@@ -209,31 +214,56 @@ export function MoneyDashboard({
             <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <MoneyField label="Sueldo">
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
                   value={salaryAmount}
-                  onChange={(event) => setSalaryAmount(Number(event.target.value))}
+                  inputMode="decimal"
+                  placeholder="2.200,00"
+                  onChange={(event) => setSalaryAmount(event.target.value)}
                   className="input-control"
                 />
               </MoneyField>
-              <MoneyField label="Día cobro">
-                <input
-                  type="number"
-                  min="1"
-                  max="31"
-                  value={salaryDay}
-                  onChange={(event) => setSalaryDay(Number(event.target.value))}
-                  className="input-control"
-                />
+              <MoneyField label="Día de cobro">
+                <button
+                  type="button"
+                  onClick={() => setDayPickerOpen((open) => !open)}
+                  className="input-control flex items-center justify-between text-left"
+                  aria-expanded={dayPickerOpen}
+                  aria-label={`Cambiar dia de cobro, dia ${salaryDay}`}
+                >
+                  <span>Día {salaryDay}</span>
+                  <span className="text-xs font-semibold text-lime-200">
+                    Cambiar
+                  </span>
+                </button>
+                {dayPickerOpen ? (
+                  <div className="rounded-[1rem] border border-white/10 bg-white/[0.045] p-2 shadow-[0_18px_45px_rgba(0,0,0,0.34)]">
+                    <div className="grid grid-cols-7 gap-1">
+                      {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => {
+                            setSalaryDay(day);
+                            setDayPickerOpen(false);
+                          }}
+                          className={`grid h-9 place-items-center rounded-xl text-sm font-semibold transition ${
+                            day === salaryDay
+                              ? "bg-lime-300 text-slate-950 shadow-[0_0_20px_rgba(190,242,100,0.22)]"
+                              : "bg-white/[0.055] text-slate-100 hover:bg-white/10"
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </MoneyField>
-              <MoneyField label="Ahorro mensual BBVA">
+              <MoneyField label="Ahorro mensual">
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
                   value={savingsTarget}
-                  onChange={(event) => setSavingsTarget(Number(event.target.value))}
+                  inputMode="decimal"
+                  placeholder="300,00"
+                  onChange={(event) => setSavingsTarget(event.target.value)}
                   className="input-control"
                 />
               </MoneyField>
@@ -320,4 +350,22 @@ function MoneyCard({
       <p className="mt-1 text-xs font-medium text-slate-300">{detail}</p>
     </article>
   );
+}
+
+function formatMoneyInput(value: number) {
+  return new Intl.NumberFormat("es-ES", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function parseMoneyInput(value: string) {
+  const normalized = value
+    .trim()
+    .replace(/\s/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".");
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? Math.max(parsed, 0) : 0;
 }

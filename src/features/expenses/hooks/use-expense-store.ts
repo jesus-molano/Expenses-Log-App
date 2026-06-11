@@ -75,7 +75,7 @@ export function useExpenseStore() {
         setSyncMessage(
           saved.mode === "table"
             ? "Sincronizado en la nube"
-            : "Nube pendiente de preparar",
+            : "Guardado en este dispositivo",
         );
       } catch (error) {
         hydratedRef.current = true;
