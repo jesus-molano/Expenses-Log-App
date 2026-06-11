@@ -13,6 +13,7 @@ export function useScrollChrome() {
   );
   const stateRef = useRef(chromeState);
   const frameRef = useRef<number | null>(null);
+  const hasScrollBaselineRef = useRef(false);
 
   useEffect(() => {
     function updateChrome() {
@@ -24,14 +25,22 @@ export function useScrollChrome() {
       const todaySection = document.querySelector<HTMLElement>(
         '[data-section-id="today"]',
       );
-      const nextState = reduceScrollChromeState(stateRef.current, {
+      const snapshot = {
         scrollY: window.scrollY,
         viewportHeight,
         viewportWidth: window.innerWidth,
         documentHeight: document.documentElement.scrollHeight,
         headerHeight,
         todayTop: todaySection?.getBoundingClientRect().top ?? Infinity,
-      });
+      };
+      const nextState = hasScrollBaselineRef.current
+        ? reduceScrollChromeState(stateRef.current, snapshot)
+        : {
+            ...stateRef.current,
+            compactHeader: false,
+            showBottomBar: true,
+            lastScrollY: snapshot.scrollY,
+          };
 
       document.documentElement.style.setProperty(
         "--app-viewport-height",
@@ -46,6 +55,7 @@ export function useScrollChrome() {
         `${headerHeight}px`,
       );
 
+      hasScrollBaselineRef.current = true;
       stateRef.current = nextState;
       setChromeState(nextState);
     }
