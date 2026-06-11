@@ -88,19 +88,19 @@ export function MonthlyTrendSection({
             <Bar
               dataKey="income"
               name={t("money.income", language)}
-              fill="var(--app-accent-2)"
+              fill="var(--app-chart-income)"
               radius={[8, 8, 2, 2]}
             />
             <Bar
               dataKey="expenses"
               name={t("money.fixedExpenses", language)}
-              fill="var(--app-warning)"
+              fill="var(--app-chart-expenses)"
               radius={[8, 8, 2, 2]}
             />
             <Bar
               dataKey="free"
               name={t("money.free", language)}
-              fill="var(--app-accent)"
+              fill="var(--app-chart-free)"
               radius={[8, 8, 2, 2]}
             />
           </BarChart>

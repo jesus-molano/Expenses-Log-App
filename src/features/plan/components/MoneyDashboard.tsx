@@ -28,7 +28,7 @@ export function MoneyDashboard() {
     deleteIncomeEvent,
     skipOccurrence,
   } = useExpenseStore();
-  useScrollChrome();
+  const chrome = useScrollChrome();
 
   const language = store.preferences?.language ?? "es";
   const money = useMoneyDashboardData(store, language);
@@ -55,6 +55,7 @@ export function MoneyDashboard() {
       }
       activeTab="money"
       language={language}
+      compactHeader={chrome.compactHeader}
     >
       <section className="grid w-full min-w-0 max-w-full gap-3 overflow-hidden pb-8 pt-2">
         <PlanHeader

@@ -8,33 +8,39 @@ import { SettingRow } from "../SettingRow";
 
 export function DangerRows({ settings }: { settings: SettingsController }) {
   return (
-    <>
-      <Button
-        variant="danger"
-        onClick={() => settings.setClearExpensesOpen(true)}
-      >
-        <Trash2 size={17} />
-        {t("settings.clearExpenses")}
-      </Button>
+    <section className="mt-3 border-t border-[var(--app-border)] pt-3">
+      <p className="mb-2 px-1 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--app-text-subtle)]">
+        {t("settings.dangerZone")}
+      </p>
 
-      <SettingRow
-        icon={<UserX size={18} />}
-        title={t("settings.deleteAccount")}
-        description={t("settings.deleteAccountHelp")}
-        action={
-          <Button
-            variant="danger"
-            onClick={() => settings.setDeleteAccountOpen(true)}
-            disabled={!settings.user || settings.isDeletingAccount}
-            className="h-9 rounded-xl px-3"
-          >
-            <Trash2 size={15} />
-            {settings.isDeletingAccount
-              ? t("settings.deletingAccount")
-              : t("settings.delete")}
-          </Button>
-        }
-      />
-    </>
+      <div className="grid gap-2">
+        <Button
+          variant="danger"
+          onClick={() => settings.setClearExpensesOpen(true)}
+        >
+          <Trash2 size={17} />
+          {t("settings.clearExpenses")}
+        </Button>
+
+        <SettingRow
+          icon={<UserX size={18} />}
+          title={t("settings.deleteAccount")}
+          description={t("settings.deleteAccountHelp")}
+          action={
+            <Button
+              variant="danger"
+              onClick={() => settings.setDeleteAccountOpen(true)}
+              disabled={!settings.user || settings.isDeletingAccount}
+              className="h-9 rounded-xl px-3"
+            >
+              <Trash2 size={15} />
+              {settings.isDeletingAccount
+                ? t("settings.deletingAccount")
+                : t("settings.delete")}
+            </Button>
+          }
+        />
+      </div>
+    </section>
   );
 }

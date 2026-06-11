@@ -8,6 +8,15 @@ import {
 const ROW_SNAP_DISTANCE = 88;
 
 export const rowFirstCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  const dayCollision = pointerCollisions.find((collision) => {
+    const container = args.droppableContainers.find(
+      (item) => item.id === collision.id,
+    );
+    return container?.data.current?.type === "day";
+  });
+  if (dayCollision) return [dayCollision];
+
   const rowContainers = args.droppableContainers.filter(
     (container) => container.data.current?.type === "row",
   );
@@ -30,7 +39,6 @@ export const rowFirstCollisionDetection: CollisionDetection = (args) => {
     }
   }
 
-  const pointerCollisions = pointerWithin(args);
   if (pointerCollisions.length) return pointerCollisions;
 
   return rectIntersection(args);

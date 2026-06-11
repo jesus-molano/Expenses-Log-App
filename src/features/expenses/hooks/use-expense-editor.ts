@@ -78,9 +78,10 @@ export function useExpenseEditor({
     router.push("/");
   }
 
-  function removeExpense() {
-    deleteExpense(template.id);
-    router.push("/");
+  async function removeExpense() {
+    await deleteExpense(template.id);
+    setDeleteOpen(false);
+    router.replace("/");
   }
 
   return {

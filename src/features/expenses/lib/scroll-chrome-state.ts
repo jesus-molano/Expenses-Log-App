@@ -1,6 +1,7 @@
 export type ScrollChromeSnapshot = {
   scrollY: number;
   viewportHeight: number;
+  viewportWidth?: number;
   documentHeight: number;
   headerHeight: number;
   todayTop: number;
@@ -16,12 +17,11 @@ export type ScrollChromeState = {
 export const SCROLL_CHROME_THRESHOLDS = {
   top: 80,
   compactTop: 20,
+  mobileMaxWidth: 1023,
   showDelta: -10,
   hideDelta: 12,
   nearBottomEnter: 96,
   nearBottomExit: 220,
-  todayAnchorStart: 28,
-  todayAnchorEnd: 128,
 };
 
 export function createInitialScrollChromeState(): ScrollChromeState {
@@ -45,12 +45,9 @@ export function reduceScrollChromeState(
     (previous.nearBottom &&
       distanceFromBottom <= SCROLL_CHROME_THRESHOLDS.nearBottomExit);
   const atTop = snapshot.scrollY < SCROLL_CHROME_THRESHOLDS.compactTop;
-  const todayAnchored =
-    snapshot.todayTop >=
-      snapshot.headerHeight + SCROLL_CHROME_THRESHOLDS.todayAnchorStart &&
-    snapshot.todayTop <=
-      snapshot.headerHeight + SCROLL_CHROME_THRESHOLDS.todayAnchorEnd;
-
+  const isMobileChrome =
+    (snapshot.viewportWidth ?? SCROLL_CHROME_THRESHOLDS.mobileMaxWidth) <=
+    SCROLL_CHROME_THRESHOLDS.mobileMaxWidth;
   let showBottomBar = previous.showBottomBar;
   if (snapshot.scrollY < SCROLL_CHROME_THRESHOLDS.top || nearBottom) {
     showBottomBar = true;
@@ -60,9 +57,18 @@ export function reduceScrollChromeState(
     showBottomBar = false;
   }
 
+  let compactHeader = previous.compactHeader;
+  if (!isMobileChrome || atTop || nearBottom) {
+    compactHeader = false;
+  } else if (delta >= SCROLL_CHROME_THRESHOLDS.hideDelta) {
+    compactHeader = true;
+  } else if (delta <= SCROLL_CHROME_THRESHOLDS.showDelta) {
+    compactHeader = false;
+  }
+
   return {
     showBottomBar,
-    compactHeader: !atTop && !todayAnchored,
+    compactHeader,
     nearBottom,
     lastScrollY: snapshot.scrollY,
   };

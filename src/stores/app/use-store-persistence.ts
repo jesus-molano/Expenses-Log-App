@@ -135,11 +135,15 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
     onPersist: (store: ExpenseStore) => void,
     syncingMessage: string,
   ) {
-    await saveImmediately(nextStore, syncingMessage);
-
     localRevisionRef.current += 1;
     saveExpenseStore(nextStore);
     onPersist(nextStore);
+
+    try {
+      await saveImmediately(nextStore, syncingMessage);
+    } catch (error) {
+      markError(error, "settings.cloudSaveError");
+    }
   }
 
   return {

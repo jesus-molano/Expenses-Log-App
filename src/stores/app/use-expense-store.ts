@@ -44,8 +44,12 @@ export function useExpenseStore() {
     persist(addExpenseToStore(store, draft, options));
   }
 
-  function deleteExpense(templateId: string) {
-    persist(deleteExpenseFromStore(store, templateId));
+  async function deleteExpense(templateId: string) {
+    await persistence.persistImmediately(
+      deleteExpenseFromStore(store, templateId),
+      setStore,
+      t("settings.savingChanges"),
+    );
   }
 
   async function clearExpenses() {

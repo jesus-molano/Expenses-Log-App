@@ -11,6 +11,7 @@ type DashboardShellProps = {
   headlineTitle: string;
   activeTab: "expenses" | "money";
   language: AppLanguage;
+  compactHeader?: boolean;
   children: React.ReactNode;
 };
 
@@ -19,11 +20,14 @@ export function DashboardShell({
   headlineTitle,
   activeTab,
   language,
+  compactHeader = false,
   children,
 }: DashboardShellProps) {
   useEffect(() => {
     sessionStorage.setItem("expense-last-tab", activeTab);
   }, [activeTab]);
+
+  const mobileCompact = compactHeader;
 
   return (
     <main className="app-page-bg min-h-dvh text-white">
@@ -40,21 +44,35 @@ export function DashboardShell({
             />
           ) : null}
           <section
-            className="app-shell-card relative z-10 mx-auto max-w-2xl overflow-hidden rounded-[1.45rem] border p-3.5 backdrop-blur-2xl lg:max-w-none"
+            className={`app-shell-card relative z-10 mx-auto overflow-hidden border transition-[max-width,border-radius,padding,box-shadow,transform] duration-300 ease-out lg:max-w-none lg:rounded-[1.45rem] lg:p-3.5 ${
+              mobileCompact
+                ? "max-w-[15.5rem] rounded-[1.4rem] p-2"
+                : "max-w-2xl rounded-[1.45rem] p-3.5"
+            }`}
           >
-            <div className="flex items-start justify-between gap-3">
+            <div
+              className={`flex items-start justify-between gap-3 overflow-hidden transition-[max-height,opacity,transform,margin] duration-300 ease-out lg:max-h-16 lg:opacity-100 lg:translate-y-0 ${
+                mobileCompact
+                  ? "max-h-0 -translate-y-1 opacity-0"
+                  : "max-h-16 translate-y-0 opacity-100"
+              }`}
+            >
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                <p
+                  className="text-xs font-semibold uppercase tracking-wide text-slate-300"
+                >
                   {headlineTitle}
                 </p>
-                <p className="mt-1 text-[30px] font-semibold leading-none">
+                <p
+                  className="mt-1 text-[30px] font-semibold leading-none"
+                >
                   {headlineLabel}
                 </p>
               </div>
               <Link
                 href={`/settings?from=${activeTab}`}
                 aria-label={t("common.settings", language)}
-                className="grid size-10 shrink-0 place-items-center rounded-full bg-white/10 text-white ring-1 ring-white/15 transition hover:bg-lime-300/15 hover:text-lime-100"
+                className="grid size-10 shrink-0 place-items-center rounded-full bg-white/10 text-white ring-1 ring-white/15 transition-[background-color,color] duration-300 hover:bg-lime-300/15 hover:text-lime-100"
               >
                 <Settings size={18} />
               </Link>
@@ -62,17 +80,21 @@ export function DashboardShell({
 
             <nav
               aria-label="Secciones"
-              className="mt-3 grid grid-cols-2 gap-2 overflow-hidden rounded-2xl bg-white/[0.045] p-1 text-sm font-semibold ring-1 ring-white/10"
+              className={`grid grid-cols-2 gap-2 overflow-hidden rounded-2xl bg-[var(--app-surface-muted)] p-1 text-sm font-semibold ring-1 ring-white/10 transition-[margin,border-radius] duration-300 ${
+                mobileCompact ? "mt-0 rounded-[1.1rem] lg:mt-3" : "mt-3"
+              }`}
             >
               <ChromeTab
                 href="/"
                 active={activeTab === "expenses"}
+                compact={mobileCompact}
                 icon={<WalletCards size={17} />}
                 label={t("common.expenses", language)}
               />
               <ChromeTab
                 href="/money"
                 active={activeTab === "money"}
+                compact={mobileCompact}
                 icon={<Landmark size={17} />}
                 label={t("common.plan", language)}
               />
@@ -95,25 +117,29 @@ export function DashboardShell({
 function ChromeTab({
   href,
   active,
+  compact,
   icon,
   label,
 }: {
   href: string;
   active: boolean;
+  compact: boolean;
   icon: React.ReactNode;
   label: string;
 }) {
   return (
     <Link
       href={href}
-      className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl transition ${
+      className={`inline-flex items-center justify-center gap-2 rounded-xl transition-[height,background-color,color,box-shadow] duration-300 ${
+        compact ? "h-10 lg:h-10" : "h-10"
+      } ${
         active
           ? "bg-lime-300 text-slate-950 shadow-[0_0_24px_rgba(132,204,22,0.18)]"
           : "text-slate-200 hover:bg-white/8"
       }`}
     >
       {icon}
-      <span>{label}</span>
+      <span className={compact ? "sr-only lg:not-sr-only" : ""}>{label}</span>
     </Link>
   );
 }

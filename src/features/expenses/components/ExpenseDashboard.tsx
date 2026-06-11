@@ -61,6 +61,7 @@ export function ExpenseDashboard({
       headlineTitle={t("common.due", language)}
       activeTab="expenses"
       language={language}
+      compactHeader={chrome.compactHeader}
     >
       <ExpenseList
         sections={filters.timelineSections}

@@ -48,6 +48,11 @@ export function ExpenseList({
     currentMonth,
     draggedOccurrence: dnd.draggedOccurrence,
   });
+  const activeCategory = dnd.activeOccurrence
+    ? categories.find(
+        (category) => category.id === dnd.activeOccurrence?.template.categoryId,
+      )
+    : undefined;
 
   return (
     <DndContext
@@ -94,7 +99,12 @@ export function ExpenseList({
       </section>
 
       <DragOverlay dropAnimation={null}>
-        <ExpenseDragPreview occurrence={dnd.activeOccurrence} />
+        <ExpenseDragPreview
+          occurrence={dnd.activeOccurrence}
+          category={activeCategory}
+          today={today}
+          language={language}
+        />
       </DragOverlay>
     </DndContext>
   );

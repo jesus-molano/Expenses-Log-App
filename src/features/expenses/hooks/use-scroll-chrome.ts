@@ -27,6 +27,7 @@ export function useScrollChrome() {
       const nextState = reduceScrollChromeState(stateRef.current, {
         scrollY: window.scrollY,
         viewportHeight,
+        viewportWidth: window.innerWidth,
         documentHeight: document.documentElement.scrollHeight,
         headerHeight,
         todayTop: todaySection?.getBoundingClientRect().top ?? Infinity,
