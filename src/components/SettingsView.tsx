@@ -73,7 +73,7 @@ export function SettingsView() {
       .maybeSingle();
 
     if (error) {
-      setMessage(error.message);
+      setMessage(syncErrorMessage(error.message));
       setSyncing(false);
       return;
     }
@@ -89,7 +89,7 @@ export function SettingsView() {
     });
 
     if (upsertError) {
-      setMessage(upsertError.message);
+      setMessage(syncErrorMessage(upsertError.message));
     } else {
       saveExpenseStore(merged);
       setStore(merged);
@@ -222,11 +222,27 @@ export function SettingsView() {
             </div>
           </div>
 
-          {message ? <p className="mt-4 text-sm text-slate-300">{message}</p> : null}
+          {message ? (
+            <p className="mt-4 rounded-2xl bg-white/[0.05] p-3 text-sm leading-relaxed text-slate-200 ring-1 ring-white/10">
+              {message}
+            </p>
+          ) : null}
         </section>
       </div>
     </main>
   );
+}
+
+function syncErrorMessage(message: string) {
+  if (
+    message.includes("app_stores") ||
+    message.includes("schema cache") ||
+    message.includes("PGRST205")
+  ) {
+    return "Falta crear la tabla de sincronización en Supabase. Ejecuta supabase/migrations/20260611000000_app_store_sync.sql en el SQL Editor y vuelve a pulsar Sincronizar.";
+  }
+
+  return message;
 }
 
 function SettingCard({
