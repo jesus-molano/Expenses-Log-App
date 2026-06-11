@@ -3,14 +3,19 @@ import { buildMonthlyMoneyPlan, defaultFinanceStore } from "./finance";
 import { generateOccurrences } from "./recurrence";
 import type { ExpenseOccurrence } from "./types";
 
-function occurrence(name: string, amount: number, dueDate: string): ExpenseOccurrence {
+function occurrence(
+  name: string,
+  amount: number,
+  dueDate: string,
+  status: ExpenseOccurrence["status"] = "due",
+): ExpenseOccurrence {
   return {
     id: name,
     occurrenceDate: dueDate,
     dueDate,
     estimatedChargeDate: dueDate,
     estimatedChargeLabel: "cobro",
-    status: "due",
+    status,
     sortOrder: 0,
     template: {
       id: name,
@@ -58,6 +63,19 @@ describe("finance", () => {
     expect(plan.expensesContribution).toBe(500);
     expect(plan.shortfall).toBe(160);
     expect(plan.primaryContribution).toBe(0);
+  });
+
+  it("does not count skipped month occurrences as fixed expenses", () => {
+    const plan = buildMonthlyMoneyPlan({
+      monthDate: new Date("2026-06-10"),
+      finance: defaultFinanceStore,
+      occurrences: [
+        occurrence("Parking", 30, "2026-06-01", "skipped"),
+        occurrence("Gastos de casa", 660, "2026-06-01"),
+      ],
+    });
+
+    expect(plan.fixedExpensesTotal).toBe(660);
   });
 
   it("includes annual expenses only in their due month", () => {

@@ -277,6 +277,33 @@ export function useExpenseStore() {
     persist({ ...store, overrides });
   }
 
+  function skipOccurrence(occurrence: ExpenseOccurrence) {
+    const overrides = [
+      ...store.overrides.filter(
+        (override) =>
+          !(
+            override.templateId === occurrence.template.id &&
+            override.occurrenceDate === occurrence.occurrenceDate
+          ),
+      ),
+      {
+        id: occurrence.override?.id ?? createId("ovr"),
+        userId: "demo",
+        templateId: occurrence.template.id,
+        occurrenceDate: occurrence.occurrenceDate,
+        dueDate:
+          occurrence.dueDate !== occurrence.occurrenceDate
+            ? occurrence.dueDate
+            : undefined,
+        sortOrder: occurrence.override?.sortOrder,
+        status: "skipped" as const,
+        note: "Skipped from monthly plan",
+      },
+    ];
+
+    persist({ ...store, overrides });
+  }
+
   function moveOccurrence(
     occurrence: ExpenseOccurrence,
     dueDate: string,
@@ -468,6 +495,7 @@ export function useExpenseStore() {
     deleteExpense,
     clearExpenses,
     togglePaid,
+    skipOccurrence,
     moveOccurrence,
     moveOccurrenceSeries,
     updateSalary,

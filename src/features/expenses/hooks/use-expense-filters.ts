@@ -29,6 +29,8 @@ export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
     const normalizedQuery = query.trim().toLowerCase();
 
     return occurrences.filter((occurrence) => {
+      if (occurrence.status === "skipped") return false;
+
       const matchesQuery =
         !normalizedQuery ||
         occurrence.template.name.toLowerCase().includes(normalizedQuery) ||
@@ -43,6 +45,7 @@ export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
     .filter(
       (occurrence) =>
         occurrence.status !== "paid" &&
+        occurrence.status !== "skipped" &&
         occurrence.estimatedChargeDate <= windowEnd,
     )
     .reduce((sum, occurrence) => sum + occurrence.template.amount, 0);

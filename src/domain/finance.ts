@@ -74,7 +74,12 @@ export function buildMonthlyMoneyPlan({
     .reduce((sum, event) => sum + event.amount, 0);
   const incomeTotal = recurringIncomeTotal + extraIncomeTotal;
   const fixedExpensesTotal = occurrences
-    .filter((occurrence) => occurrence.dueDate >= monthStart && occurrence.dueDate <= monthEnd)
+    .filter(
+      (occurrence) =>
+        occurrence.status !== "skipped" &&
+        occurrence.dueDate >= monthStart &&
+        occurrence.dueDate <= monthEnd,
+    )
     .reduce((sum, occurrence) => sum + occurrence.template.amount, 0);
   const expensesContribution = Math.min(incomeTotal, fixedExpensesTotal);
   const afterExpenses = incomeTotal - expensesContribution;

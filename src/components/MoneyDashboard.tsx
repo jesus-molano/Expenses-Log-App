@@ -8,6 +8,7 @@ import {
   PiggyBank,
   Plus,
   Settings2,
+  Trash2,
   WalletCards,
   X,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import {
   YAxis,
 } from "recharts";
 import { CompactMenu } from "@/components/ui/CompactMenu";
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
 import { buildMonthlyMoneyPlan, isEventInMonth } from "@/domain/finance";
 import { generateOccurrences } from "@/domain/recurrence";
@@ -45,6 +47,7 @@ export function MoneyDashboard({
     updateMoneySettings,
     addIncomeEvent,
     deleteIncomeEvent,
+    skipOccurrence,
   } = useExpenseStore();
   useScrollChrome();
   const language = store.preferences?.language ?? "es";
@@ -73,6 +76,8 @@ export function MoneyDashboard({
   const [monthMenuOpen, setMonthMenuOpen] = useState(false);
   const [isCompactChart, setIsCompactChart] = useState(false);
   const [selectedExpensesExpanded, setSelectedExpensesExpanded] = useState(false);
+  const [occurrenceToSkip, setOccurrenceToSkip] =
+    useState<ExpenseOccurrence | null>(null);
   const [selectedYear, setSelectedYear] = useState(() =>
     new Date().getFullYear(),
   );
@@ -198,7 +203,7 @@ export function MoneyDashboard({
         store.overrides,
         toDateOnly(startOfMonth(selectedMonthDate)),
         toDateOnly(endOfMonth(selectedMonthDate)),
-      ),
+      ).filter((occurrence) => occurrence.status !== "skipped"),
     [selectedMonthDate, store.overrides, store.templates],
   );
   const visibleSelectedMonthOccurrences = selectedExpensesExpanded
@@ -215,7 +220,10 @@ export function MoneyDashboard({
     );
   }, [store.overrides, store.templates, today]);
   const annualExpensesTotal = annualOccurrences.reduce(
-    (sum, occurrence) => sum + occurrence.template.amount,
+    (sum, occurrence) =>
+      occurrence.status === "skipped"
+        ? sum
+        : sum + occurrence.template.amount,
     0,
   );
   const annualSavingsEstimate =
@@ -260,6 +268,12 @@ export function MoneyDashboard({
     });
     setExtraName("Bizum");
     setExtraAmount("");
+  }
+
+  function confirmSkipOccurrence() {
+    if (!occurrenceToSkip) return;
+    skipOccurrence(occurrenceToSkip);
+    setOccurrenceToSkip(null);
   }
 
   return (
@@ -554,6 +568,8 @@ export function MoneyDashboard({
                       }
                       language={language}
                       today={toDateOnly(today)}
+                      skipLabel={t("money.skipMonthExpense", language)}
+                      onSkip={() => setOccurrenceToSkip(occurrence)}
                     />
                   ))
                 ) : (
@@ -751,6 +767,18 @@ export function MoneyDashboard({
           </form>
         </div>
       ) : null}
+
+      {occurrenceToSkip ? (
+        <ConfirmActionDialog
+          icon={<Trash2 size={18} />}
+          title={t("money.skipMonthExpense", language)}
+          body={`${t("money.skipMonthExpenseConfirm", language)} ${occurrenceToSkip.template.name}`}
+          cancelLabel={t("common.back", language)}
+          confirmLabel={t("money.skipMonthExpenseAction", language)}
+          onCancel={() => setOccurrenceToSkip(null)}
+          onConfirm={confirmSkipOccurrence}
+        />
+      ) : null}
     </DashboardShell>
   );
 }
@@ -841,11 +869,15 @@ function MonthlyExpenseRow({
   categoryName,
   language,
   today,
+  skipLabel,
+  onSkip,
 }: {
   occurrence: ExpenseOccurrence;
   categoryName: string;
   language: "es" | "en";
   today: string;
+  skipLabel: string;
+  onSkip: () => void;
 }) {
   const locale = language === "en" ? enUS : es;
   const isPaid = occurrence.status === "paid";
@@ -857,7 +889,7 @@ function MonthlyExpenseRow({
       : t("common.pending", language);
 
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white/[0.045] px-3 py-2 ring-1 ring-white/10">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-2xl bg-white/[0.045] px-3 py-2 ring-1 ring-white/10">
       <div className="min-w-0">
         <p className={`truncate text-sm font-semibold ${isPaid ? "text-slate-300 line-through" : "text-white"}`}>
           {occurrence.template.name}
@@ -870,6 +902,15 @@ function MonthlyExpenseRow({
       <p className={`text-sm font-semibold ${isPaid ? "text-slate-300 line-through" : "text-white"}`}>
         {formatCurrency(occurrence.template.amount)}
       </p>
+      <button
+        type="button"
+        onClick={onSkip}
+        aria-label={skipLabel}
+        title={skipLabel}
+        className="grid size-8 place-items-center rounded-full bg-rose-400/12 text-rose-100 ring-1 ring-rose-300/20 transition hover:bg-rose-400/18"
+      >
+        <X size={15} />
+      </button>
     </div>
   );
 }
