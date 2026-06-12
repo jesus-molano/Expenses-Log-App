@@ -46,17 +46,17 @@ export function MonthlyTrendChart({
           label={t("money.free", language)}
         />
       </div>
-      <div className="app-chart-shell mt-4 h-48 min-h-48 min-w-0 overflow-hidden">
+      <div className="app-chart-shell mt-4 h-52 min-h-52 min-w-0 overflow-hidden">
         {mounted ? (
-          <ResponsiveContainer width="100%" height={192} minWidth={0}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <BarChart
               data={moneySeries}
               barGap={isCompactChart ? 2 : 4}
               barCategoryGap={isCompactChart ? "24%" : "32%"}
               margin={
                 isCompactChart
-                  ? { top: 12, right: 2, bottom: 0, left: 2 }
-                  : { top: 12, right: 6, bottom: 0, left: 4 }
+                  ? { top: 12, right: 2, bottom: 12, left: 2 }
+                  : { top: 12, right: 6, bottom: 12, left: 4 }
               }
             >
               <defs>
@@ -129,6 +129,9 @@ export function MonthlyTrendChart({
                   fontSize: 11,
                   fontWeight: 600,
                 }}
+                height={28}
+                interval={0}
+                minTickGap={0}
                 tickMargin={8}
               />
               {isCompactChart ? null : (

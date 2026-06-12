@@ -39,20 +39,10 @@ export function Sheet({
   onBackdropClick,
 }: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   useBodyScrollLock(true);
 
   useEffect(() => {
-    restoreFocusRef.current =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-
-    const panel = panelRef.current;
-    const focusable = panel ? getFocusableElements(panel)[0] : null;
-    (focusable ?? panel)?.focus({ preventScroll: true });
-
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.stopPropagation();
@@ -97,7 +87,6 @@ export function Sheet({
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      restoreFocusRef.current?.focus({ preventScroll: true });
     };
   }, [onBackdropClick]);
 
