@@ -1,6 +1,6 @@
 "use client";
 
-import {
+import type {
   DragEndEvent,
   DragMoveEvent,
   DragStartEvent,
@@ -115,7 +115,13 @@ export function useExpenseDnd({
     }
   }
 
-  function cleanupDrag(anchor = createDragScrollAnchor(activeOccurrence, null)) {
+  function handleDragCancel() {
+    cleanupDrag();
+  }
+
+  function cleanupDrag(
+    anchor: DragScrollAnchor | null = createDragScrollAnchor(activeOccurrence, null),
+  ) {
     document.documentElement.classList.remove("is-dragging-expense");
     document.documentElement.classList.add("is-settling-expense-drag");
     clearDragSettleTimeout(settleTimeoutRef.current);
@@ -171,7 +177,7 @@ export function useExpenseDnd({
       onDragStart: handleDragStart,
       onDragMove: handleDragMove,
       onDragEnd: handleDragEnd,
-      onDragCancel: cleanupDrag,
+      onDragCancel: handleDragCancel,
     },
   };
 }
