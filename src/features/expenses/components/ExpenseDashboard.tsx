@@ -35,7 +35,7 @@ export function ExpenseDashboard({
   } = useExpenseStore();
   const language = store.preferences?.language ?? "es";
   const filters = useExpenseFilters(store, language);
-  const quickParser = useQuickExpenseParser();
+  const quickParser = useQuickExpenseParser(language);
   const chrome = useScrollChrome();
   const runViewTransition = useViewTransitionAction();
   const [draft, setDraft] = useState<DraftExpense>(() => createEmptyDraft());
@@ -102,6 +102,7 @@ export function ExpenseDashboard({
         open={addSheetOpen}
         value={quickParser.quickText}
         statusLabel={quickParser.statusLabel}
+        statusTone={quickParser.statusTone}
         isParsing={quickParser.status === "loading"}
         language={language}
         onClose={() => setAddSheetOpen(false)}

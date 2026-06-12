@@ -1,11 +1,11 @@
 "use client";
 
 import { CalendarDays, X } from "lucide-react";
-import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { IconButton } from "@/components/ui/IconButton";
+import { useBodyScrollLock } from "@/components/ui/use-body-scroll-lock";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { cn } from "@/shared/ui";
@@ -25,33 +25,7 @@ export function PlanPaydayField({
   onOpenChange,
   onSalaryDayChange,
 }: PlanPaydayFieldProps) {
-  useEffect(() => {
-    if (!open) return;
-
-    const scrollY = window.scrollY;
-    const previousBodyStyle = {
-      overflow: document.body.style.overflow,
-      position: document.body.style.position,
-      top: document.body.style.top,
-      width: document.body.style.width,
-    };
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
-
-    return () => {
-      document.documentElement.style.overflow = previousHtmlOverflow;
-      document.body.style.overflow = previousBodyStyle.overflow;
-      document.body.style.position = previousBodyStyle.position;
-      document.body.style.top = previousBodyStyle.top;
-      document.body.style.width = previousBodyStyle.width;
-      window.scrollTo(0, scrollY);
-    };
-  }, [open]);
+  useBodyScrollLock(open, { strategy: "fixed" });
 
   function selectDay(day: number) {
     onSalaryDayChange(day);
@@ -88,13 +62,13 @@ export function PlanPaydayField({
               {label}
             </h3>
             <p className="mt-0.5 text-sm font-medium text-[var(--app-text-muted)]">
-              {language === "en" ? "Select day of month" : "Selecciona el día del mes"}
+              {t("money.selectPayday", language)}
             </p>
           </div>
           <IconButton
             type="button"
             onClick={() => onOpenChange(false)}
-            aria-label={language === "en" ? "Close" : "Cerrar"}
+            aria-label={t("common.close", language)}
             size="sm"
           >
             <X size={16} />
@@ -129,7 +103,7 @@ export function PlanPaydayField({
             variant="secondary"
             className="w-full"
           >
-            {language === "en" ? "Close" : "Cerrar"}
+            {t("common.close", language)}
           </Button>
         </footer>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
 import { cn } from "@/shared/ui";
+import { useBodyScrollLock } from "./use-body-scroll-lock";
 
 type SheetProps = {
   children: React.ReactNode;
@@ -16,18 +16,7 @@ export function Sheet({
   contentClassName,
   onBackdropClick,
 }: SheetProps) {
-  useEffect(() => {
-    const originalHtmlOverflow = document.documentElement.style.overflow;
-    const originalBodyOverflow = document.body.style.overflow;
-
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.documentElement.style.overflow = originalHtmlOverflow;
-      document.body.style.overflow = originalBodyOverflow;
-    };
-  }, []);
+  useBodyScrollLock(true);
 
   return (
     <div

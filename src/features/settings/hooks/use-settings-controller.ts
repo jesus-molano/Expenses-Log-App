@@ -1,13 +1,14 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import type { User } from "@supabase/supabase-js";
 import type { AppLanguage } from "@/domain/types";
-import { useExpenseStore } from "@/stores/app/use-expense-store";
-import { t } from "@/shared/i18n";
 import { clearExpenseLocalData } from "@/data/persistence/local-store";
+import { t } from "@/shared/i18n";
+import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { createClient } from "@/utils/supabase/client";
+import { useNotificationSettings } from "./use-notification-settings";
+import { useSettingsAuth } from "./use-settings-auth";
 import { SETTINGS_LANGUAGES, SETTINGS_THEMES } from "../lib/settings-options";
 
 export function useSettingsController() {
@@ -28,15 +29,15 @@ export function useSettingsController() {
   const [isClearingExpenses, setIsClearingExpenses] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [notificationPermission, setNotificationPermission] =
-    useState<NotificationPermission>(() =>
-      typeof window !== "undefined" && "Notification" in window
-        ? Notification.permission
-        : "default",
-    );
-  const [user, setUser] = useState<User | null>(null);
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
+  const { user, setUser, signOut } = useSettingsAuth(supabase, setMessage);
+  const {
+    notificationsActive,
+    enableNotifications,
+    disableNotifications,
+  } = useNotificationSettings(setMessage);
+
   const currentTheme = store.preferences?.theme ?? "dark";
   const currentLanguage = store.preferences?.language ?? "es";
   const selectedTheme =
@@ -50,44 +51,6 @@ export function useSettingsController() {
   const backLabel =
     backTab === "money" ? t("common.plan") : t("common.expenses");
   const deleteAccountPhrase = currentLanguage === "en" ? "DELETE" : "BORRAR";
-  const notificationsActive = notificationPermission === "granted";
-
-  useEffect(() => {
-    if (!supabase) return;
-
-    void supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase]);
-
-  async function enableNotifications() {
-    if (!("serviceWorker" in navigator) || !("Notification" in window)) {
-      setMessage(t("settings.browserNoNotifications"));
-      return;
-    }
-
-    const permission = await Notification.requestPermission();
-    setNotificationPermission(permission);
-    if (permission !== "granted") {
-      setMessage(t("settings.notificationsDenied"));
-      return;
-    }
-
-    await navigator.serviceWorker.register("/sw.js");
-    setMessage(t("settings.notificationsEnabled"));
-  }
-
-  async function signOut() {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    setUser(null);
-    setMessage(t("settings.signedOut"));
-  }
 
   function exportData() {
     const blob = new Blob([JSON.stringify(store, null, 2)], {
@@ -183,6 +146,7 @@ export function useSettingsController() {
     updateTheme,
     updateLanguage,
     enableNotifications,
+    disableNotifications,
     signOut,
     exportData,
     importData,
@@ -198,4 +162,3 @@ export function syncDescription(status: string, message: string) {
   if (status === "error") return `${t("settings.cloudError")}: ${message}`;
   return t("settings.localChanges");
 }
-

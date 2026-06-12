@@ -6,11 +6,13 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Sheet } from "@/components/ui/Sheet";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
+import { cn } from "@/shared/ui";
 
 type QuickCaptureProps = {
   open: boolean;
   value: string;
   statusLabel: string;
+  statusTone: "neutral" | "success" | "warning";
   isParsing: boolean;
   language: AppLanguage;
   onClose: () => void;
@@ -31,7 +33,7 @@ export function AddExpenseButton({
   return (
     <button
       type="button"
-      aria-label={language === "en" ? "Add expense" : "Añadir gasto"}
+      aria-label={t("expenses.addExpense", language)}
       data-state={visible ? "visible" : "hidden"}
       onClick={onClick}
       className="app-fab"
@@ -45,6 +47,7 @@ export function QuickCapture({
   open,
   value,
   statusLabel,
+  statusTone,
   isParsing,
   language,
   onClose,
@@ -62,7 +65,7 @@ export function QuickCapture({
           <header className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <h2 className="text-lg font-semibold text-[var(--app-text)]">
-                {language === "en" ? "Add expense" : "Añadir gasto"}
+                {t("expenses.addExpense", language)}
               </h2>
               <p className="truncate text-sm text-[var(--app-text-muted)]">
                 {t("expenses.newExpenseSubtitle", language)}
@@ -104,7 +107,16 @@ export function QuickCapture({
                 : t("expenses.analyzeText", language)}
             </Button>
             {statusLabel ? (
-              <p className="mt-2 text-xs text-[var(--app-text-muted)]">
+              <p
+                className={cn(
+                  "mt-2 text-xs font-medium",
+                  statusTone === "success" &&
+                    "text-[color-mix(in_srgb,var(--app-success)_78%,var(--app-text))]",
+                  statusTone === "warning" &&
+                    "text-[color-mix(in_srgb,var(--app-warning)_78%,var(--app-text))]",
+                  statusTone === "neutral" && "text-[var(--app-text-muted)]",
+                )}
+              >
                 {statusLabel}
               </p>
             ) : null}

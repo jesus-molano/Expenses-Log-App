@@ -32,12 +32,17 @@ export function NotificationsRow({
       }
       action={
         <Button
-          variant="secondary"
-          onClick={settings.enableNotifications}
-          disabled={settings.notificationsActive}
+          variant={settings.notificationsActive ? "danger" : "secondary"}
+          onClick={
+            settings.notificationsActive
+              ? settings.disableNotifications
+              : settings.enableNotifications
+          }
           size="sm"
         >
-          {settings.notificationsActive ? t("settings.active") : t("settings.activate")}
+          {settings.notificationsActive
+            ? t("settings.deactivate")
+            : t("settings.activate")}
         </Button>
       }
     />

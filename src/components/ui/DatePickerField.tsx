@@ -22,13 +22,15 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { toDateOnly } from "@/domain/calendar";
 import type { AppLanguage } from "@/domain/types";
+import { t } from "@/shared/i18n";
 import { cn } from "@/shared/ui";
 import { Button } from "./Button";
 import { IconButton } from "./IconButton";
+import { useBodyScrollLock } from "./use-body-scroll-lock";
 
 type DatePickerFieldProps = {
   value?: string;
@@ -93,33 +95,7 @@ export function DatePickerField({
     selectedDate ?? fallbackMonth,
   );
 
-  useEffect(() => {
-    if (!open) return;
-
-    const scrollY = window.scrollY;
-    const previousBodyStyle = {
-      overflow: document.body.style.overflow,
-      position: document.body.style.position,
-      top: document.body.style.top,
-      width: document.body.style.width,
-    };
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
-
-    return () => {
-      document.documentElement.style.overflow = previousHtmlOverflow;
-      document.body.style.overflow = previousBodyStyle.overflow;
-      document.body.style.position = previousBodyStyle.position;
-      document.body.style.top = previousBodyStyle.top;
-      document.body.style.width = previousBodyStyle.width;
-      window.scrollTo(0, scrollY);
-    };
-  }, [open]);
+  useBodyScrollLock(open, { strategy: "fixed" });
 
   const days = useMemo(() => {
     const monthStart = startOfMonth(visibleMonth);
@@ -201,7 +177,7 @@ export function DatePickerField({
           <IconButton
             type="button"
             onClick={() => setVisibleMonth((month) => subMonths(month, 1))}
-            aria-label={language === "en" ? "Previous month" : "Mes anterior"}
+            aria-label={t("datePicker.previousMonth", language)}
           >
             <ChevronLeft size={18} />
           </IconButton>
@@ -216,7 +192,7 @@ export function DatePickerField({
                 }
                 aria-expanded={activeSelector === "month"}
                 className="input-control flex h-10 min-w-0 items-center justify-between gap-2 pr-3 text-left"
-                aria-label={language === "en" ? "Month" : "Mes"}
+                aria-label={t("datePicker.month", language)}
               >
                 <span className="truncate">
                   {months[visibleMonth.getMonth()]}
@@ -259,7 +235,7 @@ export function DatePickerField({
                 }
                 aria-expanded={activeSelector === "year"}
                 className="input-control flex h-10 min-w-0 items-center justify-between gap-2 pr-3 text-left"
-                aria-label={language === "en" ? "Year" : "Año"}
+                aria-label={t("datePicker.year", language)}
               >
                 <span className="truncate">{visibleMonth.getFullYear()}</span>
                 <ChevronDown
@@ -294,7 +270,7 @@ export function DatePickerField({
           <IconButton
             type="button"
             onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
-            aria-label={language === "en" ? "Next month" : "Mes siguiente"}
+            aria-label={t("datePicker.nextMonth", language)}
           >
             <ChevronRight size={18} />
           </IconButton>
@@ -339,7 +315,7 @@ export function DatePickerField({
             onClick={() => setOpen(false)}
             variant="secondary"
           >
-            {language === "en" ? "Close" : "Cerrar"}
+            {t("common.close", language)}
           </Button>
           {allowClear ? (
             <Button
@@ -351,7 +327,7 @@ export function DatePickerField({
               variant="secondary"
               leadingIcon={<X size={16} />}
             >
-              {language === "en" ? "Clear" : "Limpiar"}
+              {t("common.clear", language)}
             </Button>
           ) : (
             <Button
@@ -359,7 +335,7 @@ export function DatePickerField({
               onClick={() => selectDate(new Date())}
               variant="primary"
             >
-              {language === "en" ? "Today" : "Hoy"}
+              {t("common.today", language)}
             </Button>
           )}
         </footer>
