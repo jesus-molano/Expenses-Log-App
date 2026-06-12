@@ -1,0 +1,121 @@
+﻿/* Swipe actions */
+.app-swipe-edit {
+  background: color-mix(in srgb, var(--app-action-edit) 22%, transparent);
+  color: color-mix(in srgb, var(--app-action-edit) 82%, var(--app-text));
+  outline: 1px solid color-mix(in srgb, var(--app-action-edit) 34%, transparent);
+  outline-offset: -1px;
+}
+
+.app-swipe-paid {
+  background: color-mix(in srgb, var(--app-action-paid) 22%, transparent);
+  color: color-mix(in srgb, var(--app-action-paid) 82%, var(--app-text));
+  outline: 1px solid color-mix(in srgb, var(--app-action-paid) 34%, transparent);
+  outline-offset: -1px;
+}
+
+.app-expense-row-card {
+  --app-row-glint: var(--app-accent);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-color: color-mix(in srgb, var(--app-row-glint) 16%, var(--app-border));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--app-row-glint) 5%, transparent),
+    var(--app-shadow-row);
+}
+
+.app-expense-row-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(150deg, color-mix(in srgb, white 8%, transparent) 0%, transparent 34%),
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--app-row-glint) 5%, transparent), transparent 38%);
+  opacity: 0.46;
+}
+
+.app-expense-row-card-swiping {
+  background: var(--app-surface) !important;
+}
+
+/* Timeline */
+.app-timeline-dot {
+  background: color-mix(in srgb, var(--app-accent) 82%, var(--app-accent-2));
+  color: color-mix(in srgb, var(--app-accent) 82%, var(--app-accent-2));
+  --tw-ring-color: color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+.app-timeline-dot-critical {
+  background: var(--app-danger);
+  color: var(--app-danger);
+  --tw-ring-color: color-mix(in srgb, var(--app-danger) 18%, transparent);
+}
+
+.app-timeline-dot-estimated {
+  background: var(--app-warning);
+  color: var(--app-warning);
+  --tw-ring-color: color-mix(in srgb, var(--app-warning) 18%, transparent);
+}
+
+.app-timeline-dot-paid {
+  background: var(--app-success);
+  color: var(--app-success);
+  --tw-ring-color: color-mix(in srgb, var(--app-success) 14%, transparent);
+}
+
+.app-today-line {
+  background: color-mix(in srgb, var(--app-accent) 88%, var(--app-accent-2));
+  box-shadow: 0 0 24px color-mix(in srgb, var(--app-accent) 44%, transparent);
+}
+
+.app-drop-line {
+  background: color-mix(in srgb, var(--app-accent) 76%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-accent) 14%, transparent);
+}
+
+.app-drop-node {
+  background: var(--app-accent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--app-bg) 92%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--app-accent) 26%, transparent),
+    0 4px 10px color-mix(in srgb, var(--app-accent) 24%, transparent);
+}
+
+.app-day-drop-target {
+  border: 1px dashed var(--app-border);
+  background: var(--app-surface-muted);
+  color: var(--app-text-muted);
+  transition:
+    border-color var(--motion-fast) var(--ease-smooth),
+    background-color var(--motion-fast) var(--ease-smooth),
+    color var(--motion-fast) var(--ease-smooth),
+    box-shadow var(--motion-fast) var(--ease-smooth);
+}
+
+.app-day-drop-target[data-active="true"] {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--app-accent) 58%, transparent);
+  background: color-mix(in srgb, var(--app-accent) 12%, var(--app-surface));
+  color: var(--app-text);
+  box-shadow:
+    inset 0 -2px 0 color-mix(in srgb, var(--app-accent) 44%, transparent),
+    var(--app-shadow-sm);
+}
+
+.app-drag-preview {
+  border: 1px solid color-mix(in srgb, var(--app-accent) 42%, var(--app-border));
+  background: color-mix(in srgb, var(--app-surface-raised) 76%, transparent);
+  color: var(--app-text);
+  box-shadow: var(--app-shadow-md);
+  opacity: 0.68;
+  backdrop-filter: blur(10px) saturate(1.08);
+}
+
+.app-loading-dot {
+  background: color-mix(in srgb, var(--app-accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--app-accent) 30%, transparent);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--app-accent) 34%, transparent);
+}

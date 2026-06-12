@@ -1,0 +1,93 @@
+﻿/* App shell */
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+main {
+  background:
+    radial-gradient(circle at 50% -12%, color-mix(in srgb, var(--app-accent) 14%, transparent), transparent 30%),
+    linear-gradient(180deg, var(--app-bg) 0%, var(--app-bg-soft) 52%, var(--app-bg) 100%) !important;
+  color: var(--app-text) !important;
+}
+
+.app-page-bg {
+  background:
+    radial-gradient(circle at 50% -12%, color-mix(in srgb, var(--app-accent) 14%, transparent), transparent 30%),
+    linear-gradient(180deg, var(--app-bg) 0%, var(--app-bg-soft) 50%, var(--app-bg) 100%) !important;
+}
+
+.app-chrome-fade {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--app-bg) 98%, transparent) 0%,
+    color-mix(in srgb, var(--app-bg) 94%, transparent) 54%,
+    color-mix(in srgb, var(--app-bg) 18%, transparent) 100%
+  );
+  backdrop-filter: blur(12px);
+}
+
+.app-top-chrome {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform var(--motion-slow) var(--ease-smooth),
+    opacity var(--motion-medium) ease-out;
+  will-change: transform, opacity;
+}
+
+.app-top-chrome[data-state="hidden"] {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, calc(-100% - 0.75rem), 0);
+}
+
+.app-top-chrome[data-state="visible"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+}
+
+.app-shell-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--app-surface-strong);
+  border-color: color-mix(in srgb, var(--app-border-strong) 58%, transparent);
+  box-shadow: var(--app-shadow-chrome);
+  transition:
+    border-color var(--motion-medium) var(--ease-smooth),
+    box-shadow var(--motion-medium) var(--ease-smooth),
+    background-color var(--motion-medium) var(--ease-smooth);
+}
+
+.app-shell-card::before,
+.app-bottom-nav::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, white 22%, transparent), transparent 34%),
+    linear-gradient(315deg, color-mix(in srgb, var(--app-accent) 12%, transparent), transparent 42%),
+    linear-gradient(180deg, color-mix(in srgb, var(--app-border-strong) 30%, transparent), transparent 48%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 24%, transparent),
+    inset 1px 0 0 color-mix(in srgb, var(--app-accent-2) 8%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--app-accent) 10%, transparent);
+  opacity: 0.62;
+}
+
+.app-shell-card > *,
+.app-bottom-nav > * {
+  position: relative;
+  z-index: 1;
+}

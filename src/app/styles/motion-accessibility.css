@@ -1,0 +1,130 @@
+﻿/* Motion and view transitions */
+* {
+  transition-timing-function: var(--ease-smooth);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-group(*) {
+  z-index: 1;
+  animation-duration: var(--motion-slow);
+  animation-timing-function: var(--ease-smooth);
+}
+
+::view-transition-group(app-chrome) {
+  z-index: 20;
+  animation-duration: var(--motion-slow);
+  animation-timing-function: var(--ease-smooth);
+}
+
+::view-transition-old(*),
+::view-transition-new(*) {
+  mix-blend-mode: normal;
+  animation-duration: var(--motion-slow);
+  animation-timing-function: var(--ease-smooth);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up-soft {
+  from {
+    opacity: 0;
+    transform: translateY(0.85rem) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+
+/* Interaction and accessibility */
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.is-dragging-expense,
+.is-dragging-expense * {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+[data-expense-row],
+[data-expense-row] * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+[data-expense-row] {
+  touch-action: pan-y;
+}
+
+.input-control {
+  height: 3rem;
+  border-radius: var(--app-radius-md);
+  border: 1px solid var(--app-border);
+  background: var(--app-control);
+  color: var(--app-text);
+  padding-inline: 0.75rem;
+  font-size: 1rem;
+  outline: none;
+  transition:
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    background var(--motion-fast) ease;
+}
+
+.input-control::placeholder {
+  color: var(--app-text-subtle);
+}
+
+.input-control:focus {
+  border-color: var(--app-accent);
+  background: var(--app-control-hover);
+  box-shadow: var(--app-focus);
+}
+
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Platform behavior */
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
