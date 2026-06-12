@@ -58,6 +58,7 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
       const localStore = applyRuntimePreferences(loadExpenseStore());
       saveExpenseStore(localStore);
       if (active) onHydrate(localStore);
+      const revisionBeforeCloudHydration = localRevisionRef.current;
 
       if (!supabase) {
         markHydrated();
@@ -79,13 +80,12 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
         const cloud = await loadCloudStore(supabase, user);
         if (!active) return;
 
-        const revisionAtCloudLoad = localRevisionRef.current;
         const latestLocalStore = applyRuntimePreferences(loadExpenseStore());
         const { mergedStore, shouldHydrateReactState } = resolveHydratedStore({
           initialLocalStore: localStore,
           latestLocalStore,
           cloudStore: cloud.store,
-          revisionAtCloudLoad,
+          revisionAtCloudLoad: revisionBeforeCloudHydration,
           currentRevision: localRevisionRef.current,
         });
         const ownedStore = assignExpenseStoreOwner(mergedStore, user.id);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import webpush from "web-push";
 import { z } from "zod";
+import { createClient } from "@/utils/supabase/server";
 
 const subscriptionSchema = z.object({
   endpoint: z.string().url(),
@@ -16,6 +17,21 @@ export async function POST(request: Request) {
 
   if (!parsed.success) {
     return NextResponse.json({ error: "Suscripción push inválida." }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = supabase
+    ? await supabase.auth.getUser()
+    : { data: { user: null }, error: null };
+
+  if (userError || !user) {
+    return NextResponse.json(
+      { error: "Inicia sesión para enviar una notificación de prueba." },
+      { status: 401 },
+    );
   }
 
   const publicKey = process.env.VAPID_PUBLIC_KEY;

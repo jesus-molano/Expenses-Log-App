@@ -47,6 +47,8 @@ export function mergeExpenseStores(
   const normalizedLocalStore = normalizeExpenseStore(localStore);
   const normalizedCloudStore = normalizeExpenseStore(cloudStore);
 
+  // Best-effort whole-store merge: local values win, but deletes are not
+  // conflict-safe across devices without per-entity tombstones or revisions.
   return {
     categories: mergeById(
       normalizedCloudStore.categories,

@@ -46,7 +46,7 @@ describe("sync policy", () => {
     ]);
   });
 
-  it("keeps latest local state when a local edit happens during cloud load", () => {
+  it("keeps latest local state when a local edit happens during async cloud hydration", () => {
     const initialLocal = storeWithTemplate("initial");
     const latestLocal = storeWithTemplate("latest");
     const cloud = storeWithTemplate("cloud");
@@ -64,6 +64,9 @@ describe("sync policy", () => {
       "cloud",
       "latest",
     ]);
+    expect(result.mergedStore.templates.map((item) => item.id)).not.toContain(
+      "initial",
+    );
   });
 
   it("queues cloud save only when session is ready", () => {

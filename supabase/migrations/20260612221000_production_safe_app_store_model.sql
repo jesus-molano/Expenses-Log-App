@@ -1,9 +1,5 @@
 create extension if not exists pgcrypto;
 
-drop table if exists public.expense_occurrence_overrides cascade;
-drop table if exists public.expense_templates cascade;
-drop table if exists public.expense_categories cascade;
-
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text,
@@ -33,11 +29,9 @@ create table if not exists public.app_stores (
   updated_at timestamptz not null default now()
 );
 
-truncate table
-  public.push_subscriptions,
-  public.app_stores,
-  public.profiles
-restart identity cascade;
+grant select, insert, update, delete on table public.profiles to authenticated;
+grant select, insert, update, delete on table public.push_subscriptions to authenticated;
+grant select, insert, update, delete on table public.app_stores to authenticated;
 
 alter table public.profiles enable row level security;
 alter table public.push_subscriptions enable row level security;
