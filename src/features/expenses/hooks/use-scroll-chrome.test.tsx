@@ -32,6 +32,10 @@ describe("useScrollChrome", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    document.documentElement.classList.remove(
+      "is-dragging-expense",
+      "is-settling-expense-drag",
+    );
     document.body.replaceChildren();
   });
 
@@ -51,6 +55,30 @@ describe("useScrollChrome", () => {
     act(() => {
       window.dispatchEvent(new WheelEvent("wheel"));
       setScrollY(330);
+      window.dispatchEvent(new Event("scroll"));
+    });
+
+    await waitFor(() => expect(result.current.panelChrome).toBe("hidden"));
+  });
+
+  it("keeps chrome visible while drag settling scrolls the page", async () => {
+    document.body.innerHTML = '<header data-app-chrome="true"></header>';
+    const { result } = renderHook(() => useScrollChrome());
+
+    await waitFor(() => expect(result.current.panelChrome).toBe("visible"));
+
+    act(() => {
+      window.dispatchEvent(new WheelEvent("wheel"));
+      document.documentElement.classList.add("is-settling-expense-drag");
+      setScrollY(300);
+      window.dispatchEvent(new Event("scroll"));
+    });
+
+    await waitFor(() => expect(result.current.panelChrome).toBe("visible"));
+
+    act(() => {
+      document.documentElement.classList.remove("is-settling-expense-drag");
+      setScrollY(340);
       window.dispatchEvent(new Event("scroll"));
     });
 

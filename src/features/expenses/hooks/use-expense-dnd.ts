@@ -5,7 +5,7 @@ import {
   DragMoveEvent,
   DragStartEvent,
 } from "@dnd-kit/core";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ExpenseOccurrence } from "@/domain/types";
 import { getDropSortOrder } from "../lib/dnd-sort-order";
 import { rowFirstCollisionDetection } from "../lib/expense-dnd-collision";
@@ -18,6 +18,8 @@ import { useExpenseDndAutoScroll } from "./use-expense-dnd-auto-scroll";
 import { useExpenseDndPrompt } from "./use-expense-dnd-prompt";
 import { useExpenseDndSensors } from "./use-expense-dnd-sensors";
 export type { DropTarget } from "../lib/expense-dnd-target";
+
+const DRAG_SETTLE_LOCK_MS = 520;
 
 type UseExpenseDndOptions = {
   sections: TimelineSection[];
@@ -45,6 +47,17 @@ export function useExpenseDnd({
   const sensors = useExpenseDndSensors();
   const autoScrollWithDrag = useExpenseDndAutoScroll();
   const prompt = useExpenseDndPrompt(onMoveOccurrenceSeries);
+  const settleTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      clearDragSettleTimeout(settleTimeoutRef.current);
+      document.documentElement.classList.remove(
+        "is-dragging-expense",
+        "is-settling-expense-drag",
+      );
+    };
+  }, []);
 
   function scheduleMove(
     occurrence: ExpenseOccurrence,
@@ -67,6 +80,9 @@ export function useExpenseDnd({
       | undefined;
     if (!occurrence) return;
 
+    clearDragSettleTimeout(settleTimeoutRef.current);
+    settleTimeoutRef.current = null;
+    document.documentElement.classList.remove("is-settling-expense-drag");
     document.documentElement.classList.add("is-dragging-expense");
     setActiveOccurrence(occurrence);
     setDraggedOccurrence(occurrence);
@@ -91,6 +107,12 @@ export function useExpenseDnd({
 
   function cleanupDrag() {
     document.documentElement.classList.remove("is-dragging-expense");
+    document.documentElement.classList.add("is-settling-expense-drag");
+    clearDragSettleTimeout(settleTimeoutRef.current);
+    settleTimeoutRef.current = window.setTimeout(() => {
+      document.documentElement.classList.remove("is-settling-expense-drag");
+      settleTimeoutRef.current = null;
+    }, DRAG_SETTLE_LOCK_MS);
     setActiveOccurrence(null);
     setDraggedOccurrence(null);
     setActiveDropTarget(null);
@@ -112,4 +134,8 @@ export function useExpenseDnd({
       onDragCancel: cleanupDrag,
     },
   };
+}
+
+function clearDragSettleTimeout(timeoutId: number | null) {
+  if (timeoutId !== null) window.clearTimeout(timeoutId);
 }

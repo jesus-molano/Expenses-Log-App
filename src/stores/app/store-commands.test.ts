@@ -93,6 +93,35 @@ describe("store commands", () => {
     });
   });
 
+  it("does not persist weekend estimated charge dates as manual due dates", () => {
+    const added = addExpenseToStore(emptyStore, {
+      ...draft,
+      name: "Dazn",
+      dueDay: 13,
+      startDate: "2026-06-13",
+    });
+    const template = added.templates[0];
+    const estimatedWeekendOccurrence: ExpenseOccurrence = {
+      id: `${template.id}:2026-06-13`,
+      template,
+      occurrenceDate: "2026-06-13",
+      dueDate: "2026-06-15",
+      estimatedChargeDate: "2026-06-15",
+      estimatedChargeLabel: "estimado lunes 15",
+      status: "due",
+      sortOrder: 0,
+    };
+
+    const paid = togglePaidInStore(added, estimatedWeekendOccurrence);
+
+    expect(paid.overrides[0]).toMatchObject({
+      templateId: template.id,
+      occurrenceDate: "2026-06-13",
+      status: "paid",
+    });
+    expect(paid.overrides[0].dueDate).toBeUndefined();
+  });
+
   it("updates finance settings and preferences deterministically", () => {
     const financeStore = updateMoneySettingsInStore(emptyStore, {
       salaryAmount: 1800,
@@ -242,5 +271,31 @@ describe("store commands", () => {
       status: "paid",
       amountPaid: 35,
     });
+  });
+
+  it("normalizes estimated weekend charge dates from monthly expense edits", () => {
+    const added = addExpenseToStore(emptyStore, {
+      ...draft,
+      name: "Dazn",
+      dueDay: 13,
+      startDate: "2026-06-13",
+    });
+    const template = added.templates[0];
+    const updated = updateMonthlyExpenseOccurrenceInStore(added, {
+      templateId: template.id,
+      occurrenceDate: "2026-06-13",
+      dueDate: "2026-06-15",
+      name: "Dazn",
+      amount: 15,
+      categoryId: template.categoryId,
+      status: "due",
+    });
+
+    expect(updated.overrides[0]).toMatchObject({
+      templateId: template.id,
+      occurrenceDate: "2026-06-13",
+      status: "due",
+    });
+    expect(updated.overrides[0].dueDate).toBeUndefined();
   });
 });

@@ -23,15 +23,27 @@ export function useScrollChrome() {
       const viewportOffsetTop = viewport?.offsetTop ?? 0;
       const header = document.querySelector<HTMLElement>("[data-app-chrome]");
       const headerHeight = header?.getBoundingClientRect().height ?? 96;
+      const isChromeLockedByDrag =
+        document.documentElement.classList.contains("is-dragging-expense") ||
+        document.documentElement.classList.contains("is-settling-expense-drag");
       const snapshot = {
         scrollY: window.scrollY,
         viewportHeight,
         viewportWidth: window.innerWidth,
         documentHeight: document.documentElement.scrollHeight,
-        allowChromeReaction: hasUserScrollIntentRef.current,
+        allowChromeReaction:
+          hasUserScrollIntentRef.current && !isChromeLockedByDrag,
       };
       const nextState = hasScrollBaselineRef.current
-        ? reduceScrollChromeState(stateRef.current, snapshot)
+        ? isChromeLockedByDrag
+          ? {
+              ...stateRef.current,
+              panelChrome: "visible" as const,
+              lastScrollY: snapshot.scrollY,
+              direction: "idle" as const,
+              intentDistance: 0,
+            }
+          : reduceScrollChromeState(stateRef.current, snapshot)
         : {
             ...stateRef.current,
             panelChrome: "visible" as const,

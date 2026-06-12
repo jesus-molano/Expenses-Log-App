@@ -1,5 +1,5 @@
 import { startOfMonth } from "date-fns";
-import { buildDateWithDay, toDateOnly } from "@/domain/calendar";
+import { buildDateWithDay, estimateChargeDate, toDateOnly } from "@/domain/calendar";
 import type {
   CreateExpenseOptions,
   DraftExpense,
@@ -141,10 +141,10 @@ export function togglePaidInStore(
           userId: "demo",
           templateId: occurrence.template.id,
           occurrenceDate: occurrence.occurrenceDate,
-          dueDate:
-            occurrence.dueDate !== occurrence.occurrenceDate
-              ? occurrence.dueDate
-              : undefined,
+          dueDate: persistableDueDate(
+            occurrence.occurrenceDate,
+            occurrence.dueDate,
+          ),
           status: "paid" as const,
           paidAt: new Date().toISOString(),
           amountPaid: occurrence.template.amount,
@@ -178,10 +178,10 @@ export function skipOccurrenceInStore(
       userId: "demo",
       templateId: occurrence.template.id,
       occurrenceDate: occurrence.occurrenceDate,
-      dueDate:
-        occurrence.dueDate !== occurrence.occurrenceDate
-          ? occurrence.dueDate
-          : undefined,
+      dueDate: persistableDueDate(
+        occurrence.occurrenceDate,
+        occurrence.dueDate,
+      ),
       sortOrder: occurrence.override?.sortOrder,
       status: "skipped" as const,
       note: "Skipped from monthly plan occurrence",
@@ -266,7 +266,7 @@ export function updateMonthlyExpenseOccurrenceInStore(
     userId: existing?.userId ?? "demo",
     templateId: input.templateId,
     occurrenceDate: input.occurrenceDate,
-    dueDate: input.dueDate === input.occurrenceDate ? undefined : input.dueDate,
+    dueDate: persistableDueDate(input.occurrenceDate, input.dueDate),
     sortOrder: existing?.sortOrder,
     status: input.status,
     name: input.name.trim(),
@@ -296,4 +296,21 @@ export function updateMonthlyExpenseOccurrenceInStore(
       nextOverride,
     ],
   };
+}
+
+function persistableDueDate(
+  occurrenceDate: string,
+  dueDate: string,
+): string | undefined {
+  if (dueDate === occurrenceDate) return undefined;
+
+  const estimatedChargeDate = estimateChargeDate(occurrenceDate).date;
+  if (
+    estimatedChargeDate !== occurrenceDate &&
+    dueDate === estimatedChargeDate
+  ) {
+    return undefined;
+  }
+
+  return dueDate;
 }
