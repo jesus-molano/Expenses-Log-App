@@ -3,6 +3,7 @@ import {
   parseExpenseTextLocally,
   parseExpensesResponseSchema,
 } from "@/domain/parser";
+import { createClient } from "@/utils/supabase/server";
 import { z } from "zod";
 
 const requestSchema = z.object({
@@ -15,7 +16,8 @@ type LocalFallbackReason =
   | "quota_exhausted"
   | "ai_unavailable"
   | "invalid_response"
-  | "timeout";
+  | "timeout"
+  | "unauthenticated";
 
 const requestBuckets = new Map<string, number[]>();
 const GEMINI_REQUESTS_PER_MINUTE = 20;
@@ -33,16 +35,7 @@ function localResponse(text: string, reason: LocalFallbackReason) {
   });
 }
 
-function clientKey(request: Request) {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "local"
-  );
-}
-
-function isRateLimited(request: Request) {
-  const key = clientKey(request);
+function isRateLimited(key: string) {
   const now = Date.now();
   const windowStart = now - 60_000;
   const recent = (requestBuckets.get(key) ?? []).filter(
@@ -89,7 +82,19 @@ export async function POST(request: Request) {
     return localResponse(parsedRequest.data.text, "missing_key");
   }
 
-  if (isRateLimited(request)) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = supabase
+    ? await supabase.auth.getUser()
+    : { data: { user: null }, error: null };
+
+  if (userError || !user) {
+    return localResponse(parsedRequest.data.text, "unauthenticated");
+  }
+
+  if (isRateLimited(`user:${user.id}`)) {
     return localResponse(parsedRequest.data.text, "rate_limited");
   }
 

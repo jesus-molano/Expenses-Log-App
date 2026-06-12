@@ -119,6 +119,12 @@ export function deleteIncomeEventFromStore(
         (event) => event.id !== eventId,
       ),
     },
+    deleted: {
+      ...store.deleted,
+      incomeEvents: Array.from(
+        new Set([...(store.deleted?.incomeEvents ?? []), eventId]),
+      ),
+    },
   };
 }
 

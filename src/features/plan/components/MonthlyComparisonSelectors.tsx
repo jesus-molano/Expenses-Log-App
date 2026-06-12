@@ -113,6 +113,7 @@ function SelectorOption({
   return (
     <button
       type="button"
+      role="menuitem"
       onClick={onClick}
       className="app-select-menu-option flex h-9 w-full items-center justify-between gap-3 rounded-[var(--app-radius-sm)] px-3 text-left text-sm font-semibold"
       data-selected={selected ? "true" : "false"}

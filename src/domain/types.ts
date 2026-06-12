@@ -153,6 +153,12 @@ export type ExpenseStore = {
   templates: ExpenseTemplate[];
   overrides: ExpenseOccurrenceOverride[];
   finance: FinanceStore;
+  deleted?: {
+    categories?: string[];
+    templates?: string[];
+    overrides?: string[];
+    incomeEvents?: string[];
+  };
   preferences?: {
     theme: AppTheme;
     language?: AppLanguage;

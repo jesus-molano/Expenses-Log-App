@@ -62,7 +62,10 @@ export function ExpenseFormSheet({
   }
 
   return (
-    <Sheet onBackdropClick={onClose}>
+    <Sheet
+      ariaLabel={t("expenses.newExpense", language)}
+      onBackdropClick={onClose}
+    >
       <form onSubmit={submit} className="contents">
         <div className="app-sheet-header sticky top-0 z-10 px-5 pb-3 pt-3">
           <div className="app-sheet-handle mx-auto mb-3 sm:hidden" />

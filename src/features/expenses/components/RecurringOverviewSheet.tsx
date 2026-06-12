@@ -25,6 +25,7 @@ export function RecurringOverviewSheet({
 
   return (
     <Sheet
+      ariaLabel={t("expenses.activeSeries", language)}
       onBackdropClick={onClose}
       contentClassName="max-h-[88dvh] sm:max-w-lg"
     >

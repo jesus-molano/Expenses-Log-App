@@ -56,7 +56,10 @@ export function QuickCapture({
   if (!open) return null;
 
   return (
-    <Sheet onBackdropClick={onClose}>
+    <Sheet
+      ariaLabel={t("expenses.addExpense", language)}
+      onBackdropClick={onClose}
+    >
       <section>
         <div className="app-sheet-header sticky top-0 z-10 px-5 pb-3 pt-3">
           <div className="app-sheet-handle mx-auto mb-3 sm:hidden" />

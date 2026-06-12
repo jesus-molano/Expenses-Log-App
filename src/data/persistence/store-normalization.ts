@@ -8,6 +8,7 @@ const STORE_KEYS = [
   "templates",
   "overrides",
   "finance",
+  "deleted",
   "preferences",
 ] as const;
 
@@ -35,6 +36,23 @@ function normalizeFinanceStore(value: unknown): FinanceStore {
   };
 }
 
+function normalizeDeletedIds(value: unknown): NonNullable<ExpenseStore["deleted"]> {
+  const deleted = isRecord(value) ? value : {};
+
+  return {
+    categories: stringArray(deleted.categories),
+    templates: stringArray(deleted.templates),
+    overrides: stringArray(deleted.overrides),
+    incomeEvents: stringArray(deleted.incomeEvents),
+  };
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? Array.from(new Set(value.filter((item): item is string => typeof item === "string")))
+    : [];
+}
+
 export function normalizeExpenseStore(value: unknown): ExpenseStore {
   const store = isRecord(value) ? value : {};
   const preferences = isRecord(store.preferences) ? store.preferences : {};
@@ -50,6 +68,7 @@ export function normalizeExpenseStore(value: unknown): ExpenseStore {
       ? (store.overrides as ExpenseStore["overrides"])
       : [],
     finance: normalizeFinanceStore(store.finance),
+    deleted: normalizeDeletedIds(store.deleted),
     preferences: {
       theme: normalizeAppTheme(preferences.theme),
       language: normalizeAppLanguage(preferences.language),

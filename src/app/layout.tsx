@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { cookies } from "next/headers";
 import { PwaRegister } from "@/app/providers/PwaRegister";
 import { ThemeApplier } from "@/app/providers/ThemeApplier";
-import { normalizeAppLanguage } from "@/shared/i18n";
-import { normalizeAppTheme } from "@/shared/theme";
+import { ExpenseStoreProvider } from "@/stores/app/use-expense-store";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -46,25 +44,21 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = await cookies();
-  const theme = normalizeAppTheme(cookieStore.get("expense-theme")?.value);
-  const language = normalizeAppLanguage(cookieStore.get("expense-language")?.value);
-
   return (
     <html
-      lang={language}
-      data-theme={theme}
+      lang="es"
+      data-theme="dark"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <ThemeApplier />
         <PwaRegister />
-        {children}
+        <ExpenseStoreProvider>{children}</ExpenseStoreProvider>
       </body>
     </html>
   );

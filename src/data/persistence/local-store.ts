@@ -46,26 +46,32 @@ export function mergeExpenseStores(
   if (!cloudStore) return localStore;
   const normalizedLocalStore = normalizeExpenseStore(localStore);
   const normalizedCloudStore = normalizeExpenseStore(cloudStore);
+  const deleted = mergeDeletedIds(
+    normalizedCloudStore.deleted,
+    normalizedLocalStore.deleted,
+  );
 
-  // Best-effort whole-store merge: local values win, but deletes are not
-  // conflict-safe across devices without per-entity tombstones or revisions.
   return {
     categories: mergeById(
       normalizedCloudStore.categories,
       normalizedLocalStore.categories,
+      deleted.categories,
     ),
     templates: mergeById(
       normalizedCloudStore.templates,
       normalizedLocalStore.templates,
+      deleted.templates,
     ),
     overrides: mergeById(
       normalizedCloudStore.overrides,
       normalizedLocalStore.overrides,
+      deleted.overrides,
     ),
     finance: {
       incomeEvents: mergeById(
         normalizedCloudStore.finance.incomeEvents,
         normalizedLocalStore.finance.incomeEvents,
+        deleted.incomeEvents,
       ),
       monthlySalary: {
         ...normalizedCloudStore.finance.monthlySalary,
@@ -89,12 +95,41 @@ export function mergeExpenseStores(
         normalizedCloudStore.preferences?.language ??
         "es",
     },
+    deleted,
   };
 }
 
-function mergeById<T extends { id: string }>(base: T[], incoming: T[]): T[] {
+function mergeById<T extends { id: string }>(
+  base: T[],
+  incoming: T[],
+  deletedIds: string[] = [],
+): T[] {
+  const deleted = new Set(deletedIds);
   const map = new Map<string, T>();
-  for (const item of base) map.set(item.id, item);
-  for (const item of incoming) map.set(item.id, item);
+  for (const item of base) {
+    if (!deleted.has(item.id)) map.set(item.id, item);
+  }
+  for (const item of incoming) {
+    if (!deleted.has(item.id)) map.set(item.id, item);
+  }
   return Array.from(map.values());
+}
+
+function mergeDeletedIds(
+  base: ExpenseStore["deleted"],
+  incoming: ExpenseStore["deleted"],
+): NonNullable<ExpenseStore["deleted"]> {
+  return {
+    categories: mergeIdLists(base?.categories, incoming?.categories),
+    templates: mergeIdLists(base?.templates, incoming?.templates),
+    overrides: mergeIdLists(base?.overrides, incoming?.overrides),
+    incomeEvents: mergeIdLists(base?.incomeEvents, incoming?.incomeEvents),
+  };
+}
+
+function mergeIdLists(
+  base: string[] | undefined,
+  incoming: string[] | undefined,
+): string[] {
+  return Array.from(new Set([...(base ?? []), ...(incoming ?? [])]));
 }

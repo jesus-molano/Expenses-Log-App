@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { createContext, createElement, useCallback, useContext, useState } from "react";
 import { emptyStore } from "@/domain/seed";
 import type {
   AppLanguage,
@@ -39,7 +39,31 @@ import type {
 } from "./store-types";
 import { useStorePersistence } from "./use-store-persistence";
 
+type ExpenseStoreContextValue = ReturnType<typeof useExpenseStoreValue>;
+
+const ExpenseStoreContext = createContext<ExpenseStoreContextValue | null>(null);
+
+export function ExpenseStoreProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const value = useExpenseStoreValue();
+
+  return createElement(ExpenseStoreContext.Provider, { value }, children);
+}
+
 export function useExpenseStore() {
+  const context = useContext(ExpenseStoreContext);
+
+  if (!context) {
+    throw new Error("useExpenseStore must be used within ExpenseStoreProvider.");
+  }
+
+  return context;
+}
+
+function useExpenseStoreValue() {
   const [store, setStore] = useState<ExpenseStore>(() => emptyStore);
   const hydrateStore = useCallback((nextStore: ExpenseStore) => {
     setStore(nextStore);

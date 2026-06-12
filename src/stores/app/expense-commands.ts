@@ -78,12 +78,21 @@ export function deleteExpenseFromStore(
   store: ExpenseStore,
   templateId: string,
 ): ExpenseStore {
+  const templateOverrideIds = store.overrides
+    .filter((override) => override.templateId === templateId)
+    .map((override) => override.id);
+
   return {
     ...store,
     templates: store.templates.filter((template) => template.id !== templateId),
     overrides: store.overrides.filter(
       (override) => override.templateId !== templateId,
     ),
+    deleted: {
+      ...store.deleted,
+      templates: mergeDeletedIds(store.deleted?.templates, [templateId]),
+      overrides: mergeDeletedIds(store.deleted?.overrides, templateOverrideIds),
+    },
   };
 }
 
@@ -93,6 +102,21 @@ export function clearExpensesFromStore(store: ExpenseStore): ExpenseStore {
     categories: [],
     templates: [],
     overrides: [],
+    deleted: {
+      ...store.deleted,
+      categories: mergeDeletedIds(
+        store.deleted?.categories,
+        store.categories.map((category) => category.id),
+      ),
+      templates: mergeDeletedIds(
+        store.deleted?.templates,
+        store.templates.map((template) => template.id),
+      ),
+      overrides: mergeDeletedIds(
+        store.deleted?.overrides,
+        store.overrides.map((override) => override.id),
+      ),
+    },
   };
 }
 
@@ -128,6 +152,13 @@ export function togglePaidInStore(
       ];
 
   return { ...store, overrides };
+}
+
+function mergeDeletedIds(
+  current: string[] | undefined,
+  next: string[],
+): string[] {
+  return Array.from(new Set([...(current ?? []), ...next]));
 }
 
 export function skipOccurrenceInStore(

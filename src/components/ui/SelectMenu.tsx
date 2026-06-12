@@ -35,11 +35,14 @@ export function SelectMenu<T extends string | number>({
       label={label ?? selected?.label ?? String(value)}
       leading={selected?.leading}
       align={align}
+      menuRole="listbox"
     >
       {options.map((option) => (
         <button
           key={option.value}
           type="button"
+          role="option"
+          aria-selected={value === option.value}
           onClick={() => {
             onChange(option.value);
             onOpenChange(false);

@@ -14,7 +14,8 @@ type LocalFallbackReason =
   | "quota_exhausted"
   | "ai_unavailable"
   | "invalid_response"
-  | "timeout";
+  | "timeout"
+  | "unauthenticated";
 
 type ParseResponse = {
   provider?: "gemini" | "local";
@@ -70,6 +71,7 @@ export function useQuickExpenseParser(language: AppLanguage) {
         ai_unavailable: t("expenses.aiUnavailable", language),
         invalid_response: t("expenses.aiInvalidResponse", language),
         timeout: t("expenses.aiTimeout", language),
+        unauthenticated: t("expenses.aiRequiresLogin", language),
       }[fallbackReason]
     : t("expenses.aiLocal", language);
 

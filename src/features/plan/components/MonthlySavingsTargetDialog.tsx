@@ -23,7 +23,11 @@ export function MonthlySavingsTargetDialog({
   onSubmit,
 }: MonthlySavingsTargetDialogProps) {
   return (
-    <Sheet contentClassName="sm:max-w-sm">
+    <Sheet
+      ariaLabel={t("money.editMonthSavings", language)}
+      contentClassName="sm:max-w-sm"
+      onBackdropClick={onClose}
+    >
       <form onSubmit={onSubmit} className="p-5">
         <div className="app-sheet-handle mx-auto mb-3 sm:hidden" />
         <header className="flex items-start justify-between gap-3">

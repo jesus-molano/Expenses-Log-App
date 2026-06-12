@@ -40,7 +40,10 @@ export function PlanSettingsSheet({
   onSubmit,
 }: PlanSettingsSheetProps) {
   return (
-    <Sheet onBackdropClick={onClose}>
+    <Sheet
+      ariaLabel={t("money.configureMoney", language)}
+      onBackdropClick={onClose}
+    >
       <form onSubmit={onSubmit} className="p-5">
         <div className="app-sheet-handle mx-auto mb-3 sm:hidden" />
         <PlanSettingsHeader language={language} onClose={onClose} />

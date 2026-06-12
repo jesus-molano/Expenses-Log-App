@@ -1,5 +1,7 @@
 const CACHE_NAME = "expense-reminders-v5";
+const OFFLINE_URL = "/";
 const APP_SHELL_ASSETS = [
+  OFFLINE_URL,
   "/manifest.webmanifest?v=5",
   "/icon-192.png?v=5",
   "/icon-512.png?v=5",
@@ -33,7 +35,19 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   if (event.request.mode === "navigate") {
-    event.respondWith(fetch(event.request).catch(() => caches.match("/")));
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          if (response.ok) {
+            event.waitUntil(
+              caches.open(CACHE_NAME).then((cache) => cache.put(OFFLINE_URL, copy)),
+            );
+          }
+          return response;
+        })
+        .catch(() => caches.match(OFFLINE_URL)),
+    );
     return;
   }
 

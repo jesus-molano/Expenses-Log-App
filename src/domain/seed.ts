@@ -6,6 +6,12 @@ export const emptyStore: ExpenseStore = {
   templates: [],
   overrides: [],
   finance: emptyFinanceStore,
+  deleted: {
+    categories: [],
+    templates: [],
+    overrides: [],
+    incomeEvents: [],
+  },
   preferences: {
     theme: "dark",
     language: "es",
@@ -65,6 +71,12 @@ export const demoStore: ExpenseStore = {
     paid("ovr-gym-jun", "exp-gym", "2026-06-01", 50),
   ],
   finance: defaultFinanceStore,
+  deleted: {
+    categories: [],
+    templates: [],
+    overrides: [],
+    incomeEvents: [],
+  },
   preferences: {
     theme: "dark",
     language: "es",

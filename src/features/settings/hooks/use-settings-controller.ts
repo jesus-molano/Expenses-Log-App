@@ -8,7 +8,8 @@ import {
   assignExpenseStoreOwner,
   normalizeImportedExpenseStore,
 } from "@/data/persistence/store-normalization";
-import { t } from "@/shared/i18n";
+import { persistLanguagePreference, t } from "@/shared/i18n";
+import { applyAppTheme } from "@/shared/theme";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { createClient } from "@/utils/supabase/client";
 import { useNotificationSettings } from "./use-notification-settings";
@@ -73,9 +74,12 @@ export function useSettingsController() {
     if (!file) return;
     try {
       const text = await file.text();
+      const importedStore = normalizeImportedExpenseStore(JSON.parse(text));
+      applyAppTheme(importedStore.preferences?.theme ?? "dark");
+      persistLanguagePreference(importedStore.preferences?.language ?? "es");
       persist(
         assignExpenseStoreOwner(
-          normalizeImportedExpenseStore(JSON.parse(text)),
+          importedStore,
           user?.id,
         ),
       );

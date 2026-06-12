@@ -137,6 +137,42 @@ test("opens plan and configuration sheet", async ({ page }) => {
   await expect(page.getByText("450,00 €").first()).toBeVisible();
 });
 
+test("sheet closes with Escape and restores focus", async ({ page }) => {
+  await loadDemoStore(page);
+  await page.goto("/");
+
+  const addButton = page.getByRole("button", { name: "Añadir gasto" });
+  await addButton.click();
+
+  const dialog = page.getByRole("dialog", { name: "Añadir gasto" });
+  await expect(dialog).toBeVisible();
+
+  await page.keyboard.press("Escape");
+
+  await expect(dialog).toHaveCount(0);
+  await expect(addButton).toBeFocused();
+});
+
+test("compact menus support keyboard navigation and Escape", async ({ page }) => {
+  await loadDemoStore(page);
+  await page.goto("/settings");
+
+  const languageButton = page.getByRole("button", { name: "ES" });
+  await languageButton.focus();
+  await page.keyboard.press("ArrowDown");
+
+  const languageMenu = page.getByRole("listbox");
+  await expect(languageMenu).toBeVisible();
+  await expect(page.getByRole("option", { name: /Español/ })).toBeFocused();
+
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("option", { name: /English/ })).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(languageMenu).toHaveCount(0);
+  await expect(languageButton).toBeFocused();
+});
+
 test("deletes an expense from the edit screen", async ({ page }) => {
   await loadDemoStore(page);
   await page.goto("/expenses/exp-game-pass");
