@@ -1,10 +1,10 @@
-const CACHE_NAME = "expense-reminders-v4";
+const CACHE_NAME = "expense-reminders-v5";
 const APP_SHELL_ASSETS = [
-  "/manifest.webmanifest?v=4",
-  "/icon-192.png?v=4",
-  "/icon-512.png?v=4",
-  "/apple-touch-icon.png?v=4",
-  "/favicon.ico?v=4",
+  "/manifest.webmanifest?v=5",
+  "/icon-192.png?v=5",
+  "/icon-512.png?v=5",
+  "/apple-touch-icon.png?v=5",
+  "/favicon.ico?v=5",
 ];
 
 self.addEventListener("install", (event) => {
@@ -72,8 +72,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icon-192.png?v=4",
-      badge: "/icon-192.png?v=4",
+      icon: "/icon-192.png?v=5",
+      badge: "/icon-192.png?v=5",
       data: { url: data.url ?? "/" },
     }),
   );

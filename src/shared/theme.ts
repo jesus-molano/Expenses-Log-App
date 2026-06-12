@@ -2,6 +2,10 @@ import type { AppTheme } from "@/domain/types";
 
 export const DEFAULT_THEME: AppTheme = "dark";
 
+export function normalizeAppTheme(value: unknown): AppTheme {
+  return isAppTheme(value) ? value : DEFAULT_THEME;
+}
+
 export function setThemeDom(theme: AppTheme) {
   if (typeof document === "undefined") return;
   document.documentElement.dataset.theme = theme;

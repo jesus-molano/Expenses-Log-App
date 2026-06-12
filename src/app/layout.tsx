@@ -3,7 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 import { PwaRegister } from "@/app/providers/PwaRegister";
 import { ThemeApplier } from "@/app/providers/ThemeApplier";
-import type { AppLanguage, AppTheme } from "@/domain/types";
+import { normalizeAppLanguage } from "@/shared/i18n";
+import { normalizeAppTheme } from "@/shared/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -45,27 +46,14 @@ export const metadata: Metadata = {
   },
 };
 
-function readCookieTheme(value: string | undefined): AppTheme {
-  return value === "dark" ||
-    value === "rose-pine" ||
-    value === "catppuccin" ||
-    value === "light"
-    ? value
-    : "dark";
-}
-
-function readCookieLanguage(value: string | undefined): AppLanguage {
-  return value === "en" ? "en" : "es";
-}
-
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
-  const theme = readCookieTheme(cookieStore.get("expense-theme")?.value);
-  const language = readCookieLanguage(cookieStore.get("expense-language")?.value);
+  const theme = normalizeAppTheme(cookieStore.get("expense-theme")?.value);
+  const language = normalizeAppLanguage(cookieStore.get("expense-language")?.value);
 
   return (
     <html

@@ -5,6 +5,10 @@ export { messages };
 
 export const DEFAULT_LANGUAGE: AppLanguage = "es";
 
+export function normalizeAppLanguage(value: unknown): AppLanguage {
+  return isAppLanguage(value) ? value : DEFAULT_LANGUAGE;
+}
+
 type MessagePath<T> = T extends string
   ? never
   : {

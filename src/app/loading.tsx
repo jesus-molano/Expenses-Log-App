@@ -1,14 +1,9 @@
-﻿import { cookies } from "next/headers";
-import type { AppLanguage } from "@/domain/types";
-import { t } from "@/shared/i18n";
-
-function readCookieLanguage(value: string | undefined): AppLanguage {
-  return value === "en" ? "en" : "es";
-}
+import { cookies } from "next/headers";
+import { normalizeAppLanguage, t } from "@/shared/i18n";
 
 export default async function Loading() {
   const cookieStore = await cookies();
-  const language = readCookieLanguage(cookieStore.get("expense-language")?.value);
+  const language = normalizeAppLanguage(cookieStore.get("expense-language")?.value);
 
   return (
     <main className="app-page grid min-h-dvh place-items-center px-6 text-center">
@@ -21,4 +16,3 @@ export default async function Loading() {
     </main>
   );
 }
-
