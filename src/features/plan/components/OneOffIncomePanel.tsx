@@ -1,6 +1,4 @@
-﻿"use client";
-
-import type { FormEvent } from "react";
+﻿import type { FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatCurrency } from "@/domain/calendar";

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseServiceClient } from "@/data/supabase/admin-client";
+import { toDatabaseUuid } from "@/data/supabase/database.types";
 import { createClient } from "@/utils/supabase/server";
 
 const subscriptionSchema = z.object({
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
   }
 
   const { error } = await admin.from("push_subscriptions").upsert({
-    user_id: user.id,
+    user_id: toDatabaseUuid(user.id),
     endpoint: parsed.data.endpoint,
     p256dh: parsed.data.keys.p256dh,
     auth: parsed.data.keys.auth,
@@ -115,7 +116,7 @@ export async function DELETE(request: Request) {
   const { error } = await admin
     .from("push_subscriptions")
     .delete()
-    .eq("user_id", user.id)
+    .eq("user_id", toDatabaseUuid(user.id))
     .eq("endpoint", parsed.data.endpoint);
 
   if (error) {

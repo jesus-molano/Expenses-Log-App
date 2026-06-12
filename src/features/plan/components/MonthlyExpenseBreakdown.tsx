@@ -1,6 +1,4 @@
-"use client";
-
-import { TrendingDown } from "lucide-react";
+﻿import { TrendingDown } from "lucide-react";
 import type {
   AppLanguage,
   ExpenseCategory,
@@ -50,8 +48,8 @@ export function MonthlyExpenseBreakdown({
     >
       <div className="app-monthly-table" data-tone="expense">
         <div className="app-monthly-table-head">
-          <span>{language === "en" ? "Expense" : "Gasto"}</span>
-          <span>{language === "en" ? "Amount" : "Importe"}</span>
+          <span>{t("money.expenseItem", language)}</span>
+          <span>{t("money.amountColumn", language)}</span>
           <span aria-hidden="true" />
           <span aria-hidden="true" />
         </div>

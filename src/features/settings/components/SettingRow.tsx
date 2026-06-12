@@ -1,6 +1,4 @@
-"use client";
-
-import { ListItem } from "@/components/ui/ListItem";
+﻿import { ListItem } from "@/components/ui/ListItem";
 
 type SettingRowProps = {
   icon: React.ReactNode;

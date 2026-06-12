@@ -1,6 +1,4 @@
-"use client";
-
-import { Settings2 } from "lucide-react";
+﻿import { Settings2 } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";

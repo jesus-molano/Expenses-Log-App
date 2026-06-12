@@ -1,6 +1,4 @@
-"use client";
-
-import { CompactMenu } from "./CompactMenu";
+﻿import { CompactMenu } from "./CompactMenu";
 
 export type SelectMenuOption<T extends string | number> = {
   value: T;

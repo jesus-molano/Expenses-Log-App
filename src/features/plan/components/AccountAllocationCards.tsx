@@ -1,6 +1,4 @@
-"use client";
-
-import type { AccountAllocation } from "@/domain/finance";
+﻿import type { AccountAllocation } from "@/domain/finance";
 import type { AppLanguage } from "@/domain/types";
 import { AccountAllocationCard } from "@/features/plan/components/accounts/AccountAllocationCard";
 import { t } from "@/shared/i18n";

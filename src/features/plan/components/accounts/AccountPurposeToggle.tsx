@@ -1,6 +1,4 @@
-"use client";
-
-import type { AppLanguage, PlanAccountPurpose } from "@/domain/types";
+﻿import type { AppLanguage, PlanAccountPurpose } from "@/domain/types";
 import {
   AccountPurposeIcon,
   accountPurposeLabel,

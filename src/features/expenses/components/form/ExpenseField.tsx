@@ -1,6 +1,4 @@
-"use client";
-
-import { Field } from "@/components/ui/Field";
+﻿import { Field } from "@/components/ui/Field";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 

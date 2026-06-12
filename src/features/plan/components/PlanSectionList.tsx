@@ -1,6 +1,4 @@
-"use client";
-
-import type { ComponentType, ReactNode } from "react";
+﻿import type { ComponentType, ReactNode } from "react";
 import { Surface } from "@/components/ui/Surface";
 
 export function PlanSectionList({

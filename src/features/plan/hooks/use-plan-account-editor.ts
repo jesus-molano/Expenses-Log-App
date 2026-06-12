@@ -5,7 +5,8 @@ import {
   normalizeUniquePlanAccountPurposes,
   sortPlanAccountPurposes,
 } from "@/domain/plan-accounts";
-import type { PlanAccount, PlanAccountPurpose } from "@/domain/types";
+import type { AppLanguage, PlanAccount, PlanAccountPurpose } from "@/domain/types";
+import { t } from "@/shared/i18n";
 
 export function togglePlanAccountPurpose(
   accounts: PlanAccount[],
@@ -63,9 +64,11 @@ export function removePlanAccount(
 
 export function usePlanAccountEditor({
   accounts,
+  language,
   onAccountsChange,
 }: {
   accounts: PlanAccount[];
+  language: AppLanguage;
   onAccountsChange: (value: PlanAccount[]) => void;
 }) {
   function updateAccount(accountId: string, nextAccount: PlanAccount) {
@@ -93,7 +96,7 @@ export function usePlanAccountEditor({
       ...accounts,
       {
         id: `acct-${crypto.randomUUID()}`,
-        name: `Cuenta ${accounts.length + 1}`,
+        name: `${t("money.accountLabel", language)} ${accounts.length + 1}`,
         purposes: [],
       },
     ]);

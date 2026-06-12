@@ -1,4 +1,6 @@
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
+import type { AppSupabaseClient, Json } from "@/data/supabase/database.types";
+import { toDatabaseUuid } from "@/data/supabase/database.types";
 import type { ExpenseStore } from "@/domain/types";
 
 const METADATA_STORE_KEY = "expense_store";
@@ -14,13 +16,13 @@ export type CloudStoreSaveResult = {
 };
 
 export async function loadCloudStore(
-  supabase: SupabaseClient,
+  supabase: AppSupabaseClient,
   user: User,
 ): Promise<CloudStoreResult> {
   const { data, error } = await supabase
     .from("app_stores")
     .select("store")
-    .eq("user_id", user.id)
+    .eq("user_id", toDatabaseUuid(user.id))
     .maybeSingle();
 
   if (!error) {
@@ -41,13 +43,13 @@ export async function loadCloudStore(
 }
 
 export async function saveCloudStore(
-  supabase: SupabaseClient,
+  supabase: AppSupabaseClient,
   user: User,
   store: ExpenseStore,
 ): Promise<CloudStoreSaveResult> {
   const { error } = await supabase.from("app_stores").upsert({
-    user_id: user.id,
-    store,
+    user_id: toDatabaseUuid(user.id),
+    store: store as unknown as Json,
     updated_at: new Date().toISOString(),
   });
 
@@ -60,7 +62,7 @@ export async function saveCloudStore(
   return { mode: "unavailable" };
 }
 
-export async function clearOversizedMetadata(supabase: SupabaseClient) {
+export async function clearOversizedMetadata(supabase: AppSupabaseClient) {
   const { error } = await supabase.auth.updateUser({
     data: {
       [METADATA_STORE_KEY]: null,

@@ -1,14 +1,15 @@
 "use client";
 
 import { useCallback, useRef, type RefObject } from "react";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
+import type { AppSupabaseClient } from "@/data/supabase/database.types";
 import type { ExpenseStore } from "@/domain/types";
 import { saveCloudStore } from "@/data/persistence/cloud-store";
 import { t, type TranslationKey } from "@/shared/i18n";
 import { shouldQueueCloudSave } from "./sync-policy";
 
 type CloudSaveQueueOptions = {
-  supabaseRef: RefObject<SupabaseClient | null>;
+  supabaseRef: RefObject<AppSupabaseClient | null>;
   userRef: RefObject<User | null>;
   hydratedRef: RefObject<boolean>;
   markSyncing: (message: string) => void;

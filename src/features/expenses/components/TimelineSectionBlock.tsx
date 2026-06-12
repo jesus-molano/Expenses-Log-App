@@ -1,6 +1,4 @@
-"use client";
-
-import type { Locale } from "date-fns";
+﻿import type { Locale } from "date-fns";
 import type {
   AppLanguage,
   ExpenseCategory,

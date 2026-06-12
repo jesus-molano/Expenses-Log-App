@@ -53,6 +53,26 @@ test("starts empty for a new local user", async ({ page }) => {
 
 test("creates and pays a parsed recurring expense", async ({ page }) => {
   await loadDemoStore(page);
+  await page.route("**/api/ai/parse-expenses", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        provider: "local",
+        reason: "missing_key",
+        expenses: [
+          {
+            name: "Spotify el musica",
+            description: "Spotify 10,99 mensual el dia 12 musica",
+            amount: 10.99,
+            categoryName: "General",
+            startDate: "2026-06-12",
+            dueDay: 12,
+            recurrence: { frequency: "monthly" },
+          },
+        ],
+      }),
+    });
+  });
   await page.goto("/");
 
   await expect(page.getByText("Por pagar")).toBeVisible();

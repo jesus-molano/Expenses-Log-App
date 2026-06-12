@@ -1,6 +1,4 @@
-"use client";
-
-import { Home } from "lucide-react";
+﻿import { Home } from "lucide-react";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 

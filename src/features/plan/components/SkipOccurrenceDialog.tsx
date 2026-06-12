@@ -1,6 +1,4 @@
-"use client";
-
-import { Trash2 } from "lucide-react";
+﻿import { Trash2 } from "lucide-react";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
 import { t } from "@/shared/i18n";

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { toDateOnly } from "./calendar";
 import { parseExpenseTextLocally } from "./parser";
 
 describe("parseExpenseTextLocally", () => {
@@ -34,6 +35,6 @@ describe("parseExpenseTextLocally", () => {
       categoryName: "Vehiculo",
       recurrence: { frequency: "once" },
     });
-    expect(expense.startDate).toMatch(/^\d{4}-\d{2}-12$/);
+    expect(expense.startDate).toBe(toDateOnly(new Date()));
   });
 });

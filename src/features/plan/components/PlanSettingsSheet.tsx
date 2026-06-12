@@ -1,6 +1,4 @@
-﻿"use client";
-
-import type { FormEvent } from "react";
+﻿import type { FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Sheet } from "@/components/ui/Sheet";

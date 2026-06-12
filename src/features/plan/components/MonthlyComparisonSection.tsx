@@ -1,6 +1,4 @@
-"use client";
-
-import type {
+﻿import type {
   AppLanguage,
   ExpenseCategory,
   ExpenseOccurrence,

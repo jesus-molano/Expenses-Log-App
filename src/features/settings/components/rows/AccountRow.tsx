@@ -1,6 +1,4 @@
-"use client";
-
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Cloud, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { t } from "@/shared/i18n";

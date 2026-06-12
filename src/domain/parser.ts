@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { buildDateWithDay, toDateOnly } from "./calendar";
+import { toDateOnly } from "./calendar";
 import type { DraftExpense, RecurrenceRule } from "./types";
 
 export const draftExpenseSchema = z.object({
@@ -87,7 +87,7 @@ export function parseExpenseTextLocally(input: string): DraftExpense[] {
   const dueDay = dayMatch
     ? Math.min(Number(dayMatch[1]), 31)
     : new Date().getDate();
-  const startDate = toDateOnly(buildDateWithDay(new Date(), dueDay));
+  const startDate = toDateOnly(new Date());
   const name = normalized
     .replace(amountMatch?.[0] ?? "", "")
     .replace(/puntual|unico|único|una\s+vez|mensual|trimestral|anual|cada\s+\d+\s+\w+/gi, "")

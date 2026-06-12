@@ -1,6 +1,4 @@
-"use client";
-
-import { TrendingUp } from "lucide-react";
+﻿import { TrendingUp } from "lucide-react";
 import type { AppLanguage, IncomeEvent } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { IncomeEventRow } from "./IncomeEventRow";
@@ -30,8 +28,8 @@ export function MonthlyIncomeEventsList({
     >
       <div className="app-monthly-table" data-tone="success">
         <div className="app-monthly-table-head">
-          <span>{language === "en" ? "Income" : "Ingreso"}</span>
-          <span>{language === "en" ? "Amount" : "Importe"}</span>
+          <span>{t("money.incomeItem", language)}</span>
+          <span>{t("money.amountColumn", language)}</span>
           <span aria-hidden="true" />
           <span aria-hidden="true" />
         </div>

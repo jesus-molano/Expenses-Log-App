@@ -1,6 +1,4 @@
-"use client";
-
-type DropIndicatorProps = {
+﻿type DropIndicatorProps = {
   position: "before" | "after";
 };
 

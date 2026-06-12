@@ -1,6 +1,4 @@
-"use client";
-
-import { Pencil, Plus, Sparkles, X } from "lucide-react";
+﻿import { Pencil, Plus, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Sheet } from "@/components/ui/Sheet";

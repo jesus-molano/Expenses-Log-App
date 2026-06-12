@@ -50,7 +50,7 @@ export function useSettingsController() {
   const backHref = backTab === "money" ? "/money" : "/";
   const backLabel =
     backTab === "money" ? t("common.plan") : t("common.expenses");
-  const deleteAccountPhrase = currentLanguage === "en" ? "DELETE" : "BORRAR";
+  const deleteAccountPhrase = t("settings.deleteAccountPhrase", currentLanguage);
 
   function exportData() {
     const blob = new Blob([JSON.stringify(store, null, 2)], {

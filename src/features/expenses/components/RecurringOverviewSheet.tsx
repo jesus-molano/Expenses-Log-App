@@ -1,6 +1,4 @@
-"use client";
-
-import { Repeat, X } from "lucide-react";
+﻿import { Repeat, X } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { Sheet } from "@/components/ui/Sheet";
 import type { AppLanguage, ExpenseCategory } from "@/domain/types";

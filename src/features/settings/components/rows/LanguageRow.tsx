@@ -1,6 +1,4 @@
-"use client";
-
-import { SelectMenu } from "@/components/ui/SelectMenu";
+﻿import { SelectMenu } from "@/components/ui/SelectMenu";
 import { t } from "@/shared/i18n";
 import { SETTINGS_LANGUAGES } from "../../lib/settings-options";
 import type { SettingsController } from "../../types";

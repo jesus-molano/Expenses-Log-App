@@ -78,7 +78,7 @@ export function ExpenseRow({
       className={`relative overflow-visible rounded-2xl ${
         dragActive ? "z-0" : ""
       } ${
-        paid && !dragActive ? "app-paid-row" : ""
+        paid && !dragActive ? "app-expense-row-paid" : ""
       }`}
     >
       {dropPosition === "before" ? (

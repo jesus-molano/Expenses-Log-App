@@ -1,6 +1,4 @@
-"use client";
-
-import { Trash2, UserX } from "lucide-react";
+﻿import { Trash2, UserX } from "lucide-react";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { t } from "@/shared/i18n";
 import type { SettingsController } from "../types";

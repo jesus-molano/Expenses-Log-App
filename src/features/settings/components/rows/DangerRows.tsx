@@ -1,6 +1,4 @@
-"use client";
-
-import { Trash2, UserX } from "lucide-react";
+﻿import { Trash2, UserX } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { t } from "@/shared/i18n";
 import type { SettingsController } from "../../types";

@@ -1,6 +1,4 @@
-"use client";
-
-import { X } from "lucide-react";
+﻿import { X } from "lucide-react";
 import { Field } from "@/components/ui/Field";
 import { IconButton } from "@/components/ui/IconButton";
 import { PLAN_ACCOUNT_NAME_MAX_LENGTH } from "@/domain/plan-accounts";
@@ -35,7 +33,7 @@ export function PlanAccountConfigCard({
     <div className="app-section-card p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--app-text-subtle)]">
-          {language === "en" ? "Account" : "Cuenta"} {index + 1}
+          {t("money.accountLabel", language)} {index + 1}
         </p>
         <IconButton
           type="button"

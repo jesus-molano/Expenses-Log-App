@@ -1,6 +1,4 @@
-"use client";
-
-import { CalendarDays, CalendarX2, Repeat2 } from "lucide-react";
+﻿import { CalendarDays, CalendarX2, Repeat2 } from "lucide-react";
 import { DatePickerField } from "@/components/ui/DatePickerField";
 import { Surface } from "@/components/ui/Surface";
 import type {

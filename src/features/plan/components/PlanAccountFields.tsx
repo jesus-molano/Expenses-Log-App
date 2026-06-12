@@ -18,7 +18,7 @@ export function PlanAccountFields({
   accounts,
   onAccountsChange,
 }: PlanAccountFieldsProps) {
-  const editor = usePlanAccountEditor({ accounts, onAccountsChange });
+  const editor = usePlanAccountEditor({ accounts, language, onAccountsChange });
 
   return (
     <div className="grid gap-3 sm:col-span-2">

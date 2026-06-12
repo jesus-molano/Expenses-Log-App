@@ -1,6 +1,4 @@
-"use client";
-
-import { CompactMenu } from "@/components/ui/CompactMenu";
+﻿import { CompactMenu } from "@/components/ui/CompactMenu";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";

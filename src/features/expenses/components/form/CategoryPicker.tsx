@@ -1,6 +1,4 @@
-"use client";
-
-import { WalletCards } from "lucide-react";
+﻿import { WalletCards } from "lucide-react";
 import { Surface } from "@/components/ui/Surface";
 import { PRESET_EXPENSE_CATEGORIES } from "@/domain/categories";
 import type { AppLanguage } from "@/domain/types";

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
+import type { AppSupabaseClient } from "@/data/supabase/database.types";
 import type { ExpenseStore } from "@/domain/types";
 import { loadCloudStore, saveCloudStore } from "@/data/persistence/cloud-store";
 import {
@@ -21,7 +22,7 @@ type UseStorePersistenceOptions = {
 
 export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
   const [isHydrated, setIsHydrated] = useState(false);
-  const supabaseRef = useRef<SupabaseClient | null>(null);
+  const supabaseRef = useRef<AppSupabaseClient | null>(null);
   const userRef = useRef<User | null>(null);
   const hydratedRef = useRef(false);
   const localRevisionRef = useRef(0);

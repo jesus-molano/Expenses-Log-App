@@ -1,6 +1,4 @@
-"use client";
-
-import { format, parseISO } from "date-fns";
+﻿import { format, parseISO } from "date-fns";
 import type { Locale } from "date-fns";
 import { Button } from "@/components/ui/Button";
 import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";

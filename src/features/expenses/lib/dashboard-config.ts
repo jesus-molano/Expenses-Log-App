@@ -1,5 +1,6 @@
 import type { ElementType } from "react";
 import { CalendarDays, Check, Clock3, Sparkles } from "lucide-react";
+import { toDateOnly } from "@/domain/calendar";
 import type { DraftExpense } from "@/domain/types";
 
 export type TimelineHorizon = "today" | "week" | "month" | "paid";
@@ -34,13 +35,15 @@ export const timelineHorizons: Record<TimelineHorizon, HorizonDefinition> = {
 };
 
 export function createEmptyDraft(): DraftExpense {
+  const today = new Date();
+
   return {
     name: "",
     description: "",
     amount: 1,
     categoryName: "General",
-    startDate: new Date().toISOString().slice(0, 10),
-    dueDay: new Date().getDate(),
+    startDate: toDateOnly(today),
+    dueDay: today.getDate(),
     recurrence: { frequency: "monthly" },
   };
 }

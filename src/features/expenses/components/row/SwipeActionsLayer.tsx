@@ -1,6 +1,4 @@
-"use client";
-
-import { Pencil, RotateCcw } from "lucide-react";
+﻿import { Pencil, RotateCcw } from "lucide-react";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 

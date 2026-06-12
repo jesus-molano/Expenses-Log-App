@@ -1,6 +1,4 @@
-"use client";
-
-import type { AppLanguage } from "@/domain/types";
+﻿import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 
 type PlanSettingsHeaderProps = {

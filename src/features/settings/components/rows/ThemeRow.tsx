@@ -1,6 +1,4 @@
-"use client";
-
-import { Palette } from "lucide-react";
+﻿import { Palette } from "lucide-react";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { t } from "@/shared/i18n";
 import {

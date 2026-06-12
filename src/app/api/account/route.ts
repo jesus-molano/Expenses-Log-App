@@ -1,12 +1,7 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/data/supabase/admin-client";
+import { toDatabaseUuid } from "@/data/supabase/database.types";
 import { createClient } from "@/utils/supabase/server";
-
-const USER_SCOPED_TABLES: Array<{ table: string; column: string }> = [
-  { table: "push_subscriptions", column: "user_id" },
-  { table: "app_stores", column: "user_id" },
-  { table: "profiles", column: "id" },
-];
 
 export async function DELETE() {
   const supabase = await createClient();
@@ -38,11 +33,30 @@ export async function DELETE() {
     );
   }
 
-  for (const { table, column } of USER_SCOPED_TABLES) {
-    const { error } = await admin.from(table).delete().eq(column, user.id);
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+  const userId = toDatabaseUuid(user.id);
+
+  const { error: pushError } = await admin
+    .from("push_subscriptions")
+    .delete()
+    .eq("user_id", userId);
+  if (pushError) {
+    return NextResponse.json({ error: pushError.message }, { status: 500 });
+  }
+
+  const { error: storeError } = await admin
+    .from("app_stores")
+    .delete()
+    .eq("user_id", userId);
+  if (storeError) {
+    return NextResponse.json({ error: storeError.message }, { status: 500 });
+  }
+
+  const { error: profileError } = await admin
+    .from("profiles")
+    .delete()
+    .eq("id", userId);
+  if (profileError) {
+    return NextResponse.json({ error: profileError.message }, { status: 500 });
   }
 
   const { error: deleteUserError } = await admin.auth.admin.deleteUser(user.id);
@@ -54,4 +68,3 @@ export async function DELETE() {
   }
   return NextResponse.json({ ok: true });
 }
-

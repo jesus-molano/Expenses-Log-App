@@ -1,6 +1,4 @@
-﻿"use client";
-
-import type { AppLanguage, DraftExpense } from "@/domain/types";
+﻿import type { AppLanguage, DraftExpense } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import {
   CategoryPicker,

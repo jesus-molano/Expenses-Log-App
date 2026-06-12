@@ -1,6 +1,4 @@
-"use client";
-
-import { formatCurrency } from "@/domain/calendar";
+﻿import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage, ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
 import { categoryLabel } from "@/shared/category-labels";
 import { categoryToneClass, statusLabel } from "../../lib/expense-actions";

@@ -5,6 +5,7 @@ import { DatePickerField } from "@/components/ui/DatePickerField";
 import { IconButton } from "@/components/ui/IconButton";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage, IncomeEvent } from "@/domain/types";
+import { t } from "@/shared/i18n";
 import {
   useIncomeEventRowEditor,
   type IncomeEventUpdateInput,
@@ -40,7 +41,7 @@ export function IncomeEventRow({
           <IconButton
             type="button"
             onClick={editor.save}
-            aria-label={language === "en" ? "Save income" : "Guardar ingreso"}
+            aria-label={t("money.saveIncome", language)}
             size="sm"
             className="bg-[var(--app-accent)] text-[var(--app-accent-contrast)]"
           >
@@ -49,7 +50,7 @@ export function IncomeEventRow({
           <IconButton
             type="button"
             onClick={editor.closeEditor}
-            aria-label={language === "en" ? "Close" : "Cerrar"}
+            aria-label={t("common.close", language)}
             size="sm"
           >
             <X size={15} />
@@ -65,7 +66,7 @@ export function IncomeEventRow({
           <DatePickerField
             value={editor.receivedAt}
             onChange={(value) => editor.setReceivedAt(value ?? editor.receivedAt)}
-            label={language === "en" ? "Income date" : "Fecha de ingreso"}
+            label={t("money.incomeDate", language)}
             language={language}
             className="h-11 min-w-0"
           />
@@ -90,7 +91,7 @@ export function IncomeEventRow({
       <IconButton
         type="button"
         onClick={editor.openEditor}
-        aria-label={language === "en" ? "Edit income" : "Editar ingreso"}
+        aria-label={t("money.editIncome", language)}
         size="sm"
       >
         <Pencil size={14} />
