@@ -42,7 +42,7 @@ function sectionMeta(
     return {
       id: "overdue",
       title: t("expenses.overdue", language),
-      subtitle: `${t("expenses.from", language)} ${dayLabel(dueDate)}`,
+      subtitle: t("expenses.overduePending", language),
       tone: visualState,
       priority: 1,
     };

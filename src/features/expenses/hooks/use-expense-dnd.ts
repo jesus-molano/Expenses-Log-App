@@ -20,6 +20,13 @@ import { useExpenseDndSensors } from "./use-expense-dnd-sensors";
 export type { DropTarget } from "../lib/expense-dnd-target";
 
 const DRAG_SETTLE_LOCK_MS = 520;
+const DRAG_SCROLL_ANCHOR_SETTLE_MS = [0, 80, 180, 360, 560] as const;
+
+type DragScrollAnchor = {
+  selector: string;
+  top: number;
+  fallbackScrollY: number;
+};
 
 type UseExpenseDndOptions = {
   sections: TimelineSection[];
@@ -48,11 +55,12 @@ export function useExpenseDnd({
   const autoScrollWithDrag = useExpenseDndAutoScroll();
   const prompt = useExpenseDndPrompt(onMoveOccurrenceOnly);
   const settleTimeoutRef = useRef<number | null>(null);
-  const releaseScrollYRef = useRef(0);
+  const scrollAnchorTimeoutsRef = useRef<number[]>([]);
 
   useEffect(() => {
     return () => {
       clearDragSettleTimeout(settleTimeoutRef.current);
+      clearScrollAnchorTimeouts(scrollAnchorTimeoutsRef.current);
       document.documentElement.classList.remove(
         "is-dragging-expense",
         "is-settling-expense-drag",
@@ -97,8 +105,9 @@ export function useExpenseDnd({
   function handleDragEnd(event: DragEndEvent) {
     const target = getDropTargetFromEvent(event);
     const occurrence = activeOccurrence;
+    const anchor = createDragScrollAnchor(occurrence, target);
 
-    cleanupDrag();
+    cleanupDrag(anchor);
 
     if (!occurrence || !target) return;
     if (target.date !== occurrence.dueDate || target.rowId) {
@@ -106,8 +115,7 @@ export function useExpenseDnd({
     }
   }
 
-  function cleanupDrag() {
-    releaseScrollYRef.current = window.scrollY;
+  function cleanupDrag(anchor = createDragScrollAnchor(activeOccurrence, null)) {
     document.documentElement.classList.remove("is-dragging-expense");
     document.documentElement.classList.add("is-settling-expense-drag");
     clearDragSettleTimeout(settleTimeoutRef.current);
@@ -118,18 +126,36 @@ export function useExpenseDnd({
     setActiveOccurrence(null);
     setDraggedOccurrence(null);
     setActiveDropTarget(null);
-    stabilizeScrollAfterDrag();
+    stabilizeScrollAfterDrag(anchor);
   }
 
-  function stabilizeScrollAfterDrag() {
-    const releaseScrollY = releaseScrollYRef.current;
+  function stabilizeScrollAfterDrag(anchor: DragScrollAnchor | null) {
+    clearScrollAnchorTimeouts(scrollAnchorTimeoutsRef.current);
+    scrollAnchorTimeoutsRef.current = [];
+    if (!anchor) return;
+
+    const stabilize = () => {
+      const element = document.querySelector<HTMLElement>(anchor.selector);
+      if (!element) {
+        window.scrollTo({ top: anchor.fallbackScrollY, behavior: "auto" });
+        return;
+      }
+
+      const nextTop = element.getBoundingClientRect().top;
+      const delta = nextTop - anchor.top;
+      if (Math.abs(delta) > 0.5) {
+        window.scrollBy({ top: delta, behavior: "auto" });
+      }
+    };
 
     window.requestAnimationFrame(() => {
-      window.scrollTo({ top: releaseScrollY, behavior: "auto" });
-      window.requestAnimationFrame(() => {
-        window.scrollTo({ top: releaseScrollY, behavior: "auto" });
-      });
+      stabilize();
+      window.requestAnimationFrame(stabilize);
     });
+
+    scrollAnchorTimeoutsRef.current = DRAG_SCROLL_ANCHOR_SETTLE_MS.map((delay) =>
+      window.setTimeout(stabilize, delay),
+    );
   }
 
   return {
@@ -152,4 +178,46 @@ export function useExpenseDnd({
 
 function clearDragSettleTimeout(timeoutId: number | null) {
   if (timeoutId !== null) window.clearTimeout(timeoutId);
+}
+
+function clearScrollAnchorTimeouts(timeoutIds: number[]) {
+  for (const timeoutId of timeoutIds) {
+    window.clearTimeout(timeoutId);
+  }
+  timeoutIds.length = 0;
+}
+
+function createDragScrollAnchor(
+  occurrence: ExpenseOccurrence | null,
+  target: DropTarget | null,
+): DragScrollAnchor | null {
+  const selectors = [
+    target?.rowId ? rowSelector(target.rowId) : null,
+    target?.date ? `[data-timeline-date="${cssEscape(target.date)}"]` : null,
+    occurrence ? rowSelector(occurrence.id) : null,
+    occurrence?.dueDate
+      ? `[data-timeline-date="${cssEscape(occurrence.dueDate)}"]`
+      : null,
+  ].filter(Boolean) as string[];
+
+  for (const selector of selectors) {
+    const element = document.querySelector<HTMLElement>(selector);
+    if (element) {
+      return {
+        selector,
+        top: element.getBoundingClientRect().top,
+        fallbackScrollY: window.scrollY,
+      };
+    }
+  }
+
+  return null;
+}
+
+function rowSelector(rowId: string) {
+  return `[data-expense-row-id="${cssEscape(rowId)}"]`;
+}
+
+function cssEscape(value: string) {
+  return window.CSS?.escape ? window.CSS.escape(value) : value.replace(/"/g, '\\"');
 }
