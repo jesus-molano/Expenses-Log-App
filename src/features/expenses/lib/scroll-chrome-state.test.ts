@@ -84,6 +84,28 @@ describe("scroll chrome state", () => {
     expect(state.panelChrome).toBe("visible");
   });
 
+  it("uses programmatic scroll as the next baseline before reacting to user intent", () => {
+    const programmaticScroll = reduceScrollChromeState(
+      createInitialScrollChromeState(),
+      {
+        ...baseSnapshot,
+        allowChromeReaction: false,
+        scrollY: 300,
+      },
+    );
+
+    expect(programmaticScroll.panelChrome).toBe("visible");
+    expect(programmaticScroll.lastScrollY).toBe(300);
+    expect(programmaticScroll.intentDistance).toBe(0);
+
+    const userScroll = reduceScrollChromeState(programmaticScroll, {
+      ...baseSnapshot,
+      scrollY: 330,
+    });
+
+    expect(userScroll.panelChrome).toBe("hidden");
+  });
+
   it("uses hysteresis around the bottom edge", () => {
     const nearBottom = reduceScrollChromeState(createInitialScrollChromeState(), {
       ...baseSnapshot,
