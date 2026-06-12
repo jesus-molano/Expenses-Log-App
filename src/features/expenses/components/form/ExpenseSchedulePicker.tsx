@@ -112,7 +112,7 @@ export function ExpenseSchedulePicker({
       </div>
 
       {value.recurrence.frequency === "custom" ? (
-        <div className="mt-3 grid gap-2 sm:grid-cols-[7rem_1fr]">
+        <div className="mt-3 grid gap-2">
           <ExpenseField label={t("expenses.recurrenceInterval", language)}>
             <input
               inputMode="numeric"

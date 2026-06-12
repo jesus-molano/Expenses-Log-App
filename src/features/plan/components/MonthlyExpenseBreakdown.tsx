@@ -8,7 +8,7 @@ import type {
 } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { MonthlyExpenseRow } from "./MonthlyExpenseRow";
-import { PlanEmptyLine, PlanSectionList } from "./PlanSectionList";
+import { PlanEmptyTableRow, PlanSectionList } from "./PlanSectionList";
 
 type MonthlyExpenseBreakdownProps = {
   language: AppLanguage;
@@ -25,7 +25,8 @@ type MonthlyExpenseBreakdownProps = {
     dueDate: string;
     name: string;
     amount: number;
-    categoryId: string;
+    categoryId?: string;
+    categoryName?: string;
     status: ExpenseOccurrence["status"];
   }) => void;
 };
@@ -47,33 +48,45 @@ export function MonthlyExpenseBreakdown({
       icon={TrendingDown}
       tone="danger"
     >
-      {visibleOccurrences.length ? (
-        visibleOccurrences.map((occurrence) => (
-          <MonthlyExpenseRow
-            key={occurrence.id}
-            occurrence={occurrence}
-            categories={categories}
-            language={language}
-            today={today}
-            skipLabel={t("money.skipMonthExpense", language)}
-            onSkip={() => onSkipOccurrence(occurrence)}
-            onUpdate={onUpdateMonthlyExpense}
-          />
-        ))
-      ) : (
-        <PlanEmptyLine>{t("money.noExpensesForMonth", language)}</PlanEmptyLine>
-      )}
-      {occurrences.length > 6 ? (
-        <button
-          type="button"
-          onClick={onToggleExpanded}
-          className="mt-2 h-9 w-full rounded-2xl bg-[var(--app-panel-soft-alpha)] text-sm font-semibold text-[var(--app-text)] ring-1 ring-[var(--app-border)]"
-        >
-          {expanded
-            ? t("money.showLessExpenses", language)
-            : `${t("money.showAllExpenses", language)} (${occurrences.length})`}
-        </button>
-      ) : null}
+      <div className="app-monthly-table" data-tone="expense">
+        <div className="app-monthly-table-head">
+          <span>{language === "en" ? "Expense" : "Gasto"}</span>
+          <span>{language === "en" ? "Amount" : "Importe"}</span>
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
+        </div>
+        <div className="app-monthly-table-body" data-integrated-list="true">
+          {visibleOccurrences.length ? (
+            visibleOccurrences.map((occurrence) => (
+              <MonthlyExpenseRow
+                key={occurrence.id}
+                occurrence={occurrence}
+                categories={categories}
+                language={language}
+                today={today}
+                skipLabel={t("money.skipMonthExpense", language)}
+                onSkip={() => onSkipOccurrence(occurrence)}
+                onUpdate={onUpdateMonthlyExpense}
+              />
+            ))
+          ) : (
+            <PlanEmptyTableRow>
+              {t("money.noExpensesForMonth", language)}
+            </PlanEmptyTableRow>
+          )}
+        </div>
+        {occurrences.length > 6 ? (
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            className="app-monthly-table-more"
+          >
+            {expanded
+              ? t("money.showLessExpenses", language)
+              : `${t("money.showAllExpenses", language)} (${occurrences.length})`}
+          </button>
+        ) : null}
+      </div>
     </PlanSectionList>
   );
 }

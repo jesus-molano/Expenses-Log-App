@@ -27,7 +27,10 @@ export function IncomeEventRow({
 
   if (editor.editing) {
     return (
-      <div className="app-list-item grid min-w-0 gap-2 p-3">
+      <div
+        className="app-list-item app-income-event-row app-income-event-row-editing app-monthly-table-row grid min-w-0 gap-2 p-3"
+        data-editing="true"
+      >
         <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
           <input
             value={editor.name}
@@ -72,7 +75,7 @@ export function IncomeEventRow({
   }
 
   return (
-    <div className="app-list-item grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 px-3 py-2">
+    <div className="app-list-item app-income-event-row app-monthly-table-row grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 px-3 py-2">
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-[var(--app-text)]">
           {event.name}

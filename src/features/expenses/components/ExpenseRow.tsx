@@ -82,7 +82,7 @@ export function ExpenseRow({
       }`}
     >
       {dropPosition === "before" ? (
-        <DropIndicator label={t("expenses.before", language)} position="before" />
+        <DropIndicator position="before" />
       ) : null}
       <SwipeActionsLayer
         direction={swipe.direction}
@@ -113,7 +113,7 @@ export function ExpenseRow({
         />
       </article>
       {dropPosition === "after" ? (
-        <DropIndicator label={t("expenses.after", language)} position="after" />
+        <DropIndicator position="after" />
       ) : null}
     </div>
   );

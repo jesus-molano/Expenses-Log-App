@@ -4,7 +4,6 @@ import type {
   ExpenseCategory,
   ExpenseOccurrence,
 } from "@/domain/types";
-import { t } from "@/shared/i18n";
 import type { DropTarget } from "../../hooks/use-expense-dnd";
 import { ExpenseRow } from "../ExpenseRow";
 import { TimelineEmptyDayTarget } from "../TimelineEmptyDayTarget";
@@ -37,7 +36,6 @@ export function TimelineDayGroup({
       <TimelineEmptyDayTarget
         date={day}
         active={activeDropTarget?.date === day && !activeDropTarget.rowId}
-        label={t("expenses.dropHere", language)}
         locale={locale}
       />
       {items.map((occurrence) => (

@@ -44,3 +44,11 @@ export function PlanEmptyLine({ children }: { children: ReactNode }) {
     </Surface>
   );
 }
+
+export function PlanEmptyTableRow({ children }: { children: ReactNode }) {
+  return (
+    <div className="app-monthly-table-empty px-3 py-2 text-sm font-medium">
+      {children}
+    </div>
+  );
+}

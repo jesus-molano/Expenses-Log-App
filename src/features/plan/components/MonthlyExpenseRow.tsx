@@ -2,16 +2,19 @@
 
 import { format } from "date-fns";
 import { enUS, es } from "date-fns/locale";
-import { Check, Pencil, X } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Check, Pencil, WalletCards, X } from "lucide-react";
+import { useState } from "react";
 import { DatePickerField } from "@/components/ui/DatePickerField";
 import { IconButton } from "@/components/ui/IconButton";
+import { SelectMenu } from "@/components/ui/SelectMenu";
 import { formatCurrency } from "@/domain/calendar";
+import { PRESET_EXPENSE_CATEGORIES } from "@/domain/categories";
 import type {
   AppLanguage,
   ExpenseCategory,
   ExpenseOccurrence,
 } from "@/domain/types";
+import { categoryIconMap } from "@/features/expenses/lib/expense-form-options";
 import {
   useMonthlyExpenseRowEditor,
   type MonthlyExpenseUpdateInput,
@@ -37,22 +40,61 @@ export function MonthlyExpenseRow({
   onUpdate: (input: MonthlyExpenseUpdateInput) => void;
 }) {
   const locale = language === "en" ? enUS : es;
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const editor = useMonthlyExpenseRowEditor({
     occurrence,
     categories,
     language,
     onUpdate,
   });
+  const categoryOptions = PRESET_EXPENSE_CATEGORIES.map((category) => {
+    const Icon = categoryIconMap[category.icon] ?? WalletCards;
+
+    return {
+      value: category.name,
+      label: categoryLabel(category.name, language),
+      leading: (
+        <span
+          className="app-monthly-category-menu-icon"
+          data-tone={category.tone}
+        >
+          <Icon size={14} />
+        </span>
+      ),
+    };
+  });
 
   if (editor.editing) {
     return (
-      <div className="app-list-item grid min-w-0 gap-2 p-3">
-        <input
-          value={editor.name}
-          onChange={(event) => editor.setName(event.target.value)}
-          className="input-control h-11"
-        />
-        <div className="grid gap-2 sm:grid-cols-2">
+      <div
+        className="app-list-item app-monthly-table-row app-monthly-table-row-editing grid min-w-0 gap-2 p-3"
+        data-editing="true"
+      >
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
+          <input
+            value={editor.name}
+            onChange={(event) => editor.setName(event.target.value)}
+            className="input-control h-11 min-w-0"
+          />
+          <IconButton
+            type="button"
+            onClick={editor.save}
+            aria-label={t("expenses.saveChanges", language)}
+            size="sm"
+            className="bg-[var(--app-accent)] text-[var(--app-accent-contrast)]"
+          >
+            <Check size={15} />
+          </IconButton>
+          <IconButton
+            type="button"
+            onClick={editor.closeEditor}
+            aria-label={t("expenses.close", language)}
+            size="sm"
+          >
+            <X size={15} />
+          </IconButton>
+        </div>
+        <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
           <input
             value={editor.amount}
             inputMode="decimal"
@@ -71,27 +113,16 @@ export function MonthlyExpenseRow({
           <p className="text-xs font-semibold text-[var(--app-text-muted)]">
             {t("expenses.category", language)}
           </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {categories.map((category) => {
-              const selected = editor.categoryId === category.id;
-              return (
-                <button
-                  key={category.id}
-                  type="button"
-                  onClick={() => editor.setCategoryId(category.id)}
-                  aria-pressed={selected}
-                  className="app-control min-h-10 rounded-[var(--app-radius-md)] px-2 text-sm font-semibold"
-                  data-selected={selected ? "true" : "false"}
-                >
-                  <span className="line-clamp-1">
-                    {categoryLabel(category.name, language)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <SelectMenu
+            open={categoryMenuOpen}
+            onOpenChange={setCategoryMenuOpen}
+            value={editor.categoryName}
+            options={categoryOptions}
+            onChange={editor.setCategoryName}
+            align="left"
+          />
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="app-monthly-status-toggle" role="group">
           {(["due", "paid"] as const).map((status) => {
             const selected = editor.status === status;
             return (
@@ -100,7 +131,8 @@ export function MonthlyExpenseRow({
                 type="button"
                 onClick={() => editor.setStatus(status)}
                 aria-pressed={selected}
-                className="app-control h-10 rounded-[var(--app-radius-md)] text-sm font-semibold"
+                className="app-monthly-status-option h-9 text-sm font-semibold"
+                data-status={status}
                 data-selected={selected ? "true" : "false"}
               >
                 {status === "paid"
@@ -109,25 +141,6 @@ export function MonthlyExpenseRow({
               </button>
             );
           })}
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            type="button"
-            onClick={editor.save}
-            variant="primary"
-            size="sm"
-            leadingIcon={<Check size={16} />}
-          >
-            {t("expenses.saveChanges", language)}
-          </Button>
-          <Button
-            type="button"
-            onClick={editor.closeEditor}
-            variant="secondary"
-            size="sm"
-          >
-            {t("expenses.close", language)}
-          </Button>
         </div>
       </div>
     );
@@ -142,7 +155,7 @@ export function MonthlyExpenseRow({
       : t("common.pending", language);
 
   return (
-    <div className="app-list-item grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 px-3 py-2">
+    <div className="app-list-item app-monthly-table-row grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 px-3 py-2">
       <div className="min-w-0">
         <p
           className={`truncate text-sm font-semibold ${

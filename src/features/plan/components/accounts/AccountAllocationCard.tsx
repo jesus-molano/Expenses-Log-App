@@ -24,9 +24,9 @@ export function AccountAllocationCard({
       ];
 
   return (
-    <article className="app-stat-card p-3">
+    <article className="app-entity-card p-3">
       <div className="flex min-w-0 items-center gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[color-mix(in_srgb,var(--app-accent)_14%,transparent)] text-[var(--app-accent)]">
+        <span className="app-icon-badge size-9 shrink-0 text-[var(--app-accent)]">
           <AccountPurposeIcon purpose={allocation.leadPurpose} size={16} />
         </span>
 

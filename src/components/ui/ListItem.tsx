@@ -24,7 +24,7 @@ export function ListItem({
     >
       <span className="flex min-w-0 items-center gap-3">
         {icon ? (
-          <span className="app-icon-button size-9 min-h-9 min-w-9 shrink-0 rounded-[var(--app-radius-sm)] text-[var(--app-accent)]">
+          <span className="app-icon-badge size-9 min-h-9 min-w-9 shrink-0 text-[var(--app-accent)]">
             {icon}
           </span>
         ) : null}

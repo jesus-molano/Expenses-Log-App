@@ -1,3 +1,4 @@
+import { PiggyBank, ReceiptText } from "lucide-react";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import type { MoneySeriesItem } from "../types";
@@ -41,10 +42,14 @@ export function MonthlyTrendSection({
           <MoneyStat
             label={t("money.annualExpenses", language)}
             value={annualExpensesTotalLabel}
+            icon={<ReceiptText />}
+            tone="expense"
           />
           <MoneyStat
             label={t("money.annualSavingsEstimate", language)}
             value={annualSavingsEstimateLabel}
+            icon={<PiggyBank />}
+            tone="success"
           />
         </div>
       </div>

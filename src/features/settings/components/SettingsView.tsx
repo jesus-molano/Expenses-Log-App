@@ -23,7 +23,7 @@ export function SettingsView() {
       <div className="mx-auto max-w-2xl">
         <Link
           href={settings.backHref}
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--app-panel-soft-alpha)] px-3 text-sm font-medium text-[var(--app-text)] ring-1 ring-[var(--app-border)]"
+          className="app-back-link inline-flex h-10 items-center gap-2 rounded-full px-3 text-sm font-medium"
         >
           <ArrowLeft size={18} />
           {settings.backLabel}

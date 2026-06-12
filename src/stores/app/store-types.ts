@@ -32,6 +32,7 @@ export type MonthlyExpenseOverrideInput = {
   dueDate: string;
   name: string;
   amount: number;
-  categoryId: string;
+  categoryId?: string;
+  categoryName?: string;
   status: import("@/domain/types").OccurrenceStatus;
 };

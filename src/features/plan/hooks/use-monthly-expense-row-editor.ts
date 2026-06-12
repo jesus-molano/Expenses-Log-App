@@ -14,7 +14,8 @@ export type MonthlyExpenseUpdateInput = {
   dueDate: string;
   name: string;
   amount: number;
-  categoryId: string;
+  categoryId?: string;
+  categoryName?: string;
   status: ExpenseOccurrence["status"];
 };
 
@@ -35,19 +36,19 @@ export function useMonthlyExpenseRowEditor({
     formatMoneyInput(occurrence.template.amount, language),
   );
   const [dueDate, setDueDate] = useState(occurrence.dueDate);
-  const [categoryId, setCategoryId] = useState(occurrence.template.categoryId);
+  const initialCategoryName =
+    categories.find((category) => category.id === occurrence.template.categoryId)
+      ?.name ?? "General";
+  const [categoryName, setCategoryName] = useState(initialCategoryName);
   const [status, setStatus] = useState<ExpenseOccurrence["status"]>(
     occurrence.status,
   );
-  const categoryName =
-    categories.find((category) => category.id === occurrence.template.categoryId)
-      ?.name ?? "General";
 
   function openEditor() {
     setName(occurrence.template.name);
     setAmount(formatMoneyInput(occurrence.template.amount, language));
     setDueDate(occurrence.dueDate);
-    setCategoryId(occurrence.template.categoryId);
+    setCategoryName(initialCategoryName);
     setStatus(occurrence.status);
     setEditing(true);
   }
@@ -59,7 +60,7 @@ export function useMonthlyExpenseRowEditor({
       dueDate,
       name,
       amount: parseMoneyInput(amount),
-      categoryId,
+      categoryName,
       status,
     });
     setEditing(false);
@@ -70,13 +71,12 @@ export function useMonthlyExpenseRowEditor({
     name,
     amount,
     dueDate,
-    categoryId,
     status,
     categoryName,
     setName,
     setAmount,
     setDueDate,
-    setCategoryId,
+    setCategoryName,
     setStatus,
     openEditor,
     closeEditor: () => setEditing(false),

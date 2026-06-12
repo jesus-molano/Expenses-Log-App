@@ -48,7 +48,6 @@ export function TimelineNormalItems({
       <TimelineDayTargets
         dates={emptyDaysBefore}
         activeDropTarget={activeDropTarget}
-        language={language}
         locale={locale}
       />
       {section.items.map((occurrence) => (
@@ -72,7 +71,6 @@ export function TimelineNormalItems({
       <TimelineDayTargets
         dates={emptyDaysAfter}
         activeDropTarget={activeDropTarget}
-        language={language}
         locale={locale}
       />
     </>

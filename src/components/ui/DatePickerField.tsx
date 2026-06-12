@@ -176,7 +176,7 @@ export function DatePickerField({
 
   const pickerDialog = open ? (
     <div
-      className="app-sheet-backdrop z-[80] animate-[fade-in_180ms_ease-out] px-3 pb-3 pt-0 sm:p-6"
+      className="app-sheet-backdrop app-datepicker-backdrop z-[80] animate-[fade-in_180ms_ease-out]"
       role="presentation"
       onPointerDown={(event) => {
         if (event.target !== event.currentTarget) return;
@@ -228,7 +228,7 @@ export function DatePickerField({
               </button>
               {activeSelector === "month" ? (
                 <div
-                  className="app-card absolute left-1/2 top-[calc(100%+0.5rem)] z-20 grid w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 grid-cols-3 gap-1 rounded-[var(--app-radius-lg)] p-2"
+                  className="app-select-menu-panel absolute left-1/2 top-[calc(100%+0.5rem)] z-20 grid w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 grid-cols-3 gap-1 rounded-[var(--app-radius-lg)] p-2"
                   style={{ backgroundColor: "var(--app-surface-strong)" }}
                 >
                   {months.map((month, index) => {
@@ -239,11 +239,8 @@ export function DatePickerField({
                         type="button"
                         onClick={() => setVisibleMonthPart(index)}
                         aria-pressed={selected}
-                        className={`app-control h-10 rounded-[var(--app-radius-sm)] px-2 text-sm font-semibold ${
-                          selected
-                            ? "app-chip-selected"
-                            : "text-[var(--app-text)]"
-                        }`}
+                        className="app-select-menu-option h-10 rounded-[var(--app-radius-sm)] px-2 text-sm font-semibold"
+                        data-selected={selected ? "true" : "false"}
                       >
                         {month}
                       </button>
@@ -272,7 +269,7 @@ export function DatePickerField({
               </button>
               {activeSelector === "year" ? (
                 <div
-                  className="app-card absolute left-1/2 top-[calc(100%+0.5rem)] z-20 grid w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 grid-cols-3 gap-1 rounded-[var(--app-radius-lg)] p-2"
+                  className="app-select-menu-panel absolute left-1/2 top-[calc(100%+0.5rem)] z-20 grid w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 grid-cols-3 gap-1 rounded-[var(--app-radius-lg)] p-2"
                   style={{ backgroundColor: "var(--app-surface-strong)" }}
                 >
                   {years.map((year) => {
@@ -283,11 +280,8 @@ export function DatePickerField({
                         type="button"
                         onClick={() => setVisibleYear(year)}
                         aria-pressed={selected}
-                        className={`app-control h-10 rounded-[var(--app-radius-sm)] px-2 text-sm font-semibold ${
-                          selected
-                            ? "app-chip-selected"
-                            : "text-[var(--app-text)]"
-                        }`}
+                        className="app-select-menu-option h-10 rounded-[var(--app-radius-sm)] px-2 text-sm font-semibold"
+                        data-selected={selected ? "true" : "false"}
                       >
                         {year}
                       </button>

@@ -48,7 +48,8 @@ type MonthlyComparisonSectionProps = {
     dueDate: string;
     name: string;
     amount: number;
-    categoryId: string;
+    categoryId?: string;
+    categoryName?: string;
     status: ExpenseOccurrence["status"];
   }) => void;
 };

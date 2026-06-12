@@ -46,11 +46,8 @@ export function SelectMenu<T extends string | number>({
             onChange(option.value);
             onOpenChange(false);
           }}
-          className={`app-control flex h-9 w-full items-center justify-between gap-3 rounded-[var(--app-radius-sm)] px-3 text-left text-sm font-semibold ${
-            value === option.value
-              ? "app-chip-selected"
-              : "text-[var(--app-text)] hover:bg-[var(--app-panel-soft-alpha)]"
-          }`}
+          className="app-select-menu-option flex h-9 w-full items-center justify-between gap-3 rounded-[var(--app-radius-sm)] px-3 text-left text-sm font-semibold"
+          data-selected={value === option.value ? "true" : "false"}
         >
           <span className="flex min-w-0 items-center gap-2">
             {option.leading}

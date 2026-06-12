@@ -220,6 +220,10 @@ export function updateMonthlyExpenseOccurrenceInStore(
   store: ExpenseStore,
   input: MonthlyExpenseOverrideInput,
 ): ExpenseStore {
+  const categoryResult = input.categoryName
+    ? findOrCreateCategory(store, input.categoryName)
+    : { store, categoryId: input.categoryId ?? "" };
+  const nextStore = categoryResult.store;
   const existing = store.overrides.find(
     (override) =>
       override.templateId === input.templateId &&
@@ -236,7 +240,7 @@ export function updateMonthlyExpenseOccurrenceInStore(
     status: input.status,
     name: input.name.trim(),
     amount: Math.max(Number(input.amount), 0.01),
-    categoryId: input.categoryId,
+    categoryId: categoryResult.categoryId,
     paidAt:
       input.status === "paid"
         ? existing?.paidAt ?? now
@@ -249,9 +253,9 @@ export function updateMonthlyExpenseOccurrenceInStore(
   };
 
   return {
-    ...store,
+    ...nextStore,
     overrides: [
-      ...store.overrides.filter(
+      ...nextStore.overrides.filter(
         (override) =>
           !(
             override.templateId === input.templateId &&

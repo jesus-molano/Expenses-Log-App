@@ -12,9 +12,9 @@ const variants = {
 };
 
 const sizes = {
-  sm: "size-8 min-h-8 min-w-8",
-  md: "size-10 min-h-10 min-w-10",
-  lg: "size-12 min-h-12 min-w-12",
+  sm: "app-icon-button-sm",
+  md: "app-icon-button-md",
+  lg: "app-icon-button-lg",
 };
 
 export function IconButton({

@@ -3,7 +3,6 @@
 import type { FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Surface } from "@/components/ui/Surface";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage, IncomeEvent } from "@/domain/types";
 import { t } from "@/shared/i18n";
@@ -40,19 +39,21 @@ export function OneOffIncomePanel({
   return (
     <form
       onSubmit={onSubmit}
-      className="grid min-w-0 gap-4"
+      className="grid min-w-0 gap-3"
     >
       <header className="flex min-w-0 items-center justify-between gap-3">
         <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold text-[var(--app-text)]">
-          <Plus size={17} />
+          <span className="app-one-off-income-icon">
+            <Plus size={14} />
+          </span>
           <span className="truncate">{t("money.oneOffIncome", language)}</span>
         </h2>
-        <p className="shrink-0 text-right text-xs font-semibold text-[var(--app-text-muted)]">
+        <p className="shrink-0 text-right text-sm font-semibold text-[var(--app-success)]">
           {formatCurrency(extraIncomeTotal)}
         </p>
       </header>
 
-      <div className="app-section-card grid gap-3 p-3">
+      <div className="app-one-off-income-body grid gap-2">
         <input
           value={extraName}
           onChange={(event) => onExtraNameChange(event.target.value)}
@@ -72,7 +73,7 @@ export function OneOffIncomePanel({
           </Button>
         </div>
       </div>
-      <div className="grid gap-2.5">
+      <div className="app-one-off-income-list" data-integrated-list="true">
         {incomeEvents.length ? (
           incomeEvents.map((event) => (
             <IncomeEventRow
@@ -85,9 +86,9 @@ export function OneOffIncomePanel({
             />
           ))
         ) : (
-          <Surface variant="empty" className="px-3 py-2 text-sm font-medium">
+          <p className="app-one-off-income-empty px-1 py-2 text-sm font-medium">
             {t("money.noExtraIncome", language)}
-          </Surface>
+          </p>
         )}
       </div>
     </form>

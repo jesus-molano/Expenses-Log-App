@@ -116,7 +116,7 @@ function SelectorOption({
     <button
       type="button"
       onClick={onClick}
-      className="app-control flex h-9 w-full items-center justify-between gap-3 rounded-[var(--app-radius-sm)] px-3 text-left text-sm font-semibold"
+      className="app-select-menu-option flex h-9 w-full items-center justify-between gap-3 rounded-[var(--app-radius-sm)] px-3 text-left text-sm font-semibold"
       data-selected={selected ? "true" : "false"}
     >
       {children}
