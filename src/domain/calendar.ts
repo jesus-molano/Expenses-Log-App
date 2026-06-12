@@ -5,7 +5,8 @@ import {
   isSunday,
   parseISO,
 } from "date-fns";
-import { es } from "date-fns/locale";
+import { enUS, es } from "date-fns/locale";
+import type { AppLanguage } from "./types";
 
 export const APP_TIME_ZONE = "Atlantic/Canary";
 export const DEFAULT_CURRENCY = "EUR";
@@ -21,17 +22,20 @@ export function buildDateWithDay(baseDate: Date, dueDay: number): Date {
   return new Date(year, month, Math.min(Math.max(dueDay, 1), lastDay));
 }
 
-export function estimateChargeDate(dueDate: string): {
+export function estimateChargeDate(dueDate: string, language: AppLanguage = "es"): {
   date: string;
   label: string;
 } {
   const date = parseISO(dueDate);
+  const locale = language === "en" ? enUS : es;
+  const estimatedPrefix = language === "en" ? "estimated" : "estimado";
+  const chargePrefix = language === "en" ? "charges" : "cobro";
 
   if (isSaturday(date)) {
     const estimated = addDays(date, 2);
     return {
       date: toDateOnly(estimated),
-      label: `estimado ${format(estimated, "EEEE d", { locale: es })}`,
+      label: `${estimatedPrefix} ${format(estimated, "EEEE d", { locale })}`,
     };
   }
 
@@ -39,13 +43,13 @@ export function estimateChargeDate(dueDate: string): {
     const estimated = addDays(date, 1);
     return {
       date: toDateOnly(estimated),
-      label: `estimado ${format(estimated, "EEEE d", { locale: es })}`,
+      label: `${estimatedPrefix} ${format(estimated, "EEEE d", { locale })}`,
     };
   }
 
   return {
     date: dueDate,
-    label: `cobro ${format(date, "EEEE d", { locale: es })}`,
+    label: `${chargePrefix} ${format(date, "EEEE d", { locale })}`,
   };
 }
 

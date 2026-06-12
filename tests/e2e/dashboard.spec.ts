@@ -147,6 +147,16 @@ test("sheet closes with Escape and restores focus", async ({ page }) => {
   const dialog = page.getByRole("dialog", { name: "Añadir gasto" });
   await expect(dialog).toBeVisible();
 
+  const closeButton = dialog.getByRole("button", { name: "Cerrar" });
+  const manualButton = dialog.getByRole("button", { name: "Manual" });
+  await expect(closeButton).toBeFocused();
+
+  await page.keyboard.press("Shift+Tab");
+  await expect(manualButton).toBeFocused();
+
+  await page.keyboard.press("Tab");
+  await expect(closeButton).toBeFocused();
+
   await page.keyboard.press("Escape");
 
   await expect(dialog).toHaveCount(0);

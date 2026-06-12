@@ -27,7 +27,7 @@ export function useMoneyDashboardData(
     toDateOnly(startOfMonth(new Date())),
   );
   const [selectedExpensesExpanded, setSelectedExpensesExpanded] = useState(false);
-  const currentMonth = useCurrentMonthPlan(store, today);
+  const currentMonth = useCurrentMonthPlan(store, today, language);
   const { moneySeries, availableYears } = useMoneySeries(
     store,
     language,

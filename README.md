@@ -22,6 +22,16 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Documentacion
+
+- [Indice tecnico](./docs/README.md)
+- [Arquitectura](./docs/architecture.md)
+- [Modelo de dominio](./docs/domain-model.md)
+- [Estado, persistencia y sincronizacion](./docs/state-persistence-sync.md)
+- [Design system](./docs/design-system.md)
+- [Plataforma](./docs/platform.md)
+- [Testing y calidad](./docs/testing-quality.md)
+
 ## Environment
 
 `.env.local` is intentionally ignored by git.

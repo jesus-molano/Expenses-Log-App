@@ -13,6 +13,23 @@ type SheetProps = {
   onBackdropClick?: () => void;
 };
 
+const focusableSelector = [
+  "button:not(:disabled)",
+  "[href]",
+  "input:not(:disabled)",
+  "select:not(:disabled)",
+  "textarea:not(:disabled)",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
+
+function getFocusableElements(panel: HTMLElement): HTMLElement[] {
+  return Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector))
+    .filter((element) => {
+      const hidden = element.getAttribute("aria-hidden") === "true";
+      return !hidden && element.tabIndex >= 0;
+    });
+}
+
 export function Sheet({
   children,
   className,
@@ -33,22 +50,48 @@ export function Sheet({
         : null;
 
     const panel = panelRef.current;
-    const focusable = panel?.querySelector<HTMLElement>(
-      [
-        "button:not(:disabled)",
-        "[href]",
-        "input:not(:disabled)",
-        "select:not(:disabled)",
-        "textarea:not(:disabled)",
-        "[tabindex]:not([tabindex='-1'])",
-      ].join(","),
-    );
+    const focusable = panel ? getFocusableElements(panel)[0] : null;
     (focusable ?? panel)?.focus({ preventScroll: true });
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      onBackdropClick?.();
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onBackdropClick?.();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const panel = panelRef.current;
+      if (!panel) return;
+
+      const focusableElements = getFocusableElements(panel);
+      if (!focusableElements.length) {
+        event.preventDefault();
+        panel.focus({ preventScroll: true });
+        return;
+      }
+
+      const first = focusableElements[0];
+      const last = focusableElements.at(-1);
+      const active = document.activeElement;
+
+      if (!panel.contains(active)) {
+        event.preventDefault();
+        first?.focus({ preventScroll: true });
+        return;
+      }
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last?.focus({ preventScroll: true });
+        return;
+      }
+
+      if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first?.focus({ preventScroll: true });
+      }
     }
 
     document.addEventListener("keydown", handleKeyDown);

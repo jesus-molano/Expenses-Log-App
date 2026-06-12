@@ -13,6 +13,7 @@ import type {
   ExpenseOccurrence,
   ExpenseOccurrenceOverride,
   ExpenseTemplate,
+  AppLanguage,
   RecurrenceRule,
 } from "./types";
 import { buildDateWithDay, estimateChargeDate, toDateOnly } from "./calendar";
@@ -126,6 +127,7 @@ export function generateOccurrences(
   overrides: ExpenseOccurrenceOverride[],
   fromDate: string,
   toDate: string,
+  language: AppLanguage = "es",
 ): ExpenseOccurrence[] {
   const overrideByKey = new Map(
     overrides.map((override) => [
@@ -140,7 +142,7 @@ export function generateOccurrences(
       generateTemplateDates(template, fromDate, toDate).map((date) => {
         const override = overrideByKey.get(`${template.id}:${date}`);
         const dueDate = override?.dueDate ?? date;
-        const estimate = estimateChargeDate(dueDate);
+        const estimate = estimateChargeDate(dueDate, language);
         const defaultSortOrder = templateIndex * 1024;
         const effectiveTemplate = {
           ...template,

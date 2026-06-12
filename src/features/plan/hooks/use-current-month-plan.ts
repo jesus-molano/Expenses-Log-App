@@ -5,9 +5,13 @@ import { endOfMonth, startOfMonth } from "date-fns";
 import { toDateOnly } from "@/domain/calendar";
 import { buildMonthlyMoneyPlan, isEventInMonth } from "@/domain/finance";
 import { generateOccurrences } from "@/domain/recurrence";
-import type { ExpenseStore } from "@/domain/types";
+import type { AppLanguage, ExpenseStore } from "@/domain/types";
 
-export function useCurrentMonthPlan(store: ExpenseStore, today: Date) {
+export function useCurrentMonthPlan(
+  store: ExpenseStore,
+  today: Date,
+  language: AppLanguage,
+) {
   const occurrences = useMemo(
     () =>
       generateOccurrences(
@@ -15,8 +19,9 @@ export function useCurrentMonthPlan(store: ExpenseStore, today: Date) {
         store.overrides,
         toDateOnly(startOfMonth(today)),
         toDateOnly(endOfMonth(today)),
+        language,
       ),
-    [store.templates, store.overrides, today],
+    [store.templates, store.overrides, today, language],
   );
 
   const plan = useMemo(

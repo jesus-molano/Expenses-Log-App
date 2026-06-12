@@ -133,9 +133,22 @@ describe("recurrence", () => {
   it("moves weekend estimates to Monday", () => {
     expect(estimateChargeDate("2026-06-13")).toMatchObject({
       date: "2026-06-15",
+      label: "estimado lunes 15",
     });
     expect(estimateChargeDate("2026-06-14")).toMatchObject({
       date: "2026-06-15",
+      label: "estimado lunes 15",
+    });
+  });
+
+  it("localizes charge estimate labels", () => {
+    expect(estimateChargeDate("2026-06-15", "en")).toMatchObject({
+      date: "2026-06-15",
+      label: "charges Monday 15",
+    });
+    expect(estimateChargeDate("2026-06-14", "en")).toMatchObject({
+      date: "2026-06-15",
+      label: "estimated Monday 15",
     });
   });
 
@@ -154,9 +167,11 @@ describe("recurrence", () => {
       ],
       "2026-06-01",
       "2026-06-30",
+      "en",
     );
 
     expect(occurrence.status).toBe("paid");
+    expect(occurrence.estimatedChargeLabel).toBe("charges Wednesday 10");
   });
 
   it("gives same-day generated occurrences stable sortable gaps", () => {

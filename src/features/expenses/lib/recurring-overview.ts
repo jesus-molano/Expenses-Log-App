@@ -11,6 +11,7 @@ import type {
   ExpenseOccurrence,
   ExpenseOccurrenceOverride,
   ExpenseTemplate,
+  AppLanguage,
 } from "@/domain/types";
 
 export type RecurringOverviewStatus =
@@ -34,11 +35,13 @@ export function buildRecurringOverview({
   overrides,
   windowStart,
   windowEnd,
+  language = "es",
 }: {
   templates: ExpenseTemplate[];
   overrides: ExpenseOccurrenceOverride[];
   windowStart: string;
   windowEnd: string;
+  language?: AppLanguage;
 }): RecurringOverviewItem[] {
   const monthStart = parseISO(windowStart);
   const rangeStart = toDateOnly(startOfYear(subYears(monthStart, 1)));
@@ -54,6 +57,7 @@ export function buildRecurringOverview({
     overrides,
     rangeStart,
     rangeEnd,
+    language,
   ).filter((occurrence) => occurrence.status !== "skipped");
   const occurrencesByTemplate = groupOccurrencesByTemplate(occurrences);
 

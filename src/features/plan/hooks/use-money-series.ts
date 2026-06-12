@@ -26,6 +26,7 @@ export function useMoneySeries(
         store.overrides,
         toDateOnly(startOfMonth(monthDate)),
         toDateOnly(endOfMonth(monthDate)),
+        language,
       );
       const monthPlan = buildMonthlyMoneyPlan({
         monthDate,

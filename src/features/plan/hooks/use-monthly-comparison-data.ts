@@ -59,8 +59,9 @@ export function useMonthlyComparisonData({
         store.overrides,
         toDateOnly(startOfMonth(selectedMonthDate)),
         toDateOnly(endOfMonth(selectedMonthDate)),
+        language,
       ).filter((occurrence) => occurrence.status !== "skipped"),
-    [selectedMonthDate, store.overrides, store.templates],
+    [selectedMonthDate, store.overrides, store.templates, language],
   );
 
   const visibleSelectedMonthOccurrences = selectedExpensesExpanded

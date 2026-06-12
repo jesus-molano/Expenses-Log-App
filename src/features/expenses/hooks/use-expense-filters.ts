@@ -20,8 +20,9 @@ export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
         store.overrides,
         windowStart,
         windowEnd,
+        language,
       ),
-    [store.templates, store.overrides, windowStart, windowEnd],
+    [store.templates, store.overrides, windowStart, windowEnd, language],
   );
 
   const recurringOverviewItems = useMemo(
@@ -31,8 +32,9 @@ export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
         overrides: store.overrides,
         windowStart,
         windowEnd,
+        language,
       }),
-    [store.templates, store.overrides, windowStart, windowEnd],
+    [store.templates, store.overrides, windowStart, windowEnd, language],
   );
 
   const visibleOccurrences = useMemo(
