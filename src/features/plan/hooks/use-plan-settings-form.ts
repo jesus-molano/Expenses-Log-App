@@ -2,8 +2,11 @@
 
 import type { FormEvent } from "react";
 import { useState } from "react";
-import type { AppLanguage, FinanceStore } from "@/domain/types";
-import { getMonthlySavingsTarget } from "@/domain/finance";
+import {
+  getMonthlySalarySettings,
+  getMonthlySavingsTarget,
+} from "@/domain/finance";
+import type { AppLanguage, FinanceStore, PlanAccount } from "@/domain/types";
 import { formatMoneyInput, parseMoneyInput } from "../lib/money-input";
 
 export type PlanSettingsInput = {
@@ -11,9 +14,7 @@ export type PlanSettingsInput = {
   salaryDay: number;
   savingsMonthId: string;
   savingsTarget: number;
-  expensesAccountName: string;
-  savingsAccountName: string;
-  primaryAccountName: string;
+  accounts: PlanAccount[];
 };
 
 export function usePlanSettingsForm({
@@ -27,35 +28,26 @@ export function usePlanSettingsForm({
   savingsMonthId: string;
   onSave: (input: PlanSettingsInput) => void;
 }) {
-  const salary = finance.incomeSources.find(
-    (source) => source.id === "inc-salary",
-  );
+  const salary = getMonthlySalarySettings(finance, savingsMonthId);
   const [salaryAmount, setSalaryAmount] = useState(
-    formatMoneyInput(salary?.amount ?? 0, language),
+    formatMoneyInput(salary.amount, language),
   );
-  const [salaryDay, setSalaryDay] = useState(salary?.dayOfMonth ?? 28);
+  const [salaryDay, setSalaryDay] = useState(salary.dayOfMonth);
   const [savingsTarget, setSavingsTarget] = useState(
     formatMoneyInput(getMonthlySavingsTarget(finance, savingsMonthId), language),
   );
-  const [accountNames, setAccountNames] = useState({
-    expensesAccountName: finance.allocation.expensesAccountName,
-    savingsAccountName: finance.allocation.savingsAccountName,
-    primaryAccountName: finance.allocation.primaryAccountName,
-  });
+  const [accounts, setAccounts] = useState<PlanAccount[]>(finance.accounts);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
 
   function resetFromFinance() {
-    setSalaryAmount(formatMoneyInput(salary?.amount ?? 0, language));
-    setSalaryDay(salary?.dayOfMonth ?? 28);
+    const currentSalary = getMonthlySalarySettings(finance, savingsMonthId);
+    setSalaryAmount(formatMoneyInput(currentSalary.amount, language));
+    setSalaryDay(currentSalary.dayOfMonth);
     setSavingsTarget(
       formatMoneyInput(getMonthlySavingsTarget(finance, savingsMonthId), language),
     );
-    setAccountNames({
-      expensesAccountName: finance.allocation.expensesAccountName,
-      savingsAccountName: finance.allocation.savingsAccountName,
-      primaryAccountName: finance.allocation.primaryAccountName,
-    });
+    setAccounts(finance.accounts);
     setDayPickerOpen(false);
   }
 
@@ -76,7 +68,7 @@ export function usePlanSettingsForm({
       salaryDay,
       savingsMonthId,
       savingsTarget: parseMoneyInput(savingsTarget),
-      ...accountNames,
+      accounts,
     });
     closeSettings();
   }
@@ -85,13 +77,13 @@ export function usePlanSettingsForm({
     salaryAmount,
     salaryDay,
     savingsTarget,
-    accountNames,
+    accounts,
     settingsOpen,
     dayPickerOpen,
     setSalaryAmount,
     setSalaryDay,
     setSavingsTarget,
-    setAccountNames,
+    setAccounts,
     setDayPickerOpen,
     openSettings,
     closeSettings,

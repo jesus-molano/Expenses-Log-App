@@ -4,10 +4,8 @@ import type { AppLanguage, DraftExpense } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import {
   CategoryPicker,
-  DayOfMonthPicker,
   ExpenseField,
-  RecurrencePicker,
-  TagPicker,
+  ExpenseSchedulePicker,
 } from "./ExpenseFormControls";
 
 type ExpenseFormProps = {
@@ -37,7 +35,11 @@ export function ExpenseForm({
         />
       </ExpenseField>
 
-      <ExpenseField label={t("expenses.description", language)}>
+      <ExpenseField
+        label={t("expenses.description", language)}
+        optional
+        language={language}
+      >
         <textarea
           value={form.description}
           onChange={(event) =>
@@ -66,40 +68,10 @@ export function ExpenseForm({
         onChange={(categoryName) => onFormChange({ ...form, categoryName })}
       />
 
-      <DayOfMonthPicker
-        value={form.dueDay}
+      <ExpenseSchedulePicker
+        value={form}
         language={language}
-        onChange={(dueDay) => onFormChange({ ...form, dueDay })}
-      />
-
-      <ExpenseField label={t("expenses.endDate", language)}>
-        <input
-          type="date"
-          value={form.endDate ?? ""}
-          onChange={(event) =>
-            onFormChange({
-              ...form,
-              endDate: event.target.value || undefined,
-            })
-          }
-          className="input-control"
-          aria-label={t("expenses.endDate", language)}
-        />
-        <span className="text-xs font-medium text-[var(--app-text-subtle)]">
-          {t("expenses.endDateHelp", language)}
-        </span>
-      </ExpenseField>
-
-      <RecurrencePicker
-        value={form.recurrence}
-        language={language}
-        onChange={(recurrence) => onFormChange({ ...form, recurrence })}
-      />
-
-      <TagPicker
-        value={form.tags}
-        language={language}
-        onChange={(tags) => onFormChange({ ...form, tags })}
+        onChange={onFormChange}
       />
     </div>
   );

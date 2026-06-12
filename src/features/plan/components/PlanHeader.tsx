@@ -1,6 +1,7 @@
 "use client";
 
 import { Settings2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 
@@ -14,21 +15,22 @@ export function PlanHeader({
   onOpenSettings,
 }: PlanHeaderProps) {
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-      <div className="min-w-0">
+    <div className="relative min-w-0 pr-14">
+      <div className="min-w-0 py-1">
         <h1 className="text-xl font-semibold text-[var(--app-text)]">
           {t("money.monthlyPlan", language)}
         </h1>
       </div>
-      <button
+      <Button
         type="button"
         onClick={onOpenSettings}
         aria-label={t("money.configure", language)}
-        className="inline-flex h-11 shrink-0 items-center gap-2 rounded-2xl bg-[var(--app-panel-soft-alpha)] px-3 text-sm font-semibold text-[var(--app-text)] ring-1 ring-[var(--app-border)] sm:px-4"
+        variant="secondary"
+        className="absolute right-0 top-1/2 shrink-0 -translate-y-1/2 sm:px-4"
+        leadingIcon={<Settings2 size={17} />}
       >
-        <Settings2 size={17} />
         <span className="hidden sm:inline">{t("money.configure", language)}</span>
-      </button>
+      </Button>
     </div>
   );
 }

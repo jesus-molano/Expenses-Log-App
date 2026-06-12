@@ -1,5 +1,6 @@
 "use client";
 
+import { TrendingDown } from "lucide-react";
 import type {
   AppLanguage,
   ExpenseCategory,
@@ -18,6 +19,15 @@ type MonthlyExpenseBreakdownProps = {
   expanded: boolean;
   onToggleExpanded: () => void;
   onSkipOccurrence: (occurrence: ExpenseOccurrence) => void;
+  onUpdateMonthlyExpense: (input: {
+    templateId: string;
+    occurrenceDate: string;
+    dueDate: string;
+    name: string;
+    amount: number;
+    categoryId: string;
+    status: ExpenseOccurrence["status"];
+  }) => void;
 };
 
 export function MonthlyExpenseBreakdown({
@@ -29,19 +39,25 @@ export function MonthlyExpenseBreakdown({
   expanded,
   onToggleExpanded,
   onSkipOccurrence,
+  onUpdateMonthlyExpense,
 }: MonthlyExpenseBreakdownProps) {
   return (
-    <PlanSectionList title={t("money.monthExpenses", language)}>
+    <PlanSectionList
+      title={t("money.monthExpenses", language)}
+      icon={TrendingDown}
+      tone="danger"
+    >
       {visibleOccurrences.length ? (
         visibleOccurrences.map((occurrence) => (
           <MonthlyExpenseRow
             key={occurrence.id}
             occurrence={occurrence}
-            categoryName={getCategoryName(categories, occurrence)}
+            categories={categories}
             language={language}
             today={today}
             skipLabel={t("money.skipMonthExpense", language)}
             onSkip={() => onSkipOccurrence(occurrence)}
+            onUpdate={onUpdateMonthlyExpense}
           />
         ))
       ) : (
@@ -59,15 +75,5 @@ export function MonthlyExpenseBreakdown({
         </button>
       ) : null}
     </PlanSectionList>
-  );
-}
-
-function getCategoryName(
-  categories: ExpenseCategory[],
-  occurrence: ExpenseOccurrence,
-) {
-  return (
-    categories.find((category) => category.id === occurrence.template.categoryId)
-      ?.name ?? "General"
   );
 }

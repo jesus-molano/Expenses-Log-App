@@ -2,6 +2,7 @@
 
 import { format, parseISO } from "date-fns";
 import type { Locale } from "date-fns";
+import { Button } from "@/components/ui/Button";
 import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
 import { t } from "@/shared/i18n";
 
@@ -26,30 +27,30 @@ export function TimelineMovePrompt({
   if (!pendingMove) return null;
 
   return (
-    <div className="fixed inset-x-3 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 mx-auto max-w-md rounded-[1.35rem] border border-white/10 bg-slate-950/94 p-3 text-white shadow-[0_24px_70px_rgba(0,0,0,0.58)] backdrop-blur-2xl">
+    <div className="app-dialog fixed inset-x-3 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 mx-auto p-3">
       <p className="text-sm font-semibold">
         {t("expenses.moved", language)}{" "}
         {pendingMove.occurrence.template.name}{" "}
         {format(parseISO(pendingMove.dueDate), "d MMMM", { locale })}
       </p>
-      <p className="mt-1 text-xs text-slate-300">
+      <p className="mt-1 text-xs text-[var(--app-text-muted)]">
         {t("expenses.movedDetail", language)}
       </p>
       <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
-        <button
+        <Button
           type="button"
           onClick={onApplySeries}
-          className="h-11 rounded-2xl bg-lime-300 text-sm font-semibold text-slate-950 shadow-[0_0_30px_rgba(132,204,22,0.22)]"
+          variant="primary"
         >
           {t("expenses.thisAndNext", language)}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={onClose}
-          className="h-11 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white ring-1 ring-white/10"
+          variant="secondary"
         >
           {t("common.ok", language)}
-        </button>
+        </Button>
       </div>
     </div>
   );

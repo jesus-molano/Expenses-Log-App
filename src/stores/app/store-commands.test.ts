@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { PLAN_ACCOUNT_NAME_MAX_LENGTH } from "@/domain/plan-accounts";
 import { emptyStore } from "@/domain/seed";
 import type {
   DraftExpense,
@@ -11,8 +12,10 @@ import {
   deleteExpenseFromStore,
   skipOccurrenceInStore,
   togglePaidInStore,
+  updateMonthlyExpenseOccurrenceInStore,
   updateLanguageInStore,
   updateMoneySettingsInStore,
+  updateMonthlySalaryInStore,
   updateMonthlySavingsTargetInStore,
   updateThemeInStore,
 } from "./store-commands";
@@ -26,7 +29,6 @@ const draft: DraftExpense = {
   description: "",
   amount: 30,
   categoryName: "Transporte",
-  tags: ["transporte"],
   dueDay: 1,
   recurrence: { frequency: "monthly" },
 };
@@ -97,22 +99,30 @@ describe("store commands", () => {
       salaryDay: 25,
       savingsMonthId: "2026-06",
       savingsTarget: 250,
-      expensesAccountName: "Gastos",
-      savingsAccountName: "Ahorro",
-      primaryAccountName: "Principal",
+      accounts: [
+        {
+          id: "acct-test",
+          name: "Principal",
+          purposes: ["salary", "daily"],
+        },
+      ],
     });
 
-    expect(financeStore.finance.incomeSources[0]).toMatchObject({
+    expect(financeStore.finance.monthlySalary["2026-06"]).toMatchObject({
       amount: 1800,
       dayOfMonth: 25,
     });
-    expect(financeStore.finance.allocation).toMatchObject({
-      expensesAccountName: "Gastos",
-      savingsAccountName: "Ahorro",
-      primaryAccountName: "Principal",
+    expect(financeStore.finance).toMatchObject({
       monthlySavingsTargets: {
         "2026-06": 250,
       },
+      accounts: [
+        {
+          id: "acct-test",
+          name: "Principal",
+          purposes: ["salary", "daily"],
+        },
+      ],
     });
 
     expect(updateThemeInStore(emptyStore, "catppuccin").preferences?.theme).toBe(
@@ -123,15 +133,40 @@ describe("store commands", () => {
     );
   });
 
+  it("normalizes configurable accounts", () => {
+    const updated = updateMoneySettingsInStore(emptyStore, {
+      salaryAmount: 1800,
+      salaryDay: 25,
+      savingsMonthId: "2026-06",
+      savingsTarget: 250,
+      accounts: [
+        {
+          id: "acct-test",
+          name: "Cuenta con nombre demasiado largo para mobile",
+          purposes: ["daily", "other", "legacy" as never],
+        },
+      ],
+    });
+
+    expect(updated.finance.accounts[0].name).toHaveLength(
+      PLAN_ACCOUNT_NAME_MAX_LENGTH,
+    );
+    expect(updated.finance.accounts[0].purposes).toEqual(["daily", "other"]);
+  });
+
   it("updates only the savings target for a selected month", () => {
     const withSettings = updateMoneySettingsInStore(emptyStore, {
       salaryAmount: 1800,
       salaryDay: 25,
       savingsMonthId: "2026-06-01",
       savingsTarget: 250,
-      expensesAccountName: "Gastos",
-      savingsAccountName: "Ahorro",
-      primaryAccountName: "Principal",
+      accounts: [
+        {
+          id: "acct-test",
+          name: "Principal",
+          purposes: ["salary", "daily"],
+        },
+      ],
     });
 
     const updated = updateMonthlySavingsTargetInStore(withSettings, {
@@ -139,17 +174,73 @@ describe("store commands", () => {
       savingsTarget: 800,
     });
 
-    expect(updated.finance.allocation).toMatchObject({
-      expensesAccountName: "Gastos",
-      savingsAccountName: "Ahorro",
-      primaryAccountName: "Principal",
+    expect(updated.finance).toMatchObject({
       monthlySavingsTargets: {
         "2026-06": 250,
         "2026-07": 800,
       },
     });
-    expect(updated.finance.incomeSources).toEqual(
-      withSettings.finance.incomeSources,
+    expect(updated.finance.monthlySalary).toEqual(withSettings.finance.monthlySalary);
+  });
+
+  it("updates only the salary settings for a selected month", () => {
+    const withSettings = updateMoneySettingsInStore(emptyStore, {
+      salaryAmount: 1800,
+      salaryDay: 25,
+      savingsMonthId: "2026-06-01",
+      savingsTarget: 250,
+      accounts: [
+        {
+          id: "acct-test",
+          name: "Principal",
+          purposes: ["salary", "daily"],
+        },
+      ],
+    });
+
+    const updated = updateMonthlySalaryInStore(withSettings, {
+      monthId: "2026-07-01",
+      salaryAmount: 2200,
+      salaryDay: 27,
+    });
+
+    expect(updated.finance.monthlySalary).toMatchObject({
+      "2026-06": {
+        amount: 1800,
+        dayOfMonth: 25,
+      },
+      "2026-07": {
+        amount: 2200,
+        dayOfMonth: 27,
+      },
+    });
+    expect(updated.finance.monthlySavingsTargets).toEqual(
+      withSettings.finance.monthlySavingsTargets,
     );
+    expect(updated.finance.accounts).toEqual(withSettings.finance.accounts);
+  });
+
+  it("updates a single monthly expense occurrence with a snapshot", () => {
+    const added = addExpenseToStore(emptyStore, draft);
+    const occurrence = occurrenceFrom(added);
+    const updated = updateMonthlyExpenseOccurrenceInStore(added, {
+      templateId: occurrence.template.id,
+      occurrenceDate: occurrence.occurrenceDate,
+      dueDate: "2026-06-03",
+      name: "Parking junio",
+      amount: 35,
+      categoryId: occurrence.template.categoryId,
+      status: "paid",
+    });
+
+    expect(updated.overrides[0]).toMatchObject({
+      templateId: occurrence.template.id,
+      occurrenceDate: "2026-06-01",
+      dueDate: "2026-06-03",
+      name: "Parking junio",
+      amount: 35,
+      status: "paid",
+      amountPaid: 35,
+    });
   });
 });

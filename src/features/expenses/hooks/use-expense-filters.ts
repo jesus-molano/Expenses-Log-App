@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
 import { generateOccurrences } from "@/domain/recurrence";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
+import { buildRecurringOverview } from "../lib/recurring-overview";
 import { buildTimelineSections } from "../lib/timeline";
 
 export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
@@ -25,6 +26,17 @@ export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
     [store.templates, store.overrides, windowStart, windowEnd],
   );
 
+  const recurringOverviewItems = useMemo(
+    () =>
+      buildRecurringOverview({
+        templates: store.templates,
+        overrides: store.overrides,
+        windowStart,
+        windowEnd,
+      }),
+    [store.templates, store.overrides, windowStart, windowEnd],
+  );
+
   const visibleOccurrences = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -34,8 +46,7 @@ export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
       const matchesQuery =
         !normalizedQuery ||
         occurrence.template.name.toLowerCase().includes(normalizedQuery) ||
-        occurrence.template.description.toLowerCase().includes(normalizedQuery) ||
-        occurrence.template.tags.some((tag) => tag.includes(normalizedQuery));
+        occurrence.template.description.toLowerCase().includes(normalizedQuery);
 
       return matchesQuery;
     });
@@ -46,6 +57,8 @@ export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
       (occurrence) =>
         occurrence.status !== "paid" &&
         occurrence.status !== "skipped" &&
+        occurrence.dueDate >= windowStart &&
+        occurrence.dueDate <= windowEnd &&
         occurrence.estimatedChargeDate <= windowEnd,
     )
     .reduce((sum, occurrence) => sum + occurrence.template.amount, 0);
@@ -70,6 +83,7 @@ export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
     nextOccurrence,
     visibleOccurrences,
     timelineSections,
+    recurringOverviewItems,
     setQuery,
   };
 }

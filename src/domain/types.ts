@@ -1,4 +1,5 @@
 export type RecurrenceFrequency =
+  | "once"
   | "monthly"
   | "quarterly"
   | "yearly"
@@ -41,7 +42,6 @@ export type ExpenseTemplate = {
   amount: number;
   currency: "EUR";
   categoryId: string;
-  tags: string[];
   startDate: string;
   endDate?: string;
   dueDay: number;
@@ -59,6 +59,9 @@ export type ExpenseOccurrenceOverride = {
   dueDate?: string;
   sortOrder?: number;
   status: OccurrenceStatus;
+  name?: string;
+  amount?: number;
+  categoryId?: string;
   paidAt?: string;
   amountPaid?: number;
   note?: string;
@@ -81,7 +84,7 @@ export type DraftExpense = {
   description: string;
   amount: number;
   categoryName: string;
-  tags: string[];
+  startDate?: string;
   dueDay: number;
   endDate?: string;
   recurrence: RecurrenceRule;
@@ -89,18 +92,6 @@ export type DraftExpense = {
 
 export type CreateExpenseOptions = {
   initialStatus?: Extract<OccurrenceStatus, "due" | "paid">;
-};
-
-export type IncomeSource = {
-  id: string;
-  userId: string;
-  name: string;
-  amount: number;
-  currency: "EUR";
-  dayOfMonth: number;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
 };
 
 export type IncomeEvent = {
@@ -115,32 +106,45 @@ export type IncomeEvent = {
   updatedAt: string;
 };
 
-export type AllocationSettings = {
-  expensesAccountName: string;
-  savingsAccountName: string;
-  primaryAccountName: string;
-  monthlySavingsTargets: Record<string, number>;
-  monthlySavingsTarget?: number;
+export type MonthlySalarySettings = {
+  amount: number;
+  dayOfMonth: number;
+};
+
+export type PlanAccountPurpose =
+  | "salary"
+  | "expenses"
+  | "daily"
+  | "savings"
+  | "investment"
+  | "other";
+
+export type PlanAccount = {
+  id: string;
+  name: string;
+  purposes: PlanAccountPurpose[];
 };
 
 export type FinanceStore = {
-  incomeSources: IncomeSource[];
   incomeEvents: IncomeEvent[];
-  allocation: AllocationSettings;
+  monthlySalary: Record<string, MonthlySalarySettings>;
+  monthlySavingsTargets: Record<string, number>;
+  accounts: PlanAccount[];
 };
 
-export type AppTheme = "legacy" | "rose-pine" | "catppuccin" | "light";
+export type AppTheme = "dark" | "rose-pine" | "catppuccin" | "light";
 export type AppLanguage = "es" | "en";
 
 export type MonthlyMoneyPlan = {
   month: string;
   incomeTotal: number;
-  recurringIncomeTotal: number;
+  salaryIncomeTotal: number;
   extraIncomeTotal: number;
-  fixedExpensesTotal: number;
+  plannedExpensesTotal: number;
   expensesContribution: number;
   savingsContribution: number;
-  primaryContribution: number;
+  remainingContribution: number;
+  investmentContribution: number;
   shortfall: number;
 };
 

@@ -27,15 +27,15 @@ export function AccountRow({ settings }: { settings: SettingsController }) {
           <Button
             variant="secondary"
             onClick={settings.signOut}
-            className="h-9 rounded-xl px-3"
+            size="sm"
+            leadingIcon={<LogOut size={16} />}
           >
-            <LogOut size={16} />
             {t("settings.signOut")}
           </Button>
         ) : (
           <Link
             href="/login"
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[var(--app-accent)] px-3 text-sm font-semibold text-[var(--app-accent-contrast)]"
+            className="app-button app-button-primary app-button-sm"
           >
             <LogIn size={16} />
             {t("settings.google")}

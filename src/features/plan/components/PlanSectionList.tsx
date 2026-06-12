@@ -1,26 +1,46 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
+import { Surface } from "@/components/ui/Surface";
 
 export function PlanSectionList({
   title,
+  icon: Icon,
+  tone = "default",
   children,
 }: {
   title: string;
+  icon?: ComponentType<{ size?: number; className?: string }>;
+  tone?: "default" | "success" | "danger";
   children: ReactNode;
 }) {
+  const iconTone = {
+    default: "text-[var(--app-text-muted)]",
+    success: "text-[var(--app-success)]",
+    danger: "text-[var(--app-danger)]",
+  }[tone];
+
   return (
-    <section className="mt-3">
-      <h4 className="text-sm font-semibold text-[var(--app-text)]">{title}</h4>
-      <div className="mt-2 grid gap-2">{children}</div>
+    <section className="mt-9">
+      <h3 className="inline-flex items-center gap-1.5 text-base font-semibold text-[var(--app-text)]">
+        <span>{title}</span>
+        {Icon ? (
+          <span
+            className={`app-section-list-icon grid size-5 place-items-center rounded-full ${iconTone}`}
+          >
+            <Icon size={13} />
+          </span>
+        ) : null}
+      </h3>
+      <div className="mt-4 grid gap-3">{children}</div>
     </section>
   );
 }
 
 export function PlanEmptyLine({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-2xl bg-[var(--app-panel-soft-alpha)] px-3 py-2 text-sm font-medium text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]">
+    <Surface variant="empty" className="px-3 py-2 text-sm font-medium">
       {children}
-    </p>
+    </Surface>
   );
 }

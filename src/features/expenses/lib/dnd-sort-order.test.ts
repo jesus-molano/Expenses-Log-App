@@ -20,7 +20,6 @@ function occurrence(id: string, sortOrder: number): ExpenseOccurrence {
       amount: 1,
       currency: "EUR",
       categoryId: "cat",
-      tags: [],
       startDate: "2026-06-15",
       dueDay: 15,
       recurrence: { frequency: "monthly" },
@@ -34,10 +33,11 @@ function occurrence(id: string, sortOrder: number): ExpenseOccurrence {
 function section(items: ExpenseOccurrence[]): TimelineSection {
   return {
     id: "2026-06-15",
-    date: "2026-06-15",
     title: "Lunes 15",
     subtitle: "Pendiente",
-    tone: "default",
+    tone: "pending",
+    priority: 3,
+    anchorDate: "2026-06-15",
     total: 1,
     items,
   };

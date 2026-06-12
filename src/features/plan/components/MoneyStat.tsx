@@ -8,7 +8,7 @@ export function MoneyStat({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0 rounded-2xl bg-[var(--app-panel-soft-alpha)] px-3 py-2.5 ring-1 ring-[color-mix(in_srgb,var(--app-border)_70%,transparent)]">
+    <div className="app-stat-card px-3 py-2.5">
       <p className="text-xs font-medium text-[var(--app-text-muted)]">{label}</p>
       <div className="mt-1 flex min-w-0 items-center justify-between gap-2">
         <p className="min-w-0 truncate text-base font-semibold text-[var(--app-text)]">

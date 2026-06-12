@@ -22,14 +22,19 @@ import {
   moveOccurrenceSeriesInStore,
   skipOccurrenceInStore,
   togglePaidInStore,
+  updateIncomeEventInStore,
   updateLanguageInStore,
   updateMoneySettingsInStore,
+  updateMonthlyExpenseOccurrenceInStore,
+  updateMonthlySalaryInStore,
   updateMonthlySavingsTargetInStore,
   updateThemeInStore,
 } from "./store-commands";
 import type {
   IncomeEventInput,
   MoneySettingsInput,
+  MonthlyExpenseOverrideInput,
+  MonthlySalaryInput,
   MonthlySavingsTargetInput,
 } from "./store-types";
 import { useStorePersistence } from "./use-store-persistence";
@@ -93,12 +98,24 @@ export function useExpenseStore() {
     persist(updateMonthlySavingsTargetInStore(store, input));
   }
 
+  function updateMonthlySalary(input: MonthlySalaryInput) {
+    persist(updateMonthlySalaryInStore(store, input));
+  }
+
   function addIncomeEvent(input: IncomeEventInput) {
     persist(addIncomeEventToStore(store, input));
   }
 
   function deleteIncomeEvent(eventId: string) {
     persist(deleteIncomeEventFromStore(store, eventId));
+  }
+
+  function updateIncomeEvent(eventId: string, input: IncomeEventInput) {
+    persist(updateIncomeEventInStore(store, eventId, input));
+  }
+
+  function updateMonthlyExpenseOccurrence(input: MonthlyExpenseOverrideInput) {
+    persist(updateMonthlyExpenseOccurrenceInStore(store, input));
   }
 
   function updateTheme(theme: AppTheme) {
@@ -123,8 +140,11 @@ export function useExpenseStore() {
     moveOccurrenceSeries,
     updateMoneySettings,
     updateMonthlySavingsTarget,
+    updateMonthlySalary,
     addIncomeEvent,
     deleteIncomeEvent,
+    updateIncomeEvent,
+    updateMonthlyExpenseOccurrence,
     updateTheme,
     updateLanguage,
     syncStatus: persistence.syncStatus,

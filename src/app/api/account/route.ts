@@ -4,9 +4,6 @@ import { createClient } from "@/utils/supabase/server";
 
 const USER_SCOPED_TABLES: Array<{ table: string; column: string }> = [
   { table: "push_subscriptions", column: "user_id" },
-  { table: "expense_occurrence_overrides", column: "user_id" },
-  { table: "expense_templates", column: "user_id" },
-  { table: "expense_categories", column: "user_id" },
   { table: "app_stores", column: "user_id" },
   { table: "profiles", column: "id" },
 ];

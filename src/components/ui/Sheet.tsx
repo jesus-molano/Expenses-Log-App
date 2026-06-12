@@ -1,22 +1,48 @@
-﻿import { cn } from "@/shared/ui";
+"use client";
+
+import { useEffect } from "react";
+import { cn } from "@/shared/ui";
 
 type SheetProps = {
   children: React.ReactNode;
   className?: string;
   contentClassName?: string;
+  onBackdropClick?: () => void;
 };
 
-export function Sheet({ children, className, contentClassName }: SheetProps) {
+export function Sheet({
+  children,
+  className,
+  contentClassName,
+  onBackdropClick,
+}: SheetProps) {
+  useEffect(() => {
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    const originalBodyOverflow = document.body.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+    };
+  }, []);
+
   return (
     <div
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onBackdropClick?.();
+      }}
       className={cn(
-        "fixed inset-0 z-50 flex items-end bg-[color-mix(in_srgb,var(--app-bg)_72%,transparent)] p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6",
+        "app-sheet-backdrop",
         className,
       )}
     >
       <div
+        onMouseDown={(event) => event.stopPropagation()}
         className={cn(
-          "max-h-[92dvh] w-full overflow-y-auto rounded-t-[1.65rem] border border-[var(--app-border)] bg-[var(--app-surface-strong)] shadow-[var(--app-shadow)] sm:max-w-xl sm:rounded-[1.65rem]",
+          "app-sheet-panel",
           contentClassName,
         )}
       >
@@ -25,4 +51,3 @@ export function Sheet({ children, className, contentClassName }: SheetProps) {
     </div>
   );
 }
-

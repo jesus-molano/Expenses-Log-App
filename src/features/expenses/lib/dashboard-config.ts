@@ -39,7 +39,7 @@ export function createEmptyDraft(): DraftExpense {
     description: "",
     amount: 1,
     categoryName: "General",
-    tags: [],
+    startDate: new Date().toISOString().slice(0, 10),
     dueDay: new Date().getDate(),
     recurrence: { frequency: "monthly" },
   };

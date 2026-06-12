@@ -35,7 +35,7 @@ export function NotificationsRow({
           variant="secondary"
           onClick={settings.enableNotifications}
           disabled={settings.notificationsActive}
-          className="h-9 rounded-xl px-3"
+          size="sm"
         >
           {settings.notificationsActive ? t("settings.active") : t("settings.activate")}
         </Button>

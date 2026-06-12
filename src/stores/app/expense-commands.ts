@@ -11,6 +11,7 @@ import {
   createId,
   findOrCreateCategory,
 } from "@/features/expenses/lib/expense-actions";
+import type { MonthlyExpenseOverrideInput } from "./store-types";
 
 export function addExpenseToStore(
   store: ExpenseStore,
@@ -18,13 +19,13 @@ export function addExpenseToStore(
   options: CreateExpenseOptions = {},
 ): ExpenseStore {
   const categoryResult = findOrCreateCategory(store, draft.categoryName);
-  const startDate = toDateOnly(startOfMonth(new Date()));
+  const startDate = draft.startDate || toDateOnly(startOfMonth(new Date()));
   const template = buildTemplateFromDraft(
-    draft,
+    normalizeDraftStartDate(draft, startDate),
     categoryResult.categoryId,
     startDate,
   );
-  const occurrenceDate = toDateOnly(buildDateWithDay(new Date(), draft.dueDay));
+  const occurrenceDate = getInitialOccurrenceDate(draft, startDate);
   const initialOverrides =
     options.initialStatus === "paid"
       ? [
@@ -44,6 +45,32 @@ export function addExpenseToStore(
     ...categoryResult.store,
     templates: [...categoryResult.store.templates, template],
     overrides: [...categoryResult.store.overrides, ...initialOverrides],
+  };
+}
+
+function getInitialOccurrenceDate(draft: DraftExpense, startDate: string): string {
+  const isAnchoredToStartDate =
+    draft.recurrence.frequency === "once" ||
+    (draft.recurrence.frequency === "custom" &&
+      ["day", "week"].includes(draft.recurrence.unit ?? ""));
+
+  if (isAnchoredToStartDate) return startDate;
+
+  return toDateOnly(
+    buildDateWithDay(new Date(`${startDate}T00:00:00`), draft.dueDay),
+  );
+}
+
+function normalizeDraftStartDate(draft: DraftExpense, startDate: string): DraftExpense {
+  if (draft.recurrence.frequency !== "yearly") return draft;
+  if (draft.recurrence.annualMonth) return draft;
+
+  return {
+    ...draft,
+    recurrence: {
+      ...draft.recurrence,
+      annualMonth: new Date(`${startDate}T00:00:00`).getMonth() + 1,
+    },
   };
 }
 
@@ -186,5 +213,52 @@ export function moveOccurrenceSeriesInStore(
           }
         : template,
     ),
+  };
+}
+
+export function updateMonthlyExpenseOccurrenceInStore(
+  store: ExpenseStore,
+  input: MonthlyExpenseOverrideInput,
+): ExpenseStore {
+  const existing = store.overrides.find(
+    (override) =>
+      override.templateId === input.templateId &&
+      override.occurrenceDate === input.occurrenceDate,
+  );
+  const now = new Date().toISOString();
+  const nextOverride = {
+    id: existing?.id ?? createId("ovr"),
+    userId: existing?.userId ?? "demo",
+    templateId: input.templateId,
+    occurrenceDate: input.occurrenceDate,
+    dueDate: input.dueDate === input.occurrenceDate ? undefined : input.dueDate,
+    sortOrder: existing?.sortOrder,
+    status: input.status,
+    name: input.name.trim(),
+    amount: Math.max(Number(input.amount), 0.01),
+    categoryId: input.categoryId,
+    paidAt:
+      input.status === "paid"
+        ? existing?.paidAt ?? now
+        : undefined,
+    amountPaid:
+      input.status === "paid"
+        ? Math.max(Number(input.amount), 0.01)
+        : undefined,
+    note: existing?.note,
+  };
+
+  return {
+    ...store,
+    overrides: [
+      ...store.overrides.filter(
+        (override) =>
+          !(
+            override.templateId === input.templateId &&
+            override.occurrenceDate === input.occurrenceDate
+          ),
+      ),
+      nextOverride,
+    ],
   };
 }

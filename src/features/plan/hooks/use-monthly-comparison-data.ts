@@ -87,7 +87,7 @@ function emptyMonthSummary(
     monthLong: format(today, "MMMM yyyy", { locale }),
     income: 0,
     expenses: 0,
-    free: 0,
+    remaining: 0,
     savings: 0,
     shortfall: 0,
     hasRecords: true,

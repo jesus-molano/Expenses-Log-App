@@ -81,7 +81,7 @@ function getFirstMonthWithData(
       monthIds.add(event.receivedAt.slice(0, 7));
     }
   }
-  const monthlyTargets = store.finance.allocation.monthlySavingsTargets ?? {};
+  const monthlyTargets = store.finance.monthlySavingsTargets ?? {};
   for (const monthId of Object.keys(monthlyTargets)) {
     if (monthId.startsWith(`${selectedYear}-`)) {
       monthIds.add(monthId);
@@ -103,7 +103,7 @@ function estimateSavingsFromFirstDataMonth({
   todayMonthId: string;
 }): number {
   const monthIds = monthsFrom(firstMonthId, selectedYear);
-  const monthlyTargets = store.finance.allocation.monthlySavingsTargets ?? {};
+  const monthlyTargets = store.finance.monthlySavingsTargets ?? {};
   const explicitTargets = Object.entries(monthlyTargets).filter(
     ([monthId]) =>
       monthId.startsWith(`${selectedYear}-`) && monthId >= firstMonthId,

@@ -15,7 +15,6 @@ function storeWithTemplate(id: string): ExpenseStore {
         amount: 1,
         currency: "EUR",
         categoryId: "cat",
-        tags: [],
         startDate: "2026-06-01",
         dueDay: 1,
         recurrence: { frequency: "monthly" },

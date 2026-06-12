@@ -10,12 +10,12 @@ type TimelineEmptyStateProps = {
 
 export function TimelineEmptyState({ language }: TimelineEmptyStateProps) {
   return (
-    <div className="grid place-items-center rounded-[1.25rem] border border-dashed border-white/15 bg-white/[0.04] px-6 py-14 text-center">
-      <Home size={32} className="text-slate-500" />
-      <p className="mt-3 font-semibold text-white">
+    <div className="app-empty-line grid place-items-center border-dashed px-6 py-14 text-center">
+      <Home size={32} className="text-[var(--app-text-subtle)]" />
+      <p className="mt-3 font-semibold text-[var(--app-text)]">
         {t("expenses.emptyTitle", language)}
       </p>
-      <p className="mt-1 max-w-xs text-sm text-slate-400">
+      <p className="mt-1 max-w-xs text-sm text-[var(--app-text-muted)]">
         {t("expenses.emptyBody", language)}
       </p>
     </div>

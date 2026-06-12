@@ -10,7 +10,6 @@ import type {
 } from "@/domain/types";
 import {
   findOrCreateCategory,
-  normalizeTags,
 } from "@/features/expenses/lib/expense-actions";
 import {
   formatEuroInput,
@@ -42,10 +41,10 @@ export function useExpenseEditor({
     description: template.description,
     amount: template.amount,
     categoryName: resolvePresetCategory(category?.name ?? "General").name,
+    startDate: template.startDate,
     dueDay: template.dueDay,
     endDate: template.endDate,
     recurrence: template.recurrence,
-    tags: template.tags,
   }));
 
   const previewAmount = Math.max(parseEuroInput(amountText), 0);
@@ -66,10 +65,10 @@ export function useExpenseEditor({
               description: form.description.trim(),
               amount,
               categoryId: categoryResult.categoryId,
+              startDate: form.startDate || item.startDate,
               dueDay: Math.min(Math.max(Number(form.dueDay), 1), 31),
               endDate: form.endDate || undefined,
               recurrence: form.recurrence,
-              tags: normalizeTags(form.tags.join(",")),
               updatedAt: new Date().toISOString(),
             }
           : item,

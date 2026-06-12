@@ -34,7 +34,7 @@ export function MonthlyComparisonSelectors({
   onSelectMonth,
 }: MonthlyComparisonSelectorsProps) {
   return (
-    <div className="mt-3 grid grid-cols-[0.8fr_1.2fr] gap-2">
+    <div className="mt-5 grid grid-cols-[0.8fr_1.2fr] gap-3">
       <SelectorField label={t("money.year", language)}>
         <CompactMenu
           open={yearMenuOpen}
@@ -74,7 +74,7 @@ export function MonthlyComparisonSelectors({
                 }}
               >
                 <span className="truncate capitalize">{item.monthLong}</span>
-                <span>{formatCurrency(item.free)}</span>
+                <span>{formatCurrency(item.remaining)}</span>
               </SelectorOption>
             ))
           ) : (
@@ -116,11 +116,8 @@ function SelectorOption({
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-9 w-full items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-semibold ${
-        selected
-          ? "bg-[var(--app-accent)] text-[var(--app-accent-contrast)]"
-          : "text-[var(--app-text)] hover:bg-[var(--app-panel-soft-alpha)]"
-      }`}
+      className="app-control flex h-9 w-full items-center justify-between gap-3 rounded-[var(--app-radius-sm)] px-3 text-left text-sm font-semibold"
+      data-selected={selected ? "true" : "false"}
     >
       {children}
     </button>

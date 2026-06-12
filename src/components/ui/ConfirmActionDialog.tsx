@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "./Button";
 
 type ConfirmActionDialogProps = {
   icon: React.ReactNode;
@@ -32,12 +33,12 @@ export function ConfirmActionDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-end bg-[color-mix(in_srgb,var(--app-bg)_70%,transparent)] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 backdrop-blur-md sm:place-items-center sm:p-6"
+      className="app-sheet-backdrop z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-action-title"
     >
-      <div className="w-full max-w-sm rounded-[1.35rem] border border-[color-mix(in_srgb,var(--app-danger)_28%,transparent)] bg-[color-mix(in_srgb,var(--app-surface)_92%,transparent)] p-4 text-[var(--app-text)] shadow-[var(--app-shadow)] ring-1 ring-[var(--app-border)]">
+      <div className="app-dialog border-[color-mix(in_srgb,var(--app-danger)_28%,transparent)] p-4">
         <div className="flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[color-mix(in_srgb,var(--app-danger)_16%,transparent)] text-[var(--app-danger)] ring-1 ring-[color-mix(in_srgb,var(--app-danger)_26%,transparent)]">
             {icon}
@@ -66,22 +67,22 @@ export function ConfirmActionDialog({
         ) : null}
 
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <button
+          <Button
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="h-11 rounded-2xl bg-[var(--app-panel-soft-alpha)] text-sm font-semibold text-[var(--app-text)] ring-1 ring-[var(--app-border)] transition hover:bg-[color-mix(in_srgb,var(--app-text)_10%,transparent)] disabled:opacity-50"
+            variant="secondary"
           >
             {cancelLabel}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onConfirm}
             disabled={!canConfirm}
-            className="h-11 rounded-2xl bg-[color-mix(in_srgb,var(--app-danger)_22%,transparent)] text-sm font-semibold text-[var(--app-danger)] ring-1 ring-[color-mix(in_srgb,var(--app-danger)_34%,transparent)] transition hover:bg-[color-mix(in_srgb,var(--app-danger)_28%,transparent)] disabled:opacity-45"
+            variant="danger"
           >
             {loading ? "..." : confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

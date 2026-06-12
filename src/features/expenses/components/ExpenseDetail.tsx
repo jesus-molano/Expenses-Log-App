@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { formatCurrency } from "@/domain/calendar";
 import type {
@@ -21,9 +22,9 @@ export function ExpenseDetail({ id }: { id: string }) {
 
   if (!expenseStore.isHydrated) {
     return (
-      <main className="grid min-h-dvh place-items-center bg-slate-950 p-6 text-center text-white">
-        <div className="rounded-3xl border border-white/10 bg-white/[0.04] px-6 py-5">
-          <p className="font-semibold">
+      <main className="app-page grid min-h-dvh place-items-center p-6 text-center">
+        <div className="app-section-card px-6 py-5">
+          <p className="font-semibold text-[var(--app-text)]">
             {t("expenses.loadingExpense", language)}
           </p>
         </div>
@@ -33,12 +34,15 @@ export function ExpenseDetail({ id }: { id: string }) {
 
   if (!template) {
     return (
-      <main className="grid min-h-dvh place-items-center bg-slate-950 p-6 text-center text-white">
-        <div>
-          <p className="font-semibold">
+      <main className="app-page grid min-h-dvh place-items-center p-6 text-center">
+        <div className="app-section-card p-5">
+          <p className="font-semibold text-[var(--app-text)]">
             {t("expenses.expenseNotFound", language)}
           </p>
-          <Link className="mt-3 inline-block text-sm text-slate-300" href="/">
+          <Link
+            className="mt-3 inline-block text-sm font-semibold text-[var(--app-accent)]"
+            href="/"
+          >
             {t("common.back", language)}
           </Link>
         </div>
@@ -68,11 +72,11 @@ function ExpenseDetailForm({
   const editor = useExpenseEditor({ template, expenseStore, language });
 
   return (
-    <main className="app-page-bg min-h-dvh px-4 py-5 text-white">
+    <main className="app-page min-h-dvh px-4 py-5">
       <div className="mx-auto max-w-2xl">
         <Link
           href="/"
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-white/10 px-3 text-sm font-medium text-white ring-1 ring-white/10"
+          className="app-button app-button-secondary app-button-sm inline-flex"
         >
           <ArrowLeft size={18} />
           {t("expenses.expensesBack", language)}
@@ -80,18 +84,18 @@ function ExpenseDetailForm({
 
         <form
           onSubmit={editor.saveExpense}
-          className="mt-4 rounded-[1.35rem] border border-white/10 bg-slate-950/82 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.48)] backdrop-blur-2xl"
+          className="app-section-card mt-4 p-5"
         >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-lime-100">
+              <p className="text-sm font-medium text-[var(--app-accent)]">
                 {localizedRecurrenceLabel(editor.form.recurrence, language)}
               </p>
-              <h1 className="mt-1 truncate text-3xl font-semibold">
+              <h1 className="mt-1 truncate text-3xl font-semibold text-[var(--app-text)]">
                 {editor.form.name || template.name}
               </h1>
             </div>
-            <p className="shrink-0 text-xl font-semibold">
+            <p className="shrink-0 text-xl font-semibold text-[var(--app-text)]">
               {formatCurrency(editor.previewAmount)}
             </p>
           </div>
@@ -107,17 +111,17 @@ function ExpenseDetailForm({
           </div>
 
           <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
-            <button className="h-11 rounded-2xl bg-lime-300 text-sm font-semibold text-slate-950">
+            <Button type="submit">
               {t("expenses.saveChanges", language)}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="danger"
+              leadingIcon={<Trash2 size={17} />}
               onClick={() => editor.setDeleteOpen(true)}
-              className="inline-flex h-11 items-center gap-2 rounded-2xl bg-rose-400/14 px-4 text-sm font-semibold text-rose-100 ring-1 ring-rose-300/20"
             >
-              <Trash2 size={17} />
               {t("expenses.delete", language)}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

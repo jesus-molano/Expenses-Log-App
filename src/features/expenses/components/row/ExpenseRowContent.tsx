@@ -28,9 +28,7 @@ export function ExpenseRowContent({
         <div className="flex min-w-0 items-center gap-2">
           <span
             className={`min-w-0 truncate text-[15px] font-semibold ${
-              paid
-                ? "text-slate-300 line-through decoration-slate-400"
-                : "text-white"
+              paid ? "app-row-paid" : "text-[var(--app-text)]"
             }`}
           >
             {occurrence.template.name}
@@ -50,7 +48,7 @@ export function ExpenseRowContent({
       <div className="shrink-0 text-right">
         <p
           className={`text-[14px] font-semibold ${
-            paid ? "text-slate-300 line-through decoration-slate-400" : "text-white"
+            paid ? "app-row-paid" : "text-[var(--app-text)]"
           }`}
         >
           {formatCurrency(occurrence.template.amount)}

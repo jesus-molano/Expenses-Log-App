@@ -2,21 +2,23 @@
 
 import { useState } from "react";
 import { formatCurrency } from "@/domain/calendar";
+import { buildAccountAllocations } from "@/domain/finance";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { t } from "@/shared/i18n";
 import { useMoneyDashboardData } from "../hooks/use-money-dashboard-data";
+import { useMonthlySalaryEditor } from "../hooks/use-monthly-salary-editor";
 import { useMonthlySavingsTargetEditor } from "../hooks/use-monthly-savings-target-editor";
 import { useOneOffIncomeForm } from "../hooks/use-one-off-income-form";
 import { usePlanSettingsForm } from "../hooks/use-plan-settings-form";
 import { useSkipOccurrenceConfirmation } from "../hooks/use-skip-occurrence-confirmation";
 import { AccountAllocationCards } from "./AccountAllocationCards";
 import { MonthlyComparisonSection } from "./MonthlyComparisonSection";
+import { MonthlySalaryDialog } from "./MonthlySalaryDialog";
 import { MonthlySavingsTargetDialog } from "./MonthlySavingsTargetDialog";
 import { MonthlyTrendSection } from "./MonthlyTrendSection";
 import { OneOffIncomePanel } from "./OneOffIncomePanel";
-import { PlanAnalyticsDivider } from "./PlanAnalyticsDivider";
 import { PlanHeader } from "./PlanHeader";
 import { PlanSettingsSheet } from "./PlanSettingsSheet";
 import { PlanShortfallBanner } from "./PlanShortfallBanner";
@@ -28,8 +30,11 @@ export function MoneyDashboard() {
     store,
     updateMoneySettings,
     updateMonthlySavingsTarget,
+    updateMonthlySalary,
     addIncomeEvent,
     deleteIncomeEvent,
+    updateIncomeEvent,
+    updateMonthlyExpenseOccurrence,
     skipOccurrence,
   } = useExpenseStore();
   const chrome = useScrollChrome();
@@ -54,12 +59,19 @@ export function MoneyDashboard() {
     monthLabel: money.selectedMonthSummary.monthLong,
     onSave: updateMonthlySavingsTarget,
   });
+  const salaryEditor = useMonthlySalaryEditor({
+    finance: store.finance,
+    language,
+    monthId: money.selectedMonthSummary.id,
+    monthLabel: money.selectedMonthSummary.monthLong,
+    onSave: updateMonthlySalary,
+  });
   const [yearMenuOpen, setYearMenuOpen] = useState(false);
   const [monthMenuOpen, setMonthMenuOpen] = useState(false);
 
   return (
     <DashboardShell
-      headlineLabel={formatCurrency(money.plan.primaryContribution)}
+      headlineLabel={formatCurrency(money.plan.remainingContribution)}
       headlineTitle={
         money.plan.shortfall > 0
           ? t("common.shortfall", language)
@@ -69,30 +81,25 @@ export function MoneyDashboard() {
       language={language}
       panelChrome={chrome.panelChrome}
     >
-      <section className="grid w-full min-w-0 max-w-full gap-3 overflow-hidden pb-8 pt-2">
-        <PlanHeader
-          language={language}
-          onOpenSettings={settingsForm.openSettings}
-        />
+      <section className="grid w-full min-w-0 max-w-full gap-9 overflow-hidden pb-8 pt-2 sm:gap-10">
+        <section className="grid gap-2">
+          <PlanHeader
+            language={language}
+            onOpenSettings={settingsForm.openSettings}
+          />
 
-        <PlanSummaryStats
-          language={language}
-          incomeTotal={money.plan.incomeTotal}
-          fixedExpensesTotal={money.plan.fixedExpensesTotal}
-          savingsContribution={money.plan.savingsContribution}
-          primaryContribution={money.plan.primaryContribution}
-        />
+          <PlanSummaryStats
+            language={language}
+            incomeTotal={money.plan.incomeTotal}
+            plannedExpensesTotal={money.plan.plannedExpensesTotal}
+            savingsContribution={money.plan.savingsContribution}
+            remainingContribution={money.plan.remainingContribution}
+          />
+        </section>
 
         <AccountAllocationCards
           language={language}
-          expensesAccountName={store.finance.allocation.expensesAccountName}
-          savingsAccountName={store.finance.allocation.savingsAccountName}
-          primaryAccountName={store.finance.allocation.primaryAccountName}
-          expensesContribution={money.plan.expensesContribution}
-          fixedExpensesTotal={money.plan.fixedExpensesTotal}
-          savingsContribution={money.plan.savingsContribution}
-          monthlySavingsTarget={money.currentMonthSavingsTarget}
-          primaryContribution={money.plan.primaryContribution}
+          allocations={buildAccountAllocations(store.finance.accounts, money.plan)}
         />
 
         <PlanShortfallBanner
@@ -110,9 +117,8 @@ export function MoneyDashboard() {
           onExtraAmountChange={oneOffIncome.setExtraAmount}
           onSubmit={oneOffIncome.saveExtra}
           onDeleteIncomeEvent={deleteIncomeEvent}
+          onUpdateIncomeEvent={updateIncomeEvent}
         />
-
-        <PlanAnalyticsDivider language={language} />
 
         <MonthlyTrendSection
           language={language}
@@ -141,12 +147,15 @@ export function MoneyDashboard() {
           onMonthOpenChange={setMonthMenuOpen}
           onSelectYear={money.selectYear}
           onSelectMonth={money.selectMonth}
+          onEditSalary={salaryEditor.openEditor}
           onEditSavings={savingsEditor.openEditor}
           onToggleExpanded={() =>
             money.setSelectedExpensesExpanded((expanded) => !expanded)
           }
           onDeleteIncomeEvent={deleteIncomeEvent}
+          onUpdateIncomeEvent={updateIncomeEvent}
           onSkipOccurrence={skipDialog.requestSkipOccurrence}
+          onUpdateMonthlyExpense={updateMonthlyExpenseOccurrence}
         />
       </section>
 
@@ -156,12 +165,12 @@ export function MoneyDashboard() {
           salaryAmount={settingsForm.salaryAmount}
           salaryDay={settingsForm.salaryDay}
           savingsTarget={settingsForm.savingsTarget}
-          accountNames={settingsForm.accountNames}
+          accounts={settingsForm.accounts}
           dayPickerOpen={settingsForm.dayPickerOpen}
           onSalaryAmountChange={settingsForm.setSalaryAmount}
           onSalaryDayChange={settingsForm.setSalaryDay}
           onSavingsTargetChange={settingsForm.setSavingsTarget}
-          onAccountNamesChange={settingsForm.setAccountNames}
+          onAccountsChange={settingsForm.setAccounts}
           onDayPickerOpenChange={settingsForm.setDayPickerOpen}
           onClose={settingsForm.closeSettings}
           onSubmit={settingsForm.submitSettings}
@@ -176,6 +185,21 @@ export function MoneyDashboard() {
           onAmountChange={savingsEditor.setAmount}
           onClose={savingsEditor.closeEditor}
           onSubmit={savingsEditor.submit}
+        />
+      ) : null}
+
+      {salaryEditor.open ? (
+        <MonthlySalaryDialog
+          language={language}
+          monthLabel={salaryEditor.monthLabel}
+          amount={salaryEditor.amount}
+          salaryDay={salaryEditor.salaryDay}
+          dayPickerOpen={salaryEditor.dayPickerOpen}
+          onAmountChange={salaryEditor.setAmount}
+          onSalaryDayChange={salaryEditor.setSalaryDay}
+          onDayPickerOpenChange={salaryEditor.setDayPickerOpen}
+          onClose={salaryEditor.closeEditor}
+          onSubmit={salaryEditor.submit}
         />
       ) : null}
 

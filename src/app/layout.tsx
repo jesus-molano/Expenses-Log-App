@@ -46,9 +46,12 @@ export const metadata: Metadata = {
 };
 
 function readCookieTheme(value: string | undefined): AppTheme {
-  return value === "rose-pine" || value === "catppuccin" || value === "light"
+  return value === "dark" ||
+    value === "rose-pine" ||
+    value === "catppuccin" ||
+    value === "light"
     ? value
-    : "legacy";
+    : "dark";
 }
 
 function readCookieLanguage(value: string | undefined): AppLanguage {

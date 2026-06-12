@@ -19,7 +19,7 @@ export function SettingsView() {
   const settings = useSettingsController();
 
   return (
-    <main className="app-page-bg min-h-dvh px-4 py-5 text-white">
+    <main className="app-page px-4 py-5">
       <div className="mx-auto max-w-2xl">
         <Link
           href={settings.backHref}
@@ -29,7 +29,7 @@ export function SettingsView() {
           {settings.backLabel}
         </Link>
 
-        <Card className="mt-4 p-4">
+        <Card variant="section" className="mt-4 p-4">
           <header>
             <h1 className="text-2xl font-semibold text-[var(--app-text)]">
               {t("settings.title")}

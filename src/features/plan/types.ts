@@ -4,14 +4,10 @@ export type MoneySeriesItem = {
   monthLong: string;
   income: number;
   expenses: number;
-  free: number;
+  remaining: number;
   savings: number;
   shortfall: number;
   hasRecords: boolean;
 };
 
-export type PlanAccountNames = {
-  expensesAccountName: string;
-  savingsAccountName: string;
-  primaryAccountName: string;
-};
+export type { PlanAccount, PlanAccountPurpose } from "@/domain/types";

@@ -10,7 +10,7 @@ const requestSchema = z.object({
 });
 
 function jsonInstruction(text: string) {
-  return `Extract recurring expenses from this Spanish text and return only JSON with this shape: {"expenses":[{"name":"string","description":"string","amount":12.34,"categoryName":"string","tags":["string"],"dueDay":1,"recurrence":{"frequency":"monthly|quarterly|yearly|custom","interval":1,"unit":"day|week|month|year"}}]}. Text: ${text}`;
+  return `Extract expenses from this Spanish text and return only JSON with this shape: {"expenses":[{"name":"string","description":"string","amount":12.34,"categoryName":"string","startDate":"YYYY-MM-DD","dueDay":1,"recurrence":{"frequency":"once|monthly|quarterly|yearly|custom","interval":1,"unit":"day|week|month|year"}}]}. Use "once" for one-time expenses. Text: ${text}`;
 }
 
 export async function POST(request: Request) {

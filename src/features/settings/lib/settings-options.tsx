@@ -5,7 +5,7 @@ export const SETTINGS_THEMES: Array<{
   label: string;
   swatches: [string, string, string];
 }> = [
-  { id: "legacy", label: "Legacy", swatches: ["#020617", "#bef264", "#67e8f9"] },
+  { id: "dark", label: "Dark", swatches: ["#0b1220", "#3b82f6", "#06b6d4"] },
   { id: "rose-pine", label: "Rosé Pine", swatches: ["#191724", "#ebbcba", "#9ccfd8"] },
   { id: "catppuccin", label: "Catppuccin", swatches: ["#11111b", "#cba6f7", "#74c7ec"] },
   { id: "light", label: "Light", swatches: ["#f7f9fc", "#2563eb", "#0891b2"] },
@@ -26,7 +26,7 @@ export function ThemeSwatches({
       {swatches.map((swatch) => (
         <span
           key={swatch}
-          className="size-3 rounded-full ring-1 ring-white/20"
+          className="size-3 rounded-full border border-[var(--app-border)]"
           style={{ backgroundColor: swatch }}
         />
       ))}

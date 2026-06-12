@@ -22,7 +22,7 @@ export function updateLanguageInStore(
     ...store,
     preferences: {
       ...store.preferences,
-      theme: store.preferences?.theme ?? "legacy",
+      theme: store.preferences?.theme ?? "dark",
       language,
     },
   };

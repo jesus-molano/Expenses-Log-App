@@ -46,9 +46,9 @@ export function SelectMenu<T extends string | number>({
             onChange(option.value);
             onOpenChange(false);
           }}
-          className={`flex h-9 w-full items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-semibold ${
+          className={`app-control flex h-9 w-full items-center justify-between gap-3 rounded-[var(--app-radius-sm)] px-3 text-left text-sm font-semibold ${
             value === option.value
-              ? "bg-[var(--app-accent)] text-[var(--app-accent-contrast)]"
+              ? "app-chip-selected"
               : "text-[var(--app-text)] hover:bg-[var(--app-panel-soft-alpha)]"
           }`}
         >

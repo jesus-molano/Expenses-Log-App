@@ -37,7 +37,7 @@ export function PlanPaydayField({
       </button>
 
       {open ? (
-        <div className="rounded-[1rem] border border-[var(--app-border)] bg-[var(--app-panel-soft-alpha)] p-2 shadow-[var(--app-shadow)]">
+        <div className="app-card rounded-[var(--app-radius-lg)] p-2">
           <div className="grid grid-cols-7 gap-1">
             {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
               <button
@@ -47,11 +47,8 @@ export function PlanPaydayField({
                   onSalaryDayChange(day);
                   onOpenChange(false);
                 }}
-                className={`grid h-9 place-items-center rounded-xl text-sm font-semibold transition ${
-                  day === salaryDay
-                    ? "bg-[var(--app-accent)] text-[var(--app-accent-contrast)] shadow-[0_0_20px_color-mix(in_srgb,var(--app-accent)_22%,transparent)]"
-                    : "bg-[var(--app-panel-soft-alpha)] text-[var(--app-text)] hover:bg-[color-mix(in_srgb,var(--app-text)_10%,transparent)]"
-                }`}
+                data-selected={day === salaryDay}
+                className="app-control grid h-9 place-items-center rounded-[var(--app-radius-sm)] text-sm font-semibold"
               >
                 {day}
               </button>

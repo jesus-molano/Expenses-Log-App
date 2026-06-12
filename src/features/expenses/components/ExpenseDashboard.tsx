@@ -10,6 +10,8 @@ import {
   AddExpenseButton,
   QuickCapture,
 } from "@/features/expenses/components/QuickCapture";
+import { RecurringOverviewButton } from "@/features/expenses/components/RecurringOverviewButton";
+import { RecurringOverviewSheet } from "@/features/expenses/components/RecurringOverviewSheet";
 import { useExpenseFilters } from "@/features/expenses/hooks/use-expense-filters";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { useQuickExpenseParser } from "@/features/expenses/hooks/use-quick-expense-parser";
@@ -39,6 +41,7 @@ export function ExpenseDashboard({
   const [draft, setDraft] = useState<DraftExpense>(() => createEmptyDraft());
   const [sheetOpen, setSheetOpen] = useState(initialNewExpense);
   const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [recurringOpen, setRecurringOpen] = useState(false);
 
   function openEmptySheet() {
     setDraft(createEmptyDraft());
@@ -68,6 +71,12 @@ export function ExpenseDashboard({
       activeTab="expenses"
       language={language}
       panelChrome={chrome.panelChrome}
+      headerAction={
+        <RecurringOverviewButton
+          language={language}
+          onClick={() => setRecurringOpen(true)}
+        />
+      }
     >
       <ExpenseList
         sections={filters.timelineSections}
@@ -104,12 +113,20 @@ export function ExpenseDashboard({
       />
 
       <ExpenseFormSheet
-        key={`${draft.name}:${draft.description}:${draft.amount}:${draft.categoryName}:${draft.dueDay}:${draft.tags.join(",")}:${sheetOpen}`}
+        key={`${draft.name}:${draft.description}:${draft.amount}:${draft.categoryName}:${draft.dueDay}:${sheetOpen}`}
         open={sheetOpen}
         draft={draft}
         language={language}
         onClose={() => setSheetOpen(false)}
         onSave={saveDraft}
+      />
+
+      <RecurringOverviewSheet
+        open={recurringOpen}
+        items={filters.recurringOverviewItems}
+        categories={store.categories}
+        language={language}
+        onClose={() => setRecurringOpen(false)}
       />
     </DashboardShell>
   );

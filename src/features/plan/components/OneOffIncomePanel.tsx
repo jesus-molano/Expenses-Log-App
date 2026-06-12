@@ -2,6 +2,8 @@
 
 import type { FormEvent } from "react";
 import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Surface } from "@/components/ui/Surface";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage, IncomeEvent } from "@/domain/types";
 import { t } from "@/shared/i18n";
@@ -17,6 +19,10 @@ type OneOffIncomePanelProps = {
   onExtraAmountChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onDeleteIncomeEvent: (id: string) => void;
+  onUpdateIncomeEvent: (
+    id: string,
+    input: { name: string; amount: number; receivedAt: string; note?: string },
+  ) => void;
 };
 
 export function OneOffIncomePanel({
@@ -29,11 +35,12 @@ export function OneOffIncomePanel({
   onExtraAmountChange,
   onSubmit,
   onDeleteIncomeEvent,
+  onUpdateIncomeEvent,
 }: OneOffIncomePanelProps) {
   return (
     <form
       onSubmit={onSubmit}
-      className="rounded-[1.2rem] border border-[var(--app-border)] bg-[var(--app-panel-alpha)] p-3"
+      className="grid min-w-0 gap-4"
     >
       <header className="flex min-w-0 items-center justify-between gap-3">
         <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold text-[var(--app-text)]">
@@ -45,7 +52,7 @@ export function OneOffIncomePanel({
         </p>
       </header>
 
-      <div className="mt-3 grid gap-2">
+      <div className="app-section-card grid gap-3 p-3">
         <input
           value={extraName}
           onChange={(event) => onExtraNameChange(event.target.value)}
@@ -60,27 +67,27 @@ export function OneOffIncomePanel({
             className="input-control min-w-0"
             placeholder={t("money.extraAmountPlaceholder", language)}
           />
-          <button className="h-12 rounded-2xl bg-[var(--app-panel-soft-alpha)] px-4 text-sm font-semibold text-[var(--app-text)] ring-1 ring-[var(--app-border)] transition hover:bg-[color-mix(in_srgb,var(--app-text)_10%,transparent)]">
+          <Button type="submit" size="lg" variant="secondary">
             {t("money.addIncome", language)}
-          </button>
+          </Button>
         </div>
       </div>
-      <div className="mt-3 grid gap-2">
+      <div className="grid gap-2.5">
         {incomeEvents.length ? (
           incomeEvents.map((event) => (
             <IncomeEventRow
               key={event.id}
-              name={event.name}
-              date={event.receivedAt}
-              amount={formatCurrency(event.amount)}
+              event={event}
+              language={language}
               removeLabel={t("money.removeIncome", language)}
               onRemove={() => onDeleteIncomeEvent(event.id)}
+              onUpdate={(input) => onUpdateIncomeEvent(event.id, input)}
             />
           ))
         ) : (
-          <p className="rounded-2xl bg-[var(--app-panel-soft-alpha)] px-3 py-2 text-sm font-medium text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]">
+          <Surface variant="empty" className="px-3 py-2 text-sm font-medium">
             {t("money.noExtraIncome", language)}
-          </p>
+          </Surface>
         )}
       </div>
     </form>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { buildDateWithDay, toDateOnly } from "./calendar";
 import type { DraftExpense, RecurrenceRule } from "./types";
 
 export const draftExpenseSchema = z.object({
@@ -6,10 +7,10 @@ export const draftExpenseSchema = z.object({
   description: z.string().max(240).default(""),
   amount: z.number().positive(),
   categoryName: z.string().min(1).max(40),
-  tags: z.array(z.string().min(1).max(24)).max(8).default([]),
+  startDate: z.string().optional(),
   dueDay: z.number().int().min(1).max(31),
   recurrence: z.object({
-    frequency: z.enum(["monthly", "quarterly", "yearly", "custom", "rrule"]),
+    frequency: z.enum(["once", "monthly", "quarterly", "yearly", "custom", "rrule"]),
     interval: z.number().int().positive().optional(),
     unit: z.enum(["day", "week", "month", "year"]).optional(),
     rrule: z.string().optional(),
@@ -21,23 +22,31 @@ export const parseExpensesResponseSchema = z.object({
   expenses: z.array(draftExpenseSchema).min(1).max(10),
 });
 
-const categoryHints: Array<[string, string, string[]]> = [
-  ["Casa", "Casa", ["alquiler", "hipoteca", "comunidad", "luz", "agua", "compra", "gatos"]],
-  ["Suscripciones", "Suscripciones", ["netflix", "spotify", "icloud", "prime", "hbo"]],
-  ["Transporte", "Transporte", ["gasolina", "parking", "seguro", "bono", "bus", "coche"]],
-  ["Salud", "Salud", ["seguro medico", "farmacia", "dentista", "gimnasio"]],
-  ["Servicios", "Servicios", ["internet", "móvil", "movil", "telefono", "fibra"]],
+const categoryHints: Array<[string, string[]]> = [
+  ["Casa", ["alquiler", "hipoteca", "comunidad", "luz", "agua"]],
+  ["Alimentacion", ["compra", "supermercado", "mercadona", "comida", "alimentacion"]],
+  ["Suscripciones", ["netflix", "spotify", "icloud", "prime", "hbo", "youtube"]],
+  ["Vehiculo", ["gasolina", "parking", "seguro coche", "rodaje", "coche"]],
+  ["Transporte", ["bono", "bus", "metro", "tranvia", "taxi"]],
+  ["Deporte", ["gym", "gimnasio", "crossfit", "deporte"]],
+  ["Salud", ["seguro medico", "farmacia", "dentista", "medico"]],
+  ["Servicios", ["internet", "movil", "telefono", "fibra"]],
+  ["Mascotas", ["gato", "perro", "veterinario", "mascota"]],
+  ["Educacion/Trabajo", ["codex", "curso", "software", "trabajo", "formacion"]],
 ];
 
 function detectRecurrence(text: string): RecurrenceRule {
+  if (/puntual|unico|único|una\s+vez|one[-\s]?time/i.test(text)) {
+    return { frequency: "once" };
+  }
   if (/trimestral|cada\s+3\s+mes/i.test(text)) {
     return { frequency: "quarterly" };
   }
-  if (/anual|ano|año|yearly/i.test(text)) {
+  if (/anual|ano|yearly/i.test(text)) {
     return { frequency: "yearly" };
   }
   const customMatch = text.match(
-    /cada\s+(\d+)\s+(dia|dias|día|días|semana|semanas|mes|meses)/i,
+    /cada\s+(\d+)\s+(dia|dias|semana|semanas|mes|meses)/i,
   );
   if (customMatch) {
     const unitToken = customMatch[2].toLowerCase();
@@ -55,29 +64,22 @@ function detectRecurrence(text: string): RecurrenceRule {
   return { frequency: "monthly" };
 }
 
-function detectCategory(text: string): { categoryName: string; tags: string[] } {
+function detectCategory(text: string): string {
   const normalized = text.toLowerCase();
-  const match = categoryHints.find(([, , hints]) =>
+  const match = categoryHints.find(([, hints]) =>
     hints.some((hint) => normalized.includes(hint)),
   );
 
-  if (!match) {
-    return { categoryName: "General", tags: ["general"] };
-  }
-
-  return {
-    categoryName: match[0],
-    tags: [match[1].toLowerCase()],
-  };
+  return match?.[0] ?? "General";
 }
 
 export function parseExpenseTextLocally(input: string): DraftExpense[] {
   const normalized = input.trim();
   if (!normalized) return [];
 
-  const amountMatch = normalized.match(/(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur|euros)?/i);
-  const dayMatch = normalized.match(/(?:dia|día|el)\s*(\d{1,2})/i);
-  const { categoryName, tags } = detectCategory(normalized);
+  const amountMatch = normalized.match(/(\d+(?:[.,]\d{1,2})?)\s*(?:eur|euros)?/i);
+  const dayMatch = normalized.match(/(?:dia|el)\s*(\d{1,2})/i);
+  const categoryName = detectCategory(normalized);
 
   const amount = amountMatch
     ? Number(amountMatch[1].replace(",", "."))
@@ -85,10 +87,11 @@ export function parseExpenseTextLocally(input: string): DraftExpense[] {
   const dueDay = dayMatch
     ? Math.min(Number(dayMatch[1]), 31)
     : new Date().getDate();
+  const startDate = toDateOnly(buildDateWithDay(new Date(), dueDay));
   const name = normalized
     .replace(amountMatch?.[0] ?? "", "")
-    .replace(/mensual|trimestral|anual|cada\s+\d+\s+\w+/gi, "")
-    .replace(/(?:dia|día|el)\s*\d{1,2}/gi, "")
+    .replace(/puntual|unico|único|una\s+vez|mensual|trimestral|anual|cada\s+\d+\s+\w+/gi, "")
+    .replace(/(?:dia|el)\s*\d{1,2}/gi, "")
     .trim()
     .split(/\s+/)
     .slice(0, 5)
@@ -100,7 +103,7 @@ export function parseExpenseTextLocally(input: string): DraftExpense[] {
       description: normalized,
       amount: amount || 1,
       categoryName,
-      tags,
+      startDate,
       dueDay,
       recurrence: detectRecurrence(normalized),
     },

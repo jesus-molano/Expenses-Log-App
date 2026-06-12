@@ -70,9 +70,9 @@ export function TimelineSectionBlock({
       <TimelineSectionHeader section={section} today={today} />
 
       <div
-        className={`space-y-1.5 transition ${
-          index === 0 ? "drop-shadow-[0_20px_35px_rgba(132,204,22,0.22)]" : ""
-        } ${index > 2 ? "opacity-90" : ""}`}
+        className={`space-y-1.5 transition-opacity duration-200 ${
+          index > 2 ? "opacity-90" : ""
+        }`}
       >
         {isExpandedMonthDrag ? (
           <TimelineExpandedMonth

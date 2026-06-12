@@ -6,27 +6,27 @@ import { MoneyStat } from "./MoneyStat";
 type PlanSummaryStatsProps = {
   language: AppLanguage;
   incomeTotal: number;
-  fixedExpensesTotal: number;
+  plannedExpensesTotal: number;
   savingsContribution: number;
-  primaryContribution: number;
+  remainingContribution: number;
 };
 
 export function PlanSummaryStats({
   language,
   incomeTotal,
-  fixedExpensesTotal,
+  plannedExpensesTotal,
   savingsContribution,
-  primaryContribution,
+  remainingContribution,
 }: PlanSummaryStatsProps) {
   return (
-    <section className="grid grid-cols-2 gap-2">
+    <section className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
       <MoneyStat
         label={t("money.income", language)}
         value={formatCurrency(incomeTotal)}
       />
       <MoneyStat
         label={t("money.fixedExpenses", language)}
-        value={formatCurrency(fixedExpensesTotal)}
+        value={formatCurrency(plannedExpensesTotal)}
       />
       <MoneyStat
         label={t("money.savings", language)}
@@ -34,7 +34,7 @@ export function PlanSummaryStats({
       />
       <MoneyStat
         label={t("money.free", language)}
-        value={formatCurrency(primaryContribution)}
+        value={formatCurrency(remainingContribution)}
       />
     </section>
   );

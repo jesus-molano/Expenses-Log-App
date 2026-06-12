@@ -11,7 +11,6 @@ const baseTemplate: ExpenseTemplate = {
   amount: 10,
   currency: "EUR",
   categoryId: "cat",
-  tags: [],
   startDate: "2026-01-31",
   dueDay: 31,
   recurrence: { frequency: "monthly" },
@@ -55,6 +54,49 @@ describe("recurrence", () => {
         "2026-12-31",
       ),
     ).toEqual(["2026-05-18"]);
+  });
+
+  it("generates a one-time occurrence only on its start date", () => {
+    expect(
+      generateTemplateDates(
+        {
+          ...baseTemplate,
+          startDate: "2026-09-12",
+          dueDay: 12,
+          recurrence: { frequency: "once" },
+        },
+        "2026-01-01",
+        "2026-12-31",
+      ),
+    ).toEqual(["2026-09-12"]);
+
+    expect(
+      generateTemplateDates(
+        {
+          ...baseTemplate,
+          startDate: "2026-09-12",
+          dueDay: 12,
+          recurrence: { frequency: "once" },
+        },
+        "2026-10-01",
+        "2026-12-31",
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps weekly custom recurrence anchored to the start date", () => {
+    expect(
+      generateTemplateDates(
+        {
+          ...baseTemplate,
+          startDate: "2026-06-03",
+          dueDay: 3,
+          recurrence: { frequency: "custom", interval: 2, unit: "week" },
+        },
+        "2026-06-01",
+        "2026-07-05",
+      ),
+    ).toEqual(["2026-06-03", "2026-06-17", "2026-07-01"]);
   });
 
   it("includes the configured end month and excludes later monthly charges", () => {

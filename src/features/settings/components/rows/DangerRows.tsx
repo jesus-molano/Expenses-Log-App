@@ -17,8 +17,8 @@ export function DangerRows({ settings }: { settings: SettingsController }) {
         <Button
           variant="danger"
           onClick={() => settings.setClearExpensesOpen(true)}
+          leadingIcon={<Trash2 size={17} />}
         >
-          <Trash2 size={17} />
           {t("settings.clearExpenses")}
         </Button>
 
@@ -31,9 +31,9 @@ export function DangerRows({ settings }: { settings: SettingsController }) {
               variant="danger"
               onClick={() => settings.setDeleteAccountOpen(true)}
               disabled={!settings.user || settings.isDeletingAccount}
-              className="h-9 rounded-xl px-3"
+              size="sm"
+              leadingIcon={<Trash2 size={15} />}
             >
-              <Trash2 size={15} />
               {settings.isDeletingAccount
                 ? t("settings.deletingAccount")
                 : t("settings.delete")}

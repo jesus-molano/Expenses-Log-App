@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseExpenseTextLocally } from "./parser";
 
 describe("parseExpenseTextLocally", () => {
-  it("extracts amount, due day, category, tags and monthly recurrence", () => {
+  it("extracts amount, due day, category and monthly recurrence", () => {
     const [expense] = parseExpenseTextLocally(
       "Netflix 15,99 mensual el dia 12 entretenimiento",
     );
@@ -13,7 +13,6 @@ describe("parseExpenseTextLocally", () => {
       categoryName: "Suscripciones",
       recurrence: { frequency: "monthly" },
     });
-    expect(expense.tags).toContain("suscripciones");
   });
 
   it("detects custom recurrence", () => {
@@ -24,5 +23,17 @@ describe("parseExpenseTextLocally", () => {
       interval: 2,
       unit: "week",
     });
+  });
+
+  it("detects one-time expenses", () => {
+    const [expense] = parseExpenseTextLocally("Seguro coche 450 puntual el 12");
+
+    expect(expense).toMatchObject({
+      amount: 450,
+      dueDay: 12,
+      categoryName: "Vehiculo",
+      recurrence: { frequency: "once" },
+    });
+    expect(expense.startDate).toMatch(/^\d{4}-\d{2}-12$/);
   });
 });

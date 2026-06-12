@@ -1,35 +1,106 @@
-import { X } from "lucide-react";
+"use client";
+
+import { Check, Pencil, X } from "lucide-react";
+import { DatePickerField } from "@/components/ui/DatePickerField";
+import { IconButton } from "@/components/ui/IconButton";
+import { formatCurrency } from "@/domain/calendar";
+import type { AppLanguage, IncomeEvent } from "@/domain/types";
+import {
+  useIncomeEventRowEditor,
+  type IncomeEventUpdateInput,
+} from "../hooks/use-income-event-row-editor";
 
 export function IncomeEventRow({
-  name,
-  date,
-  amount,
+  event,
+  language,
   removeLabel,
   onRemove,
+  onUpdate,
 }: {
-  name: string;
-  date: string;
-  amount: string;
+  event: IncomeEvent;
+  language: AppLanguage;
   removeLabel: string;
   onRemove: () => void;
+  onUpdate: (input: IncomeEventUpdateInput) => void;
 }) {
+  const editor = useIncomeEventRowEditor({ event, language, onUpdate });
+
+  if (editor.editing) {
+    return (
+      <div className="app-list-item grid min-w-0 gap-2 p-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
+          <input
+            value={editor.name}
+            onChange={(event) => editor.setName(event.target.value)}
+            className="input-control h-11 min-w-0"
+          />
+          <IconButton
+            type="button"
+            onClick={editor.save}
+            aria-label={language === "en" ? "Save income" : "Guardar ingreso"}
+            size="sm"
+            className="bg-[var(--app-accent)] text-[var(--app-accent-contrast)]"
+          >
+            <Check size={15} />
+          </IconButton>
+          <IconButton
+            type="button"
+            onClick={editor.closeEditor}
+            aria-label={language === "en" ? "Close" : "Cerrar"}
+            size="sm"
+          >
+            <X size={15} />
+          </IconButton>
+        </div>
+        <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2">
+          <input
+            value={editor.amount}
+            inputMode="decimal"
+            onChange={(event) => editor.setAmount(event.target.value)}
+            className="input-control h-11 min-w-0"
+          />
+          <DatePickerField
+            value={editor.receivedAt}
+            onChange={(value) => editor.setReceivedAt(value ?? editor.receivedAt)}
+            label={language === "en" ? "Income date" : "Fecha de ingreso"}
+            language={language}
+            className="h-11 min-w-0"
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-2xl bg-[var(--app-panel-soft-alpha)] px-3 py-2 ring-1 ring-[var(--app-border)]">
+    <div className="app-list-item grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 px-3 py-2">
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-[var(--app-text)]">
-          {name}
+          {event.name}
         </p>
-        <p className="text-xs font-medium text-[var(--app-text-muted)]">{date}</p>
+        <p className="text-xs font-medium text-[var(--app-text-muted)]">
+          {event.receivedAt}
+        </p>
       </div>
-      <p className="text-sm font-semibold text-[var(--app-text)]">{amount}</p>
-      <button
+      <p className="text-sm font-semibold text-[var(--app-text)]">
+        {formatCurrency(event.amount)}
+      </p>
+      <IconButton
+        type="button"
+        onClick={editor.openEditor}
+        aria-label={language === "en" ? "Edit income" : "Editar ingreso"}
+        size="sm"
+      >
+        <Pencil size={14} />
+      </IconButton>
+      <IconButton
         type="button"
         onClick={onRemove}
         aria-label={removeLabel}
-        className="grid size-8 place-items-center rounded-full bg-[var(--app-panel-soft-alpha)] text-sm font-semibold text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]"
+        variant="danger"
+        size="sm"
       >
         <X size={15} />
-      </button>
+      </IconButton>
     </div>
   );
 }

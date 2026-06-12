@@ -40,7 +40,7 @@ export function useMoneySeries(
       const isPastOrCurrentMonth = monthId <= currentMonthId;
       const hasRecords =
         (isPastOrCurrentMonth &&
-          (monthPlan.fixedExpensesTotal > 0 || oneOffEvents.length > 0)) ||
+          (monthPlan.plannedExpensesTotal > 0 || oneOffEvents.length > 0)) ||
         isCurrentMonth;
 
       return {
@@ -48,8 +48,8 @@ export function useMoneySeries(
         month: format(monthDate, "MMM", { locale }),
         monthLong: format(monthDate, "MMMM yyyy", { locale }),
         income: monthPlan.incomeTotal,
-        expenses: monthPlan.fixedExpensesTotal,
-        free: monthPlan.primaryContribution,
+        expenses: monthPlan.plannedExpensesTotal,
+        remaining: monthPlan.remainingContribution,
         savings: monthPlan.savingsContribution,
         shortfall: monthPlan.shortfall,
         hasRecords,

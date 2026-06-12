@@ -1,0 +1,34 @@
+import { cn } from "@/shared/ui";
+
+type IconButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: "default" | "danger" | "ghost";
+  size?: "sm" | "md" | "lg";
+};
+
+const variants = {
+  default: "app-icon-button",
+  danger: "app-icon-button app-icon-button-danger",
+  ghost: "app-icon-button border-transparent bg-transparent",
+};
+
+const sizes = {
+  sm: "size-8 min-h-8 min-w-8",
+  md: "size-10 min-h-10 min-w-10",
+  lg: "size-12 min-h-12 min-w-12",
+};
+
+export function IconButton({
+  variant = "default",
+  size = "md",
+  className,
+  type = "button",
+  ...props
+}: IconButtonProps) {
+  return (
+    <button
+      type={type}
+      className={cn(variants[variant], sizes[size], className)}
+      {...props}
+    />
+  );
+}

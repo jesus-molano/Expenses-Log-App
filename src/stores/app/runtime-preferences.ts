@@ -12,7 +12,7 @@ export function applyRuntimePreferences(store: ExpenseStore): ExpenseStore {
     ...store,
     preferences: {
       ...store.preferences,
-      theme: theme ?? store.preferences?.theme ?? "legacy",
+      theme: theme ?? store.preferences?.theme ?? "dark",
       language: language ?? store.preferences?.language ?? "es",
     },
   };

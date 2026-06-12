@@ -12,11 +12,15 @@ export function ImportExportRow({
 }) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      <Button variant="secondary" onClick={settings.exportData} className="px-3">
-        <Download size={17} />
+      <Button
+        variant="secondary"
+        onClick={settings.exportData}
+        className="px-3"
+        leadingIcon={<Download size={17} />}
+      >
         {t("settings.export")}
       </Button>
-      <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[var(--app-panel-soft-alpha)] px-3 text-sm font-semibold text-[var(--app-text)] ring-1 ring-[var(--app-border)]">
+      <label className="app-button app-button-secondary cursor-pointer px-3">
         <Upload size={17} />
         {t("settings.import")}
         <input

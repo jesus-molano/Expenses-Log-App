@@ -21,12 +21,14 @@ describe("i18n", () => {
     expect(flattenKeys(messages.en).sort()).toEqual(flattenKeys(messages.es).sort());
   });
 
-  it("translates shared keys, tags and categories in Spanish and English", () => {
+  it("translates shared keys and categories in Spanish and English", () => {
     expect(t("common.expenses", "es")).toBe("Gastos");
     expect(t("common.expenses", "en")).toBe("Expenses");
     expect(t("settings.delete", "es")).toBe("Borrar");
     expect(t("settings.delete", "en")).toBe("Delete");
     expect(t("categories.suscripciones", "es")).toBe("Suscripciones");
     expect(t("categories.suscripciones", "en")).toBe("Subscriptions");
+    expect(t("categories.vehiculo", "es")).toBe("Vehiculo");
+    expect(t("categories.vehiculo", "en")).toBe("Vehicle");
   });
 });

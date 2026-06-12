@@ -5,9 +5,7 @@ export type MoneySettingsInput = {
   salaryDay: number;
   savingsMonthId: string;
   savingsTarget: number;
-  expensesAccountName: string;
-  savingsAccountName: string;
-  primaryAccountName: string;
+  accounts: import("@/domain/types").PlanAccount[];
 };
 
 export type MonthlySavingsTargetInput = {
@@ -15,9 +13,25 @@ export type MonthlySavingsTargetInput = {
   savingsTarget: number;
 };
 
+export type MonthlySalaryInput = {
+  monthId: string;
+  salaryAmount: number;
+  salaryDay: number;
+};
+
 export type IncomeEventInput = {
   name: string;
   amount: number;
   receivedAt: string;
   note?: string;
+};
+
+export type MonthlyExpenseOverrideInput = {
+  templateId: string;
+  occurrenceDate: string;
+  dueDate: string;
+  name: string;
+  amount: number;
+  categoryId: string;
+  status: import("@/domain/types").OccurrenceStatus;
 };

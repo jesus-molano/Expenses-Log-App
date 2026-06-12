@@ -27,7 +27,7 @@ export function MonthlySavingsTargetDialog({
   return (
     <Sheet contentClassName="sm:max-w-sm">
       <form onSubmit={onSubmit} className="p-5">
-        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--app-panel-soft-alpha)] sm:hidden" />
+        <div className="app-sheet-handle mx-auto mb-3 sm:hidden" />
         <header className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-[var(--app-text)]">
@@ -37,13 +37,15 @@ export function MonthlySavingsTargetDialog({
               {monthLabel}
             </p>
           </div>
-          <button
+          <Button
             type="button"
             onClick={onClose}
-            className="h-10 rounded-full px-3 text-sm font-medium text-[var(--app-text-muted)] hover:bg-[var(--app-panel-soft-alpha)]"
+            variant="ghost"
+            size="sm"
+            className="rounded-full"
           >
             {t("money.close", language)}
-          </button>
+          </Button>
         </header>
 
         <Field

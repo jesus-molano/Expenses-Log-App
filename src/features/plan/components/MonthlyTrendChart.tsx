@@ -88,7 +88,7 @@ export function MonthlyTrendChart({
               radius={[8, 8, 2, 2]}
             />
             <Bar
-              dataKey="free"
+              dataKey="remaining"
               name={t("money.free", language)}
               fill="var(--app-chart-free)"
               radius={[8, 8, 2, 2]}

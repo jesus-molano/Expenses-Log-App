@@ -20,8 +20,8 @@ export function MonthlyTrendSection({
   annualSavingsEstimateLabel,
 }: MonthlyTrendSectionProps) {
   return (
-    <section className="min-w-0 overflow-hidden rounded-[1.35rem] border border-[color-mix(in_srgb,var(--app-border)_72%,transparent)] bg-[color-mix(in_srgb,var(--app-panel-alpha)_78%,transparent)] p-3 shadow-[0_10px_28px_rgba(0,0,0,0.16)] sm:p-4">
-      <header>
+    <section className="grid min-w-0 gap-4">
+      <header className="px-1">
         <h2 className="text-lg font-semibold text-[var(--app-text)]">
           {t("money.trendTitle", language)}
         </h2>
@@ -30,21 +30,23 @@ export function MonthlyTrendSection({
         </p>
       </header>
 
-      <MonthlyTrendChart
-        language={language}
-        moneySeries={moneySeries}
-        isCompactChart={isCompactChart}
-      />
+      <div className="app-section-card min-w-0 p-4">
+        <MonthlyTrendChart
+          language={language}
+          moneySeries={moneySeries}
+          isCompactChart={isCompactChart}
+        />
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <MoneyStat
-          label={t("money.annualExpenses", language)}
-          value={annualExpensesTotalLabel}
-        />
-        <MoneyStat
-          label={t("money.annualSavingsEstimate", language)}
-          value={annualSavingsEstimateLabel}
-        />
+        <div className="mt-4 grid grid-cols-2 gap-2.5">
+          <MoneyStat
+            label={t("money.annualExpenses", language)}
+            value={annualExpensesTotalLabel}
+          />
+          <MoneyStat
+            label={t("money.annualSavingsEstimate", language)}
+            value={annualSavingsEstimateLabel}
+          />
+        </div>
       </div>
     </section>
   );

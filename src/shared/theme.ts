@@ -1,6 +1,6 @@
 import type { AppTheme } from "@/domain/types";
 
-export const DEFAULT_THEME: AppTheme = "legacy";
+export const DEFAULT_THEME: AppTheme = "dark";
 
 export function setThemeDom(theme: AppTheme) {
   if (typeof document === "undefined") return;
@@ -30,7 +30,7 @@ export function readThemeCookie(): AppTheme | null {
 
 export function isAppTheme(value: unknown): value is AppTheme {
   return (
-    value === "legacy" ||
+    value === "dark" ||
     value === "rose-pine" ||
     value === "catppuccin" ||
     value === "light"

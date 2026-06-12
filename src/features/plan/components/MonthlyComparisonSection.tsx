@@ -34,9 +34,23 @@ type MonthlyComparisonSectionProps = {
   onSelectYear: (year: number) => void;
   onSelectMonth: (monthId: string) => void;
   onToggleExpanded: () => void;
+  onEditSalary: () => void;
   onEditSavings: () => void;
   onDeleteIncomeEvent: (id: string) => void;
+  onUpdateIncomeEvent: (
+    id: string,
+    input: { name: string; amount: number; receivedAt: string; note?: string },
+  ) => void;
   onSkipOccurrence: (occurrence: ExpenseOccurrence) => void;
+  onUpdateMonthlyExpense: (input: {
+    templateId: string;
+    occurrenceDate: string;
+    dueDate: string;
+    name: string;
+    amount: number;
+    categoryId: string;
+    status: ExpenseOccurrence["status"];
+  }) => void;
 };
 
 export function MonthlyComparisonSection({
@@ -59,19 +73,24 @@ export function MonthlyComparisonSection({
   onSelectYear,
   onSelectMonth,
   onToggleExpanded,
+  onEditSalary,
   onEditSavings,
   onDeleteIncomeEvent,
+  onUpdateIncomeEvent,
   onSkipOccurrence,
+  onUpdateMonthlyExpense,
 }: MonthlyComparisonSectionProps) {
   return (
-    <div className="mt-4 rounded-[1.15rem] border border-[color-mix(in_srgb,var(--app-border)_70%,transparent)] bg-[color-mix(in_srgb,var(--app-panel-soft-alpha)_72%,transparent)] p-3">
-      <header>
-        <h3 className="text-sm font-semibold text-[var(--app-text)]">
-          {t("money.compareMonths", language)}
-        </h3>
-        <p className="mt-0.5 text-xs font-medium capitalize text-[var(--app-text-muted)]">
-          {selectedMonthSummary.monthLong}
-        </p>
+    <section className="min-w-0">
+      <header className="px-1">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-[var(--app-text)]">
+            {t("money.compareMonths", language)}
+          </h2>
+          <p className="mt-1 text-sm font-medium capitalize text-[var(--app-text-muted)]">
+            {selectedMonthSummary.monthLong}
+          </p>
+        </div>
       </header>
 
       <MonthlyComparisonSelectors
@@ -95,7 +114,9 @@ export function MonthlyComparisonSection({
       <MonthlyComparisonStats
         language={language}
         summary={selectedMonthSummary}
+        canEditSalary={selectedMonthIsPast}
         canEditSavings={selectedMonthIsPast}
+        onEditSalary={onEditSalary}
         onEditSavings={onEditSavings}
       />
 
@@ -103,6 +124,7 @@ export function MonthlyComparisonSection({
         language={language}
         incomeEvents={incomeEvents}
         onDeleteIncomeEvent={onDeleteIncomeEvent}
+        onUpdateIncomeEvent={onUpdateIncomeEvent}
       />
 
       <MonthlyExpenseBreakdown
@@ -114,7 +136,8 @@ export function MonthlyComparisonSection({
         expanded={expanded}
         onToggleExpanded={onToggleExpanded}
         onSkipOccurrence={onSkipOccurrence}
+        onUpdateMonthlyExpense={onUpdateMonthlyExpense}
       />
-    </div>
+    </section>
   );
 }

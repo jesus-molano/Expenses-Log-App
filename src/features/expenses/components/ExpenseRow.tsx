@@ -97,11 +97,11 @@ export function ExpenseRow({
           viewTransitionName: `expense-${occurrence.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`,
         }}
         aria-label={`${occurrence.template.name} ${statusLabelForA11y(paid, language)}`}
-        className={`app-expense-row-card grid min-h-[4.25rem] touch-pan-y select-none grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border px-3.5 py-3 transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out will-change-transform ${
+        className={`app-expense-row-card grid min-h-[4.25rem] touch-pan-y select-none grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[var(--app-radius-md)] border px-3.5 py-3 transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out will-change-transform ${
           dragActive
-            ? "invisible border-[var(--app-border-strong)] bg-[var(--app-surface)] shadow-[0_0_38px_color-mix(in_srgb,var(--app-accent)_28%,transparent)]"
+            ? "invisible app-surface-raised border-[var(--app-border-strong)]"
             : swipe.direction
-              ? "app-expense-row-card-swiping border-[var(--app-border)] shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
+              ? "app-expense-row-card-swiping app-surface-raised border-[var(--app-border)]"
               : rowToneClass
         }`}
       >

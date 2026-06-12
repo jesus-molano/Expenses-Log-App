@@ -1,11 +1,11 @@
 ﻿"use client";
 
 import type { FormEvent } from "react";
+import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Sheet } from "@/components/ui/Sheet";
-import type { AppLanguage } from "@/domain/types";
+import type { AppLanguage, PlanAccount } from "@/domain/types";
 import { t } from "@/shared/i18n";
-import type { PlanAccountNames } from "../types";
 import { PlanAccountFields } from "./PlanAccountFields";
 import { PlanPaydayField } from "./PlanPaydayField";
 import { PlanSettingsHeader } from "./PlanSettingsHeader";
@@ -15,12 +15,12 @@ type PlanSettingsSheetProps = {
   salaryAmount: string;
   salaryDay: number;
   savingsTarget: string;
-  accountNames: PlanAccountNames;
+  accounts: PlanAccount[];
   dayPickerOpen: boolean;
   onSalaryAmountChange: (value: string) => void;
   onSalaryDayChange: (value: number) => void;
   onSavingsTargetChange: (value: string) => void;
-  onAccountNamesChange: (value: PlanAccountNames) => void;
+  onAccountsChange: (value: PlanAccount[]) => void;
   onDayPickerOpenChange: (open: boolean) => void;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -31,20 +31,20 @@ export function PlanSettingsSheet({
   salaryAmount,
   salaryDay,
   savingsTarget,
-  accountNames,
+  accounts,
   dayPickerOpen,
   onSalaryAmountChange,
   onSalaryDayChange,
   onSavingsTargetChange,
-  onAccountNamesChange,
+  onAccountsChange,
   onDayPickerOpenChange,
   onClose,
   onSubmit,
 }: PlanSettingsSheetProps) {
   return (
-    <Sheet>
+    <Sheet onBackdropClick={onClose}>
       <form onSubmit={onSubmit} className="p-5">
-        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--app-panel-soft-alpha)] sm:hidden" />
+        <div className="app-sheet-handle mx-auto mb-3 sm:hidden" />
         <PlanSettingsHeader language={language} onClose={onClose} />
 
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -78,14 +78,14 @@ export function PlanSettingsSheet({
 
           <PlanAccountFields
             language={language}
-            accountNames={accountNames}
-            onAccountNamesChange={onAccountNamesChange}
+            accounts={accounts}
+            onAccountsChange={onAccountsChange}
           />
         </div>
 
-        <button className="mt-5 h-12 w-full rounded-2xl bg-[var(--app-accent)] text-sm font-semibold text-[var(--app-accent-contrast)]">
+        <Button type="submit" className="mt-5 w-full" variant="primary" size="lg">
           {t("money.saveSettings", language)}
-        </button>
+        </Button>
       </form>
     </Sheet>
   );

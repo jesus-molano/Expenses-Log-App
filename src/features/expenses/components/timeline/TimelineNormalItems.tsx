@@ -37,7 +37,7 @@ export function TimelineNormalItems({
 }: TimelineNormalItemsProps) {
   if (!section.items.length) {
     return (
-      <div className="rounded-2xl border border-cyan-200/16 bg-white/[0.045] px-3 py-3 text-sm font-medium text-white">
+      <div className="app-empty-line px-3 py-3 text-sm font-medium">
         {t("expenses.todayEmpty", language)}
       </div>
     );

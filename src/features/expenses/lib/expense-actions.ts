@@ -16,14 +16,6 @@ export function createId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
-export function normalizeTags(tags: string): string[] {
-  return tags
-    .split(",")
-    .map((tag) => tag.trim().toLowerCase())
-    .filter(Boolean)
-    .slice(0, 8);
-}
-
 export function findOrCreateCategory(
   store: ExpenseStore,
   categoryName: string,
@@ -68,7 +60,6 @@ export function buildTemplateFromDraft(
     amount: Number(draft.amount),
     currency: "EUR",
     categoryId,
-    tags: draft.tags,
     startDate,
     endDate: draft.endDate || undefined,
     dueDay: draft.dueDay,

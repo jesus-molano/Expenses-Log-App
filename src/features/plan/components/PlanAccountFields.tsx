@@ -1,61 +1,55 @@
 "use client";
 
-import { Field } from "@/components/ui/Field";
-import type { AppLanguage } from "@/domain/types";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import type { AppLanguage, PlanAccount } from "@/domain/types";
+import { PlanAccountConfigCard } from "@/features/plan/components/accounts/PlanAccountConfigCard";
+import { usePlanAccountEditor } from "@/features/plan/hooks/use-plan-account-editor";
 import { t } from "@/shared/i18n";
-import type { PlanAccountNames } from "../types";
 
 type PlanAccountFieldsProps = {
   language: AppLanguage;
-  accountNames: PlanAccountNames;
-  onAccountNamesChange: (value: PlanAccountNames) => void;
+  accounts: PlanAccount[];
+  onAccountsChange: (value: PlanAccount[]) => void;
 };
 
 export function PlanAccountFields({
   language,
-  accountNames,
-  onAccountNamesChange,
+  accounts,
+  onAccountsChange,
 }: PlanAccountFieldsProps) {
+  const editor = usePlanAccountEditor({ accounts, onAccountsChange });
+
   return (
-    <>
-      <Field label={t("money.expensesAccount", language)}>
-        <input
-          value={accountNames.expensesAccountName}
-          onChange={(event) =>
-            onAccountNamesChange({
-              ...accountNames,
-              expensesAccountName: event.target.value,
-            })
-          }
-          className="input-control"
-        />
-      </Field>
+    <div className="grid gap-3 sm:col-span-2">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-[var(--app-text)]">
+          {t("money.accounts", language)}
+        </h3>
+        <Button
+          type="button"
+          onClick={editor.addAccount}
+          disabled={!editor.canAddAccount}
+          variant="secondary"
+          size="sm"
+          leadingIcon={<Plus size={16} />}
+        >
+          {t("money.addAccount", language)}
+        </Button>
+      </div>
 
-      <Field label={t("money.savingsAccount", language)}>
-        <input
-          value={accountNames.savingsAccountName}
-          onChange={(event) =>
-            onAccountNamesChange({
-              ...accountNames,
-              savingsAccountName: event.target.value,
-            })
-          }
-          className="input-control"
+      {accounts.map((account, index) => (
+        <PlanAccountConfigCard
+          key={account.id}
+          account={account}
+          index={index}
+          language={language}
+          canRemove={editor.canRemoveAccount}
+          onRename={editor.renameAccount}
+          onRemove={editor.removeAccount}
+          onTogglePurpose={editor.togglePurpose}
         />
-      </Field>
-
-      <Field label={t("money.mainAccount", language)}>
-        <input
-          value={accountNames.primaryAccountName}
-          onChange={(event) =>
-            onAccountNamesChange({
-              ...accountNames,
-              primaryAccountName: event.target.value,
-            })
-          }
-          className="input-control"
-        />
-      </Field>
-    </>
+      ))}
+    </div>
   );
 }

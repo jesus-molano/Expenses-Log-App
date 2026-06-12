@@ -1,10 +1,15 @@
 import {
+  BriefcaseBusiness,
   Car,
   CreditCard,
+  Dumbbell,
   Gamepad2,
   HeartPulse,
   Home,
+  PawPrint,
   Sparkles,
+  TrainFront,
+  Utensils,
   User,
   WalletCards,
   type LucideIcon,
@@ -46,8 +51,9 @@ export const MONTHS_EN = [
 
 export const RECURRENCE_OPTIONS: Array<{
   value: RecurrenceFrequency;
-  labelKey: "monthly" | "quarterly" | "yearly" | "custom";
+  labelKey: "once" | "monthly" | "quarterly" | "yearly" | "custom";
 }> = [
+  { value: "once", labelKey: "once" },
   { value: "monthly", labelKey: "monthly" },
   { value: "quarterly", labelKey: "quarterly" },
   { value: "yearly", labelKey: "yearly" },
@@ -73,4 +79,9 @@ export const categoryIconMap: Record<string, LucideIcon> = {
   HeartPulse,
   Gamepad2,
   User,
+  Utensils,
+  TrainFront,
+  Dumbbell,
+  BriefcaseBusiness,
+  PawPrint,
 };

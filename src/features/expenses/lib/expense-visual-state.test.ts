@@ -56,7 +56,6 @@ function occurrence(
       amount: 10,
       currency: "EUR",
       categoryId: "cat-test",
-      tags: [],
       startDate: dueDate,
       dueDay: Number(dueDate.slice(-2)),
       recurrence: { frequency: "monthly", interval: 1 },

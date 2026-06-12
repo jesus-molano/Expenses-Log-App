@@ -8,19 +8,6 @@ import type {
 } from "@/domain/types";
 
 const finance: FinanceStore = {
-  incomeSources: [
-    {
-      id: "salary",
-      userId: "user",
-      name: "Sueldo",
-      amount: 2000,
-      currency: "EUR",
-      dayOfMonth: 25,
-      active: true,
-      createdAt: "2026-05-01T00:00:00.000Z",
-      updatedAt: "2026-05-01T00:00:00.000Z",
-    },
-  ],
   incomeEvents: [
     {
       id: "bizum-may",
@@ -33,15 +20,17 @@ const finance: FinanceStore = {
       updatedAt: "2026-05-10T00:00:00.000Z",
     },
   ],
-  allocation: {
-    expensesAccountName: "Gastos",
-    savingsAccountName: "Ahorro",
-    primaryAccountName: "Principal",
-    monthlySavingsTargets: {
-      "2026-05": 300,
-      "2026-06": 300,
+  monthlySalary: {
+    "2026-05": {
+      amount: 2000,
+      dayOfMonth: 25,
     },
   },
+  monthlySavingsTargets: {
+    "2026-05": 300,
+    "2026-06": 300,
+  },
+  accounts: [],
 };
 
 const templates: ExpenseTemplate[] = [
@@ -110,9 +99,9 @@ describe("monthly plan domain behavior", () => {
     });
 
     expect(mayPlan.extraIncomeTotal).toBe(40);
-    expect(mayPlan.fixedExpensesTotal).toBe(960);
+    expect(mayPlan.plannedExpensesTotal).toBe(960);
     expect(junePlan.extraIncomeTotal).toBe(0);
-    expect(junePlan.fixedExpensesTotal).toBe(0);
+    expect(junePlan.plannedExpensesTotal).toBe(0);
   });
 });
 
@@ -132,7 +121,6 @@ function template(
     amount,
     currency: "EUR",
     categoryId: "cat",
-    tags: [],
     startDate,
     dueDay,
     recurrence,

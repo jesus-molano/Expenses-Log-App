@@ -37,7 +37,7 @@ export function useSettingsController() {
   const [user, setUser] = useState<User | null>(null);
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
-  const currentTheme = store.preferences?.theme ?? "legacy";
+  const currentTheme = store.preferences?.theme ?? "dark";
   const currentLanguage = store.preferences?.language ?? "es";
   const selectedTheme =
     SETTINGS_THEMES.find((theme) => theme.id === currentTheme) ??

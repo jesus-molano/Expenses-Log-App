@@ -9,78 +9,6 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.expense_categories (
-  id uuid primary key default gen_random_uuid(),
-  external_id text,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  name text not null,
-  icon text not null default 'WalletCards',
-  tone text not null default 'slate',
-  created_at timestamptz not null default now()
-);
-
-create unique index if not exists expense_categories_user_name_idx
-  on public.expense_categories (user_id, lower(name));
-
-create index if not exists expense_categories_user_id_idx
-  on public.expense_categories (user_id);
-
-alter table public.expense_categories
-  add column if not exists external_id text;
-
-create table if not exists public.expense_templates (
-  id uuid primary key default gen_random_uuid(),
-  external_id text,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  category_id uuid references public.expense_categories(id) on delete set null,
-  name text not null,
-  description text not null default '',
-  amount numeric(12, 2) not null check (amount > 0),
-  currency text not null default 'EUR',
-  tags text[] not null default '{}',
-  start_date date not null,
-  due_day integer not null check (due_day between 1 and 31),
-  recurrence jsonb not null,
-  active boolean not null default true,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-alter table public.expense_templates
-  add column if not exists external_id text;
-
-create index if not exists expense_templates_user_id_idx
-  on public.expense_templates (user_id);
-
-create index if not exists expense_templates_category_id_idx
-  on public.expense_templates (category_id);
-
-create table if not exists public.expense_occurrence_overrides (
-  id uuid primary key default gen_random_uuid(),
-  external_id text,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  template_id uuid not null references public.expense_templates(id) on delete cascade,
-  occurrence_date date not null,
-  due_date date,
-  sort_order numeric(12, 4),
-  status text not null check (status in ('due', 'paid', 'skipped')),
-  paid_at timestamptz,
-  amount_paid numeric(12, 2),
-  note text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (template_id, occurrence_date)
-);
-
-alter table public.expense_occurrence_overrides
-  add column if not exists external_id text;
-
-create index if not exists expense_occurrence_overrides_user_id_idx
-  on public.expense_occurrence_overrides (user_id);
-
-create index if not exists expense_occurrence_overrides_template_id_idx
-  on public.expense_occurrence_overrides (template_id);
-
 create table if not exists public.push_subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -102,23 +30,15 @@ create table if not exists public.app_stores (
 );
 
 alter table public.profiles enable row level security;
-alter table public.expense_categories enable row level security;
-alter table public.expense_templates enable row level security;
-alter table public.expense_occurrence_overrides enable row level security;
 alter table public.push_subscriptions enable row level security;
 alter table public.app_stores enable row level security;
 
+drop policy if exists "profiles own rows" on public.profiles;
+drop policy if exists "push own rows" on public.push_subscriptions;
+drop policy if exists "app stores own rows" on public.app_stores;
+
 create policy "profiles own rows" on public.profiles
   for all using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
-
-create policy "categories own rows" on public.expense_categories
-  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-
-create policy "templates own rows" on public.expense_templates
-  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-
-create policy "overrides own rows" on public.expense_occurrence_overrides
-  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 create policy "push own rows" on public.push_subscriptions
   for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);

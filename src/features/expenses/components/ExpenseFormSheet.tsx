@@ -1,6 +1,8 @@
-﻿"use client";
+"use client";
 
 import { FormEvent, useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Sheet } from "@/components/ui/Sheet";
 import type {
   AppLanguage,
   CreateExpenseOptions,
@@ -36,8 +38,13 @@ export function ExpenseFormSheet({
   const [initialStatus, setInitialStatus] =
     useState<Extract<OccurrenceStatus, "due" | "paid">>("due");
   const today = new Date();
+  const startDate = form.startDate
+    ? new Date(`${form.startDate}T00:00:00`)
+    : today;
   const isPastCurrentMonthDay =
-    form.recurrence.frequency !== "yearly" && form.dueDay < today.getDate();
+    startDate.getFullYear() === today.getFullYear() &&
+    startDate.getMonth() === today.getMonth() &&
+    startDate.getDate() < today.getDate();
 
   if (!open) return null;
 
@@ -55,29 +62,28 @@ export function ExpenseFormSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6">
-      <form
-        onSubmit={submit}
-        className="max-h-[92dvh] w-full overflow-y-auto rounded-t-[1.65rem] border border-white/10 bg-slate-950 shadow-[0_0_60px_rgba(132,204,22,0.12),0_30px_80px_rgba(0,0,0,0.55)] sm:max-w-xl sm:rounded-[1.65rem]"
-      >
-        <div className="sticky top-0 z-10 bg-slate-950/92 px-5 pb-3 pt-3 backdrop-blur-xl">
-          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/20 sm:hidden" />
+    <Sheet onBackdropClick={onClose}>
+      <form onSubmit={submit} className="contents">
+        <div className="app-sheet-header sticky top-0 z-10 px-5 pb-3 pt-3">
+          <div className="app-sheet-handle mx-auto mb-3 sm:hidden" />
           <header className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-lg font-semibold text-[var(--app-text)]">
                 {t("expenses.newExpense", language)}
               </h2>
-              <p className="truncate text-sm text-slate-300">
+              <p className="truncate text-sm text-[var(--app-text-muted)]">
                 {t("expenses.newExpenseSubtitle", language)}
               </p>
             </div>
-            <button
+            <Button
               type="button"
               onClick={onClose}
-              className="h-10 shrink-0 rounded-full px-3 text-sm font-medium text-slate-200 hover:bg-white/10"
+              variant="ghost"
+              size="sm"
+              className="shrink-0 rounded-full"
             >
               {t("expenses.close", language)}
-            </button>
+            </Button>
           </header>
         </div>
 
@@ -91,51 +97,48 @@ export function ExpenseFormSheet({
           />
 
           {isPastCurrentMonthDay ? (
-            <div className="rounded-[1.15rem] border border-orange-300/20 bg-orange-400/10 p-3">
-              <p className="text-sm font-semibold text-orange-100">
+            <div className="app-section-card border-[color-mix(in_srgb,var(--app-warning)_28%,transparent)] p-3">
+              <p className="text-sm font-semibold text-[var(--app-warning)]">
                 {t("expenses.pastDayTitle", language)}
               </p>
-              <p className="mt-1 text-xs text-slate-300">
+              <p className="mt-1 text-xs text-[var(--app-text-muted)]">
                 {t("expenses.pastDayBody", language)}
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => setInitialStatus("due")}
-                  className={`h-10 rounded-2xl text-sm font-semibold transition ${
-                    initialStatus === "due"
-                      ? "bg-white text-slate-950"
-                      : "bg-white/[0.07] text-white ring-1 ring-white/10"
-                  }`}
+                  variant={initialStatus === "due" ? "primary" : "secondary"}
+                  size="sm"
+                  className="h-10"
                 >
                   {t("common.pending", language)}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => setInitialStatus("paid")}
-                  className={`h-10 rounded-2xl text-sm font-semibold transition ${
-                    initialStatus === "paid"
-                      ? "bg-lime-300 text-slate-950"
-                      : "bg-white/[0.07] text-white ring-1 ring-white/10"
-                  }`}
+                  variant={initialStatus === "paid" ? "primary" : "secondary"}
+                  size="sm"
+                  className="h-10"
                 >
                   {t("common.paid", language)}
-                </button>
+                </Button>
               </div>
             </div>
           ) : null}
 
-          <div className="sticky bottom-0 -mx-5 bg-slate-950/92 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl">
-            <button
+          <div className="app-sheet-footer sticky bottom-0 -mx-5 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+            <Button
               type="submit"
-              className="h-12 w-full rounded-2xl bg-lime-300 text-base font-semibold text-slate-950 shadow-[0_0_34px_rgba(132,204,22,0.28)] transition hover:bg-lime-200"
+              className="w-full"
+              variant="primary"
+              size="lg"
             >
               {t("expenses.saveExpense", language)}
-            </button>
+            </Button>
           </div>
         </div>
       </form>
-    </div>
+    </Sheet>
   );
 }
-

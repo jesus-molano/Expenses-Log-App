@@ -51,17 +51,13 @@ function storeWith({
     templates,
     overrides: [],
     finance: {
-      incomeSources: [],
       incomeEvents: [],
-      allocation: {
-        expensesAccountName: "Gastos",
-        savingsAccountName: "Ahorro",
-        primaryAccountName: "Principal",
-        monthlySavingsTargets,
-      },
+      monthlySalary: {},
+      monthlySavingsTargets,
+      accounts: [],
     },
     preferences: {
-      theme: "legacy",
+      theme: "dark",
       language: "es",
     },
   };
@@ -80,7 +76,6 @@ function template(
     amount,
     currency: "EUR",
     categoryId: "cat",
-    tags: [],
     startDate,
     dueDay: Number(startDate.slice(-2)),
     recurrence: { frequency: "monthly" },

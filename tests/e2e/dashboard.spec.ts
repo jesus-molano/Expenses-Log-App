@@ -1,31 +1,23 @@
 import { expect, test, type Page } from "@playwright/test";
 import { demoStore } from "../../src/domain/seed";
 
-const currentStorageKey = "expense-reminders-store-v3";
-const legacyStorageKeys = [
-  "expense-reminders-store-v1",
-  "expense-reminders-store-v2",
-];
+const currentStorageKey = "expense-log-store-v1";
 
 async function loadDemoStore(page: Page) {
   await page.addInitScript(
-    ([key, legacyKeys, store]) => {
-      for (const legacyKey of legacyKeys) {
-        window.localStorage.removeItem(legacyKey);
-      }
+    ({ key, store }) => {
+      window.localStorage.clear();
       window.localStorage.setItem(key, JSON.stringify(store));
     },
-    [currentStorageKey, legacyStorageKeys, demoStore],
+    { key: currentStorageKey, store: demoStore },
   );
 }
 
 async function clearStore(page: Page) {
-  await page.addInitScript(([key, legacyKeys]) => {
-    for (const legacyKey of legacyKeys) {
-      window.localStorage.removeItem(legacyKey);
-    }
+  await page.addInitScript((key) => {
+    window.localStorage.clear();
     window.localStorage.removeItem(key);
-  }, [currentStorageKey, legacyStorageKeys]);
+  }, currentStorageKey);
 }
 
 async function swipeRow(page: Page, name: string, distance: number) {
@@ -56,7 +48,7 @@ test("starts empty for a new local user", async ({ page }) => {
   await page.getByRole("link", { name: "Plan" }).click();
   await expect(page.getByText("Ingresos").first()).toBeVisible();
   await expect(page.getByText("0,00 €").first()).toBeVisible();
-  await expect(page.getByText("Meta este mes: 0,00 €")).toBeVisible();
+  await expect(page.getByText("Ahorro").first()).toBeVisible();
 });
 
 test("creates and pays a parsed recurring expense", async ({ page }) => {
@@ -113,15 +105,16 @@ test("opens plan and configuration sheet", async ({ page }) => {
   await page.getByRole("button", { name: /Cambiar día de cobro/ }).click();
   await page.getByRole("button", { name: "25" }).click();
   await page.getByLabel("Ahorro este mes").fill("450");
-  await page.getByLabel("Cuenta gastos").fill("Cuenta gastos test");
-  await page.getByLabel("Cuenta ahorro").fill("Cuenta ahorro test");
-  await page.getByLabel("Cuenta principal").fill("Cuenta principal test");
+  const accountNames = page.getByLabel("Nombre de cuenta");
+  await accountNames.nth(0).fill("Cuenta principal test");
+  await accountNames.nth(1).fill("Cuenta gastos test");
+  await accountNames.nth(2).fill("Cuenta ahorro test");
   await page.getByRole("button", { name: "Guardar configuración" }).click();
 
   await expect(page.getByText("Cuenta gastos test")).toBeVisible();
   await expect(page.getByText("Cuenta ahorro test")).toBeVisible();
   await expect(page.getByText("Cuenta principal test")).toBeVisible();
-  await expect(page.getByText("Meta este mes: 450,00 €")).toBeVisible();
+  await expect(page.getByText("450,00 €").first()).toBeVisible();
 });
 
 test("deletes an expense from the edit screen", async ({ page }) => {

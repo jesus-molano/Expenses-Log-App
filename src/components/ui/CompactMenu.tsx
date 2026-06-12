@@ -22,7 +22,7 @@ export function CompactMenu({
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
-        className="inline-flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-xl bg-[var(--app-panel-soft-alpha)] px-3 text-sm font-semibold text-[var(--app-text)] ring-1 ring-[var(--app-border)]"
+        className="app-control inline-flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-[var(--app-radius-sm)] px-3 text-sm font-semibold"
       >
         {leading}
         <span className="min-w-0 truncate">{label}</span>
@@ -30,7 +30,7 @@ export function CompactMenu({
       </button>
       {open ? (
         <div
-          className={`absolute top-10 z-20 grid min-w-full gap-0.5 rounded-2xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface)_96%,transparent)] p-1.5 shadow-[var(--app-shadow)] backdrop-blur-2xl ${
+          className={`app-card absolute top-10 z-20 grid min-w-full gap-0.5 rounded-[var(--app-radius-lg)] p-1.5 ${
             align === "left" ? "left-0" : "right-0"
           }`}
         >

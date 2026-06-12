@@ -13,6 +13,7 @@ type DashboardShellProps = {
   activeTab: "expenses" | "money";
   language: AppLanguage;
   panelChrome: PanelChromeState;
+  headerAction?: React.ReactNode;
   children: React.ReactNode;
 };
 
@@ -22,6 +23,7 @@ export function DashboardShell({
   activeTab,
   language,
   panelChrome,
+  headerAction,
   children,
 }: DashboardShellProps) {
   useEffect(() => {
@@ -29,13 +31,13 @@ export function DashboardShell({
   }, [activeTab]);
 
   return (
-    <main className="app-page-bg min-h-dvh text-white">
-      <div className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
+    <main className="app-page">
+      <div className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col pb-[calc(var(--app-bottom-nav-height)+1.25rem+env(safe-area-inset-bottom))]">
         <header
           data-app-chrome="true"
           style={{ viewTransitionName: "app-chrome" }}
           data-state={panelChrome}
-          className="app-top-chrome sticky top-0 z-40 px-3 pt-[max(0.65rem,env(safe-area-inset-top))] text-white"
+          className="app-top-chrome sticky top-0 z-40 px-3 pt-[max(0.65rem,env(safe-area-inset-top))]"
         >
           <div
             aria-hidden="true"
@@ -43,7 +45,7 @@ export function DashboardShell({
           />
           <section
             data-state={panelChrome}
-            className="app-shell-card relative z-10 mx-auto rounded-[1.35rem] border px-4 py-3.5"
+            className="app-shell-card relative z-10 mx-auto rounded-[var(--app-radius-xl)] border px-4 py-3.5"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -54,13 +56,16 @@ export function DashboardShell({
                   {headlineLabel}
                 </p>
               </div>
-              <Link
-                href={`/settings?from=${activeTab}`}
-                aria-label={t("common.settings", language)}
-                className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--app-panel-soft-alpha)] text-[var(--app-text)] ring-1 ring-[var(--app-border)] transition hover:bg-[color-mix(in_srgb,var(--app-accent)_16%,transparent)] hover:text-[var(--app-accent)]"
-              >
-                <Settings size={18} />
-              </Link>
+              <div className="flex shrink-0 items-center gap-2">
+                {headerAction}
+                <Link
+                  href={`/settings?from=${activeTab}`}
+                  aria-label={t("common.settings", language)}
+                  className="app-icon-button size-10 min-h-10 min-w-10 shrink-0"
+                >
+                  <Settings size={18} />
+                </Link>
+              </div>
             </div>
           </section>
         </header>
@@ -74,7 +79,7 @@ export function DashboardShell({
         aria-label="Secciones"
         className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2"
       >
-        <div className="mx-auto grid max-w-md grid-cols-2 gap-2 rounded-[1.35rem] border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface-strong)_92%,transparent)] p-1.5 text-sm font-semibold shadow-[0_-10px_34px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+        <div className="app-bottom-nav mx-auto grid max-w-md grid-cols-2 gap-2 p-1.5 text-sm font-semibold">
           <ChromeTab
             href="/"
             active={activeTab === "expenses"}
@@ -107,11 +112,8 @@ function ChromeTab({
   return (
     <Link
       href={href}
-      className={`inline-flex h-12 items-center justify-center gap-2 rounded-[1rem] transition-[background-color,color,box-shadow] duration-300 ${
-        active
-          ? "bg-[var(--app-accent)] text-[var(--app-accent-contrast)] shadow-[0_0_24px_color-mix(in_srgb,var(--app-accent)_20%,transparent)]"
-          : "text-[var(--app-text-muted)] hover:bg-[var(--app-panel-soft-alpha)] hover:text-[var(--app-text)]"
-      }`}
+      data-active={active ? "true" : "false"}
+      className="app-bottom-nav-tab inline-flex items-center justify-center gap-2"
     >
       {icon}
       <span>{label}</span>

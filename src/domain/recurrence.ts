@@ -34,6 +34,15 @@ function nextDate(date: Date, rule: RecurrenceRule): Date {
   return addMonths(date, 1);
 }
 
+function dateForRule(date: Date, template: ExpenseTemplate): Date {
+  const { recurrence } = template;
+  if (recurrence.frequency === "once") return date;
+  if (recurrence.frequency === "custom" && ["day", "week"].includes(recurrence.unit ?? "")) {
+    return date;
+  }
+  return buildDateWithDay(date, template.dueDay);
+}
+
 function rruleDates(template: ExpenseTemplate, from: Date, to: Date): Date[] {
   if (!template.recurrence.rrule) return [];
 
@@ -78,6 +87,12 @@ export function generateTemplateDates(
 
   if (isBefore(to, from) || isBefore(to, start)) return [];
 
+  if (template.recurrence.frequency === "once") {
+    return !isBefore(start, from) && !isAfter(start, to)
+      ? [toDateOnly(start)]
+      : [];
+  }
+
   if (template.recurrence.frequency === "rrule") {
     return rruleDates(template, from, to).map(toDateOnly);
   }
@@ -87,19 +102,19 @@ export function generateTemplateDates(
   }
 
   const dates: string[] = [];
-  let cursor = buildDateWithDay(start, template.dueDay);
+  let cursor = dateForRule(start, template);
   let guard = 0;
 
   while (isBefore(cursor, from) && guard < 500) {
     cursor = nextDate(cursor, template.recurrence);
-    cursor = buildDateWithDay(cursor, template.dueDay);
+    cursor = dateForRule(cursor, template);
     guard += 1;
   }
 
   while (!isAfter(cursor, to) && guard < 1000) {
     dates.push(toDateOnly(cursor));
     cursor = nextDate(cursor, template.recurrence);
-    cursor = buildDateWithDay(cursor, template.dueDay);
+    cursor = dateForRule(cursor, template);
     guard += 1;
   }
 
@@ -127,10 +142,16 @@ export function generateOccurrences(
         const dueDate = override?.dueDate ?? date;
         const estimate = estimateChargeDate(dueDate);
         const defaultSortOrder = templateIndex * 1024;
+        const effectiveTemplate = {
+          ...template,
+          name: override?.name ?? template.name,
+          amount: override?.amount ?? template.amount,
+          categoryId: override?.categoryId ?? template.categoryId,
+        };
 
         return {
           id: `${template.id}:${date}`,
-          template,
+          template: effectiveTemplate,
           occurrenceDate: date,
           dueDate,
           estimatedChargeDate: estimate.date,
@@ -145,6 +166,7 @@ export function generateOccurrences(
 }
 
 export function recurrenceLabel(rule: RecurrenceRule): string {
+  if (rule.frequency === "once") return "Pago unico";
   if (rule.frequency === "monthly") return "Mensual";
   if (rule.frequency === "quarterly") return "Trimestral";
   if (rule.frequency === "yearly") return "Anual";

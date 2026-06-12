@@ -1,6 +1,7 @@
 "use client";
 
 import { Pencil } from "lucide-react";
+import { IconButton } from "@/components/ui/IconButton";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
@@ -10,21 +11,39 @@ import { MoneyStat } from "./MoneyStat";
 type MonthlyComparisonStatsProps = {
   language: AppLanguage;
   summary: MoneySeriesItem;
+  canEditSalary: boolean;
   canEditSavings: boolean;
+  onEditSalary: () => void;
   onEditSavings: () => void;
 };
 
 export function MonthlyComparisonStats({
   language,
   summary,
+  canEditSalary,
   canEditSavings,
+  onEditSalary,
   onEditSavings,
 }: MonthlyComparisonStatsProps) {
   return (
-    <div className="mt-3 grid grid-cols-2 gap-2">
+    <div className="mt-5 grid grid-cols-2 gap-3">
       <MoneyStat
         label={t("money.income", language)}
         value={formatCurrency(summary.income)}
+        action={
+          canEditSalary ? (
+            <IconButton
+              type="button"
+              onClick={onEditSalary}
+              aria-label={t("money.editMonthSalary", language)}
+              title={t("money.editMonthSalary", language)}
+              size="sm"
+              className="size-7 min-h-7 min-w-7 shrink-0"
+            >
+              <Pencil size={13} />
+            </IconButton>
+          ) : null
+        }
       />
       <MoneyStat
         label={t("money.fixedExpenses", language)}
@@ -35,15 +54,16 @@ export function MonthlyComparisonStats({
         value={formatCurrency(summary.savings)}
         action={
           canEditSavings ? (
-            <button
+            <IconButton
               type="button"
               onClick={onEditSavings}
               aria-label={t("money.editMonthSavings", language)}
               title={t("money.editMonthSavings", language)}
-              className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--app-panel-soft-alpha)] text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)] transition hover:text-[var(--app-text)]"
+              size="sm"
+              className="size-7 min-h-7 min-w-7 shrink-0"
             >
               <Pencil size={13} />
-            </button>
+            </IconButton>
           ) : null
         }
       />
@@ -54,7 +74,7 @@ export function MonthlyComparisonStats({
             : t("money.free", language)
         }
         value={formatCurrency(
-          summary.shortfall > 0 ? summary.shortfall : summary.free,
+          summary.shortfall > 0 ? summary.shortfall : summary.remaining,
         )}
       />
     </div>
