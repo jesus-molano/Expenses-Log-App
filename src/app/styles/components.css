@@ -7,6 +7,11 @@
   color: var(--app-text);
 }
 
+.app-page-safe {
+  padding-top: max(1.25rem, calc(env(safe-area-inset-top) + 0.75rem));
+  padding-bottom: max(1.25rem, calc(env(safe-area-inset-bottom) + 0.75rem));
+}
+
 .app-focus-ring:focus-visible,
 .app-button:focus-visible,
 .app-icon-button:focus-visible,

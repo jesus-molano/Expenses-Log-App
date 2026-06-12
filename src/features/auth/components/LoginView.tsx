@@ -33,7 +33,7 @@ export function LoginView() {
   }
 
   return (
-    <main className="app-page grid min-h-dvh px-4 py-5">
+    <main className="app-page app-page-safe grid min-h-dvh px-4">
       <div className="mx-auto w-full max-w-md">
         <Link
           href="/settings"

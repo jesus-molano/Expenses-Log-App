@@ -10,7 +10,7 @@ export default function Error({
   reset: () => void;
 }) {
   return (
-    <main className="app-page grid min-h-dvh place-items-center px-6 text-center">
+    <main className="app-page app-page-safe grid min-h-dvh place-items-center px-6 text-center">
       <div className="app-section-card max-w-sm p-5">
         <p className="text-sm font-semibold text-[var(--app-danger)]">
           Error de aplicacion

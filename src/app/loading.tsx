@@ -6,7 +6,7 @@ export default async function Loading() {
   const language = normalizeAppLanguage(cookieStore.get("expense-language")?.value);
 
   return (
-    <main className="app-page grid min-h-dvh place-items-center px-6 text-center">
+    <main className="app-page app-page-safe grid min-h-dvh place-items-center px-6 text-center">
       <div>
         <div className="app-loading-dot mx-auto size-11 animate-pulse rounded-full border" />
         <p className="mt-3 text-sm font-semibold text-[var(--app-text-muted)]">

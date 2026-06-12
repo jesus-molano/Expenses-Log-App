@@ -19,7 +19,7 @@ export function SettingsView() {
   const settings = useSettingsController();
 
   return (
-    <main className="app-page px-4 py-5">
+    <main className="app-page app-page-safe px-4">
       <div className="mx-auto max-w-2xl">
         <Link
           href={settings.backHref}

@@ -22,7 +22,7 @@ export function ExpenseDetail({ id }: { id: string }) {
 
   if (!expenseStore.isHydrated) {
     return (
-      <main className="app-page grid min-h-dvh place-items-center p-6 text-center">
+      <main className="app-page app-page-safe grid min-h-dvh place-items-center px-6 text-center">
         <div className="app-section-card px-6 py-5">
           <p className="font-semibold text-[var(--app-text)]">
             {t("expenses.loadingExpense", language)}
@@ -34,7 +34,7 @@ export function ExpenseDetail({ id }: { id: string }) {
 
   if (!template) {
     return (
-      <main className="app-page grid min-h-dvh place-items-center p-6 text-center">
+      <main className="app-page app-page-safe grid min-h-dvh place-items-center px-6 text-center">
         <div className="app-section-card p-5">
           <p className="font-semibold text-[var(--app-text)]">
             {t("expenses.expenseNotFound", language)}
@@ -72,7 +72,7 @@ function ExpenseDetailForm({
   const editor = useExpenseEditor({ template, expenseStore, language });
 
   return (
-    <main className="app-page min-h-dvh px-4 py-5">
+    <main className="app-page app-page-safe min-h-dvh px-4">
       <div className="mx-auto max-w-2xl">
         <Link
           href="/"
