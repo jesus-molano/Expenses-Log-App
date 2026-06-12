@@ -84,4 +84,23 @@ describe("useScrollChrome", () => {
 
     await waitFor(() => expect(result.current.panelChrome).toBe("hidden"));
   });
+
+  it("does not treat expense row touch movement as chrome scroll intent", async () => {
+    document.body.innerHTML = `
+      <header data-app-chrome="true"></header>
+      <div data-expense-row="true"><article>Netflix</article></div>
+    `;
+    const row = document.querySelector("[data-expense-row]")!;
+    const { result } = renderHook(() => useScrollChrome());
+
+    await waitFor(() => expect(result.current.panelChrome).toBe("visible"));
+
+    act(() => {
+      row.dispatchEvent(new Event("touchmove", { bubbles: true }));
+      setScrollY(300);
+      window.dispatchEvent(new Event("scroll"));
+    });
+
+    await waitFor(() => expect(result.current.panelChrome).toBe("visible"));
+  });
 });

@@ -18,7 +18,7 @@ type ExpenseListProps = {
   today: string;
   language?: AppLanguage;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
-  onMoveOccurrence: (
+  onMoveOccurrenceOnly: (
     occurrence: ExpenseOccurrence,
     dueDate: string,
     sortOrder?: number,
@@ -32,7 +32,7 @@ export function ExpenseList({
   today,
   language = "es",
   onTogglePaid,
-  onMoveOccurrence,
+  onMoveOccurrenceOnly,
   onMoveOccurrenceSeries,
 }: ExpenseListProps) {
   const locale = language === "en" ? enUS : es;
@@ -40,7 +40,7 @@ export function ExpenseList({
   const { focusIndex, focusRef } = useTimelineInitialFocus(sections, today);
   const dnd = useExpenseDnd({
     sections,
-    onMoveOccurrence,
+    onMoveOccurrenceOnly,
     onMoveOccurrenceSeries,
   });
   const visibleSections = visibleSectionsDuringMonthDrag({
@@ -93,7 +93,7 @@ export function ExpenseList({
           pendingMove={dnd.pendingMove}
           language={language}
           locale={locale}
-          onApplySeries={dnd.applySeriesMove}
+          onApplySingleMonth={dnd.applySingleMonthMove}
           onClose={dnd.closeMoveSheet}
         />
       </section>

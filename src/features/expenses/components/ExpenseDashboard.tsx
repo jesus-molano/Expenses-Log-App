@@ -30,7 +30,7 @@ export function ExpenseDashboard({
     store,
     addExpense,
     togglePaid,
-    moveOccurrence,
+    moveOccurrenceOnly,
     moveOccurrenceSeries,
   } = useExpenseStore();
   const language = store.preferences?.language ?? "es";
@@ -84,8 +84,8 @@ export function ExpenseDashboard({
         today={filters.today}
         language={language}
         onTogglePaid={(occurrence) => runViewTransition(() => togglePaid(occurrence))}
-        onMoveOccurrence={(occurrence, dueDate, sortOrder) =>
-          runViewTransition(() => moveOccurrence(occurrence, dueDate, sortOrder))
+        onMoveOccurrenceOnly={(occurrence, dueDate, sortOrder) =>
+          runViewTransition(() => moveOccurrenceOnly(occurrence, dueDate, sortOrder))
         }
         onMoveOccurrenceSeries={(occurrence, dueDate) =>
           runViewTransition(() => moveOccurrenceSeries(occurrence, dueDate))

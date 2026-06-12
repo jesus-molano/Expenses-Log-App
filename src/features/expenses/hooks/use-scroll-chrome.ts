@@ -82,6 +82,17 @@ export function useScrollChrome() {
     const markUserScrollIntent = () => {
       hasUserScrollIntentRef.current = true;
     };
+    const markTouchScrollIntent = (event: TouchEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest("[data-expense-row]")
+      ) {
+        return;
+      }
+
+      hasUserScrollIntentRef.current = true;
+    };
     const markKeyboardScrollIntent = (event: KeyboardEvent) => {
       if (
         [
@@ -99,7 +110,7 @@ export function useScrollChrome() {
     };
 
     window.addEventListener("wheel", markUserScrollIntent, { passive: true });
-    window.addEventListener("touchmove", markUserScrollIntent, {
+    window.addEventListener("touchmove", markTouchScrollIntent, {
       passive: true,
     });
     window.addEventListener("keydown", markKeyboardScrollIntent);
@@ -111,7 +122,7 @@ export function useScrollChrome() {
     return () => {
       if (frameRef.current) window.cancelAnimationFrame(frameRef.current);
       window.removeEventListener("wheel", markUserScrollIntent);
-      window.removeEventListener("touchmove", markUserScrollIntent);
+      window.removeEventListener("touchmove", markTouchScrollIntent);
       window.removeEventListener("keydown", markKeyboardScrollIntent);
       window.removeEventListener("scroll", scheduleUpdate);
       window.removeEventListener("resize", scheduleUpdate);

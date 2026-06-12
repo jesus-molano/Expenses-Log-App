@@ -6,25 +6,38 @@ import type { ExpenseOccurrence } from "@/domain/types";
 type PendingMove = {
   occurrence: ExpenseOccurrence;
   dueDate: string;
+  sortOrder?: number;
 };
 
 export function useExpenseDndPrompt(
-  onMoveOccurrenceSeries: (occurrence: ExpenseOccurrence, dueDate: string) => void,
+  onMoveOccurrenceOnly: (
+    occurrence: ExpenseOccurrence,
+    dueDate: string,
+    sortOrder?: number,
+  ) => void,
 ) {
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
 
-  function requestMovePrompt(occurrence: ExpenseOccurrence, dueDate: string) {
-    setPendingMove({ occurrence, dueDate });
+  function requestMovePrompt(
+    occurrence: ExpenseOccurrence,
+    dueDate: string,
+    sortOrder?: number,
+  ) {
+    setPendingMove({ occurrence, dueDate, sortOrder });
   }
 
   function closeMoveSheet() {
     setPendingMove(null);
   }
 
-  function applySeriesMove() {
+  function applySingleMonthMove() {
     if (!pendingMove) return;
 
-    onMoveOccurrenceSeries(pendingMove.occurrence, pendingMove.dueDate);
+    onMoveOccurrenceOnly(
+      pendingMove.occurrence,
+      pendingMove.dueDate,
+      pendingMove.sortOrder,
+    );
     setPendingMove(null);
   }
 
@@ -32,6 +45,6 @@ export function useExpenseDndPrompt(
     pendingMove,
     requestMovePrompt,
     closeMoveSheet,
-    applySeriesMove,
+    applySingleMonthMove,
   };
 }

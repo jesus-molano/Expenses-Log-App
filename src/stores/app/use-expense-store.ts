@@ -19,6 +19,7 @@ import {
   deleteExpenseFromStore,
   deleteIncomeEventFromStore,
   moveOccurrenceInStore,
+  moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
   skipOccurrenceInStore,
   togglePaidInStore,
@@ -114,6 +115,14 @@ function useExpenseStoreValue() {
     persist(moveOccurrenceSeriesInStore(store, occurrence, dueDate));
   }
 
+  function moveOccurrenceOnly(
+    occurrence: ExpenseOccurrence,
+    dueDate: string,
+    sortOrder?: number,
+  ) {
+    persist(moveOccurrenceOnlyInStore(store, occurrence, dueDate, sortOrder));
+  }
+
   function updateMoneySettings(input: MoneySettingsInput) {
     persist(updateMoneySettingsInStore(store, input));
   }
@@ -162,6 +171,7 @@ function useExpenseStoreValue() {
     skipOccurrence,
     moveOccurrence,
     moveOccurrenceSeries,
+    moveOccurrenceOnly,
     updateMoneySettings,
     updateMonthlySavingsTarget,
     updateMonthlySalary,

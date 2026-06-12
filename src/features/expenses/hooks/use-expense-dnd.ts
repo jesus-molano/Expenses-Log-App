@@ -23,7 +23,7 @@ const DRAG_SETTLE_LOCK_MS = 520;
 
 type UseExpenseDndOptions = {
   sections: TimelineSection[];
-  onMoveOccurrence: (
+  onMoveOccurrenceOnly: (
     occurrence: ExpenseOccurrence,
     dueDate: string,
     sortOrder?: number,
@@ -36,7 +36,7 @@ type UseExpenseDndOptions = {
 
 export function useExpenseDnd({
   sections,
-  onMoveOccurrence,
+  onMoveOccurrenceOnly,
   onMoveOccurrenceSeries,
 }: UseExpenseDndOptions) {
   const [draggedOccurrence, setDraggedOccurrence] =
@@ -46,8 +46,9 @@ export function useExpenseDnd({
     useState<ExpenseOccurrence | null>(null);
   const sensors = useExpenseDndSensors();
   const autoScrollWithDrag = useExpenseDndAutoScroll();
-  const prompt = useExpenseDndPrompt(onMoveOccurrenceSeries);
+  const prompt = useExpenseDndPrompt(onMoveOccurrenceOnly);
   const settleTimeoutRef = useRef<number | null>(null);
+  const releaseScrollYRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -59,7 +60,7 @@ export function useExpenseDnd({
     };
   }, []);
 
-  function scheduleMove(
+  function scheduleSeriesMove(
     occurrence: ExpenseOccurrence,
     dueDate: string,
     target?: DropTarget | null,
@@ -70,8 +71,8 @@ export function useExpenseDnd({
       target,
     });
 
-    onMoveOccurrence(occurrence, dueDate, sortOrder);
-    prompt.requestMovePrompt(occurrence, dueDate);
+    onMoveOccurrenceSeries(occurrence, dueDate);
+    prompt.requestMovePrompt(occurrence, dueDate, sortOrder);
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -101,11 +102,12 @@ export function useExpenseDnd({
 
     if (!occurrence || !target) return;
     if (target.date !== occurrence.dueDate || target.rowId) {
-      scheduleMove(occurrence, target.date, target);
+      scheduleSeriesMove(occurrence, target.date, target);
     }
   }
 
   function cleanupDrag() {
+    releaseScrollYRef.current = window.scrollY;
     document.documentElement.classList.remove("is-dragging-expense");
     document.documentElement.classList.add("is-settling-expense-drag");
     clearDragSettleTimeout(settleTimeoutRef.current);
@@ -116,6 +118,18 @@ export function useExpenseDnd({
     setActiveOccurrence(null);
     setDraggedOccurrence(null);
     setActiveDropTarget(null);
+    stabilizeScrollAfterDrag();
+  }
+
+  function stabilizeScrollAfterDrag() {
+    const releaseScrollY = releaseScrollYRef.current;
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: releaseScrollY, behavior: "auto" });
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: releaseScrollY, behavior: "auto" });
+      });
+    });
   }
 
   return {
@@ -126,7 +140,7 @@ export function useExpenseDnd({
     activeDropTarget,
     pendingMove: prompt.pendingMove,
     closeMoveSheet: prompt.closeMoveSheet,
-    applySeriesMove: prompt.applySeriesMove,
+    applySingleMonthMove: prompt.applySingleMonthMove,
     dndHandlers: {
       onDragStart: handleDragStart,
       onDragMove: handleDragMove,

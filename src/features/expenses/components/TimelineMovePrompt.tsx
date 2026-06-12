@@ -11,7 +11,7 @@ type TimelineMovePromptProps = {
   } | null;
   language: AppLanguage;
   locale: Locale;
-  onApplySeries: () => void;
+  onApplySingleMonth: () => void;
   onClose: () => void;
 };
 
@@ -19,7 +19,7 @@ export function TimelineMovePrompt({
   pendingMove,
   language,
   locale,
-  onApplySeries,
+  onApplySingleMonth,
   onClose,
 }: TimelineMovePromptProps) {
   if (!pendingMove) return null;
@@ -37,17 +37,17 @@ export function TimelineMovePrompt({
       <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
         <Button
           type="button"
-          onClick={onApplySeries}
-          variant="primary"
+          onClick={onApplySingleMonth}
+          variant="secondary"
         >
-          {t("expenses.thisAndNext", language)}
+          {t("expenses.onlyThisMonth", language)}
         </Button>
         <Button
           type="button"
           onClick={onClose}
-          variant="secondary"
+          variant="primary"
         >
-          {t("common.ok", language)}
+          {t("expenses.continueSeries", language)}
         </Button>
       </div>
     </div>

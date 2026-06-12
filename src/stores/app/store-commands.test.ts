@@ -10,6 +10,8 @@ import {
   addExpenseToStore,
   clearExpensesFromStore,
   deleteExpenseFromStore,
+  moveOccurrenceOnlyInStore,
+  moveOccurrenceSeriesInStore,
   skipOccurrenceInStore,
   togglePaidInStore,
   updateMonthlyExpenseOccurrenceInStore,
@@ -270,6 +272,43 @@ describe("store commands", () => {
       amount: 35,
       status: "paid",
       amountPaid: 35,
+    });
+  });
+
+  it("can revert a default series move into a one-off month move", () => {
+    const added = addExpenseToStore(emptyStore, {
+      ...draft,
+      dueDay: 10,
+      startDate: "2026-06-10",
+    });
+    const occurrence = {
+      ...occurrenceFrom(added),
+      id: `${added.templates[0].id}:2026-06-10`,
+      occurrenceDate: "2026-06-10",
+      dueDate: "2026-06-10",
+    };
+
+    const seriesMoved = moveOccurrenceSeriesInStore(
+      added,
+      occurrence,
+      "2026-06-14",
+    );
+    expect(seriesMoved.templates[0].dueDay).toBe(14);
+
+    const oneOff = moveOccurrenceOnlyInStore(
+      seriesMoved,
+      occurrence,
+      "2026-06-14",
+      512,
+    );
+
+    expect(oneOff.templates[0].dueDay).toBe(10);
+    expect(oneOff.overrides[0]).toMatchObject({
+      templateId: occurrence.template.id,
+      occurrenceDate: "2026-06-10",
+      dueDate: "2026-06-14",
+      sortOrder: 512,
+      status: "due",
     });
   });
 

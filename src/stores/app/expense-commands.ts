@@ -226,6 +226,28 @@ export function moveOccurrenceInStore(
   return { ...store, overrides };
 }
 
+export function moveOccurrenceOnlyInStore(
+  store: ExpenseStore,
+  occurrence: ExpenseOccurrence,
+  dueDate: string,
+  sortOrder?: number,
+): ExpenseStore {
+  const restoredSeriesStore = {
+    ...store,
+    templates: store.templates.map((template) =>
+      template.id === occurrence.template.id
+        ? {
+            ...template,
+            dueDay: occurrence.template.dueDay,
+            updatedAt: new Date().toISOString(),
+          }
+        : template,
+    ),
+  };
+
+  return moveOccurrenceInStore(restoredSeriesStore, occurrence, dueDate, sortOrder);
+}
+
 export function moveOccurrenceSeriesInStore(
   store: ExpenseStore,
   occurrence: ExpenseOccurrence,
