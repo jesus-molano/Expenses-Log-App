@@ -40,6 +40,20 @@ GEMINI_API_KEY=
 GEMINI_API_MODEL=gemini-2.5-flash
 ```
 
+Required for scheduled push reminders:
+
+```bash
+SUPABASE_SERVICE_ROLE_KEY=
+CRON_SECRET=
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:you@example.com
+```
+
+The Vercel cron in `vercel.json` calls `/api/push/daily-reminders` every day
+at `08:00 UTC`. The endpoint sends one Web Push reminder to each saved
+subscription when that user's store has unpaid expenses due or estimated today.
+
 Apply `supabase/schema.sql` in the Supabase SQL editor to create tables and RLS policies.
 
 ## Verify
