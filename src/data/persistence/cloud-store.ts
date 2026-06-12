@@ -2,7 +2,10 @@ import type { User } from "@supabase/supabase-js";
 import type { AppSupabaseClient, Json } from "@/data/supabase/database.types";
 import { toDatabaseUuid } from "@/data/supabase/database.types";
 import type { ExpenseStore } from "@/domain/types";
-import { normalizeExpenseStore } from "./store-normalization";
+import {
+  assignExpenseStoreOwner,
+  normalizeExpenseStore,
+} from "./store-normalization";
 
 const METADATA_STORE_KEY = "expense_store";
 const METADATA_SYNCED_AT_KEY = "expense_store_synced_at";
@@ -28,7 +31,9 @@ export async function loadCloudStore(
 
   if (!error) {
     return {
-      store: data?.store ? normalizeExpenseStore(data.store) : null,
+      store: data?.store
+        ? assignExpenseStoreOwner(normalizeExpenseStore(data.store), user.id)
+        : null,
       mode: "table",
     };
   }
@@ -50,7 +55,7 @@ export async function saveCloudStore(
 ): Promise<CloudStoreSaveResult> {
   const { error } = await supabase.from("app_stores").upsert({
     user_id: toDatabaseUuid(user.id),
-    store: store as unknown as Json,
+    store: assignExpenseStoreOwner(store, user.id) as unknown as Json,
     updated_at: new Date().toISOString(),
   });
 

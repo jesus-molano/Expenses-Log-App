@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { emptyFinanceStore } from "@/domain/finance";
 import {
+  assignExpenseStoreOwner,
   normalizeExpenseStore,
   normalizeImportedExpenseStore,
 } from "./store-normalization";
@@ -109,6 +110,35 @@ describe("normalizeExpenseStore", () => {
     );
     expect(() => normalizeImportedExpenseStore({})).toThrow(
       "Invalid expense store export.",
+    );
+  });
+
+  it("assigns the authenticated user id to nested store entities", () => {
+    const store = normalizeExpenseStore({
+      categories: [{ id: "cat", userId: "demo" }],
+      templates: [{ id: "tpl", userId: "demo" }],
+      overrides: [{ id: "ovr", userId: "demo" }],
+      finance: {
+        incomeEvents: [{ id: "evt", userId: "demo" }],
+      },
+    });
+
+    const ownedStore = assignExpenseStoreOwner(
+      store,
+      "11111111-1111-4111-8111-111111111111",
+    );
+
+    expect(ownedStore.categories[0].userId).toBe(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    expect(ownedStore.templates[0].userId).toBe(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    expect(ownedStore.overrides[0].userId).toBe(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    expect(ownedStore.finance.incomeEvents[0].userId).toBe(
+      "11111111-1111-4111-8111-111111111111",
     );
   });
 });

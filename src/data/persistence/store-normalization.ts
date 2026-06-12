@@ -64,3 +64,33 @@ export function normalizeImportedExpenseStore(value: unknown): ExpenseStore {
 
   return normalizeExpenseStore(value);
 }
+
+export function assignExpenseStoreOwner(
+  store: ExpenseStore,
+  userId: string | null | undefined,
+): ExpenseStore {
+  if (!userId) return store;
+
+  return {
+    ...store,
+    categories: store.categories.map((category) => ({
+      ...category,
+      userId,
+    })),
+    templates: store.templates.map((template) => ({
+      ...template,
+      userId,
+    })),
+    overrides: store.overrides.map((override) => ({
+      ...override,
+      userId,
+    })),
+    finance: {
+      ...store.finance,
+      incomeEvents: store.finance.incomeEvents.map((event) => ({
+        ...event,
+        userId,
+      })),
+    },
+  };
+}

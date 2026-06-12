@@ -9,6 +9,7 @@ import {
   loadExpenseStore,
   saveExpenseStore,
 } from "@/data/persistence/local-store";
+import { assignExpenseStoreOwner } from "@/data/persistence/store-normalization";
 import { t } from "@/shared/i18n";
 import { createClient } from "@/utils/supabase/client";
 import { applyRuntimePreferences } from "./runtime-preferences";
@@ -87,13 +88,14 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
           revisionAtCloudLoad,
           currentRevision: localRevisionRef.current,
         });
-        saveExpenseStore(mergedStore);
+        const ownedStore = assignExpenseStoreOwner(mergedStore, user.id);
+        saveExpenseStore(ownedStore);
         if (active && shouldHydrateReactState) {
-          onHydrate(mergedStore);
+          onHydrate(ownedStore);
         }
         markHydrated();
 
-        const saved = await saveCloudStore(supabase, user, mergedStore);
+        const saved = await saveCloudStore(supabase, user, ownedStore);
         if (!active) return;
         markSynced(saved.mode);
       } catch (error) {
@@ -125,10 +127,11 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
   ]);
 
   function persist(nextStore: ExpenseStore, onPersist: (store: ExpenseStore) => void) {
+    const ownedStore = assignExpenseStoreOwner(nextStore, userRef.current?.id);
     localRevisionRef.current += 1;
-    saveExpenseStore(nextStore);
-    onPersist(nextStore);
-    queueCloudSave(nextStore);
+    saveExpenseStore(ownedStore);
+    onPersist(ownedStore);
+    queueCloudSave(ownedStore);
   }
 
   async function persistImmediately(
@@ -136,12 +139,13 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
     onPersist: (store: ExpenseStore) => void,
     syncingMessage: string,
   ) {
+    const ownedStore = assignExpenseStoreOwner(nextStore, userRef.current?.id);
     localRevisionRef.current += 1;
-    saveExpenseStore(nextStore);
-    onPersist(nextStore);
+    saveExpenseStore(ownedStore);
+    onPersist(ownedStore);
 
     try {
-      await saveImmediately(nextStore, syncingMessage);
+      await saveImmediately(ownedStore, syncingMessage);
     } catch (error) {
       markError(error, "settings.cloudSaveError");
     }

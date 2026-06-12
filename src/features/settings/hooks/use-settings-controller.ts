@@ -4,7 +4,10 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { AppLanguage } from "@/domain/types";
 import { clearExpenseLocalData } from "@/data/persistence/local-store";
-import { normalizeImportedExpenseStore } from "@/data/persistence/store-normalization";
+import {
+  assignExpenseStoreOwner,
+  normalizeImportedExpenseStore,
+} from "@/data/persistence/store-normalization";
 import { t } from "@/shared/i18n";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { createClient } from "@/utils/supabase/client";
@@ -54,7 +57,8 @@ export function useSettingsController() {
   const deleteAccountPhrase = t("settings.deleteAccountPhrase", currentLanguage);
 
   function exportData() {
-    const blob = new Blob([JSON.stringify(store, null, 2)], {
+    const exportStore = assignExpenseStoreOwner(store, user?.id);
+    const blob = new Blob([JSON.stringify(exportStore, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -69,7 +73,12 @@ export function useSettingsController() {
     if (!file) return;
     try {
       const text = await file.text();
-      persist(normalizeImportedExpenseStore(JSON.parse(text)));
+      persist(
+        assignExpenseStoreOwner(
+          normalizeImportedExpenseStore(JSON.parse(text)),
+          user?.id,
+        ),
+      );
       setMessage(t("settings.imported"));
     } catch {
       setMessage(t("settings.importError"));
