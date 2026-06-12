@@ -1,30 +1,10 @@
 "use client";
 
 import { emptyStore } from "@/domain/seed";
-import { emptyFinanceStore } from "@/domain/finance";
 import type { ExpenseStore } from "@/domain/types";
+import { normalizeExpenseStore } from "./store-normalization";
 
 const STORAGE_KEY = "expense-log-store-v1";
-
-function withStoreDefaults(store: Partial<ExpenseStore>): ExpenseStore {
-  return {
-    categories: store.categories ?? [],
-    templates: store.templates ?? [],
-    overrides: store.overrides ?? [],
-    finance: {
-      incomeEvents: store.finance?.incomeEvents ?? [],
-      monthlySalary: store.finance?.monthlySalary ?? {},
-      monthlySavingsTargets: store.finance?.monthlySavingsTargets ?? {},
-      accounts: store.finance?.accounts?.length
-        ? store.finance.accounts
-        : emptyFinanceStore.accounts,
-    },
-    preferences: {
-      theme: store.preferences?.theme ?? "dark",
-      language: store.preferences?.language ?? "es",
-    },
-  };
-}
 
 export function loadExpenseStore(): ExpenseStore {
   try {
@@ -33,7 +13,7 @@ export function loadExpenseStore(): ExpenseStore {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return emptyStore;
 
-    return withStoreDefaults(JSON.parse(raw) as Partial<ExpenseStore>);
+    return normalizeExpenseStore(JSON.parse(raw));
   } catch {
     return emptyStore;
   }
@@ -64,33 +44,47 @@ export function mergeExpenseStores(
   cloudStore: ExpenseStore | null,
 ): ExpenseStore {
   if (!cloudStore) return localStore;
+  const normalizedLocalStore = normalizeExpenseStore(localStore);
+  const normalizedCloudStore = normalizeExpenseStore(cloudStore);
 
   return {
-    categories: mergeById(cloudStore.categories, localStore.categories),
-    templates: mergeById(cloudStore.templates, localStore.templates),
-    overrides: mergeById(cloudStore.overrides, localStore.overrides),
+    categories: mergeById(
+      normalizedCloudStore.categories,
+      normalizedLocalStore.categories,
+    ),
+    templates: mergeById(
+      normalizedCloudStore.templates,
+      normalizedLocalStore.templates,
+    ),
+    overrides: mergeById(
+      normalizedCloudStore.overrides,
+      normalizedLocalStore.overrides,
+    ),
     finance: {
       incomeEvents: mergeById(
-        cloudStore.finance.incomeEvents,
-        localStore.finance.incomeEvents,
+        normalizedCloudStore.finance.incomeEvents,
+        normalizedLocalStore.finance.incomeEvents,
       ),
       monthlySalary: {
-        ...cloudStore.finance.monthlySalary,
-        ...localStore.finance.monthlySalary,
+        ...normalizedCloudStore.finance.monthlySalary,
+        ...normalizedLocalStore.finance.monthlySalary,
       },
       monthlySavingsTargets: {
-        ...cloudStore.finance.monthlySavingsTargets,
-        ...localStore.finance.monthlySavingsTargets,
+        ...normalizedCloudStore.finance.monthlySavingsTargets,
+        ...normalizedLocalStore.finance.monthlySavingsTargets,
       },
-      accounts: localStore.finance.accounts.length
-        ? localStore.finance.accounts
-        : cloudStore.finance.accounts,
+      accounts: normalizedLocalStore.finance.accounts.length
+        ? normalizedLocalStore.finance.accounts
+        : normalizedCloudStore.finance.accounts,
     },
     preferences: {
-      theme: localStore.preferences?.theme ?? cloudStore.preferences?.theme ?? "dark",
+      theme:
+        normalizedLocalStore.preferences?.theme ??
+        normalizedCloudStore.preferences?.theme ??
+        "dark",
       language:
-        localStore.preferences?.language ??
-        cloudStore.preferences?.language ??
+        normalizedLocalStore.preferences?.language ??
+        normalizedCloudStore.preferences?.language ??
         "es",
     },
   };

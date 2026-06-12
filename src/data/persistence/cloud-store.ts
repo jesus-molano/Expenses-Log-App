@@ -2,6 +2,7 @@ import type { User } from "@supabase/supabase-js";
 import type { AppSupabaseClient, Json } from "@/data/supabase/database.types";
 import { toDatabaseUuid } from "@/data/supabase/database.types";
 import type { ExpenseStore } from "@/domain/types";
+import { normalizeExpenseStore } from "./store-normalization";
 
 const METADATA_STORE_KEY = "expense_store";
 const METADATA_SYNCED_AT_KEY = "expense_store_synced_at";
@@ -27,7 +28,7 @@ export async function loadCloudStore(
 
   if (!error) {
     return {
-      store: (data?.store as ExpenseStore | null) ?? null,
+      store: data?.store ? normalizeExpenseStore(data.store) : null,
       mode: "table",
     };
   }

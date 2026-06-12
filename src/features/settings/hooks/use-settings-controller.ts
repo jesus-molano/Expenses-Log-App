@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { AppLanguage } from "@/domain/types";
 import { clearExpenseLocalData } from "@/data/persistence/local-store";
+import { normalizeImportedExpenseStore } from "@/data/persistence/store-normalization";
 import { t } from "@/shared/i18n";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { createClient } from "@/utils/supabase/client";
@@ -66,9 +67,13 @@ export function useSettingsController() {
 
   async function importData(file: File | undefined) {
     if (!file) return;
-    const text = await file.text();
-    persist(JSON.parse(text));
-    setMessage(t("settings.imported"));
+    try {
+      const text = await file.text();
+      persist(normalizeImportedExpenseStore(JSON.parse(text)));
+      setMessage(t("settings.imported"));
+    } catch {
+      setMessage(t("settings.importError"));
+    }
   }
 
   async function handleClearExpenses() {
