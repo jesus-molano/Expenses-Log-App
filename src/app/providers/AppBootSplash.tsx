@@ -9,16 +9,22 @@ export function AppBootSplash({ exiting = false }: { exiting?: boolean }) {
       data-state={exiting ? "exiting" : "visible"}
       aria-hidden="true"
     >
-      <div className="app-boot-logo">
-        <Image
-          src="/icon-512.png"
-          alt=""
-          width={512}
-          height={512}
-          priority
-        />
+      <div className="app-boot-mark">
+        <div className="app-boot-stack" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="app-boot-logo">
+          <Image
+            src="/icon-512.png"
+            alt=""
+            width={512}
+            height={512}
+            priority
+          />
+        </div>
       </div>
-      <div className="app-boot-bar" />
     </div>
   );
 }

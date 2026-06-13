@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { AppBootSplash } from "@/app/providers/AppBootSplash";
@@ -53,6 +54,7 @@ import { useStorePersistence } from "./use-store-persistence";
 type ExpenseStoreContextValue = ReturnType<typeof useExpenseStoreValue>;
 
 const ExpenseStoreContext = createContext<ExpenseStoreContextValue | null>(null);
+const FORCE_SPLASH_PREVIEW = true;
 
 export function ExpenseStoreProvider({
   children,
@@ -60,20 +62,81 @@ export function ExpenseStoreProvider({
   children: React.ReactNode;
 }) {
   const value = useExpenseStoreValue();
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => !FORCE_SPLASH_PREVIEW);
+  const [splashExiting, setSplashExiting] = useState(false);
+  const hiddenAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!value.isHydrated) return;
 
-    const timer = window.setTimeout(() => setShowSplash(false), 420);
-    return () => window.clearTimeout(timer);
+    const exitTimer = window.setTimeout(() => setSplashExiting(true), 120);
+    const hideTimer = window.setTimeout(() => setShowSplash(false), 540);
+
+    return () => {
+      window.clearTimeout(exitTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, [value.isHydrated]);
+
+  useEffect(() => {
+    if (!value.isHydrated) return;
+
+    function runResumeSplash(holdMs = 260) {
+      setShowSplash(true);
+      setSplashExiting(false);
+
+      const exitTimer = window.setTimeout(() => setSplashExiting(true), holdMs);
+      const hideTimer = window.setTimeout(() => setShowSplash(false), holdMs + 420);
+
+      return () => {
+        window.clearTimeout(exitTimer);
+        window.clearTimeout(hideTimer);
+      };
+    }
+
+    let cleanupResumeSplash: (() => void) | null = null;
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        cleanupResumeSplash?.();
+        setShowSplash(true);
+        setSplashExiting(false);
+        hiddenAtRef.current = Date.now();
+        return;
+      }
+
+      const hiddenFor = hiddenAtRef.current
+        ? Date.now() - hiddenAtRef.current
+        : 0;
+      hiddenAtRef.current = null;
+
+      cleanupResumeSplash?.();
+      cleanupResumeSplash = runResumeSplash(hiddenFor < 900 ? 80 : 260);
+    }
+
+    function handlePageShow(event: PageTransitionEvent) {
+      if (!event.persisted) return;
+      cleanupResumeSplash?.();
+      cleanupResumeSplash = runResumeSplash();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
+
+    return () => {
+      cleanupResumeSplash?.();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
+    };
   }, [value.isHydrated]);
 
   return createElement(
     ExpenseStoreContext.Provider,
     { value },
-    showSplash ? createElement(AppBootSplash, { exiting: value.isHydrated }) : null,
-    value.isHydrated
+    FORCE_SPLASH_PREVIEW || showSplash
+      ? createElement(AppBootSplash, { exiting: !FORCE_SPLASH_PREVIEW && splashExiting })
+      : null,
+    !FORCE_SPLASH_PREVIEW && value.isHydrated
       ? createElement(
           "div",
           { className: "app-hydrated-content", "data-state": "ready" },
