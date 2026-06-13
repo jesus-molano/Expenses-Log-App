@@ -119,7 +119,16 @@ main {
     radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--app-accent) 18%, transparent), transparent 34%),
     var(--app-bg);
   color: var(--app-text);
-  animation: app-boot-exit 720ms var(--ease-smooth) forwards;
+  opacity: 1;
+}
+
+.app-boot-splash[data-state="exiting"] {
+  animation: app-boot-exit 420ms var(--ease-smooth) forwards;
+}
+
+.app-hydrated-content {
+  min-height: 100dvh;
+  animation: app-content-enter 420ms var(--ease-smooth) both;
 }
 
 .app-boot-logo {
@@ -157,17 +166,25 @@ main {
   height: 100%;
   border-radius: inherit;
   background: var(--app-accent);
-  animation: app-boot-bar 720ms var(--ease-smooth) forwards;
+  animation: app-boot-bar 920ms var(--ease-smooth) infinite;
 }
 
 @keyframes app-boot-exit {
-  0%,
-  68% {
+  from {
     opacity: 1;
   }
-  100% {
+  to {
     opacity: 0;
     visibility: hidden;
+  }
+}
+
+@keyframes app-content-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
@@ -177,5 +194,14 @@ main {
   }
   to {
     transform: translateX(220%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-boot-splash[data-state="exiting"],
+  .app-hydrated-content,
+  .app-boot-bar::before {
+    animation-duration: 1ms;
+    animation-iteration-count: 1;
   }
 }

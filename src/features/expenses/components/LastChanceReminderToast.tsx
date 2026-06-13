@@ -32,7 +32,7 @@ export function LastChanceReminderToast({
           {" · "}
           {daysUntilCharge === 0
             ? t("common.today", language)
-            : `${daysUntilCharge} ${t("expenses.days", language)}`}
+            : formatDaysUntilCharge(daysUntilCharge, language)}
         </p>
       </div>
       <Button
@@ -46,4 +46,13 @@ export function LastChanceReminderToast({
       </Button>
     </aside>
   );
+}
+
+function formatDaysUntilCharge(daysUntilCharge: number, language: AppLanguage) {
+  const unit =
+    daysUntilCharge === 1
+      ? t("expenses.day", language)
+      : t("expenses.days", language);
+
+  return `${daysUntilCharge} ${unit}`;
 }

@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AppBootSplash } from "@/app/providers/AppBootSplash";
 import { PwaRegister } from "@/app/providers/PwaRegister";
 import { ThemeApplier } from "@/app/providers/ThemeApplier";
 import { ExpenseStoreProvider } from "@/stores/app/use-expense-store";
@@ -68,7 +67,6 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ThemeApplier />
         <PwaRegister />
-        <AppBootSplash />
         <ExpenseStoreProvider>{children}</ExpenseStoreProvider>
       </body>
     </html>

@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, createElement, useCallback, useContext, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { AppBootSplash } from "@/app/providers/AppBootSplash";
 import type {
   AppLanguage,
   AppTheme,
@@ -52,8 +60,27 @@ export function ExpenseStoreProvider({
   children: React.ReactNode;
 }) {
   const value = useExpenseStoreValue();
+  const [showSplash, setShowSplash] = useState(true);
 
-  return createElement(ExpenseStoreContext.Provider, { value }, children);
+  useEffect(() => {
+    if (!value.isHydrated) return;
+
+    const timer = window.setTimeout(() => setShowSplash(false), 420);
+    return () => window.clearTimeout(timer);
+  }, [value.isHydrated]);
+
+  return createElement(
+    ExpenseStoreContext.Provider,
+    { value },
+    showSplash ? createElement(AppBootSplash, { exiting: value.isHydrated }) : null,
+    value.isHydrated
+      ? createElement(
+          "div",
+          { className: "app-hydrated-content", "data-state": "ready" },
+          children,
+        )
+      : null,
+  );
 }
 
 export function useExpenseStore() {

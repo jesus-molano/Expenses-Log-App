@@ -1,33 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
 
-const BOOT_SPLASH_KEY = "expense-boot-splash-seen";
-
-export function AppBootSplash() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (sessionStorage.getItem(BOOT_SPLASH_KEY) === "true") return;
-
-    sessionStorage.setItem(BOOT_SPLASH_KEY, "true");
-    let timer: number | null = null;
-    const frame = window.requestAnimationFrame(() => {
-      setVisible(true);
-      timer = window.setTimeout(() => setVisible(false), 720);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      if (timer) window.clearTimeout(timer);
-    };
-  }, []);
-
-  if (!visible) return null;
-
+export function AppBootSplash({ exiting = false }: { exiting?: boolean }) {
   return (
-    <div className="app-boot-splash" aria-hidden="true">
+    <div
+      className="app-boot-splash"
+      data-state={exiting ? "exiting" : "visible"}
+      aria-hidden="true"
+    >
       <div className="app-boot-logo">
         <Image
           src="/icon-512.png"
