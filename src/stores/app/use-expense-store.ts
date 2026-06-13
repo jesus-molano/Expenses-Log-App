@@ -54,7 +54,7 @@ import { useStorePersistence } from "./use-store-persistence";
 type ExpenseStoreContextValue = ReturnType<typeof useExpenseStoreValue>;
 
 const ExpenseStoreContext = createContext<ExpenseStoreContextValue | null>(null);
-const FORCE_SPLASH_PREVIEW = true;
+const FORCE_SPLASH_PREVIEW = false;
 
 export function ExpenseStoreProvider({
   children,
