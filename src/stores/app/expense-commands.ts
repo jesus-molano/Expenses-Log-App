@@ -1,9 +1,12 @@
 import { startOfMonth } from "date-fns";
 import { buildDateWithDay, estimateChargeDate, toDateOnly } from "@/domain/calendar";
 import type {
+  BankMerchantAlias,
+  BankMovement,
   CreateExpenseOptions,
   DraftExpense,
   ExpenseOccurrence,
+  ExpenseOccurrenceOverride,
   ExpenseStore,
 } from "@/domain/types";
 import {
@@ -11,7 +14,7 @@ import {
   createId,
   findOrCreateCategory,
 } from "@/features/expenses/lib/expense-actions";
-import type { MonthlyExpenseOverrideInput } from "./store-types";
+import type { BankImportInput, MonthlyExpenseOverrideInput } from "./store-types";
 
 export function addExpenseToStore(
   store: ExpenseStore,
@@ -74,6 +77,44 @@ function normalizeDraftStartDate(draft: DraftExpense, startDate: string): DraftE
   };
 }
 
+export function dismissLastChanceReminderInStore(
+  store: ExpenseStore,
+  occurrence: ExpenseOccurrence,
+): ExpenseStore {
+  const existing = occurrence.override;
+  const nextOverride: ExpenseOccurrenceOverride = {
+    id: existing?.id ?? createId("ovr"),
+    userId: existing?.userId ?? "demo",
+    templateId: occurrence.template.id,
+    occurrenceDate: occurrence.occurrenceDate,
+    dueDate: existing?.dueDate,
+    sortOrder: existing?.sortOrder,
+    status: existing?.status ?? occurrence.status,
+    name: existing?.name,
+    amount: existing?.amount,
+    categoryId: existing?.categoryId,
+    paidAt: existing?.paidAt,
+    amountPaid: existing?.amountPaid,
+    note: existing?.note,
+    reminderDismissedAt: new Date().toISOString(),
+    reminderDismissedChargeDate: occurrence.estimatedChargeDate,
+  };
+
+  return {
+    ...store,
+    overrides: [
+      ...store.overrides.filter(
+        (override) =>
+          !(
+            override.templateId === occurrence.template.id &&
+            override.occurrenceDate === occurrence.occurrenceDate
+          ),
+      ),
+      nextOverride,
+    ],
+  };
+}
+
 export function deleteExpenseFromStore(
   store: ExpenseStore,
   templateId: string,
@@ -102,6 +143,8 @@ export function clearExpensesFromStore(store: ExpenseStore): ExpenseStore {
     categories: [],
     templates: [],
     overrides: [],
+    bankMovements: [],
+    bankMerchantAliases: [],
     deleted: {
       ...store.deleted,
       categories: mergeDeletedIds(
@@ -115,6 +158,14 @@ export function clearExpensesFromStore(store: ExpenseStore): ExpenseStore {
       overrides: mergeDeletedIds(
         store.deleted?.overrides,
         store.overrides.map((override) => override.id),
+      ),
+      bankMovements: mergeDeletedIds(
+        store.deleted?.bankMovements,
+        store.bankMovements.map((movement) => movement.id),
+      ),
+      bankMerchantAliases: mergeDeletedIds(
+        store.deleted?.bankMerchantAliases,
+        store.bankMerchantAliases.map((alias) => alias.id),
       ),
     },
   };
@@ -318,6 +369,208 @@ export function updateMonthlyExpenseOccurrenceInStore(
       nextOverride,
     ],
   };
+}
+
+export function confirmBankImportInStore(
+  store: ExpenseStore,
+  input: BankImportInput,
+): ExpenseStore {
+  return input.decisions.reduce((currentStore, decision) => {
+    if (decision.action === "ignore") return currentStore;
+    if (decision.action === "match" && decision.templateId && decision.occurrenceDate) {
+      return applyBankMatch(currentStore, {
+        movements: decision.movements,
+        templateId: decision.templateId,
+        occurrenceDate: decision.occurrenceDate,
+        movementMatches: decision.movementMatches,
+        alias: decision.alias,
+      });
+    }
+    if (decision.action === "create" && decision.expense) {
+      return applyBankCreatedExpense(currentStore, decision.movements, decision.expense);
+    }
+
+    return currentStore;
+  }, store);
+}
+
+function applyBankMatch(
+  store: ExpenseStore,
+  input: {
+    movements: BankMovement[];
+    templateId: string;
+    occurrenceDate: string;
+    movementMatches?: Array<{
+      movementId: string;
+      occurrenceDate: string;
+    }>;
+    alias?: BankImportInput["decisions"][number]["alias"];
+  },
+): ExpenseStore {
+  const matches = input.movements.map((movement) => ({
+    movement,
+    occurrenceDate:
+      input.movementMatches?.find((match) => match.movementId === movement.id)
+        ?.occurrenceDate ?? input.occurrenceDate,
+  }));
+  const matchedOverrideKeys = new Set(
+    matches.map((match) => `${input.templateId}:${match.occurrenceDate}`),
+  );
+  const paidOverrides = matches.map(({ movement, occurrenceDate }) => {
+    const existingOverride = store.overrides.find(
+      (override) =>
+        override.templateId === input.templateId &&
+        override.occurrenceDate === occurrenceDate,
+    );
+
+    return {
+      id: existingOverride?.id ?? createId("ovr"),
+      userId: existingOverride?.userId ?? "demo",
+      templateId: input.templateId,
+      occurrenceDate,
+      dueDate: existingOverride?.dueDate,
+      sortOrder: existingOverride?.sortOrder,
+      status: "paid",
+      name: existingOverride?.name,
+      amount: existingOverride?.amount,
+      categoryId: existingOverride?.categoryId,
+      paidAt: `${movement.bookedAt}T12:00:00.000Z`,
+      amountPaid: Math.abs(movement.amount),
+      note: existingOverride?.note ?? `Conciliado con ${movement.description}`,
+      reminderDismissedAt: existingOverride?.reminderDismissedAt,
+      reminderDismissedChargeDate: existingOverride?.reminderDismissedChargeDate,
+    } satisfies ExpenseOccurrenceOverride;
+  });
+
+  return {
+    ...store,
+    overrides: [
+      ...store.overrides.filter(
+        (override) =>
+          !matchedOverrideKeys.has(`${override.templateId}:${override.occurrenceDate}`),
+      ),
+      ...paidOverrides,
+    ],
+    bankMovements: mergeMatchedBankMovements(store.bankMovements, matches, {
+      matchedTemplateId: input.templateId,
+    }),
+    bankMerchantAliases: input.alias
+      ? upsertBankAlias(store.bankMerchantAliases, input.alias)
+      : store.bankMerchantAliases,
+  };
+}
+
+function mergeMatchedBankMovements(
+  current: BankMovement[],
+  incoming: Array<{
+    movement: BankMovement;
+    occurrenceDate: string;
+  }>,
+  match: Pick<BankMovement, "matchedTemplateId">,
+) {
+  const byFingerprint = new Map(current.map((movement) => [movement.fingerprint, movement]));
+  for (const { movement, occurrenceDate } of incoming) {
+    byFingerprint.set(movement.fingerprint, {
+      ...movement,
+      ...match,
+      matchedOccurrenceDate: occurrenceDate,
+    });
+  }
+  return Array.from(byFingerprint.values());
+}
+
+function applyBankCreatedExpense(
+  store: ExpenseStore,
+  movements: BankMovement[],
+  draft: DraftExpense,
+): ExpenseStore {
+  const startDate = draft.startDate || movements[0]?.bookedAt || toDateOnly(new Date());
+  const categoryResult = findOrCreateCategory(store, draft.categoryName);
+  const template = buildTemplateFromDraft(
+    normalizeDraftStartDate(draft, startDate),
+    categoryResult.categoryId,
+    startDate,
+  );
+  const overrides = movements.map((movement) => ({
+    id: createId("ovr"),
+    userId: "demo",
+    templateId: template.id,
+    occurrenceDate: movement.bookedAt,
+    status: "paid" as const,
+    paidAt: `${movement.bookedAt}T12:00:00.000Z`,
+    amountPaid: Math.abs(movement.amount),
+    note: `Creado desde importacion bancaria: ${movement.description}`,
+  }));
+
+  return {
+    ...categoryResult.store,
+    templates: [...categoryResult.store.templates, template],
+    overrides: [...categoryResult.store.overrides, ...overrides],
+    bankMovements: mergeBankMovements(categoryResult.store.bankMovements, movements, {
+      matchedTemplateId: template.id,
+      matchedOccurrenceDate: startDate,
+    }),
+    bankMerchantAliases: upsertBankAlias(categoryResult.store.bankMerchantAliases, {
+      merchantKey: movements[0]?.merchantKey ?? draft.name.toLowerCase(),
+      label: movements[0]?.description ?? draft.name,
+      templateId: template.id,
+    }),
+  };
+}
+
+function mergeBankMovements(
+  current: BankMovement[],
+  incoming: BankMovement[],
+  match: Pick<BankMovement, "matchedTemplateId" | "matchedOccurrenceDate">,
+) {
+  const byFingerprint = new Map(current.map((movement) => [movement.fingerprint, movement]));
+  for (const movement of incoming) {
+    byFingerprint.set(movement.fingerprint, {
+      ...movement,
+      ...match,
+    });
+  }
+  return Array.from(byFingerprint.values());
+}
+
+function upsertBankAlias(
+  aliases: BankMerchantAlias[],
+  alias: {
+    merchantKey: string;
+    label: string;
+    templateId: string;
+  },
+) {
+  const now = new Date().toISOString();
+  const existing = aliases.find(
+    (item) =>
+      item.templateId === alias.templateId && item.merchantKey === alias.merchantKey,
+  );
+
+  if (existing) {
+    return aliases.map((item) =>
+      item.id === existing.id
+        ? {
+            ...item,
+            label: alias.label,
+            updatedAt: now,
+          }
+        : item,
+    );
+  }
+
+  return [
+    ...aliases,
+    {
+      id: createId("alias"),
+      userId: "demo",
+      merchantKey: alias.merchantKey,
+      templateId: alias.templateId,
+      label: alias.label,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
 }
 
 function persistableDueDate(

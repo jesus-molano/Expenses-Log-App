@@ -11,7 +11,7 @@ import { shouldQueueCloudSave } from "./sync-policy";
 type CloudSaveQueueOptions = {
   supabaseRef: RefObject<AppSupabaseClient | null>;
   userRef: RefObject<User | null>;
-  hydratedRef: RefObject<boolean>;
+  cloudReadyRef: RefObject<boolean>;
   markSyncing: (message: string) => void;
   markSaved: (mode: "table" | "unavailable") => void;
   markError: (error: unknown, fallbackKey: TranslationKey) => void;
@@ -20,7 +20,7 @@ type CloudSaveQueueOptions = {
 export function useCloudSaveQueue({
   supabaseRef,
   userRef,
-  hydratedRef,
+  cloudReadyRef,
   markSyncing,
   markSaved,
   markError,
@@ -40,13 +40,13 @@ export function useCloudSaveQueue({
       const supabase = supabaseRef.current;
       const user = userRef.current;
 
-      if (!hydratedRef.current || !supabase || !user) return;
+      if (!cloudReadyRef.current || !supabase || !user) return;
 
       markSyncing(syncingMessage);
       const result = await saveCloudStore(supabase, user, nextStore);
       markSaved(result.mode);
     },
-    [clearQueuedSave, hydratedRef, markSaved, markSyncing, supabaseRef, userRef],
+    [clearQueuedSave, cloudReadyRef, markSaved, markSyncing, supabaseRef, userRef],
   );
 
   const queueCloudSave = useCallback(
@@ -55,7 +55,7 @@ export function useCloudSaveQueue({
       const user = userRef.current;
       if (
         !shouldQueueCloudSave({
-          hydrated: hydratedRef.current,
+          hydrated: cloudReadyRef.current,
           hasSupabase: Boolean(supabase),
           hasUser: Boolean(user),
         })
@@ -76,7 +76,7 @@ export function useCloudSaveQueue({
     },
     [
       clearQueuedSave,
-      hydratedRef,
+      cloudReadyRef,
       markError,
       markSaved,
       markSyncing,

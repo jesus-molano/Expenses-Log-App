@@ -1,33 +1,30 @@
-﻿import { Download, Upload } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import Link from "next/link";
+import { FileSpreadsheet, Upload } from "lucide-react";
 import { t } from "@/shared/i18n";
 import type { SettingsController } from "../../types";
+import { SettingRow } from "../SettingRow";
 
 export function ImportExportRow({
   settings,
 }: {
   settings: SettingsController;
 }) {
+  const from = settings.backHref === "/money" ? "money" : "expenses";
+
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <Button
-        variant="secondary"
-        onClick={settings.exportData}
-        className="px-3"
-        leadingIcon={<Download size={17} />}
-      >
-        {t("settings.export")}
-      </Button>
-      <label className="app-button app-button-secondary cursor-pointer px-3">
-        <Upload size={17} />
-        {t("settings.import")}
-        <input
-          type="file"
-          accept="application/json"
-          className="sr-only"
-          onChange={(event) => void settings.importData(event.target.files?.[0])}
-        />
-      </label>
-    </div>
+    <SettingRow
+      icon={<FileSpreadsheet size={18} />}
+      title={t("settings.bankImport", settings.currentLanguage)}
+      description={t("settings.bankImportHelp", settings.currentLanguage)}
+      action={
+        <Link
+          href={`/settings/import?from=${from}`}
+          className="app-button app-button-secondary app-button-sm"
+        >
+          <Upload size={15} />
+          {t("settings.bankImportUpload", settings.currentLanguage)}
+        </Link>
+      }
+    />
   );
 }

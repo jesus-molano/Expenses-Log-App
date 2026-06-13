@@ -22,6 +22,22 @@ create table if not exists public.push_subscriptions (
 create index if not exists push_subscriptions_user_id_idx
   on public.push_subscriptions (user_id);
 
+create table if not exists public.push_reminder_deliveries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  reminder_key text not null,
+  kind text not null,
+  delivered_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (user_id, reminder_key, kind)
+);
+
+create index if not exists push_reminder_deliveries_user_id_idx
+  on public.push_reminder_deliveries (user_id);
+
+grant select, insert, update, delete on table public.push_reminder_deliveries to authenticated;
+grant select, insert, update, delete on table public.push_reminder_deliveries to service_role;
+
 create table if not exists public.app_stores (
   user_id uuid primary key references auth.users(id) on delete cascade,
   store jsonb not null,
@@ -31,16 +47,21 @@ create table if not exists public.app_stores (
 
 alter table public.profiles enable row level security;
 alter table public.push_subscriptions enable row level security;
+alter table public.push_reminder_deliveries enable row level security;
 alter table public.app_stores enable row level security;
 
 drop policy if exists "profiles own rows" on public.profiles;
 drop policy if exists "push own rows" on public.push_subscriptions;
+drop policy if exists "push reminder deliveries own rows" on public.push_reminder_deliveries;
 drop policy if exists "app stores own rows" on public.app_stores;
 
 create policy "profiles own rows" on public.profiles
   for all using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
 
 create policy "push own rows" on public.push_subscriptions
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+
+create policy "push reminder deliveries own rows" on public.push_reminder_deliveries
   for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 create policy "app stores own rows" on public.app_stores

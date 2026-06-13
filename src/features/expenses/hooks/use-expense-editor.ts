@@ -45,6 +45,7 @@ export function useExpenseEditor({
     dueDay: template.dueDay,
     endDate: template.endDate,
     recurrence: template.recurrence,
+    reminder: template.reminder,
   }));
 
   const previewAmount = Math.max(parseEuroInput(amountText), 0);
@@ -69,6 +70,7 @@ export function useExpenseEditor({
               dueDay: Math.min(Math.max(Number(form.dueDay), 1), 31),
               endDate: form.endDate || undefined,
               recurrence: form.recurrence,
+              reminder: form.reminder,
               updatedAt: new Date().toISOString(),
             }
           : item,

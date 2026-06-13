@@ -56,6 +56,8 @@ function storeWith({
       monthlySavingsTargets,
       accounts: [],
     },
+    bankMovements: [],
+    bankMerchantAliases: [],
     preferences: {
       theme: "dark",
       language: "es",

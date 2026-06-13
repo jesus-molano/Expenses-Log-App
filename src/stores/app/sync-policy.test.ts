@@ -27,7 +27,7 @@ function storeWithTemplate(id: string): ExpenseStore {
 }
 
 describe("sync policy", () => {
-  it("hydrates React state when cloud merge did not race local changes", () => {
+  it("uses cloud as source of truth when the account already has cloud data", () => {
     const local = storeWithTemplate("local");
     const cloud = storeWithTemplate("cloud");
 
@@ -40,13 +40,31 @@ describe("sync policy", () => {
     });
 
     expect(result.shouldHydrateReactState).toBe(true);
+    expect(result.shouldSaveCloud).toBe(false);
     expect(result.mergedStore.templates.map((item) => item.id)).toEqual([
       "cloud",
+    ]);
+  });
+
+  it("uses local data as the first cloud store for a new account", () => {
+    const local = storeWithTemplate("local");
+
+    const result = resolveHydratedStore({
+      initialLocalStore: local,
+      latestLocalStore: local,
+      cloudStore: null,
+      revisionAtCloudLoad: 0,
+      currentRevision: 0,
+    });
+
+    expect(result.shouldHydrateReactState).toBe(true);
+    expect(result.shouldSaveCloud).toBe(true);
+    expect(result.mergedStore.templates.map((item) => item.id)).toEqual([
       "local",
     ]);
   });
 
-  it("keeps latest local state when a local edit happens during async cloud hydration", () => {
+  it("merges edits made during async cloud hydration and saves them", () => {
     const initialLocal = storeWithTemplate("initial");
     const latestLocal = storeWithTemplate("latest");
     const cloud = storeWithTemplate("cloud");
@@ -60,6 +78,7 @@ describe("sync policy", () => {
     });
 
     expect(result.shouldHydrateReactState).toBe(false);
+    expect(result.shouldSaveCloud).toBe(true);
     expect(result.mergedStore.templates.map((item) => item.id)).toEqual([
       "cloud",
       "latest",

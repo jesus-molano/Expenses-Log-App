@@ -36,3 +36,25 @@ export type MonthlyExpenseOverrideInput = {
   categoryName?: string;
   status: import("@/domain/types").OccurrenceStatus;
 };
+
+export type BankImportDecision = {
+  candidateId: string;
+  action: "match" | "create" | "ignore";
+  movements: import("@/domain/types").BankMovement[];
+  templateId?: string;
+  occurrenceDate?: string;
+  movementMatches?: Array<{
+    movementId: string;
+    occurrenceDate: string;
+  }>;
+  expense?: import("@/domain/types").DraftExpense;
+  alias?: {
+    merchantKey: string;
+    label: string;
+    templateId: string;
+  };
+};
+
+export type BankImportInput = {
+  decisions: BankImportDecision[];
+};

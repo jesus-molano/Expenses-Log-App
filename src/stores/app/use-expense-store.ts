@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, createElement, useCallback, useContext, useState } from "react";
-import { emptyStore } from "@/domain/seed";
 import type {
   AppLanguage,
   AppTheme,
@@ -10,14 +9,17 @@ import type {
   ExpenseOccurrence,
   ExpenseStore,
 } from "@/domain/types";
+import { emptyStore } from "@/domain/seed";
 import { persistLanguagePreference, t } from "@/shared/i18n";
 import { applyAppTheme } from "@/shared/theme";
 import {
   addExpenseToStore,
   addIncomeEventToStore,
+  confirmBankImportInStore,
   clearExpensesFromStore,
   deleteExpenseFromStore,
   deleteIncomeEventFromStore,
+  dismissLastChanceReminderInStore,
   moveOccurrenceInStore,
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
@@ -65,7 +67,7 @@ export function useExpenseStore() {
 }
 
 function useExpenseStoreValue() {
-  const [store, setStore] = useState<ExpenseStore>(() => emptyStore);
+  const [store, setStore] = useState<ExpenseStore>(emptyStore);
   const hydrateStore = useCallback((nextStore: ExpenseStore) => {
     setStore(nextStore);
   }, []);
@@ -101,6 +103,10 @@ function useExpenseStoreValue() {
 
   function skipOccurrence(occurrence: ExpenseOccurrence) {
     persist(skipOccurrenceInStore(store, occurrence));
+  }
+
+  function dismissLastChanceReminder(occurrence: ExpenseOccurrence) {
+    persist(dismissLastChanceReminderInStore(store, occurrence));
   }
 
   function moveOccurrence(
@@ -161,6 +167,10 @@ function useExpenseStoreValue() {
     persist(updateLanguageInStore(store, language));
   }
 
+  function confirmBankImport(input: Parameters<typeof confirmBankImportInStore>[1]) {
+    persist(confirmBankImportInStore(store, input));
+  }
+
   return {
     store,
     persist,
@@ -169,6 +179,7 @@ function useExpenseStoreValue() {
     clearExpenses,
     togglePaid,
     skipOccurrence,
+    dismissLastChanceReminder,
     moveOccurrence,
     moveOccurrenceSeries,
     moveOccurrenceOnly,
@@ -181,6 +192,7 @@ function useExpenseStoreValue() {
     updateMonthlyExpenseOccurrence,
     updateTheme,
     updateLanguage,
+    confirmBankImport,
     syncStatus: persistence.syncStatus,
     syncMessage: persistence.syncMessage,
     isHydrated: persistence.isHydrated,

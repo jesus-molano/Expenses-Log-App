@@ -13,6 +13,10 @@ vi.mock("@/utils/supabase/client", () => ({
   createClient: vi.fn(),
 }));
 
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+}));
+
 vi.mock("@/data/persistence/cloud-store", () => ({
   loadCloudStore: vi.fn(),
   saveCloudStore: vi.fn(),
@@ -77,6 +81,7 @@ function createMemoryStorage(): Storage {
 
 describe("useStorePersistence", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     Object.defineProperty(window, "localStorage", {
       configurable: true,
       value: createMemoryStorage(),
@@ -106,6 +111,13 @@ describe("useStorePersistence", () => {
           data: { user },
           error: null,
         }),
+        onAuthStateChange: vi.fn().mockReturnValue({
+          data: {
+            subscription: {
+              unsubscribe: vi.fn(),
+            },
+          },
+        }),
       },
     } as unknown as AppSupabaseClient;
     const onHydrate = vi.fn();
@@ -134,5 +146,63 @@ describe("useStorePersistence", () => {
       .toEqual(["latest"]);
     expect(vi.mocked(saveCloudStore).mock.calls[0][2].templates.map((item) => item.id))
       .toEqual(["cloud", "latest"]);
+  });
+
+  it("hydrates cloud data when auth appears after local startup", async () => {
+    let authHandler: ((event: string, session: { user: User } | null) => void) | null =
+      null;
+    let currentUser: User | null = null;
+    const localStore = storeWithTemplate("local");
+    const cloudStore = storeWithTemplate("cloud");
+    const user = {
+      id: "00000000-0000-4000-8000-000000000002",
+    } as User;
+    const supabase = {
+      auth: {
+        getUser: vi.fn().mockImplementation(() => Promise.resolve({
+          data: { user: currentUser },
+          error: null,
+        })),
+        onAuthStateChange: vi.fn().mockImplementation((handler) => {
+          authHandler = handler;
+          return {
+            data: {
+              subscription: {
+                unsubscribe: vi.fn(),
+              },
+            },
+          };
+        }),
+      },
+    } as unknown as AppSupabaseClient;
+    const onHydrate = vi.fn();
+
+    saveExpenseStore(localStore);
+    vi.mocked(createClient).mockReturnValue(supabase);
+    vi.mocked(loadCloudStore).mockResolvedValue({ store: cloudStore, mode: "table" });
+    vi.mocked(saveCloudStore).mockResolvedValue({ mode: "table" });
+
+    renderHook(() => useStorePersistence({ onHydrate }));
+
+    await waitFor(() => expect(onHydrate).toHaveBeenCalledWith(localStore));
+
+    act(() => {
+      currentUser = user;
+      authHandler?.("SIGNED_IN", { user });
+    });
+
+    await waitFor(() =>
+      expect(onHydrate).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          templates: [
+            expect.objectContaining({
+              id: "cloud",
+            }),
+          ],
+        }),
+      ),
+    );
+
+    expect(saveCloudStore).not.toHaveBeenCalled();
   });
 });

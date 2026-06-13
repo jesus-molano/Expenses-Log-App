@@ -4,6 +4,7 @@ import { mergeExpenseStores } from "@/data/persistence/local-store";
 export type HydrationResolution = {
   mergedStore: ExpenseStore;
   shouldHydrateReactState: boolean;
+  shouldSaveCloud: boolean;
 };
 
 export function resolveHydratedStore({
@@ -19,12 +20,24 @@ export function resolveHydratedStore({
   revisionAtCloudLoad: number;
   currentRevision: number;
 }): HydrationResolution {
+  const hasLocalEditsDuringHydration = currentRevision > revisionAtCloudLoad;
   const localStore =
-    currentRevision > revisionAtCloudLoad ? latestLocalStore : initialLocalStore;
+    hasLocalEditsDuringHydration ? latestLocalStore : initialLocalStore;
+
+  if (cloudStore) {
+    return {
+      mergedStore: hasLocalEditsDuringHydration
+        ? mergeExpenseStores(localStore, cloudStore)
+        : cloudStore,
+      shouldHydrateReactState: !hasLocalEditsDuringHydration,
+      shouldSaveCloud: hasLocalEditsDuringHydration,
+    };
+  }
 
   return {
-    mergedStore: mergeExpenseStores(localStore, cloudStore),
-    shouldHydrateReactState: currentRevision === revisionAtCloudLoad,
+    mergedStore: localStore,
+    shouldHydrateReactState: !hasLocalEditsDuringHydration,
+    shouldSaveCloud: true,
   };
 }
 

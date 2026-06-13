@@ -1,7 +1,6 @@
-/* Recharts ResponsiveContainer needs a measured parent, so the chart mounts on the client. */
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -28,7 +27,7 @@ export function MonthlyTrendChart({
   moneySeries,
   isCompactChart,
 }: MonthlyTrendChartProps) {
-  const mounted = useHasMounted();
+  const { containerRef, ready } = useMeasuredChartContainer();
 
   return (
     <>
@@ -46,8 +45,11 @@ export function MonthlyTrendChart({
           label={t("money.free", language)}
         />
       </div>
-      <div className="app-chart-shell mt-4 h-52 min-h-52 min-w-0 overflow-hidden">
-        {mounted ? (
+      <div
+        ref={containerRef}
+        className="app-chart-shell mt-4 h-52 min-h-52 min-w-0 overflow-hidden"
+      >
+        {ready ? (
           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <BarChart
               data={moneySeries}
@@ -188,20 +190,32 @@ export function MonthlyTrendChart({
   );
 }
 
-function useHasMounted() {
-  return useSyncExternalStore(subscribeToClient, getClientSnapshot, getServerSnapshot);
-}
+function useMeasuredChartContainer() {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [ready, setReady] = useState(false);
 
-function subscribeToClient() {
-  return () => {};
-}
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+    const observedElement = element;
 
-function getClientSnapshot() {
-  return true;
-}
+    function update() {
+      const rect = observedElement.getBoundingClientRect();
+      setReady(rect.width > 0 && rect.height > 0);
+    }
 
-function getServerSnapshot() {
-  return false;
+    update();
+    const frame = window.requestAnimationFrame(update);
+    const observer = new ResizeObserver(update);
+    observer.observe(observedElement);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, []);
+
+  return { containerRef, ready };
 }
 
 function ChartLegendItem({ color, label }: { color: string; label: string }) {

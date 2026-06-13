@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import type { AppSupabaseClient } from "@/data/supabase/database.types";
 import type { ExpenseStore } from "@/domain/types";
@@ -23,10 +24,16 @@ type UseStorePersistenceOptions = {
 
 export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
   const [isHydrated, setIsHydrated] = useState(false);
+  const pathname = usePathname();
   const supabaseRef = useRef<AppSupabaseClient | null>(null);
   const userRef = useRef<User | null>(null);
   const hydratedRef = useRef(false);
+  const cloudReadyRef = useRef(false);
   const localRevisionRef = useRef(0);
+  const refreshAuthRef = useRef<() => void>(() => {});
+  const syncedUserIdRef = useRef<string | null>(null);
+  const syncingUserIdRef = useRef<string | null>(null);
+  const syncRunRef = useRef(0);
   const {
     syncStatus,
     syncMessage,
@@ -43,7 +50,7 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
   } = useCloudSaveQueue({
     supabaseRef,
     userRef,
-    hydratedRef,
+    cloudReadyRef,
     markSyncing,
     markSaved,
     markError,
@@ -54,35 +61,68 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
     const supabase = createClient();
     supabaseRef.current = supabase;
 
-    async function hydrate() {
+    function hydrateLocalSnapshot() {
       const localStore = applyRuntimePreferences(loadExpenseStore());
       saveExpenseStore(localStore);
       if (active) onHydrate(localStore);
-      const revisionBeforeCloudHydration = localRevisionRef.current;
+      markHydrated();
+    }
 
+    function markHydrated() {
+      hydratedRef.current = true;
+      setIsHydrated(true);
+    }
+
+    function markUnauthenticated() {
+      syncRunRef.current += 1;
+      syncedUserIdRef.current = null;
+      syncingUserIdRef.current = null;
+      userRef.current = null;
+      cloudReadyRef.current = false;
+      markHydrated();
+      markLocal();
+      clearQueuedSave();
+    }
+
+    async function syncAuthenticatedUser(user: User | null) {
       if (!supabase) {
-        markHydrated();
+        markUnauthenticated();
         return;
       }
 
-      const { data } = await supabase.auth.getUser();
-      const user = data.user;
       if (!active || !user) {
-        markHydrated();
-        markLocal();
+        markUnauthenticated();
         return;
       }
 
+      if (
+        syncingUserIdRef.current === user.id ||
+        (syncedUserIdRef.current === user.id && cloudReadyRef.current)
+      ) {
+        return;
+      }
+
+      const revisionBeforeCloudHydration = localRevisionRef.current;
+      const initialLocalStore = applyRuntimePreferences(loadExpenseStore());
+      const syncRun = syncRunRef.current + 1;
+      syncRunRef.current = syncRun;
+      syncingUserIdRef.current = user.id;
       userRef.current = user;
+      cloudReadyRef.current = false;
+      clearQueuedSave();
       markSyncing(t("settings.preparingCloud"));
 
       try {
         const cloud = await loadCloudStore(supabase, user);
-        if (!active) return;
+        if (!active || syncRunRef.current !== syncRun) return;
 
         const latestLocalStore = applyRuntimePreferences(loadExpenseStore());
-        const { mergedStore, shouldHydrateReactState } = resolveHydratedStore({
-          initialLocalStore: localStore,
+        const {
+          mergedStore,
+          shouldHydrateReactState,
+          shouldSaveCloud,
+        } = resolveHydratedStore({
+          initialLocalStore,
           latestLocalStore,
           cloudStore: cloud.store,
           revisionAtCloudLoad: revisionBeforeCloudHydration,
@@ -94,29 +134,58 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
           onHydrate(ownedStore);
         }
         markHydrated();
+        syncedUserIdRef.current = user.id;
+        syncingUserIdRef.current = null;
 
-        const saved = await saveCloudStore(supabase, user, ownedStore);
-        if (!active) return;
-        markSynced(saved.mode);
+        if (shouldSaveCloud) {
+          const saved = await saveCloudStore(supabase, user, ownedStore);
+          if (!active || syncRunRef.current !== syncRun) return;
+          cloudReadyRef.current = saved.mode === "table";
+          markSynced(saved.mode);
+          return;
+        }
+
+        cloudReadyRef.current = cloud.mode === "table";
+        markSynced(cloud.mode);
       } catch (error) {
+        syncingUserIdRef.current = null;
+        cloudReadyRef.current = false;
         markHydrated();
         markError(error, "settings.cloudSyncError");
       }
     }
 
-    const frame = window.requestAnimationFrame(() => void hydrate());
+    hydrateLocalSnapshot();
+
+    refreshAuthRef.current = () => {
+      if (!supabase) {
+        markUnauthenticated();
+        return;
+      }
+
+      void supabase.auth
+        .getUser()
+        .then(({ data }) => syncAuthenticatedUser(data.user ?? null))
+        .catch((error: unknown) => {
+          cloudReadyRef.current = false;
+          markError(error, "settings.cloudSyncError");
+        });
+    };
+
+    const {
+      data: { subscription },
+    } = supabase?.auth.onAuthStateChange((_event, session) => {
+      void syncAuthenticatedUser(session?.user ?? null);
+    }) ?? { data: { subscription: null } };
+
+    const frame = window.requestAnimationFrame(() => refreshAuthRef.current());
 
     return () => {
       active = false;
       window.cancelAnimationFrame(frame);
+      subscription?.unsubscribe();
       clearQueuedSave();
     };
-
-    function markHydrated() {
-      hydratedRef.current = true;
-      setIsHydrated(true);
-    }
-
   }, [
     clearQueuedSave,
     markError,
@@ -125,6 +194,10 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
     markSyncing,
     onHydrate,
   ]);
+
+  useEffect(() => {
+    refreshAuthRef.current();
+  }, [pathname]);
 
   function persist(nextStore: ExpenseStore, onPersist: (store: ExpenseStore) => void) {
     const ownedStore = assignExpenseStoreOwner(nextStore, userRef.current?.id);

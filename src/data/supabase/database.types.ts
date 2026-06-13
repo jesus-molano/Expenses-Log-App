@@ -91,6 +91,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      push_reminder_deliveries: {
+        Row: {
+          id: UUID;
+          user_id: UUID;
+          reminder_key: string;
+          kind: string;
+          delivered_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: UUID;
+          user_id: UUID;
+          reminder_key: string;
+          kind: string;
+          delivered_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: UUID;
+          user_id?: UUID;
+          reminder_key?: string;
+          kind?: string;
+          delivered_at?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

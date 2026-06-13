@@ -4,6 +4,7 @@ export type SelectMenuOption<T extends string | number> = {
   value: T;
   label: string;
   detail?: string;
+  description?: string;
   leading?: React.ReactNode;
 };
 
@@ -47,12 +48,19 @@ export function SelectMenu<T extends string | number>({
             onChange(option.value);
             onOpenChange(false);
           }}
-          className="app-select-menu-option flex h-9 w-full items-center justify-between gap-3 rounded-[var(--app-radius-sm)] px-3 text-left text-sm font-semibold"
+          className="app-select-menu-option flex min-h-9 w-full items-center justify-between gap-3 rounded-[var(--app-radius-sm)] px-3 py-2 text-left text-sm font-semibold"
           data-selected={value === option.value ? "true" : "false"}
         >
           <span className="flex min-w-0 items-center gap-2">
             {option.leading}
-            <span className="truncate">{option.label}</span>
+            <span className="min-w-0">
+              <span className="block truncate">{option.label}</span>
+              {option.description ? (
+                <span className="mt-0.5 block truncate text-xs font-medium text-[var(--app-text-muted)]">
+                  {option.description}
+                </span>
+              ) : null}
+            </span>
           </span>
           {option.detail ? (
             <span className="shrink-0 text-xs opacity-75">{option.detail}</span>

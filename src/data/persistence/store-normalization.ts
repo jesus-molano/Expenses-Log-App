@@ -8,6 +8,8 @@ const STORE_KEYS = [
   "templates",
   "overrides",
   "finance",
+  "bankMovements",
+  "bankMerchantAliases",
   "deleted",
   "preferences",
 ] as const;
@@ -44,6 +46,8 @@ function normalizeDeletedIds(value: unknown): NonNullable<ExpenseStore["deleted"
     templates: stringArray(deleted.templates),
     overrides: stringArray(deleted.overrides),
     incomeEvents: stringArray(deleted.incomeEvents),
+    bankMovements: stringArray(deleted.bankMovements),
+    bankMerchantAliases: stringArray(deleted.bankMerchantAliases),
   };
 }
 
@@ -68,6 +72,12 @@ export function normalizeExpenseStore(value: unknown): ExpenseStore {
       ? (store.overrides as ExpenseStore["overrides"])
       : [],
     finance: normalizeFinanceStore(store.finance),
+    bankMovements: Array.isArray(store.bankMovements)
+      ? (store.bankMovements as ExpenseStore["bankMovements"])
+      : [],
+    bankMerchantAliases: Array.isArray(store.bankMerchantAliases)
+      ? (store.bankMerchantAliases as ExpenseStore["bankMerchantAliases"])
+      : [],
     deleted: normalizeDeletedIds(store.deleted),
     preferences: {
       theme: normalizeAppTheme(preferences.theme),
@@ -111,5 +121,13 @@ export function assignExpenseStoreOwner(
         userId,
       })),
     },
+    bankMovements: store.bankMovements.map((movement) => ({
+      ...movement,
+      userId,
+    })),
+    bankMerchantAliases: store.bankMerchantAliases.map((alias) => ({
+      ...alias,
+      userId,
+    })),
   };
 }

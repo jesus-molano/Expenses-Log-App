@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PLAN_ACCOUNT_NAME_MAX_LENGTH } from "@/domain/plan-accounts";
 import { emptyStore } from "@/domain/seed";
 import type {
+  BankMovement,
   DraftExpense,
   ExpenseOccurrence,
   ExpenseStore,
@@ -9,7 +10,9 @@ import type {
 import {
   addExpenseToStore,
   clearExpensesFromStore,
+  confirmBankImportInStore,
   deleteExpenseFromStore,
+  dismissLastChanceReminderInStore,
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
   skipOccurrenceInStore,
@@ -34,6 +37,22 @@ const draft: DraftExpense = {
   dueDay: 1,
   recurrence: { frequency: "monthly" },
 };
+
+function movement(overrides: Partial<BankMovement> = {}): BankMovement {
+  return {
+    id: overrides.id ?? "mov-1",
+    userId: "demo",
+    fingerprint: overrides.fingerprint ?? "fingerprint-1",
+    bookedAt: overrides.bookedAt ?? "2026-06-01",
+    description: overrides.description ?? "APPLE.COM/BILL",
+    amount: overrides.amount ?? -30,
+    currency: "EUR",
+    merchantKey: overrides.merchantKey ?? "apple",
+    importBatchId: overrides.importBatchId ?? "batch-1",
+    createdAt: overrides.createdAt ?? "2026-06-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
 
 function occurrenceFrom(store: ExpenseStore): ExpenseOccurrence {
   const template = store.templates[0];
@@ -92,6 +111,195 @@ describe("store commands", () => {
       templateId: occurrence.template.id,
       occurrenceDate: occurrence.occurrenceDate,
       status: "skipped",
+    });
+  });
+
+  it("dismisses a last chance reminder for a single charge occurrence", () => {
+    const added = addExpenseToStore(emptyStore, {
+      ...draft,
+      reminder: {
+        enabled: true,
+        daysBeforeCharge: 3,
+      },
+    });
+    const occurrence = {
+      ...occurrenceFrom(added),
+      estimatedChargeDate: "2026-06-02",
+    };
+
+    const dismissed = dismissLastChanceReminderInStore(added, occurrence);
+
+    expect(dismissed.overrides[0]).toMatchObject({
+      templateId: occurrence.template.id,
+      occurrenceDate: occurrence.occurrenceDate,
+      status: "due",
+      reminderDismissedChargeDate: "2026-06-02",
+    });
+    expect(dismissed.overrides[0].reminderDismissedAt).toBeTruthy();
+  });
+
+  it("confirms a bank match as a paid occurrence and saves an alias", () => {
+    const added = addExpenseToStore(emptyStore, draft);
+    const template = added.templates[0];
+    const importedMovement = movement();
+
+    const confirmed = confirmBankImportInStore(added, {
+      decisions: [
+        {
+          candidateId: "candidate-1",
+          action: "match",
+          movements: [importedMovement],
+          templateId: template.id,
+          occurrenceDate: "2026-06-01",
+          alias: {
+            merchantKey: "apple",
+            label: "APPLE.COM/BILL",
+            templateId: template.id,
+          },
+        },
+      ],
+    });
+
+    expect(confirmed.overrides[0]).toMatchObject({
+      templateId: template.id,
+      occurrenceDate: "2026-06-01",
+      status: "paid",
+      amountPaid: 30,
+    });
+    expect(confirmed.bankMovements[0]).toMatchObject({
+      fingerprint: importedMovement.fingerprint,
+      matchedTemplateId: template.id,
+      matchedOccurrenceDate: "2026-06-01",
+    });
+    expect(confirmed.bankMerchantAliases[0]).toMatchObject({
+      merchantKey: "apple",
+      templateId: template.id,
+      label: "APPLE.COM/BILL",
+    });
+  });
+
+  it("confirms grouped bank matches as separate paid occurrences", () => {
+    const added = addExpenseToStore(emptyStore, {
+      ...draft,
+      name: "Dazn",
+      amount: 14.99,
+      startDate: "2026-05-13",
+      dueDay: 13,
+    });
+    const template = added.templates[0];
+    const mayMovement = movement({
+      id: "mov-dazn-may",
+      fingerprint: "fingerprint-dazn-may",
+      bookedAt: "2026-05-13",
+      description: "COMPRA TARJ. WWW.DAZN.COM-Madrid",
+      amount: -14.99,
+      merchantKey: "dazn",
+    });
+    const juneMovement = movement({
+      id: "mov-dazn-june",
+      fingerprint: "fingerprint-dazn-june",
+      bookedAt: "2026-06-15",
+      description: "COMPRA TARJ. WWW.DAZN.COM-Madrid",
+      amount: -14.99,
+      merchantKey: "dazn",
+    });
+
+    const confirmed = confirmBankImportInStore(added, {
+      decisions: [
+        {
+          candidateId: "candidate-dazn",
+          action: "match",
+          movements: [mayMovement, juneMovement],
+          templateId: template.id,
+          occurrenceDate: "2026-06-13",
+          movementMatches: [
+            {
+              movementId: mayMovement.id,
+              occurrenceDate: "2026-05-13",
+            },
+            {
+              movementId: juneMovement.id,
+              occurrenceDate: "2026-06-13",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(confirmed.overrides).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          templateId: template.id,
+          occurrenceDate: "2026-05-13",
+          status: "paid",
+          paidAt: "2026-05-13T12:00:00.000Z",
+        }),
+        expect.objectContaining({
+          templateId: template.id,
+          occurrenceDate: "2026-06-13",
+          status: "paid",
+          paidAt: "2026-06-15T12:00:00.000Z",
+        }),
+      ]),
+    );
+    expect(confirmed.bankMovements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fingerprint: mayMovement.fingerprint,
+          matchedOccurrenceDate: "2026-05-13",
+        }),
+        expect.objectContaining({
+          fingerprint: juneMovement.fingerprint,
+          matchedOccurrenceDate: "2026-06-13",
+        }),
+      ]),
+    );
+  });
+
+  it("creates a new expense from a confirmed bank candidate only when requested", () => {
+    const importedMovement = movement({
+      id: "mov-openai",
+      fingerprint: "fingerprint-openai",
+      description: "OPENAI API",
+      amount: -20,
+      merchantKey: "openai",
+    });
+
+    const ignored = confirmBankImportInStore(emptyStore, {
+      decisions: [
+        {
+          candidateId: "candidate-ignore",
+          action: "ignore",
+          movements: [importedMovement],
+        },
+      ],
+    });
+    const created = confirmBankImportInStore(emptyStore, {
+      decisions: [
+        {
+          candidateId: "candidate-create",
+          action: "create",
+          movements: [importedMovement],
+          expense: {
+            ...draft,
+            name: "OpenAI",
+            amount: 20,
+            categoryName: "Suscripciones",
+            startDate: "2026-06-01",
+          },
+        },
+      ],
+    });
+
+    expect(ignored.templates).toHaveLength(0);
+    expect(created.templates[0]).toMatchObject({
+      name: "OpenAI",
+      amount: 20,
+    });
+    expect(created.overrides[0]).toMatchObject({
+      templateId: created.templates[0].id,
+      status: "paid",
+      amountPaid: 20,
     });
   });
 

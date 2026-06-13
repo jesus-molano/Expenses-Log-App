@@ -64,6 +64,7 @@ export function buildTemplateFromDraft(
     endDate: draft.endDate || undefined,
     dueDay: draft.dueDay,
     recurrence: draft.recurrence,
+    reminder: draft.reminder,
     active: true,
     createdAt: now,
     updatedAt: now,

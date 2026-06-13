@@ -46,9 +46,15 @@ export type ExpenseTemplate = {
   endDate?: string;
   dueDay: number;
   recurrence: RecurrenceRule;
+  reminder?: ExpenseReminderSettings;
   active: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+export type ExpenseReminderSettings = {
+  enabled: boolean;
+  daysBeforeCharge: number;
 };
 
 export type ExpenseOccurrenceOverride = {
@@ -65,6 +71,8 @@ export type ExpenseOccurrenceOverride = {
   paidAt?: string;
   amountPaid?: number;
   note?: string;
+  reminderDismissedAt?: string;
+  reminderDismissedChargeDate?: string;
 };
 
 export type ExpenseOccurrence = {
@@ -88,6 +96,7 @@ export type DraftExpense = {
   dueDay: number;
   endDate?: string;
   recurrence: RecurrenceRule;
+  reminder?: ExpenseReminderSettings;
 };
 
 export type CreateExpenseOptions = {
@@ -132,6 +141,33 @@ export type FinanceStore = {
   accounts: PlanAccount[];
 };
 
+export type BankMovement = {
+  id: string;
+  userId: string;
+  fingerprint: string;
+  bookedAt: string;
+  description: string;
+  amount: number;
+  currency: "EUR";
+  account?: string;
+  balance?: number;
+  merchantKey: string;
+  importBatchId: string;
+  matchedTemplateId?: string;
+  matchedOccurrenceDate?: string;
+  createdAt: string;
+};
+
+export type BankMerchantAlias = {
+  id: string;
+  userId: string;
+  merchantKey: string;
+  templateId: string;
+  label: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type AppTheme = "dark" | "rose-pine" | "catppuccin" | "light";
 export type AppLanguage = "es" | "en";
 
@@ -153,11 +189,15 @@ export type ExpenseStore = {
   templates: ExpenseTemplate[];
   overrides: ExpenseOccurrenceOverride[];
   finance: FinanceStore;
+  bankMovements: BankMovement[];
+  bankMerchantAliases: BankMerchantAlias[];
   deleted?: {
     categories?: string[];
     templates?: string[];
     overrides?: string[];
     incomeEvents?: string[];
+    bankMovements?: string[];
+    bankMerchantAliases?: string[];
   };
   preferences?: {
     theme: AppTheme;

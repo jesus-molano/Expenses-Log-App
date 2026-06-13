@@ -15,8 +15,8 @@ import {
   ThemeRow,
 } from "./SettingsRows";
 
-export function SettingsView() {
-  const settings = useSettingsController();
+export function SettingsView({ from }: { from?: "money" | "expenses" }) {
+  const settings = useSettingsController({ from });
 
   return (
     <main className="app-page app-page-safe px-4">

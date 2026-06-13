@@ -18,6 +18,10 @@ function template(overrides: Partial<ExpenseTemplate>): ExpenseTemplate {
     startDate: overrides.startDate ?? "2026-06-12",
     dueDay: overrides.dueDay ?? 12,
     recurrence: overrides.recurrence ?? { frequency: "monthly" },
+    reminder: overrides.reminder ?? {
+      enabled: true,
+      daysBeforeCharge: 2,
+    },
     active: overrides.active ?? true,
     createdAt: "2026-06-01T00:00:00.000Z",
     updatedAt: "2026-06-01T00:00:00.000Z",
@@ -35,24 +39,26 @@ function store(templates: ExpenseTemplate[]): ExpenseStore {
       monthlySavingsTargets: {},
       accounts: [],
     },
+    bankMovements: [],
+    bankMerchantAliases: [],
   };
 }
 
 describe("daily reminders", () => {
-  it("returns due expenses for today", () => {
+  it("returns last chance expenses one day before charge", () => {
     const reminder = buildDailyReminder(
       store([
         template({ id: "spotify", name: "Spotify", dueDay: 12 }),
         template({ id: "netflix", name: "Netflix", dueDay: 15 }),
       ]),
-      new Date("2026-06-12T08:00:00"),
+      new Date("2026-06-11T08:00:00"),
     );
 
     expect(reminder?.occurrences.map((item) => item.template.name)).toEqual([
       "Spotify",
     ]);
-    expect(dailyReminderTitle(reminder!)).toBe("Tienes 1 gasto hoy");
-    expect(dailyReminderBody(reminder!)).toBe("Spotify vence hoy.");
+    expect(dailyReminderTitle(reminder!)).toBe("Ultima oportunidad");
+    expect(dailyReminderBody(reminder!)).toBe("Spotify se cobrara pronto.");
   });
 
   it("does not remind paid occurrences", () => {
@@ -69,7 +75,29 @@ describe("daily reminders", () => {
           },
         ],
       },
-      new Date("2026-06-12T08:00:00"),
+      new Date("2026-06-11T08:00:00"),
+    );
+
+    expect(reminder).toBeNull();
+  });
+
+  it("does not remind dismissed occurrences", () => {
+    const reminder = buildDailyReminder(
+      {
+        ...store([template({ id: "spotify", name: "Spotify", dueDay: 12 })]),
+        overrides: [
+          {
+            id: "override-1",
+            userId: "user-1",
+            templateId: "spotify",
+            occurrenceDate: "2026-06-12",
+            status: "due",
+            reminderDismissedAt: "2026-06-11T09:00:00.000Z",
+            reminderDismissedChargeDate: "2026-06-12",
+          },
+        ],
+      },
+      new Date("2026-06-11T08:00:00"),
     );
 
     expect(reminder).toBeNull();

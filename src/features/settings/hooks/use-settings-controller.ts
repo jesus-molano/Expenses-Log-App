@@ -1,26 +1,23 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import type { AppLanguage } from "@/domain/types";
 import { clearExpenseLocalData } from "@/data/persistence/local-store";
-import {
-  assignExpenseStoreOwner,
-  normalizeImportedExpenseStore,
-} from "@/data/persistence/store-normalization";
-import { persistLanguagePreference, t } from "@/shared/i18n";
-import { applyAppTheme } from "@/shared/theme";
+import { t } from "@/shared/i18n";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { createClient } from "@/utils/supabase/client";
 import { useNotificationSettings } from "./use-notification-settings";
 import { useSettingsAuth } from "./use-settings-auth";
 import { SETTINGS_LANGUAGES, SETTINGS_THEMES } from "../lib/settings-options";
 
-export function useSettingsController() {
+export function useSettingsController({
+  from = "expenses",
+}: {
+  from?: "money" | "expenses";
+} = {}) {
   const expenseStore = useExpenseStore();
   const {
     store,
-    persist,
     syncStatus,
     syncMessage,
     updateTheme,
@@ -34,7 +31,6 @@ export function useSettingsController() {
   const [isClearingExpenses, setIsClearingExpenses] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const { user, setUser, signOut } = useSettingsAuth(supabase, setMessage);
   const {
@@ -51,43 +47,11 @@ export function useSettingsController() {
   const languageLabel =
     SETTINGS_LANGUAGES.find((language) => language.id === currentLanguage)
       ?.label ?? SETTINGS_LANGUAGES[0].label;
-  const backTab = searchParams.get("from") === "money" ? "money" : "expenses";
+  const backTab = from === "money" ? "money" : "expenses";
   const backHref = backTab === "money" ? "/money" : "/";
   const backLabel =
     backTab === "money" ? t("common.plan") : t("common.expenses");
   const deleteAccountPhrase = t("settings.deleteAccountPhrase", currentLanguage);
-
-  function exportData() {
-    const exportStore = assignExpenseStoreOwner(store, user?.id);
-    const blob = new Blob([JSON.stringify(exportStore, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "expense-reminders-export.json";
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function importData(file: File | undefined) {
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const importedStore = normalizeImportedExpenseStore(JSON.parse(text));
-      applyAppTheme(importedStore.preferences?.theme ?? "dark");
-      persistLanguagePreference(importedStore.preferences?.language ?? "es");
-      persist(
-        assignExpenseStoreOwner(
-          importedStore,
-          user?.id,
-        ),
-      );
-      setMessage(t("settings.imported"));
-    } catch {
-      setMessage(t("settings.importError"));
-    }
-  }
 
   async function handleClearExpenses() {
     setIsClearingExpenses(true);
@@ -166,8 +130,6 @@ export function useSettingsController() {
     enableNotifications,
     disableNotifications,
     signOut,
-    exportData,
-    importData,
     handleClearExpenses,
     handleDeleteAccount,
     closeDeleteAccountDialog,
