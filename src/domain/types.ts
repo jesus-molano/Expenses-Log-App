@@ -155,6 +155,8 @@ export type BankMovement = {
   importBatchId: string;
   matchedTemplateId?: string;
   matchedOccurrenceDate?: string;
+  matchedIncomeEventId?: string;
+  matchedSalaryMonth?: string;
   createdAt: string;
 };
 

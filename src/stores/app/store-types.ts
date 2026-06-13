@@ -39,7 +39,7 @@ export type MonthlyExpenseOverrideInput = {
 
 export type BankImportDecision = {
   candidateId: string;
-  action: "match" | "create" | "ignore";
+  action: "match" | "create" | "salary" | "income" | "import" | "ignore";
   movements: import("@/domain/types").BankMovement[];
   templateId?: string;
   occurrenceDate?: string;
@@ -48,6 +48,15 @@ export type BankImportDecision = {
     occurrenceDate: string;
   }>;
   expense?: import("@/domain/types").DraftExpense;
+  salary?: {
+    amount: number;
+    dayOfMonth: number;
+  };
+  salaryMatches?: Array<{
+    movementId: string;
+    monthId: string;
+  }>;
+  incomeEvent?: IncomeEventInput;
   alias?: {
     merchantKey: string;
     label: string;

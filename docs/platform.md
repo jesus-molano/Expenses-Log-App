@@ -98,7 +98,18 @@ Las notificaciones usan Web Push con VAPID. `vercel.json` programa
 credenciales server-side y debe protegerse con `CRON_SECRET`.
 
 Las suscripciones push se guardan en Supabase y el cron consulta stores de
-usuario para enviar recordatorios cuando hay gastos pendientes o estimados.
+usuario para enviar recordatorios de cobro.
+
+El cron solo envia el recordatorio de pre-cobro cuando:
+
+- El gasto tiene `reminder.enabled`.
+- La ocurrencia sigue `due`.
+- Falta exactamente 1 dia para `estimatedChargeDate`.
+- El usuario no descarto el aviso para esa `estimatedChargeDate`.
+- Hay al menos una suscripcion push guardada para el usuario.
+
+El endpoint registra entregas en `push_reminder_deliveries` con una clave por
+usuario, tipo y ocurrencias incluidas para evitar duplicados.
 
 ## Variables de entorno
 

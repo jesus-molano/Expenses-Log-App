@@ -11,7 +11,7 @@ que hay que validar antes de tocar piezas sensibles.
 - [Modelo de dominio](./domain-model.md): gastos recurrentes, ocurrencias,
   overrides, finanzas, preferencias y tombstones.
 - [Estado, persistencia y sincronizacion](./state-persistence-sync.md): store
-  global, localStorage, Supabase, merge cloud/local e import/export.
+  global, localStorage, Supabase, merge cloud/local e importacion bancaria.
 - [Design system](./design-system.md): tokens, componentes UI, patrones visuales
   y accesibilidad.
 - [Plataforma](./platform.md): PWA, service worker, Supabase Auth, APIs,

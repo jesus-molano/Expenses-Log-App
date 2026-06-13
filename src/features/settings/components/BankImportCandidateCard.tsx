@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { formatCurrency, formatShortDate } from "@/domain/calendar";
 import type { BankImportCandidate } from "@/domain/bank-import";
 import type {
@@ -42,10 +42,11 @@ export function BankImportCandidateCard({
     <article className="app-import-candidate">
       <CandidateSummary candidate={candidate} language={language} />
 
-      {!isDuplicate && decision ? (
+      {decision ? (
         <div className="mt-3 grid gap-2">
           <BankImportActionPicker
             action={decision.action}
+            includeImport={isDuplicate}
             language={language}
             onChange={(action) => onDecisionChange({ action })}
           />
@@ -70,12 +71,7 @@ export function BankImportCandidateCard({
             />
           ) : null}
         </div>
-      ) : (
-        <div className="mt-2 flex items-center gap-2 text-xs font-semibold text-[var(--app-text-muted)]">
-          <X size={14} />
-          {t("settings.bankImportIgnore", language)}
-        </div>
-      )}
+      ) : null}
     </article>
   );
 }
@@ -107,6 +103,12 @@ function CandidateSummary({
         <p className="truncate text-xs font-medium text-[var(--app-text-subtle)]">
           {candidate.reason}
         </p>
+        {candidate.duplicate ? (
+          <DuplicateWarning
+            duplicate={candidate.duplicate}
+            language={language}
+          />
+        ) : null}
         {candidate.movements.length > 1 ? (
           <p className="text-xs font-semibold text-[var(--app-accent)]">
             {candidate.movements.length}{" "}
@@ -117,6 +119,37 @@ function CandidateSummary({
       <p className="shrink-0 text-right text-base font-semibold text-[var(--app-text)]">
         {formatCurrency(amount)}
       </p>
+    </div>
+  );
+}
+
+function DuplicateWarning({
+  duplicate,
+  language,
+}: {
+  duplicate: NonNullable<BankImportCandidate["duplicate"]>;
+  language: AppLanguage;
+}) {
+  return (
+    <div className="app-import-duplicate-warning">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <AlertTriangle size={13} className="shrink-0" />
+        <span className="min-w-0 truncate">
+          {t("settings.bankImportDuplicateProbable", language)}
+          {" · "}
+          {duplicate.reason}
+        </span>
+      </div>
+      {duplicate.movement ? (
+        <p className="truncate">
+          {formatShortDate(duplicate.movement.bookedAt)}
+          {" · "}
+          {formatCurrency(Math.abs(duplicate.movement.amount))}
+          {" · "}
+          {duplicate.movement.description}
+        </p>
+      ) : null}
+      <p>{t("settings.bankImportDuplicateWarning", language)}</p>
     </div>
   );
 }

@@ -1,5 +1,15 @@
 import { addDays, differenceInCalendarDays, parseISO, subDays } from "date-fns";
-import { buildDateWithDay, estimateChargeDate, toDateOnly } from "./calendar";
+import { buildDateWithDay, toDateOnly } from "./calendar";
+import {
+  buildIncomeCandidates,
+  type BankImportIncomeCandidate,
+} from "./bank-import-income";
+import {
+  type BankImportDuplicateInfo,
+  inferRecurringDueDay,
+  simpleHash,
+  titleFromMovement,
+} from "./bank-import-utils";
 import { generateOccurrences } from "./recurrence";
 import type {
   BankMovement,
@@ -8,6 +18,13 @@ import type {
   ExpenseStore,
   RecurrenceRule,
 } from "./types";
+
+export type {
+  BankImportIncomeCandidate,
+  BankImportIncomeCandidateKind,
+  BankImportIncomeDraft,
+  BankImportSalaryMatch,
+} from "./bank-import-income";
 
 export type BankColumnMapping = {
   dateColumn?: string;
@@ -50,6 +67,7 @@ export type BankImportCandidate = {
   matchedTemplateId?: string;
   matchedOccurrenceDate?: string;
   matchedMovements?: BankImportMovementMatch[];
+  duplicate?: BankImportDuplicateInfo;
   reason: string;
 };
 
@@ -62,6 +80,7 @@ export type BankImportAnalysis = {
   mapping: BankColumnMapping;
   movements: BankMovement[];
   candidates: BankImportCandidate[];
+  incomeCandidates: BankImportIncomeCandidate[];
 };
 
 type MatchResult = {
@@ -146,10 +165,15 @@ export function normalizeBankMovements(
 
 export function detectRecurringMovementGroups(
   movements: BankMovement[],
+  direction: "expense" | "income" = "expense",
 ): BankMovementGroup[] {
   const groups = new Map<string, BankMovement[]>();
+  const signedMovements =
+    direction === "income"
+      ? movements.filter((item) => item.amount > 0)
+      : movements.filter((item) => item.amount < 0);
 
-  for (const movement of movements.filter((item) => item.amount < 0)) {
+  for (const movement of signedMovements) {
     const amountBucket = Math.round(Math.abs(movement.amount) * 100);
     const key = `${movement.merchantKey}:${amountBucket}`;
     groups.set(key, [...(groups.get(key) ?? []), movement]);
@@ -203,10 +227,11 @@ export function matchBankMovements(
   movements: BankMovement[],
 ): BankImportAnalysis {
   const mapping = detectBankColumns([]);
-  const existingFingerprints = new Set(
-    store.bankMovements.map((movement) => movement.fingerprint),
+  const existingMovementsByFingerprint = new Map(
+    store.bankMovements.map((movement) => [movement.fingerprint, movement]),
   );
   const expenses = movements.filter((movement) => movement.amount < 0);
+  const incomes = movements.filter((movement) => movement.amount > 0);
   const dateRange = movementDateRange(expenses);
   const occurrences = dateRange
     ? generateOccurrences(
@@ -219,17 +244,32 @@ export function matchBankMovements(
     : [];
   const candidates: BankImportCandidate[] = [];
   const unmatched: BankMovement[] = [];
-  const seenImportFingerprints = new Set<string>();
+  const seenImportMovementsByFingerprint = new Map<string, BankMovement>();
 
   for (const movement of expenses) {
-    if (
-      existingFingerprints.has(movement.fingerprint) ||
-      seenImportFingerprints.has(movement.fingerprint)
-    ) {
-      candidates.push(buildDuplicateCandidate(movement));
+    const existingMovement = existingMovementsByFingerprint.get(movement.fingerprint);
+    const repeatedMovement = seenImportMovementsByFingerprint.get(movement.fingerprint);
+
+    if (existingMovement || repeatedMovement) {
+      candidates.push(
+        buildDuplicateCandidate(
+          movement,
+          existingMovement
+            ? {
+                source: "existing",
+                movement: existingMovement,
+                reason: "Ya existe un movimiento igual importado",
+              }
+            : {
+                source: "import",
+                movement: repeatedMovement,
+                reason: "Repetido dentro de este archivo",
+              },
+        ),
+      );
       continue;
     }
-    seenImportFingerprints.add(movement.fingerprint);
+    seenImportMovementsByFingerprint.set(movement.fingerprint, movement);
 
     const match = bestMatch(store, occurrences, movement);
     if (match && match.score >= 86) {
@@ -262,6 +302,7 @@ export function matchBankMovements(
     mapping,
     movements,
     candidates: groupEquivalentMatchCandidates(candidates),
+    incomeCandidates: buildIncomeCandidates(incomes, existingMovementsByFingerprint),
   };
 }
 
@@ -468,14 +509,6 @@ function movementFingerprint(input: {
   );
 }
 
-function simpleHash(value: string) {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return hash.toString(36);
-}
-
 function movementDateRange(movements: BankMovement[]) {
   if (!movements.length) return null;
 
@@ -571,7 +604,10 @@ function matchReason(
   return `${movement.description} podria ser ${occurrence.template.name}`;
 }
 
-function buildDuplicateCandidate(movement: BankMovement): BankImportCandidate {
+function buildDuplicateCandidate(
+  movement: BankMovement,
+  duplicate: BankImportDuplicateInfo,
+): BankImportCandidate {
   return {
     id: `candidate-duplicate-${movement.id}`,
     kind: "duplicate",
@@ -581,7 +617,8 @@ function buildDuplicateCandidate(movement: BankMovement): BankImportCandidate {
     merchantKey: movement.merchantKey,
     suggestedName: titleFromMerchant(movement),
     suggestedExpense: draftFromMovement([movement], { frequency: "once" }),
-    reason: "Movimiento ya importado",
+    duplicate,
+    reason: duplicate.reason,
   };
 }
 
@@ -722,37 +759,6 @@ function draftFromMovement(
   };
 }
 
-function inferRecurringDueDay(movements: BankMovement[]) {
-  if (!movements.length) return null;
-
-  const scoredDays = Array.from({ length: 31 }, (_, index) => {
-    const day = index + 1;
-    const score = movements.reduce(
-      (sum, movement) => sum + weekendAwareDayDistance(movement.bookedAt, day),
-      0,
-    );
-
-    return { day, score };
-  }).sort((a, b) => a.score - b.score || a.day - b.day);
-
-  return scoredDays[0]?.score <= movements.length * 2 ? scoredDays[0].day : null;
-}
-
-function weekendAwareDayDistance(bookedAt: string, dueDay: number) {
-  const bookedDate = parseISO(bookedAt);
-  const dueDate = toDateOnly(buildDateWithDay(bookedDate, dueDay));
-  const estimatedCharge = estimateChargeDate(dueDate).date;
-
-  return Math.min(
-    Math.abs(differenceInCalendarDays(bookedDate, parseISO(dueDate))),
-    Math.abs(differenceInCalendarDays(bookedDate, parseISO(estimatedCharge))),
-  );
-}
-
 function titleFromMerchant(movement: BankMovement) {
-  return movement.merchantKey
-    .split(" ")
-    .filter(Boolean)
-    .map((word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`)
-    .join(" ") || "Nuevo gasto";
+  return titleFromMovement(movement, "Nuevo gasto");
 }

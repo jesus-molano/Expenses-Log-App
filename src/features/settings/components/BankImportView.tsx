@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Check, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, ArrowUp, Check, FileSpreadsheet } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
-import { BankImportCandidateCard } from "./BankImportCandidateCard";
 import { BankImportFilePanel } from "./BankImportFilePanel";
+import { BankImportReviewSections } from "./BankImportReviewSections";
 import { BankImportSummary } from "./BankImportSummary";
+import type { BankImportMode } from "../hooks/use-bank-import-controller";
 import { useBankImportController } from "../hooks/use-bank-import-controller";
 
 export function BankImportView({ from }: { from?: "money" | "settings" }) {
@@ -56,43 +59,35 @@ export function BankImportView({ from }: { from?: "money" | "settings" }) {
           <>
             <BankImportSummary
               candidates={controller.analysis.candidates}
+              incomeCandidates={controller.analysis.incomeCandidates}
               movementCount={controller.analysis.movements.length}
               language={controller.language}
+              mode={controller.activeMode}
             />
 
-            <div className="mt-5 grid gap-6">
-              {controller.sections.map((section) => (
-                <section key={section.kind} className="app-import-section grid gap-2">
-                  <div className="app-import-section-header">
-                    <h2 className="app-import-section-title">
-                      {section.title}
-                    </h2>
-                    <span className="app-import-section-count">
-                      {section.candidates.length}
-                    </span>
-                  </div>
+            <BankImportModeTabs
+              activeMode={controller.activeMode}
+              expenseCount={controller.analysis.candidates.length}
+              incomeCount={controller.analysis.incomeCandidates.length}
+              language={controller.language}
+              onChange={controller.setActiveMode}
+            />
 
-                  <div className="grid gap-2">
-                    {section.candidates.map((candidate) => (
-                      <BankImportCandidateCard
-                        key={candidate.id}
-                        candidate={candidate}
-                        templates={controller.store.templates}
-                        categories={controller.store.categories}
-                        decision={controller.decisions[candidate.id]}
-                        language={controller.language}
-                        onDecisionChange={(patch) =>
-                          controller.updateDecision(candidate.id, patch)
-                        }
-                        onExpenseChange={(patch) =>
-                          controller.updateExpenseDraft(candidate.id, patch)
-                        }
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
+            <BankImportReviewSections
+              sections={controller.sections}
+              incomeSections={controller.incomeSections}
+              mode={controller.activeMode}
+              templates={controller.store.templates}
+              categories={controller.store.categories}
+              decisions={controller.decisions}
+              incomeDecisions={controller.incomeDecisions}
+              language={controller.language}
+              onDecisionChange={controller.updateDecision}
+              onExpenseChange={controller.updateExpenseDraft}
+              onIncomeDecisionChange={controller.updateIncomeDecision}
+              onIncomeChange={controller.updateIncomeDraft}
+              onSalaryChange={controller.updateSalaryDraft}
+            />
 
           </>
         ) : (
@@ -105,21 +100,100 @@ export function BankImportView({ from }: { from?: "money" | "settings" }) {
       </div>
 
       {controller.analysis ? (
-        <footer className="app-import-action-footer">
-          <div className="app-import-action-footer-inner">
-            <Button
-              type="button"
-              variant="primary"
-              className="w-full"
-              size="lg"
-              onClick={controller.applyImport}
-              leadingIcon={<Check size={18} />}
-            >
-              {t("settings.bankImportConfirm", controller.language)}
-            </Button>
-          </div>
-        </footer>
+        <>
+          <BankImportBackToTopButton language={controller.language} />
+          <footer className="app-import-action-footer">
+            <div className="app-import-action-footer-inner">
+              <Button
+                type="button"
+                variant="primary"
+                className="w-full"
+                size="lg"
+                onClick={controller.applyImport}
+                leadingIcon={<Check size={18} />}
+              >
+                {t("settings.bankImportConfirm", controller.language)}
+              </Button>
+            </div>
+          </footer>
+        </>
       ) : null}
     </main>
+  );
+}
+
+function BankImportBackToTopButton({ language }: { language: AppLanguage }) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    function updateVisibility() {
+      setVisible(window.scrollY > 520);
+    }
+
+    updateVisibility();
+    window.addEventListener("scroll", updateVisibility, { passive: true });
+    return () => window.removeEventListener("scroll", updateVisibility);
+  }, []);
+
+  return (
+    <button
+      type="button"
+      className="app-import-back-top"
+      data-visible={visible ? "true" : "false"}
+      aria-label={t("settings.bankImportBackToTop", language)}
+      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+    >
+      <ArrowUp size={18} />
+    </button>
+  );
+}
+
+function BankImportModeTabs({
+  activeMode,
+  expenseCount,
+  incomeCount,
+  language,
+  onChange,
+}: {
+  activeMode: BankImportMode;
+  expenseCount: number;
+  incomeCount: number;
+  language: AppLanguage;
+  onChange: (mode: BankImportMode) => void;
+}) {
+  const options: Array<{
+    mode: BankImportMode;
+    label: string;
+    count: number;
+  }> = [
+    {
+      mode: "expenses",
+      label: t("settings.bankImportExpensesTab", language),
+      count: expenseCount,
+    },
+    {
+      mode: "income",
+      label: t("settings.bankImportIncomeTab", language),
+      count: incomeCount,
+    },
+  ];
+
+  return (
+    <div className="app-import-mode-tabs mt-4" role="tablist" aria-label="Tipo de movimiento">
+      {options.map((option) => (
+        <button
+          key={option.mode}
+          type="button"
+          role="tab"
+          aria-selected={activeMode === option.mode}
+          className="app-import-mode-tab"
+          data-selected={activeMode === option.mode ? "true" : "false"}
+          onClick={() => onChange(option.mode)}
+        >
+          <span>{option.label}</span>
+          <strong>{option.count}</strong>
+        </button>
+      ))}
+    </div>
   );
 }

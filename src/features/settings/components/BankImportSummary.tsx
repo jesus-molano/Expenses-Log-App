@@ -1,24 +1,39 @@
 import type {
   BankImportCandidate,
   BankImportCandidateKind,
+  BankImportIncomeCandidate,
+  BankImportIncomeCandidateKind,
 } from "@/domain/bank-import";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 
 type BankImportSummaryProps = {
   candidates: BankImportCandidate[];
+  incomeCandidates?: BankImportIncomeCandidate[];
   movementCount: number;
   language: AppLanguage;
+  mode?: "expenses" | "income";
 };
 
 export function BankImportSummary({
   candidates,
+  incomeCandidates = [],
   movementCount,
   language,
+  mode = "expenses",
 }: BankImportSummaryProps) {
-  const counts = countByKind(candidates);
-  const reviewCount = counts.match + counts.possible;
-  const newCount = counts.new_recurring + counts.new_once;
+  const expenseCounts = countByKind(candidates);
+  const incomeCounts = countIncomeByKind(incomeCandidates);
+  const reviewCount =
+    mode === "income"
+      ? incomeCounts.income_salary + incomeCounts.income_once
+      : expenseCounts.match + expenseCounts.possible;
+  const newCount =
+    mode === "income"
+      ? incomeCounts.income_once
+      : expenseCounts.new_recurring + expenseCounts.new_once;
+  const duplicateCount =
+    mode === "income" ? incomeCounts.income_duplicate : expenseCounts.duplicate;
 
   return (
     <div className="app-import-summary mt-4" aria-label={t("settings.bankImportSummary", language)}>
@@ -36,7 +51,7 @@ export function BankImportSummary({
       />
       <SummaryPill
         label={t("settings.bankImportSummaryDuplicates", language)}
-        value={counts.duplicate}
+        value={duplicateCount}
       />
     </div>
   );
@@ -48,6 +63,20 @@ function SummaryPill({ label, value }: { label: string; value: number }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </span>
+  );
+}
+
+function countIncomeByKind(candidates: BankImportIncomeCandidate[]) {
+  return candidates.reduce<Record<BankImportIncomeCandidateKind, number>>(
+    (counts, candidate) => ({
+      ...counts,
+      [candidate.kind]: counts[candidate.kind] + 1,
+    }),
+    {
+      income_salary: 0,
+      income_once: 0,
+      income_duplicate: 0,
+    },
   );
 }
 

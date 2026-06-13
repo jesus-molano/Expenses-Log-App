@@ -140,6 +140,20 @@ describe("bank import domain", () => {
     });
   });
 
+  it("normalizes money values with euro symbols", () => {
+    const [movement] = movementsFrom([
+      {
+        Fecha: "13/06/2026",
+        Descripcion: "APPLE.COM/BILL",
+        Cargo: "€2,99",
+      },
+    ]);
+
+    expect(movement).toMatchObject({
+      amount: -2.99,
+    });
+  });
+
   it("matches a bank merchant alias to an existing expense", () => {
     const movements = movementsFrom([
       {
@@ -267,6 +281,176 @@ describe("bank import domain", () => {
     });
   });
 
+  it("detects a recurring positive salary candidate", () => {
+    const movements = movementsFrom([
+      {
+        Fecha: "28/05/2026",
+        Descripcion: "NOMINA EMPRESA ACME",
+        Abono: "2200,00",
+      },
+      {
+        Fecha: "28/06/2026",
+        Descripcion: "NOMINA EMPRESA ACME",
+        Abono: "2200,00",
+      },
+    ]);
+    const analysis = matchBankMovements(store(), movements);
+
+    expect(analysis.candidates).toHaveLength(0);
+    expect(analysis.incomeCandidates[0]).toMatchObject({
+      kind: "income_salary",
+      movements,
+      suggestedSalary: {
+        amount: 2200,
+        dayOfMonth: 28,
+      },
+      salaryMatches: [
+        {
+          movementId: movements[0].id,
+          monthId: "2026-05",
+        },
+        {
+          movementId: movements[1].id,
+          monthId: "2026-06",
+        },
+      ],
+    });
+  });
+
+  it("keeps salary candidates together when amounts vary or first month is partial", () => {
+    const movements = movementsFrom([
+      {
+        Fecha: "16/02/2026",
+        Descripcion: "NOMINA EMPRESA ACME",
+        Abono: "900,00",
+      },
+      {
+        Fecha: "28/03/2026",
+        Descripcion: "NOMINA EMPRESA ACME",
+        Abono: "2200,00",
+      },
+      {
+        Fecha: "28/04/2026",
+        Descripcion: "NOMINA EMPRESA ACME",
+        Abono: "2198,42",
+      },
+    ]);
+    const analysis = matchBankMovements(store(), movements);
+
+    expect(analysis.incomeCandidates).toHaveLength(1);
+    expect(analysis.incomeCandidates[0]).toMatchObject({
+      kind: "income_salary",
+      movements,
+      suggestedSalary: {
+        amount: 2198.42,
+      },
+    });
+  });
+
+  it("infers salary payday from weekend-shifted income movements", () => {
+    const movements = movementsFrom([
+      {
+        Fecha: "28/05/2026",
+        Descripcion: "NOMINA EMPRESA ACME",
+        Abono: "2200,00",
+      },
+      {
+        Fecha: "29/06/2026",
+        Descripcion: "NOMINA EMPRESA ACME",
+        Abono: "2200,00",
+      },
+    ]);
+    const analysis = matchBankMovements(store(), movements);
+
+    expect(analysis.incomeCandidates[0]).toMatchObject({
+      kind: "income_salary",
+      suggestedSalary: {
+        amount: 2200,
+        dayOfMonth: 28,
+      },
+    });
+  });
+
+  it("classifies isolated positive movements as one-off income candidates", () => {
+    const movements = movementsFrom([
+      {
+        Fecha: "02/06/2026",
+        Descripcion: "BIZUM JESUS",
+        Abono: "45,00",
+      },
+    ]);
+    const analysis = matchBankMovements(store(), movements);
+
+    expect(analysis.incomeCandidates[0]).toMatchObject({
+      kind: "income_once",
+      suggestedIncome: {
+        amount: 45,
+        receivedAt: "2026-06-02",
+      },
+    });
+  });
+
+  it("marks already imported positive fingerprints as likely duplicates", () => {
+    const [existing] = movementsFrom([
+      {
+        Fecha: "02/06/2026",
+        Descripcion: "BIZUM JESUS",
+        Abono: "45,00",
+      },
+    ]);
+    const analysis = matchBankMovements(
+      store({
+        bankMovements: [existing],
+      }),
+      [existing],
+    );
+
+    expect(analysis.incomeCandidates[0]).toMatchObject({
+      kind: "income_duplicate",
+      confidence: 100,
+      duplicate: {
+        source: "existing",
+        movement: existing,
+        reason: "Ya existe un movimiento igual importado",
+      },
+      reason: "Ya existe un movimiento igual importado",
+    });
+  });
+
+  it("marks repeated positive fingerprints in the same import as likely duplicates", () => {
+    const movements = movementsFrom([
+      {
+        Fecha: "02/06/2026",
+        Descripcion: "BIZUM JESUS",
+        Abono: "45,00",
+      },
+      {
+        Fecha: "02/06/2026",
+        Descripcion: "BIZUM JESUS",
+        Abono: "45,00",
+      },
+    ]);
+    const analysis = matchBankMovements(store(), movements);
+
+    expect(analysis.incomeCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "income_once",
+        }),
+        expect.objectContaining({
+          kind: "income_duplicate",
+          confidence: 100,
+          duplicate: expect.objectContaining({
+            source: "import",
+            movement: movements[0],
+            reason: "Repetido dentro de este archivo",
+          }),
+          reason: "Repetido dentro de este archivo",
+        }),
+      ]),
+    );
+  });
+
   it("classifies isolated movements as one-off candidates", () => {
     const movements = movementsFrom([
       {
@@ -305,6 +489,12 @@ describe("bank import domain", () => {
     ).toMatchObject({
       kind: "duplicate",
       confidence: 100,
+      duplicate: {
+        source: "existing",
+        movement: existingMovement,
+        reason: "Ya existe un movimiento igual importado",
+      },
+      reason: "Ya existe un movimiento igual importado",
     });
   });
 
@@ -337,6 +527,12 @@ describe("bank import domain", () => {
           id: expect.stringContaining(movements[1].id),
           kind: "duplicate",
           confidence: 100,
+          duplicate: expect.objectContaining({
+            source: "import",
+            movement: movements[0],
+            reason: "Repetido dentro de este archivo",
+          }),
+          reason: "Repetido dentro de este archivo",
         }),
       ]),
     );

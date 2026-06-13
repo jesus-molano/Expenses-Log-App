@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Link2, Plus, X } from "lucide-react";
+import { Check, FilePlus2, Link2, Plus, Wallet, X } from "lucide-react";
 import { useState } from "react";
 import { Field } from "@/components/ui/Field";
 import { SelectMenu } from "@/components/ui/SelectMenu";
@@ -20,18 +20,23 @@ import {
 import { categoryLabel } from "@/shared/category-labels";
 import { t } from "@/shared/i18n";
 
-export type BankImportAction = "match" | "create" | "ignore";
+export type BankImportAction = "match" | "create" | "import" | "ignore";
+export type BankImportIncomeAction = "salary" | "income" | "import" | "ignore";
 
 export function BankImportActionPicker({
   action,
+  includeImport = false,
   language,
   onChange,
 }: {
   action: BankImportAction;
+  includeImport?: boolean;
   language: AppLanguage;
   onChange: (action: BankImportAction) => void;
 }) {
-  const options = ["match", "create", "ignore"] as const;
+  const options = includeImport
+    ? (["ignore", "import", "match", "create"] as const)
+    : (["match", "create", "ignore"] as const);
 
   return (
     <div className="app-import-actions" data-count={options.length}>
@@ -51,12 +56,63 @@ export function BankImportActionPicker({
                 <Link2 size={14} />
               ) : option === "create" ? (
                 <Plus size={14} />
+              ) : option === "import" ? (
+                <FilePlus2 size={14} />
               ) : (
                 <X size={14} />
               )}
             </span>
             <span className="app-import-action-label">
-              {actionLabel(option, language)}
+              {actionLabel(option, language, includeImport)}
+            </span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function BankImportIncomeActionPicker({
+  action,
+  includeImport = false,
+  language,
+  onChange,
+}: {
+  action: BankImportIncomeAction;
+  includeImport?: boolean;
+  language: AppLanguage;
+  onChange: (action: BankImportIncomeAction) => void;
+}) {
+  const options = includeImport
+    ? (["ignore", "import", "salary", "income"] as const)
+    : (["salary", "income", "ignore"] as const);
+
+  return (
+    <div className="app-import-actions" data-count={options.length}>
+      {options.map((option) => (
+        <button
+          key={option}
+          type="button"
+          className="app-import-action"
+          data-action={option === "ignore" ? "ignore" : "create"}
+          data-selected={action === option ? "true" : "false"}
+          aria-pressed={action === option}
+          onClick={() => onChange(option)}
+        >
+          <span className="app-import-action-content">
+            <span className="app-import-action-icon" aria-hidden="true">
+              {option === "salary" ? (
+                <Wallet size={14} />
+              ) : option === "income" ? (
+                <Plus size={14} />
+              ) : option === "import" ? (
+                <FilePlus2 size={14} />
+              ) : (
+                <X size={14} />
+              )}
+            </span>
+            <span className="app-import-action-label">
+              {incomeActionLabel(option, language, includeImport)}
             </span>
           </span>
         </button>
@@ -87,7 +143,7 @@ export function BankImportMatchControls({
     value: template.id,
     label: template.name,
     detail: formatCurrency(template.amount),
-    description: `${expenseCategoryLabel(template, categories, language)} · ${recurrenceSummary(template.recurrence, language)}`,
+    description: `${expenseCategoryLabel(template, categories, language)} Â· ${recurrenceSummary(template.recurrence, language)}`,
   }));
 
   return (
@@ -167,9 +223,31 @@ export function BankImportCreateExpenseControls({
   );
 }
 
-function actionLabel(action: BankImportAction, language: AppLanguage) {
+function actionLabel(
+  action: BankImportAction,
+  language: AppLanguage,
+  duplicateReview: boolean,
+) {
   if (action === "match") return t("settings.bankImportMatchAction", language);
   if (action === "create") return t("settings.bankImportCreate", language);
+  if (action === "import") return t("settings.bankImportForceImport", language);
+  if (action === "ignore" && duplicateReview) {
+    return t("settings.bankImportKeepIgnored", language);
+  }
+  return t("settings.bankImportIgnore", language);
+}
+
+function incomeActionLabel(
+  action: BankImportIncomeAction,
+  language: AppLanguage,
+  duplicateReview: boolean,
+) {
+  if (action === "salary") return t("settings.bankImportConfirmSalary", language);
+  if (action === "income") return t("settings.bankImportCreateIncome", language);
+  if (action === "import") return t("settings.bankImportForceImport", language);
+  if (action === "ignore" && duplicateReview) {
+    return t("settings.bankImportKeepIgnored", language);
+  }
   return t("settings.bankImportIgnore", language);
 }
 

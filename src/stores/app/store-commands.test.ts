@@ -178,6 +178,29 @@ describe("store commands", () => {
     });
   });
 
+  it("imports a bank movement without linking it when explicitly requested", () => {
+    const importedMovement = movement({
+      id: "mov-raw",
+      fingerprint: "fingerprint-raw",
+      description: "MOVIMIENTO DUPLICADO REVISADO",
+    });
+
+    const confirmed = confirmBankImportInStore(emptyStore, {
+      decisions: [
+        {
+          candidateId: "candidate-duplicate",
+          action: "import",
+          movements: [importedMovement],
+        },
+      ],
+    });
+
+    expect(confirmed.bankMovements).toEqual([importedMovement]);
+    expect(confirmed.templates).toEqual(emptyStore.templates);
+    expect(confirmed.overrides).toEqual(emptyStore.overrides);
+    expect(confirmed.finance).toEqual(emptyStore.finance);
+  });
+
   it("confirms grouped bank matches as separate paid occurrences", () => {
     const added = addExpenseToStore(emptyStore, {
       ...draft,
@@ -300,6 +323,185 @@ describe("store commands", () => {
       templateId: created.templates[0].id,
       status: "paid",
       amountPaid: 20,
+    });
+  });
+
+  it("confirms imported salary movements into monthly salary settings", () => {
+    const maySalary = movement({
+      id: "mov-salary-may",
+      fingerprint: "fingerprint-salary-may",
+      bookedAt: "2026-05-28",
+      description: "NOMINA EMPRESA ACME",
+      amount: 2200,
+      merchantKey: "nomina empresa acme",
+    });
+    const juneSalary = movement({
+      id: "mov-salary-june",
+      fingerprint: "fingerprint-salary-june",
+      bookedAt: "2026-06-29",
+      description: "NOMINA EMPRESA ACME",
+      amount: 2200,
+      merchantKey: "nomina empresa acme",
+    });
+
+    const confirmed = confirmBankImportInStore(emptyStore, {
+      decisions: [
+        {
+          candidateId: "income-salary",
+          action: "salary",
+          movements: [maySalary, juneSalary],
+          salary: {
+            amount: 2200,
+            dayOfMonth: 28,
+          },
+          salaryMatches: [
+            {
+              movementId: maySalary.id,
+              monthId: "2026-05",
+            },
+            {
+              movementId: juneSalary.id,
+              monthId: "2026-06",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(confirmed.finance.monthlySalary).toMatchObject({
+      "2026-05": {
+        amount: 2200,
+        dayOfMonth: 28,
+      },
+      "2026-06": {
+        amount: 2200,
+        dayOfMonth: 28,
+      },
+    });
+    expect(confirmed.bankMovements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fingerprint: maySalary.fingerprint,
+          matchedSalaryMonth: "2026-05",
+        }),
+        expect.objectContaining({
+          fingerprint: juneSalary.fingerprint,
+          matchedSalaryMonth: "2026-06",
+        }),
+      ]),
+    );
+  });
+
+  it("sums multiple confirmed salary payments in the same month", () => {
+    const baseSalary = movement({
+      id: "mov-base-salary",
+      fingerprint: "fingerprint-base-salary",
+      bookedAt: "2026-06-28",
+      description: "NOMINA EMPRESA ACME",
+      amount: 1800,
+      merchantKey: "nomina empresa acme",
+    });
+    const bonusSalary = movement({
+      id: "mov-bonus-salary",
+      fingerprint: "fingerprint-bonus-salary",
+      bookedAt: "2026-06-29",
+      description: "NOMINA VARIABLE ACME",
+      amount: 350.55,
+      merchantKey: "nomina variable acme",
+    });
+
+    const withBaseSalary = confirmBankImportInStore(emptyStore, {
+      decisions: [
+        {
+          candidateId: "income-salary-base",
+          action: "salary",
+          movements: [baseSalary],
+          salary: {
+            amount: 1800,
+            dayOfMonth: 28,
+          },
+          salaryMatches: [
+            {
+              movementId: baseSalary.id,
+              monthId: "2026-06",
+            },
+          ],
+        },
+      ],
+    });
+    const confirmed = confirmBankImportInStore(withBaseSalary, {
+      decisions: [
+        {
+          candidateId: "income-salary-bonus",
+          action: "salary",
+          movements: [bonusSalary],
+          salary: {
+            amount: 350.55,
+            dayOfMonth: 28,
+          },
+          salaryMatches: [
+            {
+              movementId: bonusSalary.id,
+              monthId: "2026-06",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(confirmed.finance.monthlySalary["2026-06"]).toMatchObject({
+      amount: 2150.55,
+      dayOfMonth: 28,
+    });
+    expect(confirmed.bankMovements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fingerprint: baseSalary.fingerprint,
+          matchedSalaryMonth: "2026-06",
+        }),
+        expect.objectContaining({
+          fingerprint: bonusSalary.fingerprint,
+          matchedSalaryMonth: "2026-06",
+        }),
+      ]),
+    );
+  });
+
+  it("confirms an imported positive movement as a one-off income event", () => {
+    const importedMovement = movement({
+      id: "mov-income",
+      fingerprint: "fingerprint-income",
+      bookedAt: "2026-06-02",
+      description: "BIZUM JESUS",
+      amount: 45,
+      merchantKey: "bizum jesus",
+    });
+
+    const confirmed = confirmBankImportInStore(emptyStore, {
+      decisions: [
+        {
+          candidateId: "income-once",
+          action: "income",
+          movements: [importedMovement],
+          incomeEvent: {
+            name: "Bizum Jesus",
+            amount: 45,
+            receivedAt: "2026-06-02",
+            note: "BIZUM JESUS",
+          },
+        },
+      ],
+    });
+
+    expect(confirmed.finance.incomeEvents[0]).toMatchObject({
+      name: "Bizum Jesus",
+      amount: 45,
+      receivedAt: "2026-06-02",
+      note: "BIZUM JESUS",
+    });
+    expect(confirmed.bankMovements[0]).toMatchObject({
+      fingerprint: importedMovement.fingerprint,
+      matchedIncomeEventId: confirmed.finance.incomeEvents[0].id,
     });
   });
 

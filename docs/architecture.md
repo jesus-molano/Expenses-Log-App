@@ -12,7 +12,7 @@ persistencia y servicios externos para que cada cambio tenga un lugar claro.
 - `src/features/*`: funcionalidad por dominio de producto. `expenses` contiene
   dashboard, timeline, formularios, swipe y DnD; `plan` contiene la pantalla de
   dinero; `settings` contiene preferencias, auth, notificaciones e
-  import/export; `auth` contiene login.
+  importacion bancaria; `auth` contiene login.
 - `src/components/ui`: componentes base del design system. Son genericos,
   reutilizables y no deben conocer reglas de negocio.
 - `src/domain`: tipos y logica pura compartida. No depende de React, DOM, Next
@@ -30,8 +30,10 @@ persistencia y servicios externos para que cada cambio tenga un lugar claro.
 
 - `/` renderiza `ExpenseDashboard`, la experiencia principal de gastos.
 - `/money` renderiza `MoneyDashboard`, el plan mensual, ingresos y cuentas.
-- `/settings` renderiza `SettingsView`, preferencias, import/export, auth y
-  notificaciones.
+- `/settings` renderiza `SettingsView`, preferencias, importacion bancaria,
+  auth y notificaciones.
+- `/settings/import` renderiza el flujo de conciliacion bancaria para archivos
+  CSV/XLS/XLSX.
 - `/login` renderiza `LoginView`.
 - `/expenses/new` y `/expenses/[id]` cubren creacion y detalle/edicion de
   gastos.
@@ -86,5 +88,17 @@ Pantalla de dinero:
 Ajustes:
 
 1. Cambia tema/idioma aplicando DOM/cookies y persistiendo preferencias.
-2. Gestiona login, sync cloud, import/export y notificaciones.
+2. Gestiona login, sync cloud, importacion bancaria y notificaciones.
 3. Puede reparar metadata antigua con endpoint POST autenticado.
+
+Importacion bancaria:
+
+1. `settings` lee CSV/XLS/XLSX y normaliza movimientos con helpers de dominio.
+2. `src/domain/bank-import.ts` clasifica gastos, matching, recurrentes,
+   pagos unicos y duplicados probables.
+3. `src/domain/bank-import-income.ts` clasifica ingresos, nominas y duplicados
+   positivos sin depender de React.
+4. `src/features/settings/lib/bank-import-decisions.ts` convierte decisiones de
+   UI en comandos de store.
+5. `src/stores/app/expense-commands.ts` aplica la confirmacion: vincular,
+   crear gasto, confirmar nomina, crear ingreso, guardar sin vincular o ignorar.

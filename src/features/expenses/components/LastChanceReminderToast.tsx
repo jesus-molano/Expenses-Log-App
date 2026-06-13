@@ -1,4 +1,4 @@
-import { BellRing } from "lucide-react";
+﻿import { BellRing } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
@@ -28,7 +28,8 @@ export function LastChanceReminderToast({
         </p>
         <p className="mt-0.5 text-xs leading-relaxed text-[var(--app-text-muted)]">
           {occurrence.template.name} {t("expenses.lastChanceReminderBody", language)}{" "}
-          {formatCurrency(occurrence.template.amount)} ·{" "}
+          {formatCurrency(occurrence.template.amount)}
+          {" · "}
           {daysUntilCharge === 0
             ? t("common.today", language)
             : `${daysUntilCharge} ${t("expenses.days", language)}`}

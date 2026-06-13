@@ -27,6 +27,8 @@ Un `ExpenseTemplate` representa la serie:
 - Fecha de inicio y posible fecha de fin.
 - Dia de vencimiento.
 - Regla de recurrencia.
+- `reminder`: recordatorio opcional antes del cobro, con `enabled` y
+  `daysBeforeCharge` de 1 a 5.
 - Estado `active`.
 - Timestamps de creacion y actualizacion.
 
@@ -52,6 +54,8 @@ cobro, estado y orden visual.
 - Orden manual (`sortOrder`).
 - Cambios puntuales de nombre, importe o categoria.
 - Datos de pago (`paidAt`, `amountPaid`).
+- Metadata de recordatorio descartado:
+  `reminderDismissedAt` y `reminderDismissedChargeDate`.
 - Nota opcional.
 
 El patron importante es que el template conserva la serie, y el override cambia
@@ -88,6 +92,36 @@ Las cuentas usan propositos controlados:
 La pantalla `/money` calcula un `MonthlyMoneyPlan` con ingresos, gastos
 planificados, aportacion a gastos, ahorro, inversion, restante y shortfall.
 
+## Importacion bancaria
+
+Los movimientos bancarios normalizados se guardan en `bankMovements`. Cada
+`BankMovement` incluye:
+
+- Fecha contable (`bookedAt`), descripcion, importe, moneda y cuenta opcional.
+- `merchantKey` normalizado para agrupar y matchear.
+- `fingerprint` estable para detectar duplicados.
+- Metadata de conciliacion cuando aplica:
+  `matchedTemplateId`, `matchedOccurrenceDate`, `matchedIncomeEventId` o
+  `matchedSalaryMonth`.
+
+`bankMerchantAliases` guarda alias confirmados por el usuario, por ejemplo un
+concepto bancario como `APPLE.COM/BILL` vinculado a un gasto `iCloud`.
+
+La importacion no aplica cambios automaticamente. El dominio devuelve
+candidatos y la UI obliga a confirmar, editar, vincular, crear o ignorar:
+
+- Gastos: coincidencias exactas, posibles coincidencias, recurrentes nuevos,
+  pagos unicos nuevos y duplicados probables.
+- Ingresos: nominas detectadas, ingresos puntuales y duplicados probables.
+- Duplicados probables: se ignoran por defecto, pero el usuario puede guardar
+  sin vincular o aplicar una accion manual bajo confirmacion.
+
+La deteccion de nomina agrupa ingresos positivos por pagador/concepto
+normalizado, tolera variaciones de importe, meses parciales y desplazamientos
+por fin de semana. Al confirmar nominas, `monthlySalary[monthId]` se calcula
+como suma de los movimientos de nomina confirmados para ese mes, preservando
+cada movimiento en `bankMovements`.
+
 ## Preferencias
 
 Las preferencias persistidas son:
@@ -107,16 +141,17 @@ idioma entre cargas.
 - Templates.
 - Overrides.
 - Income events.
+- Bank movements.
 
 Esto evita que un elemento borrado en un dispositivo reaparezca cuando se mezcla
 con un store cloud o local que todavia lo tenia. Los tombstones son parte del
-modelo actual y deben preservarse en import/export y sync.
+modelo actual y deben preservarse en persistencia y sync.
 
 ## Invariantes utiles
 
 - La moneda de gastos e ingresos es `EUR`.
-- El store debe pasar por normalizacion antes de usarse si viene de JSON externo
-  o Supabase.
+- El store debe pasar por normalizacion antes de usarse si viene de Supabase o
+  almacenamiento local antiguo.
 - Los comandos deben mantener la forma completa de `ExpenseStore`.
 - Los ids de entidades sincronizables no deben reutilizarse.
 - Los deletes deben anadir tombstones cuando el dato puede existir en otro

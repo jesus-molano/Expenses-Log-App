@@ -8,7 +8,11 @@ Mobile-first recurring expense tracker inspired by iPhone Reminders.
 - Recurring expenses: mensual, trimestral, anual, custom and RRULE-ready.
 - One-tap paid state with occurrence overrides.
 - Weekend charge estimate for Spain/Canary defaults.
-- Tags/categories, local persistence, JSON import/export.
+- Tags/categories, local persistence and Supabase sync.
+- Bank import from CSV/XLS/XLSX with expense matching, merchant aliases,
+  reviewed duplicates, one-off income and salary detection.
+- Per-expense pre-charge reminders with optional Web Push fallback the day
+  before the estimated charge.
 - Optional AI quick entry through Gemini; local parser fallback if no key exists.
 - PWA manifest, service worker and best-effort web notifications.
 - Supabase SSR helpers, Next 16 `proxy.ts` session refresh and RLS schema.
@@ -62,7 +66,8 @@ VAPID_SUBJECT=mailto:you@example.com
 
 The Vercel cron in `vercel.json` calls `/api/push/daily-reminders` every day
 at `08:00 UTC`. The endpoint sends one Web Push reminder to each saved
-subscription when that user's store has unpaid expenses due or estimated today.
+subscription when that user's synced store has an enabled, undismissed
+pre-charge reminder one day before the estimated charge.
 
 Apply `supabase/schema.sql` in the Supabase SQL editor to create tables and RLS policies.
 

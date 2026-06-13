@@ -57,8 +57,8 @@ describe("daily reminders", () => {
     expect(reminder?.occurrences.map((item) => item.template.name)).toEqual([
       "Spotify",
     ]);
-    expect(dailyReminderTitle(reminder!)).toBe("Ultima oportunidad");
-    expect(dailyReminderBody(reminder!)).toBe("Spotify se cobrara pronto.");
+    expect(dailyReminderTitle(reminder!)).toBe("Revisa este cobro");
+    expect(dailyReminderBody(reminder!)).toBe("Spotify se cobrará pronto.");
   });
 
   it("does not remind paid occurrences", () => {

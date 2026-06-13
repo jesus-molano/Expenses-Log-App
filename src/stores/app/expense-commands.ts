@@ -1,5 +1,6 @@
 import { startOfMonth } from "date-fns";
 import { buildDateWithDay, estimateChargeDate, toDateOnly } from "@/domain/calendar";
+import { createIncomeEvent, toMonthId } from "@/domain/finance";
 import type {
   BankMerchantAlias,
   BankMovement,
@@ -377,6 +378,9 @@ export function confirmBankImportInStore(
 ): ExpenseStore {
   return input.decisions.reduce((currentStore, decision) => {
     if (decision.action === "ignore") return currentStore;
+    if (decision.action === "import") {
+      return applyBankRawImport(currentStore, decision.movements);
+    }
     if (decision.action === "match" && decision.templateId && decision.occurrenceDate) {
       return applyBankMatch(currentStore, {
         movements: decision.movements,
@@ -389,9 +393,26 @@ export function confirmBankImportInStore(
     if (decision.action === "create" && decision.expense) {
       return applyBankCreatedExpense(currentStore, decision.movements, decision.expense);
     }
+    if (decision.action === "salary" && decision.salary) {
+      return applyBankSalary(currentStore, {
+        movements: decision.movements,
+        salary: decision.salary,
+        salaryMatches: decision.salaryMatches,
+      });
+    }
+    if (decision.action === "income" && decision.incomeEvent) {
+      return applyBankIncomeEvent(currentStore, decision.movements, decision.incomeEvent);
+    }
 
     return currentStore;
   }, store);
+}
+
+function applyBankRawImport(store: ExpenseStore, movements: BankMovement[]): ExpenseStore {
+  return {
+    ...store,
+    bankMovements: mergeRawBankMovements(store.bankMovements, movements),
+  };
 }
 
 function applyBankMatch(
@@ -477,6 +498,142 @@ function mergeMatchedBankMovements(
     });
   }
   return Array.from(byFingerprint.values());
+}
+
+function mergeRawBankMovements(current: BankMovement[], incoming: BankMovement[]) {
+  const byFingerprint = new Map(current.map((movement) => [movement.fingerprint, movement]));
+  for (const movement of incoming) {
+    byFingerprint.set(movement.fingerprint, movement);
+  }
+  return Array.from(byFingerprint.values());
+}
+
+function applyBankSalary(
+  store: ExpenseStore,
+  input: {
+    movements: BankMovement[];
+    salary: {
+      amount: number;
+      dayOfMonth: number;
+    };
+    salaryMatches?: Array<{
+      movementId: string;
+      monthId: string;
+    }>;
+  },
+): ExpenseStore {
+  const salaryDay = clampDay(input.salary.dayOfMonth);
+  const monthlySalary = { ...store.finance.monthlySalary };
+  const movementMatches = input.movements.map((movement) => ({
+    movement,
+    monthId:
+      input.salaryMatches?.find((match) => match.movementId === movement.id)?.monthId ??
+      toMonthId(movement.bookedAt),
+  }));
+  const incomingFingerprints = new Set(
+    movementMatches.map(({ movement }) => movement.fingerprint),
+  );
+  const incomingAmounts = sumSalaryMovementsByMonth(movementMatches);
+  const existingAmounts = sumSalaryMovementsByMonth(
+    store.bankMovements
+      .filter(
+        (movement) =>
+          movement.matchedSalaryMonth && !incomingFingerprints.has(movement.fingerprint),
+      )
+      .map((movement) => ({
+        movement,
+        monthId: movement.matchedSalaryMonth ?? toMonthId(movement.bookedAt),
+      })),
+  );
+
+  for (const monthId of incomingAmounts.keys()) {
+    monthlySalary[monthId] = {
+      amount: Number(((existingAmounts.get(monthId) ?? 0) + (incomingAmounts.get(monthId) ?? 0)).toFixed(2)),
+      dayOfMonth: salaryDay,
+    };
+  }
+
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      monthlySalary,
+    },
+    bankMovements: mergeSalaryBankMovements(store.bankMovements, movementMatches),
+  };
+}
+
+function sumSalaryMovementsByMonth(
+  matches: Array<{
+    movement: BankMovement;
+    monthId: string;
+  }>,
+) {
+  const sums = new Map<string, number>();
+
+  for (const { movement, monthId } of matches) {
+    sums.set(monthId, (sums.get(monthId) ?? 0) + Math.max(Number(movement.amount), 0));
+  }
+
+  return sums;
+}
+
+function applyBankIncomeEvent(
+  store: ExpenseStore,
+  movements: BankMovement[],
+  input: NonNullable<BankImportInput["decisions"][number]["incomeEvent"]>,
+): ExpenseStore {
+  const incomeEvent = createIncomeEvent({
+    name: input.name,
+    amount: Math.max(Number(input.amount), 0.01),
+    receivedAt: input.receivedAt,
+    note: input.note,
+  });
+
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      incomeEvents: [incomeEvent, ...store.finance.incomeEvents],
+    },
+    bankMovements: mergeIncomeBankMovements(store.bankMovements, movements, incomeEvent.id),
+  };
+}
+
+function mergeSalaryBankMovements(
+  current: BankMovement[],
+  incoming: Array<{
+    movement: BankMovement;
+    monthId: string;
+  }>,
+) {
+  const byFingerprint = new Map(current.map((movement) => [movement.fingerprint, movement]));
+  for (const { movement, monthId } of incoming) {
+    byFingerprint.set(movement.fingerprint, {
+      ...movement,
+      matchedSalaryMonth: monthId,
+    });
+  }
+  return Array.from(byFingerprint.values());
+}
+
+function mergeIncomeBankMovements(
+  current: BankMovement[],
+  incoming: BankMovement[],
+  incomeEventId: string,
+) {
+  const byFingerprint = new Map(current.map((movement) => [movement.fingerprint, movement]));
+  for (const movement of incoming) {
+    byFingerprint.set(movement.fingerprint, {
+      ...movement,
+      matchedIncomeEventId: incomeEventId,
+    });
+  }
+  return Array.from(byFingerprint.values());
+}
+
+function clampDay(value: number) {
+  return Math.min(Math.max(Math.round(Number(value) || 1), 1), 31);
 }
 
 function applyBankCreatedExpense(

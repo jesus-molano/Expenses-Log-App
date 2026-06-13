@@ -16,6 +16,8 @@ El hook expone:
   move series.
 - Comandos financieros: salario, ahorro, cuentas, ingresos y overrides
   mensuales.
+- Comando de importacion bancaria: confirma decisiones revisadas y aplica los
+  cambios en el mismo store.
 - Comandos de preferencias: tema e idioma.
 - Estado de sync: `syncStatus`, `syncMessage`, `isHydrated`.
 
@@ -30,6 +32,9 @@ Los comandos se dividen por responsabilidad:
   mueve o borra gastos.
 - `finance-commands`: modifica salario mensual, objetivos, cuentas e ingresos.
 - `preference-commands`: actualiza tema e idioma en el store.
+- `confirmBankImportInStore`: aplica decisiones del import bancario. Puede
+  vincular movimientos a gastos, crear gastos, confirmar nominas, crear ingresos
+  puntuales, guardar movimientos sin vincular o ignorarlos.
 
 Los comandos reciben un `ExpenseStore` y devuelven otro. Esta forma mantiene la
 logica testeable y evita mutaciones ocultas dentro de componentes.
@@ -96,17 +101,26 @@ para reducir ventanas de inconsistencia.
 El estado de sync comunica preparando cloud, guardando, guardado, local o error.
 Los mensajes se traducen con `src/shared/i18n`.
 
-## Import/export
+## Importacion bancaria
 
-El import debe pasar por `normalizeImportedExpenseStore`. Al importar:
+La UI actual no importa ni exporta stores JSON completos. El flujo de ajustes
+importa movimientos bancarios del usuario desde CSV/XLS/XLSX:
 
-- Se valida que el JSON tenga forma de store.
-- Se normalizan arrays, finance, deleted y preferences.
-- Las preferencias importadas se sincronizan con cookies/DOM.
-- El resultado entra por el mismo flujo de persistencia.
+1. Se lee el archivo en cliente.
+2. Se detectan columnas de fecha, descripcion, importe/cargo/abono, saldo y
+   cuenta.
+3. Se normalizan movimientos y fingerprints.
+4. Se comparan contra gastos, ingresos, alias y movimientos ya guardados.
+5. Se muestran candidatos revisables.
+6. Nada se aplica hasta que el usuario confirma.
 
-El export debe conservar `deleted` y `preferences`, porque forman parte del
-estado necesario para evitar conflictos y mantener la experiencia del usuario.
+Al confirmar, el resultado entra por `confirmBankImportInStore` y por el flujo
+normal de persistencia: localStorage primero y cloud si hay usuario autenticado
+e hidratacion completa.
+
+Los duplicados probables se mantienen ignorados por defecto, pero son
+editables. Si el usuario fuerza una accion, el comando conserva la trazabilidad
+en `bankMovements` y aplica la decision correspondiente.
 
 ## Reglas actuales y limites
 
@@ -117,3 +131,5 @@ estado necesario para evitar conflictos y mantener la experiencia del usuario.
 - En ediciones concurrentes del mismo elemento, gana el item que entra al final
   en el merge por id.
 - Los deletes deben seguir registrando tombstones en nuevos comandos.
+- El import bancario debe conservar `bankMovements`, `bankMerchantAliases`,
+  `finance.incomeEvents` y `finance.monthlySalary` al mezclar local/cloud.

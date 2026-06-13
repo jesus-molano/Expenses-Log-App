@@ -28,22 +28,22 @@ export function dailyReminderBody(reminder: DailyReminder) {
   const [first, second] = reminder.occurrences;
 
   if (count === 1) {
-    return `${first.template.name} se cobrara pronto.`;
+    return `${first.template.name} se cobrará pronto.`;
   }
 
   if (count === 2 && second) {
-    return `${first.template.name} y ${second.template.name} se cobraran pronto.`;
+    return `${first.template.name} y ${second.template.name} se cobrarán pronto.`;
   }
 
   return second
-    ? `${first.template.name}, ${second.template.name} y ${count - 2} mas se cobraran pronto.`
+    ? `${first.template.name}, ${second.template.name} y ${count - 2} más se cobrarán pronto.`
     : `Tienes ${count} gastos por revisar.`;
 }
 
 export function dailyReminderTitle(reminder: DailyReminder) {
   return reminder.occurrences.length === 1
-    ? "Ultima oportunidad"
-    : `${reminder.occurrences.length} avisos de ultima oportunidad`;
+    ? "Revisa este cobro"
+    : `${reminder.occurrences.length} cobros por revisar`;
 }
 
 export function isExpenseStore(value: unknown): value is ExpenseStore {

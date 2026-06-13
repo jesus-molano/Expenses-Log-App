@@ -42,7 +42,7 @@ Agregar o actualizar Vitest cuando se toque:
 - Recurrencias, fechas o calculos monetarios.
 - Parser local o contrato de parseo AI.
 - Store commands.
-- Normalizacion, import/export o merge cloud/local.
+- Normalizacion, importacion bancaria o merge cloud/local.
 - Preferencias de tema/idioma.
 - APIs route handlers con seguridad o fallback.
 
