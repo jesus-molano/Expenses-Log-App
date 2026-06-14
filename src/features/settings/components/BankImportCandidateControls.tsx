@@ -143,7 +143,7 @@ export function BankImportMatchControls({
     value: template.id,
     label: template.name,
     detail: formatCurrency(template.amount),
-    description: `${expenseCategoryLabel(template, categories, language)} Â· ${recurrenceSummary(template.recurrence, language)}`,
+    description: `${expenseCategoryLabel(template, categories, language)} · ${recurrenceSummary(template.recurrence, language)}`,
   }));
 
   return (

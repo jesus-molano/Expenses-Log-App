@@ -99,8 +99,13 @@ function IncomeCandidateSummary({
             {candidate.confidence}%
           </span>
         </div>
-        <p className="truncate text-xs font-medium text-[var(--app-text-muted)]">
-          {dateLabel} - {candidate.primaryMovement.description}
+        <p className="grid min-w-0 gap-0.5 text-xs font-medium text-[var(--app-text-muted)]">
+          <span className="shrink-0 text-[var(--app-text-subtle)]">
+            {dateLabel}
+          </span>
+          <span className="app-import-bank-description">
+            {candidate.primaryMovement.description}
+          </span>
         </p>
         <p className="truncate text-xs font-medium text-[var(--app-text-subtle)]">
           {candidate.reason}
