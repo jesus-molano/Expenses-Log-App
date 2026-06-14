@@ -1133,6 +1133,12 @@
   overflow: visible;
 }
 
+.app-import-section:has(.app-select-menu-panel) {
+  position: relative;
+  z-index: 70;
+  overflow: visible;
+}
+
 .app-import-upload-button {
   border: 1px solid var(--app-border);
   background: var(--app-surface-muted);
