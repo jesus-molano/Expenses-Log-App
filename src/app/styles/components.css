@@ -1094,6 +1094,7 @@
 }
 
 .app-import-section[data-open="true"] .app-import-section-collapse {
+  overflow: visible;
   opacity: 1;
   visibility: visible;
   transition:
@@ -1103,7 +1104,7 @@
 
 .app-import-section-list {
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .app-import-upload-button {
@@ -1198,6 +1199,7 @@
   border-radius: var(--app-radius-sm);
   background: var(--app-surface-muted);
   color: var(--app-text-muted);
+  padding-inline: 0.7rem;
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1;
@@ -1234,6 +1236,28 @@
 .app-import-action-label {
   display: block;
   line-height: 1;
+}
+
+@media (max-width: 430px) {
+  .app-import-actions[data-count="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .app-import-action {
+    height: 2.65rem;
+    min-height: 2.65rem;
+    padding-inline: 0.42rem;
+    font-size: 0.74rem;
+  }
+
+  .app-import-action-content {
+    column-gap: 0.25rem;
+  }
+
+  .app-import-action-label {
+    white-space: normal;
+    line-height: 1.08;
+  }
 }
 
 .app-import-action:hover {

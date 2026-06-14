@@ -24,6 +24,7 @@ export function CompactMenu({
 }: CompactMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const suppressTriggerClickUntilRef = useRef(0);
 
   useEffect(() => {
     if (!open) return;
@@ -40,7 +41,13 @@ export function CompactMenu({
 
     function handlePointerDown(event: PointerEvent) {
       if (!menuRef.current) return;
-      if (menuRef.current.contains(event.target as Node)) return;
+      if (menuRef.current.contains(event.target as Node)) {
+        const target = event.target as HTMLElement;
+        if (target.closest("button") !== triggerRef.current) {
+          suppressTriggerClickUntilRef.current = Date.now() + 450;
+        }
+        return;
+      }
       onOpenChange(false);
     }
 
@@ -94,7 +101,10 @@ export function CompactMenu({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => onOpenChange(!open)}
+        onClick={() => {
+          if (Date.now() < suppressTriggerClickUntilRef.current) return;
+          onOpenChange(!open);
+        }}
         aria-expanded={open}
         aria-haspopup={menuRole}
         onKeyDown={handleTriggerKeyDown}
@@ -113,7 +123,7 @@ export function CompactMenu({
         <div
           role={menuRole}
           onKeyDown={handleMenuKeyDown}
-          className={`app-select-menu-panel absolute top-10 z-20 grid min-w-full gap-0.5 rounded-[var(--app-radius-lg)] p-1.5 ${
+          className={`app-select-menu-panel absolute top-10 z-50 grid min-w-full gap-0.5 rounded-[var(--app-radius-lg)] p-1.5 ${
             align === "left" ? "left-0" : "right-0"
           }`}
         >

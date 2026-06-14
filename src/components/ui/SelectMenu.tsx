@@ -28,6 +28,17 @@ export function SelectMenu<T extends string | number>({
   align,
 }: SelectMenuProps<T>) {
   const selected = options.find((option) => option.value === value);
+  const sortedOptions = [...options].sort((left, right) =>
+    left.label.localeCompare(right.label, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    }),
+  );
+
+  function selectOption(nextValue: T) {
+    onChange(nextValue);
+    onOpenChange(false);
+  }
 
   return (
     <CompactMenu
@@ -38,15 +49,22 @@ export function SelectMenu<T extends string | number>({
       align={align}
       menuRole="listbox"
     >
-      {options.map((option) => (
+      {sortedOptions.map((option) => (
         <button
           key={option.value}
           type="button"
           role="option"
           aria-selected={value === option.value}
-          onClick={() => {
-            onChange(option.value);
-            onOpenChange(false);
+          onPointerDown={(event) => {
+            event.preventDefault();
+            selectOption(option.value);
+          }}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.detail === 0) {
+              selectOption(option.value);
+            }
           }}
           className="app-select-menu-option flex min-h-9 w-full items-center justify-between gap-3 rounded-[var(--app-radius-sm)] px-3 py-2 text-left text-sm font-semibold"
           data-selected={value === option.value ? "true" : "false"}
