@@ -128,6 +128,14 @@ export function CompactMenu({
         <div
           role={menuRole}
           onKeyDown={handleMenuKeyDown}
+          style={
+            {
+              "--app-select-menu-width":
+                align === "left"
+                  ? "min(24rem, calc(100vw - 4rem))"
+                  : "min(24rem, calc(100vw - 2rem))",
+            } as React.CSSProperties
+          }
           className={`app-select-menu-panel absolute top-10 z-50 grid min-w-full gap-0.5 rounded-[var(--app-radius-lg)] p-1.5 ${
             align === "left" ? "left-0" : "right-0"
           }`}

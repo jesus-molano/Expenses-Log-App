@@ -70,15 +70,17 @@ export function SelectMenu<T extends string | number>({
             event.stopPropagation();
             selectOption(option.value, event.detail === 0);
           }}
-          className="app-select-menu-option flex min-h-9 w-full items-center justify-between gap-3 rounded-[var(--app-radius-sm)] px-3 py-2 text-left text-sm font-semibold"
+          className="app-select-menu-option flex min-h-9 w-full items-center justify-between gap-3 overflow-hidden rounded-[var(--app-radius-sm)] px-3 py-2 text-left text-sm font-semibold"
           data-selected={value === option.value ? "true" : "false"}
         >
-          <span className="flex min-w-0 items-center gap-2">
+          <span className="flex min-w-0 flex-1 items-center gap-2">
             {option.leading}
-            <span className="min-w-0">
-              <span className="block truncate">{option.label}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block whitespace-normal break-words leading-snug [overflow-wrap:anywhere]">
+                {option.label}
+              </span>
               {option.description ? (
-                <span className="mt-0.5 block truncate text-xs font-medium text-[var(--app-text-muted)]">
+                <span className="mt-0.5 block whitespace-normal break-words text-xs font-medium leading-snug text-[var(--app-text-muted)] [overflow-wrap:anywhere]">
                   {option.description}
                 </span>
               ) : null}

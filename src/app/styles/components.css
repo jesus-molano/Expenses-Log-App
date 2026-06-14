@@ -494,9 +494,11 @@
 }
 
 .app-select-menu-panel {
-  width: max-content;
+  box-sizing: border-box;
+  width: var(--app-select-menu-width, max-content);
   max-width: min(24rem, calc(100vw - 2rem));
   max-height: min(20rem, 54dvh);
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   touch-action: pan-y;
@@ -513,6 +515,7 @@
 }
 
 .app-select-menu-option {
+  max-width: 100%;
   border: 1px solid transparent;
   background: transparent;
   color: var(--app-text-muted);
