@@ -25,6 +25,21 @@ export function SettingsDialogs({
         />
       ) : null}
 
+      {settings.clearIncomeOpen ? (
+        <ConfirmActionDialog
+          icon={<Trash2 size={18} />}
+          title={t("settings.clearIncome", settings.currentLanguage)}
+          body={t("settings.clearIncomeConfirm", settings.currentLanguage)}
+          cancelLabel={t("common.back", settings.currentLanguage)}
+          confirmLabel={t("settings.clearIncomeAction", settings.currentLanguage)}
+          loading={settings.isClearingIncome}
+          onCancel={() => {
+            if (!settings.isClearingIncome) settings.setClearIncomeOpen(false);
+          }}
+          onConfirm={settings.handleClearIncome}
+        />
+      ) : null}
+
       {settings.deleteAccountOpen ? (
         <ConfirmActionDialog
           icon={<UserX size={18} />}

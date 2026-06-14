@@ -11,6 +11,7 @@ import type {
 import {
   addExpenseToStore,
   clearExpensesFromStore,
+  clearIncomeFromStore,
   confirmBankImportInStore,
   deleteExpenseFromStore,
   dismissLastChanceReminderInStore,
@@ -93,6 +94,75 @@ describe("store commands", () => {
     expect(cleared.overrides).toEqual([]);
     expect(cleared.finance).toEqual(emptyStore.finance);
     expect(cleared.preferences).toEqual(emptyStore.preferences);
+  });
+
+  it("clears only income data", () => {
+    const added = addExpenseToStore(emptyStore, draft);
+    const incomeStore: ExpenseStore = {
+      ...added,
+      finance: {
+        incomeEvents: [
+          {
+            id: "income-1",
+            userId: "demo",
+            name: "Bizum",
+            amount: 45,
+            currency: "EUR",
+            receivedAt: "2026-06-02",
+            createdAt: "2026-06-02T00:00:00.000Z",
+            updatedAt: "2026-06-02T00:00:00.000Z",
+          },
+        ],
+        monthlySalary: {
+          "2026-06": {
+            amount: 2200,
+            dayOfMonth: 28,
+          },
+        },
+        monthlySavingsTargets: {
+          "2026-06": 500,
+        },
+        accounts: [
+          {
+            id: "acct-main",
+            name: "Principal",
+            purposes: ["salary", "daily"],
+          },
+        ],
+      },
+      bankMovements: [
+        movement({ id: "expense-mov", amount: -30 }),
+        movement({
+          id: "income-mov",
+          amount: 45,
+          matchedIncomeEventId: "income-1",
+        }),
+        movement({
+          id: "salary-mov",
+          amount: 2200,
+          matchedSalaryMonth: "2026-06",
+        }),
+      ],
+    };
+
+    const cleared = clearIncomeFromStore(incomeStore);
+
+    expect(cleared.finance.incomeEvents).toEqual([]);
+    expect(cleared.finance.monthlySalary).toEqual({});
+    expect(cleared.finance.monthlySavingsTargets).toEqual(
+      incomeStore.finance.monthlySavingsTargets,
+    );
+    expect(cleared.finance.accounts).toEqual(incomeStore.finance.accounts);
+    expect(cleared.categories).toEqual(incomeStore.categories);
+    expect(cleared.templates).toEqual(incomeStore.templates);
+    expect(cleared.overrides).toEqual(incomeStore.overrides);
+    expect(cleared.bankMovements).toEqual([
+      expect.objectContaining({ id: "expense-mov" }),
+    ]);
+    expect(cleared.deleted?.incomeEvents).toContain("income-1");
+    expect(cleared.deleted?.bankMovements).toEqual(
+      expect.arrayContaining(["income-mov", "salary-mov"]),
+    );
   });
 
   it("creates paid and skipped occurrence overrides", () => {

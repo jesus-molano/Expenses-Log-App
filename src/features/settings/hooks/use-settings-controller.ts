@@ -23,12 +23,15 @@ export function useSettingsController({
     updateTheme,
     updateLanguage,
     clearExpenses,
+    clearIncome,
   } = expenseStore;
   const [message, setMessage] = useState("");
   const [themeOpen, setThemeOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [clearExpensesOpen, setClearExpensesOpen] = useState(false);
   const [isClearingExpenses, setIsClearingExpenses] = useState(false);
+  const [clearIncomeOpen, setClearIncomeOpen] = useState(false);
+  const [isClearingIncome, setIsClearingIncome] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const supabase = useMemo(() => createClient(), []);
@@ -67,6 +70,21 @@ export function useSettingsController({
       );
     } finally {
       setIsClearingExpenses(false);
+    }
+  }
+
+  async function handleClearIncome() {
+    setIsClearingIncome(true);
+    try {
+      await clearIncome();
+      setClearIncomeOpen(false);
+      setMessage(t("settings.incomeCleared"));
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : t("settings.clearIncomeError"),
+      );
+    } finally {
+      setIsClearingIncome(false);
     }
   }
 
@@ -111,6 +129,8 @@ export function useSettingsController({
     languageOpen,
     clearExpensesOpen,
     isClearingExpenses,
+    clearIncomeOpen,
+    isClearingIncome,
     deleteAccountOpen,
     isDeletingAccount,
     currentTheme,
@@ -124,6 +144,7 @@ export function useSettingsController({
     setThemeOpen,
     setLanguageOpen,
     setClearExpensesOpen,
+    setClearIncomeOpen,
     setDeleteAccountOpen,
     updateTheme,
     updateLanguage,
@@ -131,6 +152,7 @@ export function useSettingsController({
     disableNotifications,
     signOut,
     handleClearExpenses,
+    handleClearIncome,
     handleDeleteAccount,
     closeDeleteAccountDialog,
   };

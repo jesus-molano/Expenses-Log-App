@@ -1,4 +1,4 @@
-﻿import { Trash2, UserX } from "lucide-react";
+import { BadgeEuro, ReceiptText, Trash2, UserX } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { t } from "@/shared/i18n";
 import type { SettingsController } from "../../types";
@@ -12,13 +12,25 @@ export function DangerRows({ settings }: { settings: SettingsController }) {
       </p>
 
       <div className="grid gap-2">
-        <Button
-          variant="danger"
-          onClick={() => settings.setClearExpensesOpen(true)}
-          leadingIcon={<Trash2 size={17} />}
-        >
-          {t("settings.clearExpenses")}
-        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant="danger"
+            className="min-w-0 px-3"
+            onClick={() => settings.setClearExpensesOpen(true)}
+            leadingIcon={<ReceiptText size={17} />}
+          >
+            <span className="truncate">{t("settings.clearExpenses")}</span>
+          </Button>
+
+          <Button
+            variant="danger"
+            className="min-w-0 px-3"
+            onClick={() => settings.setClearIncomeOpen(true)}
+            leadingIcon={<BadgeEuro size={17} />}
+          >
+            <span className="truncate">{t("settings.clearIncome")}</span>
+          </Button>
+        </div>
 
         <SettingRow
           icon={<UserX size={18} />}

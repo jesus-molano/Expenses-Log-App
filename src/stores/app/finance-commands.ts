@@ -128,6 +128,51 @@ export function deleteIncomeEventFromStore(
   };
 }
 
+export function clearIncomeFromStore(store: ExpenseStore): ExpenseStore {
+  const incomeEventIds = store.finance.incomeEvents.map((event) => event.id);
+  const incomeBankMovements = store.bankMovements.filter(isIncomeBankMovement);
+
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      incomeEvents: [],
+      monthlySalary: {},
+    },
+    bankMovements: store.bankMovements.filter(
+      (movement) => !isIncomeBankMovement(movement),
+    ),
+    deleted: {
+      ...store.deleted,
+      incomeEvents: mergeDeletedIds(
+        store.deleted?.incomeEvents,
+        incomeEventIds,
+      ),
+      bankMovements: mergeDeletedIds(
+        store.deleted?.bankMovements,
+        incomeBankMovements.map((movement) => movement.id),
+      ),
+    },
+  };
+}
+
+function isIncomeBankMovement(
+  movement: ExpenseStore["bankMovements"][number],
+): boolean {
+  return (
+    movement.amount > 0 ||
+    Boolean(movement.matchedIncomeEventId) ||
+    Boolean(movement.matchedSalaryMonth)
+  );
+}
+
+function mergeDeletedIds(
+  current: string[] | undefined,
+  next: string[],
+): string[] {
+  return Array.from(new Set([...(current ?? []), ...next]));
+}
+
 function normalizePlanAccounts(accounts: PlanAccount[]): PlanAccount[] {
   const normalized = accounts
     .slice(0, 3)

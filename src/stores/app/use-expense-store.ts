@@ -26,6 +26,7 @@ import {
   addIncomeEventToStore,
   confirmBankImportInStore,
   clearExpensesFromStore,
+  clearIncomeFromStore,
   deleteExpenseFromStore,
   deleteIncomeEventFromStore,
   dismissLastChanceReminderInStore,
@@ -187,6 +188,14 @@ function useExpenseStoreValue() {
     );
   }
 
+  async function clearIncome() {
+    await persistence.persistImmediately(
+      clearIncomeFromStore(store),
+      setStore,
+      t("settings.clearingCloudIncome"),
+    );
+  }
+
   function togglePaid(occurrence: ExpenseOccurrence) {
     persist(togglePaidInStore(store, occurrence));
   }
@@ -267,6 +276,7 @@ function useExpenseStoreValue() {
     addExpense,
     deleteExpense,
     clearExpenses,
+    clearIncome,
     togglePaid,
     skipOccurrence,
     dismissLastChanceReminder,
