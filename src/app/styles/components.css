@@ -1144,10 +1144,16 @@
 }
 
 .app-import-candidate {
+  position: relative;
   min-width: 0;
   border-radius: var(--app-radius-lg);
   padding: 0.75rem;
   box-shadow: var(--app-shadow-row);
+}
+
+.app-import-candidate:has(.app-import-inline-editor [data-open="true"]) {
+  z-index: 60;
+  overflow: visible;
 }
 
 .app-import-bank-description {

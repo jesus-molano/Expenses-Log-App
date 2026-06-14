@@ -101,7 +101,11 @@ export function CompactMenu({
   }
 
   return (
-    <div ref={menuRef} className="relative min-w-0">
+    <div
+      ref={menuRef}
+      className="relative min-w-0"
+      data-open={open ? "true" : "false"}
+    >
       <button
         ref={triggerRef}
         type="button"
