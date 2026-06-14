@@ -465,6 +465,23 @@ describe("bank import domain", () => {
     });
   });
 
+  it("suggests savings category for transfers to savings accounts", () => {
+    const movements = movementsFrom([
+      {
+        Fecha: "02/06/2026",
+        Descripcion: "TRANSFERENCIA A CUENTA AHORRO",
+        Cargo: "250,00",
+      },
+    ]);
+
+    expect(matchBankMovements(store(), movements).candidates[0]).toMatchObject({
+      kind: "new_once",
+      suggestedExpense: {
+        categoryName: "Ahorro",
+      },
+    });
+  });
+
   it("ignores already imported fingerprints as duplicates", () => {
     const [movement] = movementsFrom([
       {

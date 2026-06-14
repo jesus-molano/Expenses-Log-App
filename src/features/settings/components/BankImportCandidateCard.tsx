@@ -47,6 +47,7 @@ export function BankImportCandidateCard({
           <BankImportActionPicker
             action={decision.action}
             includeImport={isDuplicate}
+            canMatch={templates.length > 0}
             language={language}
             onChange={(action) => onDecisionChange({ action })}
           />

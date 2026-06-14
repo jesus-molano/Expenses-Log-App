@@ -35,9 +35,19 @@ export function SelectMenu<T extends string | number>({
     }),
   );
 
-  function selectOption(nextValue: T) {
+  function selectOption(nextValue: T, restoreFocus: boolean) {
     onChange(nextValue);
     onOpenChange(false);
+    window.requestAnimationFrame(() => {
+      if (restoreFocus) {
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLElement) {
+        activeElement.blur();
+      }
+    });
   }
 
   return (
@@ -55,16 +65,10 @@ export function SelectMenu<T extends string | number>({
           type="button"
           role="option"
           aria-selected={value === option.value}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            selectOption(option.value);
-          }}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            if (event.detail === 0) {
-              selectOption(option.value);
-            }
+            selectOption(option.value, event.detail === 0);
           }}
           className="app-select-menu-option flex min-h-9 w-full items-center justify-between gap-3 rounded-[var(--app-radius-sm)] px-3 py-2 text-left text-sm font-semibold"
           data-selected={value === option.value ? "true" : "false"}

@@ -32,6 +32,7 @@ const categories: ExpenseCategory[] = [
   category("cat-health", "Salud", "HeartPulse", "rose"),
   category("cat-sport", "Deporte", "Dumbbell", "green"),
   category("cat-debt", "Deudas", "CreditCard", "rose"),
+  category("cat-savings", "Ahorro", "PiggyBank", "green"),
   category("cat-leisure", "Ocio", "Gamepad2", "violet"),
   category("cat-work", "Educacion/Trabajo", "BriefcaseBusiness", "blue"),
   category("cat-pets", "Mascotas", "PawPrint", "green"),

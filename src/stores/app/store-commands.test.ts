@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { PLAN_ACCOUNT_NAME_MAX_LENGTH } from "@/domain/plan-accounts";
+import { generateOccurrences } from "@/domain/recurrence";
 import { emptyStore } from "@/domain/seed";
 import type {
   BankMovement,
@@ -322,7 +323,60 @@ describe("store commands", () => {
     expect(created.overrides[0]).toMatchObject({
       templateId: created.templates[0].id,
       status: "paid",
+      paidAt: "2026-06-01T12:00:00.000Z",
       amountPaid: 20,
+    });
+  });
+
+  it("creates imported recurring expenses as paid on their generated occurrence date", () => {
+    const importedMovement = movement({
+      id: "mov-weekend-shifted",
+      fingerprint: "fingerprint-weekend-shifted",
+      bookedAt: "2026-06-15",
+      description: "DAZN",
+      amount: -14.99,
+      merchantKey: "dazn",
+    });
+
+    const confirmed = confirmBankImportInStore(emptyStore, {
+      decisions: [
+        {
+          candidateId: "candidate-create-shifted",
+          action: "create",
+          movements: [importedMovement],
+          expense: {
+            ...draft,
+            name: "Dazn",
+            amount: 14.99,
+            categoryName: "Suscripciones",
+            startDate: "2026-06-13",
+            dueDay: 13,
+            recurrence: { frequency: "monthly" },
+          },
+        },
+      ],
+    });
+    const [occurrence] = generateOccurrences(
+      confirmed.templates,
+      confirmed.overrides,
+      "2026-06-01",
+      "2026-06-30",
+    );
+
+    expect(confirmed.overrides[0]).toMatchObject({
+      templateId: confirmed.templates[0].id,
+      occurrenceDate: "2026-06-13",
+      status: "paid",
+      paidAt: "2026-06-15T12:00:00.000Z",
+      amountPaid: 14.99,
+    });
+    expect(confirmed.bankMovements[0]).toMatchObject({
+      matchedTemplateId: confirmed.templates[0].id,
+      matchedOccurrenceDate: "2026-06-13",
+    });
+    expect(occurrence).toMatchObject({
+      occurrenceDate: "2026-06-13",
+      status: "paid",
     });
   });
 

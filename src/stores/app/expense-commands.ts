@@ -648,11 +648,15 @@ function applyBankCreatedExpense(
     categoryResult.categoryId,
     startDate,
   );
-  const overrides = movements.map((movement) => ({
+  const matches = movements.map((movement) => ({
+    movement,
+    occurrenceDate: occurrenceDateForImportedMovement(template, movement.bookedAt),
+  }));
+  const overrides = matches.map(({ movement, occurrenceDate }) => ({
     id: createId("ovr"),
     userId: "demo",
     templateId: template.id,
-    occurrenceDate: movement.bookedAt,
+    occurrenceDate,
     status: "paid" as const,
     paidAt: `${movement.bookedAt}T12:00:00.000Z`,
     amountPaid: Math.abs(movement.amount),
@@ -663,9 +667,8 @@ function applyBankCreatedExpense(
     ...categoryResult.store,
     templates: [...categoryResult.store.templates, template],
     overrides: [...categoryResult.store.overrides, ...overrides],
-    bankMovements: mergeBankMovements(categoryResult.store.bankMovements, movements, {
+    bankMovements: mergeMatchedBankMovements(categoryResult.store.bankMovements, matches, {
       matchedTemplateId: template.id,
-      matchedOccurrenceDate: startDate,
     }),
     bankMerchantAliases: upsertBankAlias(categoryResult.store.bankMerchantAliases, {
       merchantKey: movements[0]?.merchantKey ?? draft.name.toLowerCase(),
@@ -675,19 +678,19 @@ function applyBankCreatedExpense(
   };
 }
 
-function mergeBankMovements(
-  current: BankMovement[],
-  incoming: BankMovement[],
-  match: Pick<BankMovement, "matchedTemplateId" | "matchedOccurrenceDate">,
+function occurrenceDateForImportedMovement(
+  template: { dueDay: number; recurrence: DraftExpense["recurrence"] },
+  bookedAt: string,
 ) {
-  const byFingerprint = new Map(current.map((movement) => [movement.fingerprint, movement]));
-  for (const movement of incoming) {
-    byFingerprint.set(movement.fingerprint, {
-      ...movement,
-      ...match,
-    });
+  if (
+    template.recurrence.frequency === "once" ||
+    (template.recurrence.frequency === "custom" &&
+      ["day", "week"].includes(template.recurrence.unit ?? ""))
+  ) {
+    return bookedAt;
   }
-  return Array.from(byFingerprint.values());
+
+  return toDateOnly(buildDateWithDay(new Date(`${bookedAt}T00:00:00`), template.dueDay));
 }
 
 function upsertBankAlias(

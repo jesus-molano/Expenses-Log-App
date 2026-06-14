@@ -16,6 +16,7 @@ export const PRESET_EXPENSE_CATEGORIES: PresetExpenseCategory[] = [
   { name: "Salud", icon: "HeartPulse", tone: "rose" },
   { name: "Deporte", icon: "Dumbbell", tone: "green" },
   { name: "Deudas", icon: "CreditCard", tone: "rose" },
+  { name: "Ahorro", icon: "PiggyBank", tone: "green" },
   { name: "Ocio", icon: "Gamepad2", tone: "violet" },
   { name: "Educacion/Trabajo", icon: "BriefcaseBusiness", tone: "blue" },
   { name: "Mascotas", icon: "PawPrint", tone: "green" },

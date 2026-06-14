@@ -24,20 +24,23 @@ export function CompactMenu({
 }: CompactMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const openWithKeyboardRef = useRef(false);
   const suppressTriggerClickUntilRef = useRef(0);
 
   useEffect(() => {
     if (!open) return;
 
-    window.requestAnimationFrame(() => {
-      const selected = menuRef.current?.querySelector<HTMLElement>(
-        "[data-selected='true']",
-      );
-      const first = menuRef.current?.querySelector<HTMLElement>(
-        "button:not(:disabled)",
-      );
-      (selected ?? first)?.focus({ preventScroll: true });
-    });
+    if (openWithKeyboardRef.current) {
+      window.requestAnimationFrame(() => {
+        const selected = menuRef.current?.querySelector<HTMLElement>(
+          "[data-selected='true']",
+        );
+        const first = menuRef.current?.querySelector<HTMLElement>(
+          "button:not(:disabled)",
+        );
+        (selected ?? first)?.focus({ preventScroll: true });
+      });
+    }
 
     function handlePointerDown(event: PointerEvent) {
       if (!menuRef.current) return;
@@ -79,6 +82,7 @@ export function CompactMenu({
   function handleTriggerKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
     if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
     event.preventDefault();
+    openWithKeyboardRef.current = true;
     onOpenChange(true);
   }
 
@@ -103,6 +107,7 @@ export function CompactMenu({
         type="button"
         onClick={() => {
           if (Date.now() < suppressTriggerClickUntilRef.current) return;
+          openWithKeyboardRef.current = false;
           onOpenChange(!open);
         }}
         aria-expanded={open}

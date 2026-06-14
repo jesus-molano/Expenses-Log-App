@@ -752,11 +752,31 @@ function draftFromMovement(
     name: titleFromMerchant(latest),
     description: latest.description,
     amount: Number(averageAmount.toFixed(2)),
-    categoryName: "General",
+    categoryName: inferExpenseCategoryName(sorted),
     startDate,
     dueDay: dueDay ?? parseISO(latest.bookedAt).getDate(),
     recurrence,
   };
+}
+
+function inferExpenseCategoryName(movements: BankMovement[]) {
+  const text = normalizeText(
+    movements
+      .map((movement) => `${movement.description} ${movement.merchantKey} ${movement.account ?? ""}`)
+      .join(" "),
+  );
+
+  if (
+    text.includes("ahorro") ||
+    text.includes("hucha") ||
+    text.includes("savings") ||
+    text.includes("cuenta ahorro") ||
+    text.includes("saving account")
+  ) {
+    return "Ahorro";
+  }
+
+  return "General";
 }
 
 function titleFromMerchant(movement: BankMovement) {

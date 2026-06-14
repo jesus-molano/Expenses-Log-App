@@ -494,8 +494,12 @@
 }
 
 .app-select-menu-panel {
-  max-height: min(18rem, 46dvh);
+  width: max-content;
+  max-width: min(24rem, calc(100vw - 2rem));
+  max-height: min(20rem, 54dvh);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   scrollbar-width: none;
   -ms-overflow-style: none;
   border: 1px solid color-mix(in srgb, var(--app-border-strong) 54%, transparent);
@@ -987,6 +991,10 @@
   line-height: 1;
 }
 
+.app-import-mode-tab[data-reviewed="false"]:not([data-selected="true"]) {
+  color: color-mix(in srgb, var(--app-warning) 78%, var(--app-text-muted));
+}
+
 .app-import-mode-tab[data-selected="true"]::before {
   content: "";
   position: absolute;
@@ -1008,6 +1016,21 @@
 
 .app-import-mode-tab[data-selected="true"] strong {
   color: var(--app-accent-contrast);
+}
+
+.app-import-mode-tab[data-reviewed="false"] strong::after {
+  content: "";
+  display: inline-block;
+  width: 0.42rem;
+  height: 0.42rem;
+  margin-left: 0.35rem;
+  border-radius: var(--app-radius-pill);
+  background: var(--app-warning);
+  vertical-align: 0.08rem;
+}
+
+.app-import-mode-tab[data-selected="true"][data-reviewed="false"] strong::after {
+  background: var(--app-accent-contrast);
 }
 
 .app-import-section {
@@ -1387,6 +1410,115 @@
 .app-import-back-top:focus-visible {
   outline: none;
   box-shadow: var(--app-focus);
+}
+
+.app-import-confirm,
+.app-import-applied {
+  display: grid;
+  gap: 1rem;
+  padding-block: 0.35rem;
+  animation: app-import-panel-enter 360ms var(--ease-smooth) both;
+}
+
+.app-import-confirm-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.app-import-confirm-icon {
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--app-accent) 38%, transparent);
+  border-radius: var(--app-radius-pill);
+  background: color-mix(in srgb, var(--app-accent) 16%, var(--app-surface-raised));
+  color: var(--app-accent);
+}
+
+.app-import-confirm h2,
+.app-import-applied h2 {
+  color: var(--app-text);
+  font-size: 1rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.app-import-confirm p,
+.app-import-applied p {
+  margin-top: 0.2rem;
+  color: var(--app-text-muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.app-import-confirm-list {
+  display: grid;
+  border-top: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.app-import-confirm-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  align-items: center;
+  gap: 0.75rem;
+  padding-block: 0.85rem;
+}
+
+.app-import-confirm-group + .app-import-confirm-group {
+  border-top: 1px solid var(--app-border);
+}
+
+.app-import-confirm-group h3 {
+  color: var(--app-text);
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+.app-import-confirm-group dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.app-import-confirm-group div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.app-import-confirm-group dt {
+  color: var(--app-text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.app-import-confirm-group dd {
+  color: var(--app-text);
+  font-size: 1.2rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.app-import-applied {
+  justify-items: center;
+  padding-block: 1.5rem;
+  text-align: center;
+}
+
+@keyframes app-import-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.45rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .app-section-list-icon {

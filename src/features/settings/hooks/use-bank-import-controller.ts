@@ -28,6 +28,7 @@ import {
 } from "../lib/bank-import-decisions";
 
 export type BankImportMode = "expenses" | "income";
+export type BankImportStep = "review" | "confirm" | "applied";
 
 export type {
   BankImportCandidateDecision,
@@ -45,6 +46,17 @@ export type BankImportIncomeSection = {
   kind: BankImportIncomeCandidate["kind"];
   title: string;
   candidates: BankImportIncomeCandidate[];
+};
+
+export type BankImportSelectionSummary = {
+  expenses: BankImportSelectionSummaryGroup;
+  income: BankImportSelectionSummaryGroup;
+};
+
+type BankImportSelectionSummaryGroup = {
+  total: number;
+  selected: number;
+  ignored: number;
 };
 
 const SECTION_ORDER: BankImportCandidate["kind"][] = [
@@ -72,6 +84,11 @@ export function useBankImportController() {
     Record<string, BankImportIncomeCandidateDecision>
   >({});
   const [activeMode, setActiveMode] = useState<BankImportMode>("expenses");
+  const [step, setStep] = useState<BankImportStep>("review");
+  const [reviewedModes, setReviewedModes] = useState<Record<BankImportMode, boolean>>({
+    expenses: true,
+    income: true,
+  });
   const [message, setMessage] = useState("");
   const [isReading, setIsReading] = useState(false);
 
@@ -96,6 +113,31 @@ export function useBankImportController() {
     [analysis, language],
   );
 
+  const selectionSummary = useMemo<BankImportSelectionSummary>(
+    () => ({
+      expenses: summarizeDecisions(
+        analysis?.candidates.map((candidate) => decisions[candidate.id]?.action) ?? [],
+      ),
+      income: summarizeDecisions(
+        analysis?.incomeCandidates.map((candidate) => incomeDecisions[candidate.id]?.action) ??
+          [],
+      ),
+    }),
+    [analysis, decisions, incomeDecisions],
+  );
+
+  const requiredReviewModes = useMemo<BankImportMode[]>(
+    () =>
+      [
+        analysis?.candidates.length ? "expenses" : null,
+        analysis?.incomeCandidates.length ? "income" : null,
+      ].filter((mode): mode is BankImportMode => Boolean(mode)),
+    [analysis],
+  );
+  const nextReviewMode =
+    requiredReviewModes.find((mode) => !reviewedModes[mode]) ?? null;
+  const canContinueToConfirm = Boolean(analysis) && !nextReviewMode;
+
   async function importFile(file: File) {
     setIsReading(true);
     setMessage("");
@@ -114,11 +156,16 @@ export function useBankImportController() {
       setIncomeDecisions(
         initialBankImportIncomeDecisions(nextAnalysis.incomeCandidates),
       );
-      setActiveMode(
+      const initialMode =
         nextAnalysis.candidates.length === 0 && nextAnalysis.incomeCandidates.length > 0
           ? "income"
-          : "expenses",
-      );
+          : "expenses";
+      setActiveMode(initialMode);
+      setReviewedModes({
+        expenses: initialMode === "expenses" || nextAnalysis.candidates.length === 0,
+        income: initialMode === "income" || nextAnalysis.incomeCandidates.length === 0,
+      });
+      setStep("review");
       setMessage(
         `${nextAnalysis.movements.length} ${t("settings.bankImportRows", language)}`,
       );
@@ -221,6 +268,32 @@ export function useBankImportController() {
     updateIncomeDecision(candidateId, { salary: patch });
   }
 
+  function changeMode(mode: BankImportMode) {
+    setActiveMode(mode);
+    setReviewedModes((current) => ({
+      ...current,
+      [mode]: true,
+    }));
+  }
+
+  function continueImportReview() {
+    if (!analysis) return;
+
+    if (nextReviewMode) {
+      changeMode(nextReviewMode);
+      setMessage(t("settings.bankImportReviewMissing", language));
+      return;
+    }
+
+    setStep("confirm");
+    setMessage("");
+  }
+
+  function backToReview() {
+    setStep("review");
+    setMessage("");
+  }
+
   function applyImport() {
     if (!analysis) return;
 
@@ -235,6 +308,8 @@ export function useBankImportController() {
     setAnalysis(null);
     setDecisions({});
     setIncomeDecisions({});
+    setReviewedModes({ expenses: true, income: true });
+    setStep("applied");
     setMessage(t("settings.bankImportApplied", language));
   }
 
@@ -246,17 +321,37 @@ export function useBankImportController() {
     incomeDecisions,
     sections,
     incomeSections,
+    selectionSummary,
+    step,
     activeMode,
+    reviewedModes,
+    canContinueToConfirm,
+    nextReviewMode,
     message,
     isReading,
-    setActiveMode,
+    setActiveMode: changeMode,
     importFile,
     updateDecision,
     updateExpenseDraft,
     updateIncomeDecision,
     updateIncomeDraft,
     updateSalaryDraft,
+    continueImportReview,
+    backToReview,
     applyImport,
+  };
+}
+
+function summarizeDecisions(
+  actions: Array<string | undefined>,
+): BankImportSelectionSummaryGroup {
+  const total = actions.length;
+  const ignored = actions.filter((action) => action === "ignore" || !action).length;
+
+  return {
+    total,
+    selected: total - ignored,
+    ignored,
   };
 }
 

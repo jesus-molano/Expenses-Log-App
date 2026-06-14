@@ -11,6 +11,7 @@ const categoryKeyByName = {
   salud: "categories.salud",
   deporte: "categories.deporte",
   deudas: "categories.deudas",
+  ahorro: "categories.ahorro",
   ocio: "categories.ocio",
   "educacion/trabajo": "categories.educacionTrabajo",
   mascotas: "categories.mascotas",

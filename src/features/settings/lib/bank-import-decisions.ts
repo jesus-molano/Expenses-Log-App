@@ -105,6 +105,14 @@ export function toBankImportDecision(
     };
   }
 
+  if (decision.action === "match" && store.templates.length === 0) {
+    return {
+      candidateId: candidate.id,
+      action: "ignore",
+      movements: candidate.movements,
+    };
+  }
+
   const templateId = decision.templateId ?? candidate.matchedTemplateId;
   const template = store.templates.find((item) => item.id === templateId);
   const occurrenceDate =

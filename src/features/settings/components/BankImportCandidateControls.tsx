@@ -26,17 +26,21 @@ export type BankImportIncomeAction = "salary" | "income" | "import" | "ignore";
 export function BankImportActionPicker({
   action,
   includeImport = false,
+  canMatch = true,
   language,
   onChange,
 }: {
   action: BankImportAction;
   includeImport?: boolean;
+  canMatch?: boolean;
   language: AppLanguage;
   onChange: (action: BankImportAction) => void;
 }) {
-  const options = includeImport
-    ? (["ignore", "import", "match", "create"] as const)
-    : (["match", "create", "ignore"] as const);
+  const options = (
+    includeImport
+      ? (["ignore", "import", "match", "create"] as const)
+      : (["match", "create", "ignore"] as const)
+  ).filter((option) => option !== "match" || canMatch);
 
   return (
     <div className="app-import-actions" data-count={options.length}>

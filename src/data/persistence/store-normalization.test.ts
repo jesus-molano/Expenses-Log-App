@@ -141,4 +141,140 @@ describe("normalizeExpenseStore", () => {
       "11111111-1111-4111-8111-111111111111",
     );
   });
+
+  it("repairs imported paid overrides stored on bank booked dates", () => {
+    const store = normalizeExpenseStore({
+      categories: [],
+      templates: [
+        {
+          id: "tpl-dazn",
+          userId: "demo",
+          name: "Dazn",
+          description: "",
+          amount: 14.99,
+          currency: "EUR",
+          categoryId: "cat",
+          startDate: "2026-06-13",
+          dueDay: 13,
+          recurrence: { frequency: "monthly" },
+          active: true,
+          createdAt: "2026-06-01T00:00:00.000Z",
+          updatedAt: "2026-06-01T00:00:00.000Z",
+        },
+      ],
+      overrides: [
+        {
+          id: "ovr-import",
+          userId: "demo",
+          templateId: "tpl-dazn",
+          occurrenceDate: "2026-06-15",
+          status: "paid",
+          paidAt: "2026-06-15T12:00:00.000Z",
+          amountPaid: 14.99,
+          note: "Creado desde importacion bancaria: DAZN",
+        },
+      ],
+      bankMovements: [
+        {
+          id: "mov-dazn",
+          userId: "demo",
+          fingerprint: "fingerprint-dazn",
+          bookedAt: "2026-06-15",
+          description: "DAZN",
+          amount: -14.99,
+          currency: "EUR",
+          merchantKey: "dazn",
+          importBatchId: "batch",
+          matchedTemplateId: "tpl-dazn",
+          matchedOccurrenceDate: "2026-06-15",
+          createdAt: "2026-06-15T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(store.overrides[0]).toMatchObject({
+      occurrenceDate: "2026-06-13",
+      status: "paid",
+    });
+    expect(store.bankMovements[0]).toMatchObject({
+      matchedOccurrenceDate: "2026-06-13",
+    });
+  });
+
+  it("materializes paid overrides for imported alias occurrences before today only", () => {
+    const store = normalizeExpenseStore({
+      categories: [],
+      templates: [
+        {
+          id: "tpl-import",
+          userId: "demo",
+          name: "Udon Meridiano",
+          description: "",
+          amount: 39.9,
+          currency: "EUR",
+          categoryId: "cat",
+          startDate: "2000-01-01",
+          dueDay: 1,
+          recurrence: { frequency: "once" },
+          active: true,
+          createdAt: "2026-06-14T00:00:00.000Z",
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+        {
+          id: "tpl-future",
+          userId: "demo",
+          name: "Future Import",
+          description: "",
+          amount: 29,
+          currency: "EUR",
+          categoryId: "cat",
+          startDate: "2999-01-01",
+          dueDay: 1,
+          recurrence: { frequency: "once" },
+          active: true,
+          createdAt: "2026-06-14T00:00:00.000Z",
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      ],
+      overrides: [],
+      bankMerchantAliases: [
+        {
+          id: "alias-past",
+          userId: "demo",
+          merchantKey: "udon meridiano",
+          templateId: "tpl-import",
+          label: "UDON MERIDIANO",
+          createdAt: "2026-06-14T00:00:00.000Z",
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+        {
+          id: "alias-future",
+          userId: "demo",
+          merchantKey: "future import",
+          templateId: "tpl-future",
+          label: "FUTURE IMPORT",
+          createdAt: "2026-06-14T00:00:00.000Z",
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(store.overrides).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          templateId: "tpl-import",
+          occurrenceDate: "2000-01-01",
+          status: "paid",
+          amountPaid: 39.9,
+        }),
+      ]),
+    );
+    expect(
+      store.overrides.some(
+        (override) =>
+          override.templateId === "tpl-future" &&
+          override.occurrenceDate === "2999-01-01",
+      ),
+    ).toBe(false);
+  });
 });

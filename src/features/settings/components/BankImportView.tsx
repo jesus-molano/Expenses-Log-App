@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowUp, Check, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUp, Check, FileSpreadsheet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import type { AppLanguage } from "@/domain/types";
@@ -9,7 +9,10 @@ import { t } from "@/shared/i18n";
 import { BankImportFilePanel } from "./BankImportFilePanel";
 import { BankImportReviewSections } from "./BankImportReviewSections";
 import { BankImportSummary } from "./BankImportSummary";
-import type { BankImportMode } from "../hooks/use-bank-import-controller";
+import type {
+  BankImportMode,
+  BankImportSelectionSummary,
+} from "../hooks/use-bank-import-controller";
 import { useBankImportController } from "../hooks/use-bank-import-controller";
 
 export function BankImportView({ from }: { from?: "money" | "settings" }) {
@@ -65,31 +68,43 @@ export function BankImportView({ from }: { from?: "money" | "settings" }) {
               mode={controller.activeMode}
             />
 
-            <BankImportModeTabs
-              activeMode={controller.activeMode}
-              expenseCount={controller.analysis.candidates.length}
-              incomeCount={controller.analysis.incomeCandidates.length}
-              language={controller.language}
-              onChange={controller.setActiveMode}
-            />
+            {controller.step === "confirm" ? (
+              <BankImportConfirmPanel
+                summary={controller.selectionSummary}
+                language={controller.language}
+                onBack={controller.backToReview}
+              />
+            ) : (
+              <>
+                <BankImportModeTabs
+                  activeMode={controller.activeMode}
+                  expenseCount={controller.analysis.candidates.length}
+                  incomeCount={controller.analysis.incomeCandidates.length}
+                  reviewedModes={controller.reviewedModes}
+                  language={controller.language}
+                  onChange={controller.setActiveMode}
+                />
 
-            <BankImportReviewSections
-              sections={controller.sections}
-              incomeSections={controller.incomeSections}
-              mode={controller.activeMode}
-              templates={controller.store.templates}
-              categories={controller.store.categories}
-              decisions={controller.decisions}
-              incomeDecisions={controller.incomeDecisions}
-              language={controller.language}
-              onDecisionChange={controller.updateDecision}
-              onExpenseChange={controller.updateExpenseDraft}
-              onIncomeDecisionChange={controller.updateIncomeDecision}
-              onIncomeChange={controller.updateIncomeDraft}
-              onSalaryChange={controller.updateSalaryDraft}
-            />
-
+                <BankImportReviewSections
+                  sections={controller.sections}
+                  incomeSections={controller.incomeSections}
+                  mode={controller.activeMode}
+                  templates={controller.store.templates}
+                  categories={controller.store.categories}
+                  decisions={controller.decisions}
+                  incomeDecisions={controller.incomeDecisions}
+                  language={controller.language}
+                  onDecisionChange={controller.updateDecision}
+                  onExpenseChange={controller.updateExpenseDraft}
+                  onIncomeDecisionChange={controller.updateIncomeDecision}
+                  onIncomeChange={controller.updateIncomeDraft}
+                  onSalaryChange={controller.updateSalaryDraft}
+                />
+              </>
+            )}
           </>
+        ) : controller.step === "applied" ? (
+          <BankImportAppliedState language={controller.language} />
         ) : (
           <div className="app-import-empty mt-4 p-5 text-center">
             <p className="text-sm font-semibold text-[var(--app-text-muted)]">
@@ -109,10 +124,22 @@ export function BankImportView({ from }: { from?: "money" | "settings" }) {
                 variant="primary"
                 className="w-full"
                 size="lg"
-                onClick={controller.applyImport}
-                leadingIcon={<Check size={18} />}
+                onClick={
+                  controller.step === "confirm"
+                    ? controller.applyImport
+                    : controller.continueImportReview
+                }
+                leadingIcon={
+                  controller.step === "confirm" ? (
+                    <Check size={18} />
+                  ) : (
+                    <ArrowRight size={18} />
+                  )
+                }
               >
-                {t("settings.bankImportConfirm", controller.language)}
+                {controller.step === "confirm"
+                  ? t("settings.bankImportConfirm", controller.language)
+                  : t("settings.bankImportNext", controller.language)}
               </Button>
             </div>
           </footer>
@@ -152,12 +179,14 @@ function BankImportModeTabs({
   activeMode,
   expenseCount,
   incomeCount,
+  reviewedModes,
   language,
   onChange,
 }: {
   activeMode: BankImportMode;
   expenseCount: number;
   incomeCount: number;
+  reviewedModes: Record<BankImportMode, boolean>;
   language: AppLanguage;
   onChange: (mode: BankImportMode) => void;
 }) {
@@ -186,8 +215,14 @@ function BankImportModeTabs({
           type="button"
           role="tab"
           aria-selected={activeMode === option.mode}
+          aria-label={`${option.label} ${option.count}${
+            option.count > 0 && !reviewedModes[option.mode]
+              ? `, ${t("settings.bankImportPendingReview", language)}`
+              : ""
+          }`}
           className="app-import-mode-tab"
           data-selected={activeMode === option.mode ? "true" : "false"}
+          data-reviewed={reviewedModes[option.mode] ? "true" : "false"}
           onClick={() => onChange(option.mode)}
         >
           <span>{option.label}</span>
@@ -195,5 +230,91 @@ function BankImportModeTabs({
         </button>
       ))}
     </div>
+  );
+}
+
+function BankImportConfirmPanel({
+  summary,
+  language,
+  onBack,
+}: {
+  summary: BankImportSelectionSummary;
+  language: AppLanguage;
+  onBack: () => void;
+}) {
+  return (
+    <section className="app-import-confirm mt-5">
+      <div className="app-import-confirm-header">
+        <span className="app-import-confirm-icon" aria-hidden="true">
+          <Check size={18} />
+        </span>
+        <div className="min-w-0">
+          <h2>{t("settings.bankImportConfirmTitle", language)}</h2>
+          <p>{t("settings.bankImportConfirmBody", language)}</p>
+        </div>
+      </div>
+
+      <div className="app-import-confirm-list">
+        <BankImportConfirmGroup
+          title={t("settings.bankImportExpensesTab", language)}
+          group={summary.expenses}
+          language={language}
+        />
+        <BankImportConfirmGroup
+          title={t("settings.bankImportIncomeTab", language)}
+          group={summary.income}
+          language={language}
+        />
+      </div>
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="justify-self-start px-0"
+        leadingIcon={<ArrowLeft size={16} />}
+        onClick={onBack}
+      >
+        {t("common.back", language)}
+      </Button>
+    </section>
+  );
+}
+
+function BankImportConfirmGroup({
+  title,
+  group,
+  language,
+}: {
+  title: string;
+  group: BankImportSelectionSummary["expenses"];
+  language: AppLanguage;
+}) {
+  return (
+    <div className="app-import-confirm-group">
+      <h3>{title}</h3>
+      <dl>
+        <div>
+          <dt>{t("settings.bankImportSelected", language)}</dt>
+          <dd>{group.selected}</dd>
+        </div>
+        <div>
+          <dt>{t("settings.bankImportIgnored", language)}</dt>
+          <dd>{group.ignored}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+function BankImportAppliedState({ language }: { language: AppLanguage }) {
+  return (
+    <section className="app-import-applied mt-4">
+      <span className="app-import-confirm-icon" aria-hidden="true">
+        <Check size={18} />
+      </span>
+      <h2>{t("settings.bankImportAppliedTitle", language)}</h2>
+      <p>{t("settings.bankImportApplied", language)}</p>
+    </section>
   );
 }
