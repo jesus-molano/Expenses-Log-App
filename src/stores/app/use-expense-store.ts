@@ -56,6 +56,8 @@ type ExpenseStoreContextValue = ReturnType<typeof useExpenseStoreValue>;
 
 const ExpenseStoreContext = createContext<ExpenseStoreContextValue | null>(null);
 const FORCE_SPLASH_PREVIEW = false;
+const BOOT_SPLASH_INTRO_MS = 1_200;
+const BOOT_SPLASH_EXIT_MS = 420;
 
 export function ExpenseStoreProvider({
   children,
@@ -65,13 +67,27 @@ export function ExpenseStoreProvider({
   const value = useExpenseStoreValue();
   const [showSplash, setShowSplash] = useState(() => !FORCE_SPLASH_PREVIEW);
   const [splashExiting, setSplashExiting] = useState(false);
+  const splashStartedAtRef = useRef(0);
   const hiddenAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    splashStartedAtRef.current = Date.now();
+  }, []);
 
   useEffect(() => {
     if (!value.isHydrated) return;
 
-    const exitTimer = window.setTimeout(() => setSplashExiting(true), 120);
-    const hideTimer = window.setTimeout(() => setShowSplash(false), 540);
+    if (splashStartedAtRef.current === 0) {
+      splashStartedAtRef.current = Date.now();
+    }
+
+    const visibleFor = Date.now() - splashStartedAtRef.current;
+    const exitDelay = Math.max(0, BOOT_SPLASH_INTRO_MS - visibleFor);
+    const exitTimer = window.setTimeout(() => setSplashExiting(true), exitDelay);
+    const hideTimer = window.setTimeout(
+      () => setShowSplash(false),
+      exitDelay + BOOT_SPLASH_EXIT_MS,
+    );
 
     return () => {
       window.clearTimeout(exitTimer);
@@ -87,7 +103,10 @@ export function ExpenseStoreProvider({
       setSplashExiting(false);
 
       const exitTimer = window.setTimeout(() => setSplashExiting(true), holdMs);
-      const hideTimer = window.setTimeout(() => setShowSplash(false), holdMs + 420);
+      const hideTimer = window.setTimeout(
+        () => setShowSplash(false),
+        holdMs + BOOT_SPLASH_EXIT_MS,
+      );
 
       return () => {
         window.clearTimeout(exitTimer);
