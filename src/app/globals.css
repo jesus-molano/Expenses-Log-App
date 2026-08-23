@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 @import "./styles/tokens.css";
 @import "./styles/app-shell.css";
 @import "./styles/expenses-timeline.css";

@@ -23,6 +23,7 @@ export function CompactMenu({
   children,
 }: CompactMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const openWithKeyboardRef = useRef(false);
   const suppressTriggerClickUntilRef = useRef(0);
@@ -32,10 +33,10 @@ export function CompactMenu({
 
     if (openWithKeyboardRef.current) {
       window.requestAnimationFrame(() => {
-        const selected = menuRef.current?.querySelector<HTMLElement>(
+        const selected = popupRef.current?.querySelector<HTMLElement>(
           "[data-selected='true']",
         );
-        const first = menuRef.current?.querySelector<HTMLElement>(
+        const first = popupRef.current?.querySelector<HTMLElement>(
           "button:not(:disabled)",
         );
         (selected ?? first)?.focus({ preventScroll: true });
@@ -66,7 +67,7 @@ export function CompactMenu({
 
   function moveFocus(direction: 1 | -1) {
     const options = Array.from(
-      menuRef.current?.querySelectorAll<HTMLElement>("button:not(:disabled)") ??
+      popupRef.current?.querySelectorAll<HTMLElement>("button:not(:disabled)") ??
         [],
     );
     if (!options.length) return;
@@ -130,6 +131,7 @@ export function CompactMenu({
       </button>
       {open ? (
         <div
+          ref={popupRef}
           role={menuRole}
           onKeyDown={handleMenuKeyDown}
           style={

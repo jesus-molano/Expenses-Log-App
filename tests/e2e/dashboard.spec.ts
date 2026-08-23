@@ -115,7 +115,9 @@ test("opens plan and configuration sheet", async ({ page }) => {
 
   await page.getByRole("link", { name: "Plan" }).click();
   await expect(page).toHaveURL(/\/money$/);
-  await expect(page.getByText("Plan del mes")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Plan del mes" }),
+  ).toBeVisible();
   await expect(page.getByText("Ingreso puntual")).toBeVisible();
 
   await page.getByRole("button", { name: "Configurar" }).click();
@@ -167,7 +169,7 @@ test("compact menus support keyboard navigation and Escape", async ({ page }) =>
   await loadDemoStore(page);
   await page.goto("/settings");
 
-  const languageButton = page.getByRole("button", { name: "ES" });
+  const languageButton = page.getByRole("button", { name: "ES", exact: true });
   await languageButton.focus();
   await page.keyboard.press("ArrowDown");
 

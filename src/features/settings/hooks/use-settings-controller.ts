@@ -103,7 +103,8 @@ export function useSettingsController({
       await supabase?.auth.signOut();
       clearExpenseLocalData();
       setUser(null);
-      window.location.assign("/");
+      // Reload the document to discard the deleted account's in-memory store.
+      window.location.replace("/");
     } catch (error) {
       setMessage(
         error instanceof Error
