@@ -231,7 +231,6 @@
 
 .app-one-off-income-list {
   margin-top: 0.15rem;
-  border-top: 1px solid color-mix(in srgb, var(--app-border) 72%, transparent);
 }
 
 .app-one-off-income-list[data-integrated-list="true"] .app-income-event-row {
@@ -244,9 +243,7 @@
 }
 
 .app-one-off-income-list[data-integrated-list="true"] .app-income-event-row + .app-income-event-row {
-  border-top-width: 1px;
-  border-top-style: solid;
-  border-top-color: color-mix(in srgb, var(--app-border) 58%, transparent);
+  margin-top: 0.125rem;
 }
 
 .app-one-off-income-list[data-integrated-list="true"] .app-income-event-row-editing {
@@ -258,17 +255,16 @@
 }
 
 .app-monthly-table {
-  overflow: hidden;
-  border-block: 1px solid color-mix(in srgb, var(--app-border) 66%, transparent);
+  overflow: visible;
   background: transparent;
 }
 
 .app-monthly-table[data-tone="success"] {
-  border-block-color: color-mix(in srgb, var(--app-success) 12%, var(--app-border));
+  --app-monthly-table-tone: var(--app-success);
 }
 
 .app-monthly-table[data-tone="expense"] {
-  border-block-color: color-mix(in srgb, var(--app-warning) 12%, var(--app-border));
+  --app-monthly-table-tone: var(--app-warning);
 }
 
 .app-monthly-table-head {
@@ -277,7 +273,12 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.55rem 0.75rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--app-border) 62%, transparent);
+  border-radius: var(--app-radius-sm);
+  background: color-mix(
+    in srgb,
+    var(--app-monthly-table-tone, var(--app-accent)) 7%,
+    var(--app-panel-soft-alpha)
+  );
   color: var(--app-text-muted);
   font-size: 0.72rem;
   font-weight: 800;
@@ -296,6 +297,8 @@
 
 .app-monthly-table-body {
   display: grid;
+  gap: 0.125rem;
+  padding-top: 0.25rem;
 }
 
 .app-monthly-table-empty {
@@ -308,6 +311,15 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  transition:
+    background-color var(--motion-fast) ease,
+    color var(--motion-fast) ease;
+}
+
+.app-monthly-table-body[data-integrated-list="true"] .app-monthly-table-row:not([data-editing="true"]):hover,
+.app-monthly-table-body[data-integrated-list="true"] .app-monthly-table-row:not([data-editing="true"]):focus-within {
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--app-control-hover) 34%, transparent);
 }
 
 .app-monthly-table-body[data-integrated-list="true"] .app-monthly-table-row:not([data-editing="true"]) {
@@ -333,12 +345,6 @@
   }
 }
 
-.app-monthly-table-body[data-integrated-list="true"] .app-monthly-table-row + .app-monthly-table-row {
-  border-top-width: 1px;
-  border-top-style: solid;
-  border-top-color: color-mix(in srgb, var(--app-border) 54%, transparent);
-}
-
 .app-monthly-table-body[data-integrated-list="true"] .app-monthly-table-row[data-editing="true"] {
   display: grid;
   grid-column: 1 / -1;
@@ -357,8 +363,9 @@
 .app-monthly-table-more {
   min-height: 2.5rem;
   width: 100%;
-  border-top: 1px solid color-mix(in srgb, var(--app-border) 58%, transparent);
-  background: transparent;
+  margin-top: 0.5rem;
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--app-panel-soft-alpha) 58%, transparent);
   color: var(--app-text-muted);
   font-size: 0.875rem;
   font-weight: 700;
@@ -401,17 +408,95 @@
 }
 
 .app-chart-legend > span {
-  border: 1px solid color-mix(in srgb, var(--app-border) 52%, transparent);
   background: color-mix(in srgb, var(--app-panel-soft-alpha) 54%, transparent);
 }
 
 .app-chart-shell {
-  border: 1px solid color-mix(in srgb, var(--app-border) 54%, transparent);
   border-radius: var(--app-radius-lg);
   background:
     radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--app-accent) 5%, transparent), transparent 48%),
     color-mix(in srgb, var(--app-panel-soft-alpha) 32%, transparent);
   padding: 0.5rem 0.25rem 0.25rem;
+}
+
+.app-plan-page-title {
+  font-size: clamp(1.35rem, 5vw, 1.55rem);
+  font-weight: 720;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.app-plan-section-title {
+  font-size: clamp(1.25rem, 4.6vw, 1.5rem);
+  font-weight: 740;
+  letter-spacing: -0.03em;
+  line-height: 1.18;
+  text-wrap: balance;
+}
+
+.app-plan-group-title {
+  font-size: clamp(1.125rem, 4.2vw, 1.3rem);
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  line-height: 1.22;
+  text-wrap: balance;
+}
+
+.app-plan-subsection-title {
+  font-size: clamp(1.05rem, 4vw, 1.2rem);
+  font-weight: 700;
+  letter-spacing: -0.018em;
+  line-height: 1.25;
+}
+
+.app-plan-equation,
+.app-plan-metric-grid,
+.app-plan-review-summary {
+  background: color-mix(in srgb, var(--app-panel-soft-alpha) 66%, transparent);
+}
+
+.app-plan-next-receipt,
+.app-plan-equation,
+.app-plan-metric-grid,
+.app-plan-review-summary,
+.app-plan-actions,
+.app-plan-action-row,
+.app-plan-savings-action {
+  transition:
+    background-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.app-plan-next-receipt,
+.app-plan-equation {
+  border-radius: var(--app-radius-lg);
+}
+
+.app-plan-actions {
+  background: color-mix(in srgb, var(--app-panel-soft-alpha) 52%, transparent);
+}
+
+.app-plan-equation-total {
+  background: color-mix(in srgb, var(--app-accent) 10%, transparent);
+}
+
+.app-plan-savings-action {
+  background: color-mix(in srgb, var(--app-success) 5%, transparent);
+}
+
+.app-plan-savings-action:hover,
+.app-plan-savings-action:focus-visible {
+  background: color-mix(in srgb, var(--app-success) 12%, var(--app-panel-soft-alpha));
+}
+
+.app-plan-action-row {
+  background: transparent;
+}
+
+.app-plan-action-row:hover,
+.app-plan-action-row:focus-visible {
+  background: color-mix(in srgb, var(--app-control-hover) 54%, transparent);
 }
 
 .app-chart-tooltip {

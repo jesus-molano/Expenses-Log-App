@@ -107,8 +107,8 @@ export function MonthlyTrendChart({
                 </linearGradient>
               </defs>
               <CartesianGrid
-                stroke="color-mix(in srgb, var(--app-border) 68%, transparent)"
-                strokeDasharray="2 8"
+                stroke="color-mix(in srgb, var(--app-border) 30%, transparent)"
+                strokeDasharray="2 10"
                 vertical={false}
               />
               <XAxis
@@ -140,7 +140,7 @@ export function MonthlyTrendChart({
               )}
               <ReferenceLine
                 y={0}
-                stroke="color-mix(in srgb, var(--app-border-strong) 70%, transparent)"
+                stroke="color-mix(in srgb, var(--app-border-strong) 38%, transparent)"
                 strokeWidth={1}
               />
               <Tooltip

@@ -19,8 +19,8 @@ export function PlanSectionList({
   }[tone];
 
   return (
-    <section className="mt-9">
-      <h3 className="inline-flex items-center gap-1.5 text-base font-semibold text-[var(--app-text)]">
+    <section className="mt-10">
+      <h3 className="app-plan-subsection-title inline-flex items-center gap-2 text-[var(--app-text)]">
         <span>{title}</span>
         {Icon ? (
           <span
@@ -30,7 +30,7 @@ export function PlanSectionList({
           </span>
         ) : null}
       </h3>
-      <div className="mt-4 grid gap-3">{children}</div>
+      <div className="mt-3 grid gap-3">{children}</div>
     </section>
   );
 }

@@ -118,7 +118,7 @@ test("edits plan settings and monthly savings without losing either value", asyn
   await expect(
     page.getByRole("heading", { level: 1, name: /Plan de/ }),
   ).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Plan de este mes" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Resumen del mes" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recibos pendientes" })).toBeVisible();
 
   await page.getByRole("button", { name: "Configurar" }).click();

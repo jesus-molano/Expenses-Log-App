@@ -243,11 +243,11 @@ export function MoneyDashboard() {
       language={language}
       panelChrome={chrome.panelChrome}
     >
-      <div className="grid w-full min-w-0 gap-10 overflow-hidden pb-8 pt-1 sm:gap-12">
-        <section className="min-w-0">
+      <div className="grid w-full min-w-0 gap-16 overflow-hidden pb-8 pt-1 sm:gap-20">
+        <section className="min-w-0" aria-labelledby="current-month-title">
           <header className="flex items-start justify-between gap-3 px-1">
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold capitalize text-[var(--app-text)]">
+              <h1 id="current-month-title" className="app-plan-page-title text-[var(--app-text)]">
                 {copy.planFor} {monthLabel}
               </h1>
               <p className="mt-1 text-sm text-[var(--app-text-muted)]">
@@ -282,7 +282,7 @@ export function MoneyDashboard() {
             </div>
           ) : null}
 
-          <div className="mt-4 flex min-h-11 items-center gap-3 border-y border-[var(--app-border)] py-3">
+          <div className="app-plan-next-receipt mt-5 flex min-h-11 items-center gap-3 px-3 py-3">
             <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--app-panel-soft-alpha)] text-[var(--app-accent)]">
               <CalendarClock size={17} />
             </span>
@@ -305,120 +305,122 @@ export function MoneyDashboard() {
               )}
             </div>
           </div>
-        </section>
 
-        <section aria-labelledby="monthly-equation-title" className="min-w-0 px-1">
-          <h2 id="monthly-equation-title" className="text-lg font-semibold text-[var(--app-text)]">
-            {copy.monthEquation}
-          </h2>
-          <dl className="mt-4 divide-y divide-[var(--app-border)] border-y border-[var(--app-border)]">
-            <EquationRow
-              label={copy.expectedIncome}
-              detail={`${copy.fixedIncome} ${formatCurrency(plan.fixedIncomeTotal)} · ${copy.extras} ${formatCurrency(plan.extraIncomeTotal)}`}
-              value={plan.plannedIncomeTotal}
-            />
-            <EquationRow
-              label={copy.expectedFinalExpenses}
-              detail={`${copy.paid} ${formatCurrency(plan.paidExpensesTotal)} · ${copy.pending} ${formatCurrency(plan.pendingExpensesTotal)}`}
-              value={-plan.expectedExpensesTotal}
-            />
-            <EquationRow
-              label={copy.reservedSavings}
-              detail={`${copy.goal} ${formatCurrency(plan.savingsTarget)} · ${copy.actual} ${formatCurrency(plan.savingsActual)}`}
-              value={-plan.savingsReserved}
-            />
-            <div className="flex items-end justify-between gap-4 py-4">
-              <div>
-                <dt className="font-semibold text-[var(--app-text)]">{copy.freeAccordingToPlan}</dt>
-                <dd className="mt-1 max-w-lg text-xs leading-relaxed text-[var(--app-text-muted)]">
-                  {copy.freeDisclaimer}
-                </dd>
-              </div>
-              <dd className="app-money shrink-0 text-xl font-semibold text-[var(--app-accent)]">
-                {formatCurrency(plan.freeAccordingToPlan)}
-              </dd>
-            </div>
-          </dl>
-          {plan.billsShortfall > 0 || plan.savingsGoalShortfall > 0 ? (
-            <div className="mt-3 flex gap-2 text-sm text-[var(--app-warning)]">
-              <TriangleAlert className="mt-0.5 shrink-0" size={16} />
-              <p>
-                {plan.billsShortfall > 0
-                  ? `${copy.missingForReceipts} ${formatCurrency(plan.billsShortfall)}.`
-                  : `${copy.unfundedGoal} ${formatCurrency(plan.savingsGoalShortfall)}.`}
-              </p>
-            </div>
-          ) : null}
-        </section>
-
-        <button
-          type="button"
-          onClick={() => openSavings(currentMonthId)}
-          className="app-focus-ring flex min-h-14 w-full items-center justify-between gap-4 border-y border-[var(--app-border)] px-1 py-3 text-left"
-        >
-          <span className="min-w-0">
-            <span className="block font-semibold text-[var(--app-text)]">{copy.savingsThisMonth}</span>
-            <span className="mt-1 block text-sm text-[var(--app-text-muted)]">
-              {copy.actual} {formatCurrency(plan.savingsActual)} · {copy.goal.toLowerCase()} {formatCurrency(plan.savingsTarget)}
-            </span>
-          </span>
-          <span className="flex shrink-0 items-center gap-2">
-            <span className="app-money font-semibold text-[var(--app-success)]">
-              {formatCurrency(plan.savingsActual)}
-            </span>
-            <ChevronRight size={17} className="text-[var(--app-text-muted)]" />
-          </span>
-        </button>
-
-        <section className="min-w-0" aria-labelledby="pending-receipts-title">
-          <header className="flex items-end justify-between gap-3 px-1">
-            <div>
-              <h2 id="pending-receipts-title" className="text-lg font-semibold text-[var(--app-text)]">
-                {copy.pendingReceipts}
+          <div className="mt-10 grid gap-10 sm:mt-12 sm:gap-12">
+            <section aria-labelledby="monthly-equation-title" className="min-w-0 px-1">
+              <h2 id="monthly-equation-title" className="app-plan-group-title text-[var(--app-text)]">
+                {copy.monthEquation}
               </h2>
-              <p className="mt-1 text-sm text-[var(--app-text-muted)]">
-                {pendingOccurrences.length} · {formatCurrency(plan.pendingExpensesTotal)}
-              </p>
-            </div>
-          </header>
-          <div className="app-monthly-table mt-4" data-tone="expense">
-            <div className="app-monthly-table-body" data-integrated-list="true">
-              {pendingOccurrences.length ? (
-                pendingOccurrences.map((occurrence) => (
-                  <MonthlyExpenseRow
-                    key={occurrence.id}
-                    occurrence={occurrence}
-                    categories={store.categories}
-                    language={language}
-                    today={todayDateOnly}
-                    skipLabel={t("money.skipMonthExpense", language)}
-                    onSkip={() => skipDialog.requestSkipOccurrence(occurrence)}
-                    onTogglePaid={() => togglePaid(occurrence)}
-                    onUpdate={updateMonthlyExpenseOccurrence}
-                  />
-                ))
-              ) : (
-                <p className="px-3 py-4 text-sm font-medium text-[var(--app-text-muted)]">
-                  {plan.plannedExpenseCount ? copy.allPaid : copy.noReceipts}
-                </p>
-              )}
-            </div>
-          </div>
-        </section>
+              <dl className="app-plan-equation mt-5 grid gap-1 p-2 sm:p-3">
+                <EquationRow
+                  label={copy.expectedIncome}
+                  detail={`${copy.fixedIncome} ${formatCurrency(plan.fixedIncomeTotal)} · ${copy.extras} ${formatCurrency(plan.extraIncomeTotal)}`}
+                  value={plan.plannedIncomeTotal}
+                />
+                <EquationRow
+                  label={copy.expectedFinalExpenses}
+                  detail={`${copy.paid} ${formatCurrency(plan.paidExpensesTotal)} · ${copy.pending} ${formatCurrency(plan.pendingExpensesTotal)}`}
+                  value={-plan.expectedExpensesTotal}
+                />
+                <EquationRow
+                  label={copy.reservedSavings}
+                  detail={`${copy.goal} ${formatCurrency(plan.savingsTarget)} · ${copy.actual} ${formatCurrency(plan.savingsActual)}`}
+                  value={-plan.savingsReserved}
+                />
+                <div className="app-plan-equation-total mt-1 flex items-end justify-between gap-4 rounded-[var(--app-radius-md)] px-3 py-3">
+                  <div>
+                    <dt className="font-semibold text-[var(--app-text)]">{copy.freeAccordingToPlan}</dt>
+                    <dd className="mt-1 max-w-lg text-xs leading-relaxed text-[var(--app-text-muted)]">
+                      {copy.freeDisclaimer}
+                    </dd>
+                  </div>
+                  <dd className="app-money shrink-0 text-xl font-semibold text-[var(--app-accent)]">
+                    {formatCurrency(plan.freeAccordingToPlan)}
+                  </dd>
+                </div>
+              </dl>
+              {plan.billsShortfall > 0 || plan.savingsGoalShortfall > 0 ? (
+                <div className="mt-3 flex gap-2 text-sm text-[var(--app-warning)]">
+                  <TriangleAlert className="mt-0.5 shrink-0" size={16} />
+                  <p>
+                    {plan.billsShortfall > 0
+                      ? `${copy.missingForReceipts} ${formatCurrency(plan.billsShortfall)}.`
+                      : `${copy.unfundedGoal} ${formatCurrency(plan.savingsGoalShortfall)}.`}
+                  </p>
+                </div>
+              ) : null}
+            </section>
 
-        <section aria-label={copy.quickActions}>
-          <PlanAction
-            icon={<Plus size={17} />}
-            label={copy.extraIncome}
-            detail={formatCurrency(plan.extraIncomeTotal)}
-            onClick={() => setExtraSheetOpen(true)}
-          />
+            <div className="app-plan-actions grid gap-1 rounded-[var(--app-radius-lg)] p-1">
+              <button
+                type="button"
+                onClick={() => openSavings(currentMonthId)}
+                className="app-plan-savings-action app-focus-ring flex min-h-14 w-full items-center justify-between gap-4 rounded-[var(--app-radius-md)] px-3 py-3 text-left"
+              >
+                <span className="min-w-0">
+                  <span className="block font-semibold text-[var(--app-text)]">{copy.savingsThisMonth}</span>
+                  <span className="mt-1 block text-sm text-[var(--app-text-muted)]">
+                    {copy.actual} {formatCurrency(plan.savingsActual)} · {copy.goal.toLowerCase()} {formatCurrency(plan.savingsTarget)}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="app-money font-semibold text-[var(--app-success)]">
+                    {formatCurrency(plan.savingsActual)}
+                  </span>
+                  <ChevronRight size={17} className="text-[var(--app-text-muted)]" />
+                </span>
+              </button>
+
+              <PlanAction
+                icon={<Plus size={17} />}
+                label={copy.extraIncome}
+                detail={formatCurrency(plan.extraIncomeTotal)}
+                onClick={() => setExtraSheetOpen(true)}
+              />
+            </div>
+
+            <section className="min-w-0" aria-labelledby="pending-receipts-title">
+              <header className="flex items-end justify-between gap-3 px-1">
+                <div>
+                  <h2 id="pending-receipts-title" className="app-plan-group-title text-[var(--app-text)]">
+                    {copy.pendingReceipts}
+                  </h2>
+                  <p className="mt-1 text-sm text-[var(--app-text-muted)]">
+                    {pendingOccurrences.length} · {formatCurrency(plan.pendingExpensesTotal)}
+                  </p>
+                </div>
+              </header>
+              <div className="app-monthly-table mt-3" data-tone="expense">
+                <div className="app-monthly-table-body" data-integrated-list="true">
+                  {pendingOccurrences.length ? (
+                    pendingOccurrences.map((occurrence) => (
+                      <MonthlyExpenseRow
+                        key={occurrence.id}
+                        occurrence={occurrence}
+                        categories={store.categories}
+                        language={language}
+                        today={todayDateOnly}
+                        skipLabel={t("money.skipMonthExpense", language)}
+                        onSkip={() => skipDialog.requestSkipOccurrence(occurrence)}
+                        onTogglePaid={() => togglePaid(occurrence)}
+                        onUpdate={updateMonthlyExpenseOccurrence}
+                      />
+                    ))
+                  ) : (
+                    <p className="px-3 py-4 text-sm font-medium text-[var(--app-text-muted)]">
+                      {plan.plannedExpenseCount ? copy.allPaid : copy.noReceipts}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </section>
+          </div>
         </section>
 
         <section className="min-w-0" aria-labelledby="annual-plan-title">
           <header className="flex items-end justify-between gap-3 px-1">
             <div>
-              <h2 id="annual-plan-title" className="text-lg font-semibold text-[var(--app-text)]">
+              <h2 id="annual-plan-title" className="app-plan-section-title text-[var(--app-text)]">
                 {copy.thisYear}
               </h2>
               <p className="mt-1 text-sm text-[var(--app-text-muted)]">{copy.annualSubtitle}</p>
@@ -434,14 +436,14 @@ export function MoneyDashboard() {
               ))}
             </select>
           </header>
-          <div className="mt-4 border-y border-[var(--app-border)] py-4">
+          <div className="mt-4">
             <MonthlyTrendChart
               language={language}
               moneySeries={annualMoneySeries}
               isCompactChart={isCompactChart}
             />
           </div>
-          <dl className="grid grid-cols-2 gap-x-5 border-b border-[var(--app-border)] py-4 sm:grid-cols-4">
+          <dl className="app-plan-metric-grid mt-4 grid grid-cols-2 gap-x-5 rounded-[var(--app-radius-lg)] px-3 py-3 sm:grid-cols-4">
             <AnnualMetric label={copy.annualRecurring} value={annualExpenses} />
             <AnnualMetric label={copy.annualPaid} value={annualPaid} />
             <AnnualMetric label={copy.savedThisYear} value={annualSavingsActual} />
@@ -451,7 +453,7 @@ export function MoneyDashboard() {
 
         <section className="min-w-0" aria-labelledby="monthly-review-title">
           <header className="px-1">
-            <h2 id="monthly-review-title" className="text-lg font-semibold text-[var(--app-text)]">
+            <h2 id="monthly-review-title" className="app-plan-section-title text-[var(--app-text)]">
               {copy.monthlyReview}
             </h2>
             <p className="mt-1 text-sm text-[var(--app-text-muted)]">{copy.comparedWithPrevious}</p>
@@ -483,17 +485,17 @@ export function MoneyDashboard() {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2 px-1 text-xs font-semibold">
-            <span className="rounded-full border border-[var(--app-border)] px-2 py-1 text-[var(--app-text-muted)]">
+            <span className="rounded-full bg-[var(--app-panel-soft-alpha)] px-2.5 py-1 text-[var(--app-text-muted)]">
               {phaseLabel(selectedSummary.phase, copy)}
             </span>
             {selectedHasLegacyHistory ? (
-              <span className="rounded-full border border-[var(--app-warning)] px-2 py-1 text-[var(--app-warning)]">
+              <span className="rounded-full bg-[color-mix(in_srgb,var(--app-warning)_12%,transparent)] px-2.5 py-1 text-[var(--app-warning)]">
                 {copy.legacyDerived}
               </span>
             ) : null}
           </div>
 
-          <dl className="mt-4 divide-y divide-[var(--app-border)] border-y border-[var(--app-border)]">
+          <dl className="app-plan-review-summary mt-5 grid gap-1 rounded-[var(--app-radius-lg)] p-2">
             <ReviewDelta label={copy.recurringExpenses} value={selectedSummary.expenses} previous={previousSummary.expenses} />
             <ReviewDelta label={copy.paid} value={selectedSummary.paid ?? 0} previous={previousSummary.paid ?? 0} />
             <ReviewDelta label={copy.actualSavings} value={selectedSummary.savings} previous={previousSummary.savings} />
@@ -640,7 +642,7 @@ function EquationRow({
   value: number;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
+    <div className="flex items-center justify-between gap-4 rounded-[var(--app-radius-sm)] px-3 py-2.5">
       <div className="min-w-0">
         <dt className="font-medium text-[var(--app-text)]">{label}</dt>
         <dd className="mt-1 truncate text-xs text-[var(--app-text-muted)]">{detail}</dd>
@@ -667,7 +669,7 @@ function PlanAction({
     <button
       type="button"
       onClick={onClick}
-      className="app-focus-ring flex min-h-14 w-full items-center gap-3 border-y border-[var(--app-border)] px-1 text-left"
+      className="app-plan-action-row app-focus-ring flex min-h-14 w-full items-center gap-3 rounded-[var(--app-radius-md)] px-3 text-left"
     >
       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--app-control)] text-[var(--app-accent)]">{icon}</span>
       <span className="min-w-0 flex-1">
@@ -681,7 +683,7 @@ function PlanAction({
 
 function AnnualMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="min-w-0 py-2">
+    <div className="min-w-0 py-1.5">
       <dt className="text-xs font-medium text-[var(--app-text-muted)]">{label}</dt>
       <dd className="app-money mt-1 text-base font-semibold text-[var(--app-text)]">{formatCurrency(value)}</dd>
     </div>
@@ -699,7 +701,7 @@ function ReviewDelta({
 }) {
   const delta = value - previous;
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
+    <div className="flex items-center justify-between gap-4 rounded-[var(--app-radius-sm)] px-2 py-2.5">
       <dt className="text-sm font-medium text-[var(--app-text)]">{label}</dt>
       <dd className="text-right">
         <span className="app-money block font-semibold text-[var(--app-text)]">{formatCurrency(value)}</span>
@@ -823,7 +825,7 @@ function planCopy(language: AppLanguage) {
       nextReceipt: "Next receipt",
       allPaid: "Everything planned is paid",
       noUpcomingReceipt: "No upcoming receipt",
-      monthEquation: "This month's plan",
+      monthEquation: "Month overview",
       expectedIncome: "Expected income",
       fixedIncome: "Fixed",
       extras: "extras",
@@ -876,7 +878,7 @@ function planCopy(language: AppLanguage) {
     nextReceipt: "Próximo recibo",
     allPaid: "Todo lo previsto está pagado",
     noUpcomingReceipt: "No hay un próximo recibo",
-    monthEquation: "Plan de este mes",
+    monthEquation: "Resumen del mes",
     expectedIncome: "Ingresos previstos",
     fixedIncome: "Fijo",
     extras: "extras",
