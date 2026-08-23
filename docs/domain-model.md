@@ -11,7 +11,7 @@ y, si el usuario esta autenticado, en Supabase `app_stores`.
 - `categories`: categorias de gasto con icono y tono visual.
 - `templates`: definiciones recurrentes o puntuales de gastos.
 - `overrides`: cambios sobre ocurrencias concretas.
-- `finance`: ingresos, salario, objetivos de ahorro y cuentas.
+- `finance`: ingresos, salario, objetivos y aportaciones reales de ahorro.
 - `deleted`: tombstones para evitar que deletes reaparezcan al mezclar stores.
 - `preferences`: tema e idioma.
 
@@ -77,56 +77,34 @@ existente o crea una nueva segun el nombre normalizado.
 
 - `incomeEvents`: ingresos puntuales con importe, fecha y nota.
 - `monthlySalary`: salario por mes, indexado por `YYYY-MM`.
-- `monthlySavingsTargets`: objetivo de ahorro por mes.
-- `accounts`: hasta tres cuentas de plan.
-
-Las cuentas usan propositos controlados:
-
-- `salary`
-- `expenses`
-- `daily`
-- `savings`
-- `investment`
-- `other`
+- `monthlySavingsTargets`: objetivo habitual efectivo desde un mes.
+- `monthlySavingsContributions`: transferencia real registrada para cada mes.
 
 La pantalla `/money` calcula un `MonthlyMoneyPlan` con ingresos, gastos
-planificados, aportacion a gastos, ahorro, inversion, restante y shortfall.
+planificados, ahorro reservado, capacidad, restante y faltantes.
 
-## Importacion bancaria
+Semantica de producto:
 
-Los movimientos bancarios normalizados se guardan en `bankMovements`. Cada
-`BankMovement` incluye:
+- Sueldo fijo, dia de cobro y objetivo habitual forman la base del plan.
+- `monthlySavingsTargets` expresa cuanto se quiere ahorrar habitualmente.
+- `monthlySavingsContributions` expresa cuanto se transfirio realmente ese mes.
+- El restante es una proyeccion del mes completo. No es el saldo bancario y no
+  incluye los gastos pequeños del dia a dia.
+- La capacidad maxima es ingreso previsto menos gasto recurrente previsto; no
+  presupone que todo ese importe vaya a ahorrarse.
 
-- Fecha contable (`bookedAt`), descripcion, importe, moneda y cuenta opcional.
-- `merchantKey` normalizado para agrupar y matchear.
-- `fingerprint` estable para detectar duplicados.
-- Metadata de conciliacion cuando aplica:
-  `matchedTemplateId`, `matchedOccurrenceDate`, `matchedIncomeEventId` o
-  `matchedSalaryMonth`.
-
-`bankMerchantAliases` guarda alias confirmados por el usuario, por ejemplo un
-concepto bancario como `APPLE.COM/BILL` vinculado a un gasto `iCloud`.
-
-La importacion no aplica cambios automaticamente. El dominio devuelve
-candidatos y la UI obliga a confirmar, editar, vincular, crear o ignorar:
-
-- Gastos: coincidencias exactas, posibles coincidencias, recurrentes nuevos,
-  pagos unicos nuevos y duplicados probables.
-- Ingresos: nominas detectadas, ingresos puntuales y duplicados probables.
-- Duplicados probables: se ignoran por defecto, pero el usuario puede guardar
-  sin vincular o aplicar una accion manual bajo confirmacion.
-
-La deteccion de nomina agrupa ingresos positivos por pagador/concepto
-normalizado, tolera variaciones de importe, meses parciales y desplazamientos
-por fin de semana. Al confirmar nominas, `monthlySalary[monthId]` se calcula
-como suma de los movimientos de nomina confirmados para ese mes, preservando
-cada movimiento en `bankMovements`.
+La normalizacion v3 acepta stores antiguos. Antes de descartar datos bancarios
+legacy convierte conciliaciones explícitas en overrides pagados. Si ya existe
+un pago persistido para la misma ocurrencia, conserva su correccion manual y no
+la reemplaza con el movimiento antiguo. No conserva movimientos, alias ni
+cuentas que la app ya no usa.
 
 ## Preferencias
 
 Las preferencias persistidas son:
 
-- `theme`: `dark`, `rose-pine`, `catppuccin` o `light`.
+- `theme`: una de las paletas declaradas en `AppTheme`, incluidas las de
+  Noctalia.
 - `language`: `es` o `en`.
 
 El tema se aplica al DOM con `data-theme`. El idioma se aplica al atributo
@@ -141,7 +119,8 @@ idioma entre cargas.
 - Templates.
 - Overrides.
 - Income events.
-- Bank movements.
+- Registros históricos de ocurrencias.
+- Aportaciones reales de ahorro.
 
 Esto evita que un elemento borrado en un dispositivo reaparezca cuando se mezcla
 con un store cloud o local que todavia lo tenia. Los tombstones son parte del

@@ -1,11 +1,9 @@
 import {
-  emptyFinanceStore,
   materializeClosedOccurrenceRecords,
   toMonthId,
 } from "@/domain/finance";
 import { buildDateWithDay, toDateOnly } from "@/domain/calendar";
 import type {
-  BankMovement,
   ExpenseOccurrenceOverride,
   ExpenseStore,
   ExpenseTemplate,
@@ -23,11 +21,20 @@ const STORE_KEYS = [
   "overrides",
   "occurrenceRecords",
   "finance",
-  "bankMovements",
-  "bankMerchantAliases",
   "deleted",
   "preferences",
 ] as const;
+
+type LegacyBankMovement = {
+  id: string;
+  userId: string;
+  fingerprint: string;
+  bookedAt: string;
+  description: string;
+  amount: number;
+  matchedTemplateId?: string;
+  matchedOccurrenceDate?: string;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -39,13 +46,10 @@ function recordOrEmpty<T>(value: unknown): Record<string, T> {
 
 function normalizeFinanceStore(
   value: unknown,
-  legacyStore: boolean,
+  needsLegacySavingsMigration: boolean,
   today: Date,
 ): FinanceStore {
   const finance = isRecord(value) ? value : {};
-  const accounts = Array.isArray(finance.accounts)
-    ? (finance.accounts as FinanceStore["accounts"])
-    : [];
 
   const monthlySavingsTargets = normalizeSavingsTargets(
     finance.monthlySavingsTargets,
@@ -54,7 +58,7 @@ function normalizeFinanceStore(
     finance.monthlySavingsContributions,
   );
 
-  if (legacyStore) {
+  if (needsLegacySavingsMigration) {
     const currentMonthId = toMonthId(today);
     for (const [monthId, target] of Object.entries(monthlySavingsTargets)) {
       if (monthId > currentMonthId || monthlySavingsContributions[monthId]) {
@@ -82,7 +86,6 @@ function normalizeFinanceStore(
     monthlySalary: normalizeMonthlySalary(finance.monthlySalary),
     monthlySavingsTargets,
     monthlySavingsContributions,
-    accounts: accounts.length ? accounts : emptyFinanceStore.accounts,
   };
 }
 
@@ -182,8 +185,6 @@ function normalizeDeletedIds(value: unknown): NonNullable<ExpenseStore["deleted"
     templates: stringArray(deleted.templates),
     overrides: stringArray(deleted.overrides),
     incomeEvents: stringArray(deleted.incomeEvents),
-    bankMovements: stringArray(deleted.bankMovements),
-    bankMerchantAliases: stringArray(deleted.bankMerchantAliases),
     occurrenceRecords: stringArray(deleted.occurrenceRecords),
     savingsContributions: stringArray(deleted.savingsContributions),
   };
@@ -201,10 +202,16 @@ export function normalizeExpenseStore(
 ): ExpenseStore {
   const store = isRecord(value) ? value : {};
   const preferences = isRecord(store.preferences) ? store.preferences : {};
-  const legacyStore = store.schemaVersion !== 2;
+  const schemaVersion = Number(store.schemaVersion ?? 1);
+  const needsLegacySavingsMigration = schemaVersion < 2;
+  const needsBankMigration = schemaVersion < 3;
+  const legacyBankMovements =
+    needsBankMigration && Array.isArray(store.bankMovements)
+      ? (store.bankMovements as LegacyBankMovement[])
+      : [];
 
   const base: ExpenseStore = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     categories: Array.isArray(store.categories)
       ? (store.categories as ExpenseStore["categories"])
       : [],
@@ -214,30 +221,39 @@ export function normalizeExpenseStore(
     overrides: Array.isArray(store.overrides)
       ? (store.overrides as ExpenseStore["overrides"])
       : [],
-    occurrenceRecords: Array.isArray(store.occurrenceRecords)
-      ? (store.occurrenceRecords as ExpenseStore["occurrenceRecords"])
-      : [],
-    finance: normalizeFinanceStore(store.finance, legacyStore, today),
-    bankMovements: Array.isArray(store.bankMovements)
-      ? (store.bankMovements as ExpenseStore["bankMovements"])
-      : [],
-    bankMerchantAliases: Array.isArray(store.bankMerchantAliases)
-      ? (store.bankMerchantAliases as ExpenseStore["bankMerchantAliases"])
-      : [],
+    occurrenceRecords: normalizeOccurrenceRecords(store.occurrenceRecords),
+    finance: normalizeFinanceStore(
+      store.finance,
+      needsLegacySavingsMigration,
+      today,
+    ),
     deleted: normalizeDeletedIds(store.deleted),
     preferences: {
       theme: normalizeAppTheme(preferences.theme),
       language: normalizeAppLanguage(preferences.language),
     },
   };
-  const normalized = legacyStore
-    ? normalizeImportedPaidOccurrenceDates(base)
+  const normalized = needsBankMigration
+    ? normalizeImportedPaidOccurrenceDates(base, legacyBankMovements)
     : base;
 
   return materializeClosedOccurrenceRecords(normalized, {
     today,
-    source: legacyStore ? "legacy-derived" : "native",
+    source: schemaVersion < 3 ? "legacy-derived" : "native",
   });
+}
+
+function normalizeOccurrenceRecords(
+  value: unknown,
+): ExpenseStore["occurrenceRecords"] {
+  if (!Array.isArray(value)) return [];
+
+  return (value as Array<NonNullable<ExpenseStore["occurrenceRecords"]>[number]>).map(
+    (record) => ({
+      ...record,
+      source: record.source === "native" ? "native" : "legacy-derived",
+    }),
+  );
 }
 
 export function normalizeImportedExpenseStore(value: unknown): ExpenseStore {
@@ -287,20 +303,15 @@ export function assignExpenseStoreOwner(
       ...record,
       userId,
     })),
-    bankMovements: store.bankMovements.map((movement) => ({
-      ...movement,
-      userId,
-    })),
-    bankMerchantAliases: store.bankMerchantAliases.map((alias) => ({
-      ...alias,
-      userId,
-    })),
   };
 }
 
-function normalizeImportedPaidOccurrenceDates(store: ExpenseStore): ExpenseStore {
+function normalizeImportedPaidOccurrenceDates(
+  store: ExpenseStore,
+  legacyBankMovements: LegacyBankMovement[],
+): ExpenseStore {
   const templatesById = new Map(store.templates.map((template) => [template.id, template]));
-  const bankMovements = store.bankMovements.map((movement) =>
+  const bankMovements = legacyBankMovements.map((movement) =>
     normalizeMatchedBankMovementOccurrenceDate(movement, templatesById),
   );
   const importedMovementDatesByTemplate = new Map<string, Set<string>>();
@@ -312,30 +323,30 @@ function normalizeImportedPaidOccurrenceDates(store: ExpenseStore): ExpenseStore
     importedMovementDatesByTemplate.set(movement.matchedTemplateId, dates);
   }
 
+  const normalizedOverrides = store.overrides.map((override) =>
+    normalizeImportedOverrideOccurrenceDate(
+      override,
+      templatesById,
+      importedMovementDatesByTemplate,
+    ),
+  );
+  const bankPaidOverrides = bankMovements.flatMap((movement) =>
+    paidOverrideFromMatchedBankMovement(movement, templatesById),
+  );
+
   return {
     ...store,
-    bankMovements,
-    overrides: dedupeOverrides(
-      [
-        ...store.overrides.map((override) =>
-          normalizeImportedOverrideOccurrenceDate(
-            override,
-            templatesById,
-            importedMovementDatesByTemplate,
-          ),
-        ),
-        ...bankMovements.flatMap((movement) =>
-          paidOverrideFromMatchedBankMovement(movement, templatesById),
-        ),
-      ],
+    overrides: mergeLegacyBankPaidOverrides(
+      normalizedOverrides,
+      bankPaidOverrides,
     ),
   };
 }
 
 function normalizeMatchedBankMovementOccurrenceDate(
-  movement: BankMovement,
+  movement: LegacyBankMovement,
   templatesById: Map<string, ExpenseTemplate>,
-): BankMovement {
+): LegacyBankMovement {
   if (!movement.matchedTemplateId) return movement;
 
   const template = templatesById.get(movement.matchedTemplateId);
@@ -381,7 +392,7 @@ function normalizeImportedOverrideOccurrenceDate(
 }
 
 function paidOverrideFromMatchedBankMovement(
-  movement: BankMovement,
+  movement: LegacyBankMovement,
   templatesById: Map<string, ExpenseTemplate>,
 ): ExpenseOccurrenceOverride[] {
   if (!movement.matchedTemplateId) return [];
@@ -422,16 +433,18 @@ function occurrenceDateForImportedMovement(
   return toDateOnly(buildDateWithDay(new Date(`${bookedAt}T00:00:00`), template.dueDay));
 }
 
-function dedupeOverrides(overrides: ExpenseOccurrenceOverride[]) {
+function mergeLegacyBankPaidOverrides(
+  persistedOverrides: ExpenseOccurrenceOverride[],
+  bankPaidOverrides: ExpenseOccurrenceOverride[],
+) {
   const byKey = new Map<string, ExpenseOccurrenceOverride>();
 
-  for (const override of overrides) {
+  for (const override of persistedOverrides) {
     const key = `${override.templateId}:${override.occurrenceDate}`;
     const existing = byKey.get(key);
     if (
       !existing ||
-      (override.status === "paid" && existing.status !== "paid") ||
-      isImportedPaidOverride(override)
+      (override.status === "paid" && existing.status !== "paid")
     ) {
       byKey.set(key, override);
       continue;
@@ -447,14 +460,13 @@ function dedupeOverrides(overrides: ExpenseOccurrenceOverride[]) {
     }
   }
 
-  return Array.from(byKey.values());
-}
+  for (const override of bankPaidOverrides) {
+    const key = `${override.templateId}:${override.occurrenceDate}`;
+    const existing = byKey.get(key);
+    if (!existing || existing.status !== "paid") {
+      byKey.set(key, override);
+    }
+  }
 
-function isImportedPaidOverride(override: ExpenseOccurrenceOverride) {
-  return (
-    override.status === "paid" &&
-    (override.id.startsWith("ovr-import-") ||
-      override.note?.toLowerCase().includes("importacion bancaria") ||
-      override.note?.toLowerCase().includes("conciliado con"))
-  );
+  return Array.from(byKey.values());
 }

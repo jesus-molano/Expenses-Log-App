@@ -11,8 +11,8 @@ persistencia y servicios externos para que cada cambio tenga un lugar claro.
   nivel.
 - `src/features/*`: funcionalidad por dominio de producto. `expenses` contiene
   dashboard, timeline, formularios, swipe y DnD; `plan` contiene la pantalla de
-  dinero; `settings` contiene preferencias, auth, notificaciones e
-  importacion bancaria; `auth` contiene login.
+  dinero; `settings` contiene preferencias, auth y notificaciones; `auth`
+  contiene login.
 - `src/components/ui`: componentes base del design system. Son genericos,
   reutilizables y no deben conocer reglas de negocio.
 - `src/domain`: tipos y logica pura compartida. No depende de React, DOM, Next
@@ -29,11 +29,9 @@ persistencia y servicios externos para que cada cambio tenga un lugar claro.
 ## Rutas y composicion
 
 - `/` renderiza `ExpenseDashboard`, la experiencia principal de gastos.
-- `/money` renderiza `MoneyDashboard`, el plan mensual, ingresos y cuentas.
-- `/settings` renderiza `SettingsView`, preferencias, importacion bancaria,
-  auth y notificaciones.
-- `/settings/import` renderiza el flujo de conciliacion bancaria para archivos
-  CSV/XLS/XLSX.
+- `/money` renderiza `MoneyDashboard`, que orquesta tres secciones de igual
+  nivel: mes actual, plan anual y revision mensual.
+- `/settings` renderiza `SettingsView`, preferencias, auth y notificaciones.
 - `/login` renderiza `LoginView`.
 - `/expenses/new` y `/expenses/[id]` cubren creacion y detalle/edicion de
   gastos.
@@ -81,24 +79,32 @@ Dashboard de gastos:
 
 Pantalla de dinero:
 
-1. Combina ingresos, salario mensual, objetivos, cuentas y gastos previstos.
-2. Calcula contribuciones, shortfall y tendencias.
-3. Guarda cambios mediante comandos financieros del store.
+1. `CurrentMonthPlanSection` responde que queda por pagar, que ya esta pagado y
+   cuanto queda libre segun el plan.
+2. `AnnualPlanSection` muestra gasto recurrente, pagado, ahorro real y capacidad
+   maxima de los doce meses del año seleccionado.
+3. `MonthlyReviewSection` compara un mes con el anterior y permite editar sus
+   ingresos y ahorro real.
+4. `MoneyDashboard` compone las secciones; los calculos puros viven en dominio y
+   `features/plan/lib`.
+5. La base del plan guarda sueldo fijo, dia de cobro y objetivo habitual. La
+   transferencia real de ahorro pertenece a cada mes y no cambia ese objetivo.
 
 Ajustes:
 
 1. Cambia tema/idioma aplicando DOM/cookies y persistiendo preferencias.
-2. Gestiona login, sync cloud, importacion bancaria y notificaciones.
+2. Gestiona login, sync cloud y notificaciones.
 3. Puede reparar metadata antigua con endpoint POST autenticado.
 
-Importacion bancaria:
+PWA y avisos:
 
-1. `settings` lee CSV/XLS/XLSX y normaliza movimientos con helpers de dominio.
-2. `src/domain/bank-import.ts` clasifica gastos, matching, recurrentes,
-   pagos unicos y duplicados probables.
-3. `src/domain/bank-import-income.ts` clasifica ingresos, nominas y duplicados
-   positivos sin depender de React.
-4. `src/features/settings/lib/bank-import-decisions.ts` convierte decisiones de
-   UI en comandos de store.
-5. `src/stores/app/expense-commands.ts` aplica la confirmacion: vincular,
-   crear gasto, confirmar nomina, crear ingreso, guardar sin vincular o ignorar.
+1. Serwist genera el service worker desde `src/pwa/sw.ts` durante el build.
+2. La shell principal queda disponible sin red. Las rutas centrales fuerzan una
+   navegación de documento cuando el navegador está offline; las respuestas RSC
+   GET usan `NetworkFirst`. API, origenes externos y peticiones no GET nunca se
+   guardan en cache.
+3. Ajustes registra y verifica la suscripcion push del dispositivo.
+4. El cron usa un lease atomico por ocurrencia, marca `delivered` tras el primer
+   envio aceptado y permite recuperar claims abandonados.
+5. `public/sw.js` es un artefacto generado e ignorado; la fuente mantenida es
+   `src/pwa/sw.ts`.

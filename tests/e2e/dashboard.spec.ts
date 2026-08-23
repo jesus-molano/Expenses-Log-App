@@ -77,6 +77,7 @@ test("creates and pays a parsed recurring expense", async ({ page }) => {
 
   await expect(page.getByText("Por pagar")).toBeVisible();
   await page.getByRole("button", { name: "Añadir gasto" }).click();
+  await page.locator("summary").filter({ hasText: "Analizar texto" }).click();
   await page
     .getByPlaceholder("Ej: Luz 64,75 mensual día 8")
     .fill("Spotify 10,99 mensual el dia 12 musica");
@@ -122,16 +123,17 @@ test("edits plan settings and monthly savings without losing either value", asyn
   await expect(page.getByRole("heading", { name: "Recibos pendientes" })).toBeVisible();
 
   await page.getByRole("button", { name: "Configurar" }).click();
-  await expect(page.getByRole("heading", { name: "Configurar Plan" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Base del plan" })).toBeVisible();
 
   await page.getByLabel("Sueldo").fill("3000");
+  await page.getByLabel("Objetivo habitual de ahorro").fill("450");
   await page.getByRole("button", { name: /Cambiar día de cobro/ }).click();
   await page.getByRole("button", { name: "25" }).click();
   await page.getByRole("button", { name: "Guardar configuración" }).click();
   await expect(page.getByText(/Fijo 3\.?000,00\s*€/)).toBeVisible();
 
   await page.getByRole("button", { name: /Ahorro de este mes/ }).click();
-  await page.getByLabel("Objetivo mensual").fill("450");
+  await expect(page.getByText(/Objetivo mensual: 450,00\s*€/)).toBeVisible();
   await page.getByLabel("Transferencia real").fill("325");
   await page.getByRole("button", { name: "Guardar ahorro" }).click();
 
@@ -163,6 +165,30 @@ test("marks a pending receipt as paid directly from plan", async ({ page }) => {
   await expect(payButton).toHaveCount(0);
 });
 
+test("shows a color marker for every annual chart series", async ({ page }) => {
+  await page.setViewportSize({ width: 481, height: 881 });
+  await loadDemoStore(page);
+  await page.goto("/money");
+
+  const chart = page.locator(".recharts-wrapper");
+  await expect(chart).toBeVisible();
+  await chart.scrollIntoViewIfNeeded();
+  await page.locator(".recharts-bar-rectangle").first().hover({ force: true });
+
+  const tooltipRows = page.locator(".app-chart-tooltip-row");
+  await expect(tooltipRows).toHaveCount(3);
+  const markerColors = await tooltipRows.evaluateAll((rows) =>
+    rows.map((row) => {
+      const marker = row.querySelector<HTMLElement>('[aria-hidden="true"]');
+      return marker ? getComputedStyle(marker).backgroundColor : "";
+    }),
+  );
+
+  expect(markerColors).toHaveLength(3);
+  expect(markerColors.every((color) => color && color !== "rgba(0, 0, 0, 0)"))
+    .toBe(true);
+});
+
 test("sheet closes with Escape and restores focus", async ({ page }) => {
   await loadDemoStore(page);
   await page.goto("/");
@@ -175,10 +201,12 @@ test("sheet closes with Escape and restores focus", async ({ page }) => {
 
   const closeButton = dialog.getByRole("button", { name: "Cerrar" });
   const manualButton = dialog.getByRole("button", { name: "Manual" });
+  const textSummary = dialog.locator("summary");
   await expect(closeButton).toBeFocused();
+  await expect(manualButton).toHaveClass(/app-button-primary/);
 
   await page.keyboard.press("Shift+Tab");
-  await expect(manualButton).toBeFocused();
+  await expect(textSummary).toBeFocused();
 
   await page.keyboard.press("Tab");
   await expect(closeButton).toBeFocused();
@@ -194,6 +222,21 @@ test("compact menus support keyboard navigation and Escape", async ({ page }) =>
   await page.goto("/settings");
 
   await expect(page.getByText("Importar movimientos bancarios")).toHaveCount(0);
+
+  await page.getByRole("button", { name: /Vice Afterglow/ }).click();
+  const themeMenu = page.getByRole("listbox");
+  await expect(themeMenu).toBeVisible();
+  await expect(page.getByRole("option", { name: /Tokyo Night City/ }))
+    .toBeInViewport({ ratio: 0.95 });
+  await expect
+    .poll(() =>
+      page.locator(".app-settings-card").evaluate(
+        (element) => getComputedStyle(element).overflow,
+      ),
+    )
+    .toBe("visible");
+  await page.keyboard.press("Escape");
+  await expect(themeMenu).toHaveCount(0);
 
   const languageButton = page.getByRole("button", { name: "ES", exact: true });
   await languageButton.focus();

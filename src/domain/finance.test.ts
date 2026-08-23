@@ -151,7 +151,7 @@ describe("finance", () => {
   it("keeps closed occurrences stable after a template is edited or deleted", () => {
     const template = occurrence("Internet", 60, "2026-06-08").template;
     const base: ExpenseStore = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       categories: [
         {
           id: "cat",
@@ -165,8 +165,6 @@ describe("finance", () => {
       overrides: [],
       occurrenceRecords: [],
       finance: emptyFinanceStore,
-      bankMovements: [],
-      bankMerchantAliases: [],
       preferences: { theme: "vice-afterglow", language: "es" },
     };
     const recorded = materializeClosedOccurrenceRecords(base, {
@@ -211,14 +209,12 @@ describe("finance", () => {
     const template = occurrence("Seguro", 120, "2026-06-10").template;
     const recorded = materializeClosedOccurrenceRecords(
       {
-        schemaVersion: 2,
+        schemaVersion: 3,
         categories: [],
         templates: [{ ...template, endDate: "2026-06-30" }],
         overrides: [],
         occurrenceRecords: [],
         finance: emptyFinanceStore,
-        bankMovements: [],
-        bankMerchantAliases: [],
       },
       { today: new Date("2026-08-10T12:00:00") },
     );

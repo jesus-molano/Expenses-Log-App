@@ -38,9 +38,14 @@ export function useSettingsController({
   const supabase = useMemo(() => createClient(), []);
   const { user, setUser, signOut } = useSettingsAuth(supabase, setMessage);
   const {
+    notificationState,
+    notificationHealth,
     notificationsActive,
+    isTestingNotification,
+    lastTestSentAt,
     enableNotifications,
     disableNotifications,
+    sendTestNotification,
   } = useNotificationSettings(setMessage);
 
   const currentTheme = store.preferences?.theme ?? DEFAULT_THEME;
@@ -93,12 +98,9 @@ export function useSettingsController({
     setIsDeletingAccount(true);
     try {
       const response = await fetch("/api/account", { method: "DELETE" });
-      const payload = (await response.json().catch(() => ({}))) as {
-        error?: string;
-      };
 
       if (!response.ok) {
-        throw new Error(payload.error ?? t("settings.deleteAccountError"));
+        throw new Error(t("settings.deleteAccountError"));
       }
 
       await supabase?.auth.signOut();
@@ -106,12 +108,8 @@ export function useSettingsController({
       setUser(null);
       // Reload the document to discard the deleted account's in-memory store.
       window.location.replace("/");
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : t("settings.deleteAccountError"),
-      );
+    } catch {
+      setMessage(t("settings.deleteAccountError"));
       setIsDeletingAccount(false);
     }
   }
@@ -142,7 +140,11 @@ export function useSettingsController({
     backHref,
     backLabel,
     deleteAccountPhrase,
+    notificationState,
+    notificationHealth,
     notificationsActive,
+    isTestingNotification,
+    lastTestSentAt,
     setThemeOpen,
     setLanguageOpen,
     setClearExpensesOpen,
@@ -152,6 +154,7 @@ export function useSettingsController({
     updateLanguage,
     enableNotifications,
     disableNotifications,
+    sendTestNotification,
     signOut,
     handleClearExpenses,
     handleClearIncome,

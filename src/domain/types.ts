@@ -139,32 +139,14 @@ export type MonthlySavingsContribution = {
   updatedAt: string;
 };
 
-export type PlanAccountPurpose =
-  | "salary"
-  | "expenses"
-  | "daily"
-  | "savings"
-  | "investment"
-  | "other";
-
-export type PlanAccount = {
-  id: string;
-  name: string;
-  purposes: PlanAccountPurpose[];
-};
-
 export type FinanceStore = {
   incomeEvents: IncomeEvent[];
   monthlySalary: Record<string, MonthlySalarySettings>;
   monthlySavingsTargets: Record<string, number | MonthlySavingsTarget>;
   monthlySavingsContributions?: Record<string, MonthlySavingsContribution>;
-  accounts: PlanAccount[];
 };
 
-export type ExpenseOccurrenceRecordSource =
-  | "native"
-  | "legacy-derived"
-  | "bank-import";
+export type ExpenseOccurrenceRecordSource = "native" | "legacy-derived";
 
 export type ExpenseOccurrenceRecord = {
   id: string;
@@ -184,35 +166,6 @@ export type ExpenseOccurrenceRecord = {
   paidAt?: string;
   amountPaid?: number;
   source: ExpenseOccurrenceRecordSource;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type BankMovement = {
-  id: string;
-  userId: string;
-  fingerprint: string;
-  bookedAt: string;
-  description: string;
-  amount: number;
-  currency: "EUR";
-  account?: string;
-  balance?: number;
-  merchantKey: string;
-  importBatchId: string;
-  matchedTemplateId?: string;
-  matchedOccurrenceDate?: string;
-  matchedIncomeEventId?: string;
-  matchedSalaryMonth?: string;
-  createdAt: string;
-};
-
-export type BankMerchantAlias = {
-  id: string;
-  userId: string;
-  merchantKey: string;
-  templateId: string;
-  label: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -267,21 +220,17 @@ export type MonthlyMoneyPlan = {
 };
 
 export type ExpenseStore = {
-  schemaVersion?: 2;
+  schemaVersion?: 3;
   categories: ExpenseCategory[];
   templates: ExpenseTemplate[];
   overrides: ExpenseOccurrenceOverride[];
   occurrenceRecords?: ExpenseOccurrenceRecord[];
   finance: FinanceStore;
-  bankMovements: BankMovement[];
-  bankMerchantAliases: BankMerchantAlias[];
   deleted?: {
     categories?: string[];
     templates?: string[];
     overrides?: string[];
     incomeEvents?: string[];
-    bankMovements?: string[];
-    bankMerchantAliases?: string[];
     occurrenceRecords?: string[];
     savingsContributions?: string[];
   };

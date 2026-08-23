@@ -6,7 +6,7 @@ import {
   getMonthlySalarySettings,
   getMonthlySavingsTarget,
 } from "@/domain/finance";
-import type { AppLanguage, FinanceStore, PlanAccount } from "@/domain/types";
+import type { AppLanguage, FinanceStore } from "@/domain/types";
 import { formatMoneyInput, parseMoneyInput } from "../lib/money-input";
 
 export type PlanSettingsInput = {
@@ -14,7 +14,6 @@ export type PlanSettingsInput = {
   salaryDay: number;
   savingsMonthId: string;
   savingsTarget: number;
-  accounts: PlanAccount[];
 };
 
 export function usePlanSettingsForm({
@@ -66,7 +65,6 @@ export function usePlanSettingsForm({
       salaryDay,
       savingsMonthId,
       savingsTarget: parseMoneyInput(savingsTarget),
-      accounts: finance.accounts,
     });
     closeSettings();
   }

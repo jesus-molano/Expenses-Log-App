@@ -11,9 +11,11 @@ type PlanSettingsSheetProps = {
   language: AppLanguage;
   salaryAmount: string;
   salaryDay: number;
+  savingsTarget: string;
   dayPickerOpen: boolean;
   onSalaryAmountChange: (value: string) => void;
   onSalaryDayChange: (value: number) => void;
+  onSavingsTargetChange: (value: string) => void;
   onDayPickerOpenChange: (open: boolean) => void;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -23,9 +25,11 @@ export function PlanSettingsSheet({
   language,
   salaryAmount,
   salaryDay,
+  savingsTarget,
   dayPickerOpen,
   onSalaryAmountChange,
   onSalaryDayChange,
+  onSavingsTargetChange,
   onDayPickerOpenChange,
   onClose,
   onSubmit,
@@ -57,6 +61,19 @@ export function PlanSettingsSheet({
             onOpenChange={onDayPickerOpenChange}
             onSalaryDayChange={onSalaryDayChange}
           />
+
+          <Field
+            label={t("money.savingsTarget", language)}
+            className="sm:col-span-2"
+          >
+            <input
+              value={savingsTarget}
+              inputMode="decimal"
+              placeholder="300,00"
+              onChange={(event) => onSavingsTargetChange(event.target.value)}
+              className="input-control"
+            />
+          </Field>
         </div>
 
         <Button type="submit" className="mt-5 w-full" variant="primary" size="lg">

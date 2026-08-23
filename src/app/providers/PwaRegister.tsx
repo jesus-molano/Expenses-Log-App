@@ -6,12 +6,7 @@ export function PwaRegister() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
-    const isLocalhost =
-      window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1" ||
-      window.location.hostname === "[::1]";
-
-    if (isLocalhost) {
+    if (process.env.NODE_ENV === "development") {
       void navigator.serviceWorker.getRegistrations().then((registrations) => {
         registrations.forEach((registration) => void registration.unregister());
       });
@@ -24,9 +19,11 @@ export function PwaRegister() {
     }
 
     const register = () => {
-      void navigator.serviceWorker.register("/sw.js").catch(() => {
-        // Installability should never block the app shell.
-      });
+      void navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .catch(() => {
+          // Installability should never block the app shell.
+        });
     };
 
     if (document.readyState === "complete") {

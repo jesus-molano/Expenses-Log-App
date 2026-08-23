@@ -14,10 +14,8 @@ El hook expone:
 - `store`: datos normalizados de la app.
 - Comandos de gastos: add, delete, clear, toggle paid, skip, move occurrence y
   move series.
-- Comandos financieros: salario, ahorro, cuentas, ingresos y overrides
-  mensuales.
-- Comando de importacion bancaria: confirma decisiones revisadas y aplica los
-  cambios en el mismo store.
+- Comandos financieros: salario, objetivo de ahorro, aportacion real, ingresos
+  y overrides mensuales.
 - Comandos de preferencias: tema e idioma.
 - Estado de sync: `syncStatus`, `syncMessage`, `isHydrated`.
 
@@ -30,11 +28,9 @@ Los comandos se dividen por responsabilidad:
 
 - `expense-commands`: crea templates, categorias y overrides; paga, salta,
   mueve o borra gastos.
-- `finance-commands`: modifica salario mensual, objetivos, cuentas e ingresos.
+- `finance-commands`: modifica salario mensual, objetivos, aportaciones reales
+  e ingresos.
 - `preference-commands`: actualiza tema e idioma en el store.
-- `confirmBankImportInStore`: aplica decisiones del import bancario. Puede
-  vincular movimientos a gastos, crear gastos, confirmar nominas, crear ingresos
-  puntuales, guardar movimientos sin vincular o ignorarlos.
 
 Los comandos reciben un `ExpenseStore` y devuelven otro. Esta forma mantiene la
 logica testeable y evita mutaciones ocultas dentro de componentes.
@@ -85,7 +81,6 @@ La mezcla actual usa ids:
 - Entidades locales como entrada con prioridad final.
 - Tombstones combinados para filtrar elementos borrados.
 - Mapas mensuales de salario y ahorro: cloud + local, con local al final.
-- Cuentas: se prefieren las locales si existen; si no, cloud.
 - Preferencias: local, luego cloud, luego defaults.
 
 La politica de hidratacion protege cambios hechos por el usuario mientras
@@ -101,27 +96,6 @@ para reducir ventanas de inconsistencia.
 El estado de sync comunica preparando cloud, guardando, guardado, local o error.
 Los mensajes se traducen con `src/shared/i18n`.
 
-## Importacion bancaria
-
-La UI actual no importa ni exporta stores JSON completos. El flujo de ajustes
-importa movimientos bancarios del usuario desde CSV/XLS/XLSX:
-
-1. Se lee el archivo en cliente.
-2. Se detectan columnas de fecha, descripcion, importe/cargo/abono, saldo y
-   cuenta.
-3. Se normalizan movimientos y fingerprints.
-4. Se comparan contra gastos, ingresos, alias y movimientos ya guardados.
-5. Se muestran candidatos revisables.
-6. Nada se aplica hasta que el usuario confirma.
-
-Al confirmar, el resultado entra por `confirmBankImportInStore` y por el flujo
-normal de persistencia: localStorage primero y cloud si hay usuario autenticado
-e hidratacion completa.
-
-Los duplicados probables se mantienen ignorados por defecto, pero son
-editables. Si el usuario fuerza una accion, el comando conserva la trazabilidad
-en `bankMovements` y aplica la decision correspondiente.
-
 ## Reglas actuales y limites
 
 - El modelo cloud sigue siendo JSONB por usuario, no tablas normalizadas por
@@ -131,5 +105,9 @@ en `bankMovements` y aplica la decision correspondiente.
 - En ediciones concurrentes del mismo elemento, gana el item que entra al final
   en el merge por id.
 - Los deletes deben seguir registrando tombstones en nuevos comandos.
-- El import bancario debe conservar `bankMovements`, `bankMerchantAliases`,
-  `finance.incomeEvents` y `finance.monthlySalary` al mezclar local/cloud.
+- La migracion v3 descarta cuentas y datos bancarios legacy despues de
+  materializar conciliaciones pagadas.
+- Un override pagado persistido tiene prioridad sobre el pago sintetizado desde
+  un movimiento bancario legacy de la misma ocurrencia.
+- La v3 no mantiene importador bancario, movimientos, alias ni cuentas; no deben
+  reintroducirse en el store o los comandos sin una decision de producto nueva.

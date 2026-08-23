@@ -5,19 +5,12 @@ import {
   toMonthId,
   updateIncomeEvent,
 } from "@/domain/finance";
-import {
-  isPlanAccountPurpose,
-  normalizePlanAccountName,
-  normalizeUniquePlanAccountPurposes,
-  sortPlanAccountPurposes,
-} from "@/domain/plan-accounts";
-import type { ExpenseStore, PlanAccount } from "@/domain/types";
+import type { ExpenseStore } from "@/domain/types";
 import type {
   IncomeEventInput,
   MoneySettingsInput,
   MonthlySalaryInput,
   MonthlySavingsContributionInput,
-  MonthlySavingsInput,
   MonthlySavingsTargetInput,
 } from "./store-types";
 
@@ -47,7 +40,6 @@ export function updateMoneySettingsInStore(
           updatedAt,
         },
       },
-      accounts: normalizePlanAccounts(input.accounts),
     },
   };
 }
@@ -135,16 +127,6 @@ export function updateMonthlySavingsContributionInStore(
             ),
     },
   };
-}
-
-export function updateMonthlySavingsInStore(
-  store: ExpenseStore,
-  input: MonthlySavingsInput,
-): ExpenseStore {
-  return updateMonthlySavingsContributionInStore(
-    updateMonthlySavingsTargetInStore(store, input),
-    input,
-  );
 }
 
 function createSavingsContributionId(monthId: string, updatedAt: string) {
@@ -244,7 +226,6 @@ export function deleteIncomeEventFromStore(
 
 export function clearIncomeFromStore(store: ExpenseStore): ExpenseStore {
   const incomeEventIds = store.finance.incomeEvents.map((event) => event.id);
-  const incomeBankMovements = store.bankMovements.filter(isIncomeBankMovement);
 
   return {
     ...store,
@@ -253,31 +234,14 @@ export function clearIncomeFromStore(store: ExpenseStore): ExpenseStore {
       incomeEvents: [],
       monthlySalary: {},
     },
-    bankMovements: store.bankMovements.filter(
-      (movement) => !isIncomeBankMovement(movement),
-    ),
     deleted: {
       ...store.deleted,
       incomeEvents: mergeDeletedIds(
         store.deleted?.incomeEvents,
         incomeEventIds,
       ),
-      bankMovements: mergeDeletedIds(
-        store.deleted?.bankMovements,
-        incomeBankMovements.map((movement) => movement.id),
-      ),
     },
   };
-}
-
-function isIncomeBankMovement(
-  movement: ExpenseStore["bankMovements"][number],
-): boolean {
-  return (
-    movement.amount > 0 ||
-    Boolean(movement.matchedIncomeEventId) ||
-    Boolean(movement.matchedSalaryMonth)
-  );
 }
 
 function mergeDeletedIds(
@@ -285,26 +249,4 @@ function mergeDeletedIds(
   next: string[],
 ): string[] {
   return Array.from(new Set([...(current ?? []), ...next]));
-}
-
-function normalizePlanAccounts(accounts: PlanAccount[]): PlanAccount[] {
-  const normalized = accounts
-    .slice(0, 3)
-    .map((account, index) => ({
-      id: account.id || `acct-${index + 1}`,
-      name: normalizePlanAccountName(account.name, index),
-      purposes: sortPlanAccountPurposes(
-        Array.from(new Set(account.purposes.filter(isPlanAccountPurpose))),
-      ),
-    }));
-
-  return normalized.length
-    ? normalizeUniquePlanAccountPurposes(normalized)
-    : [
-        {
-          id: "acct-primary",
-          name: "Cuenta principal",
-          purposes: ["salary", "daily"],
-        },
-      ];
 }

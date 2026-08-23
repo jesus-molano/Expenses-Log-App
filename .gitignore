@@ -21,6 +21,8 @@
 
 # production
 /build
+/public/sw.js
+/supabase/.temp/
 
 # misc
 .DS_Store

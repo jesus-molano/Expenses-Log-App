@@ -35,7 +35,7 @@ function withRecords(
 ): ExpenseStore {
   return {
     ...emptyStore,
-    schemaVersion: 2,
+    schemaVersion: 3,
     occurrenceRecords,
   };
 }

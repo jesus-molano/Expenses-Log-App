@@ -13,7 +13,7 @@ export function preserveClosedOccurrenceRecords(
 
   return {
     ...nextStore,
-    schemaVersion: 2,
+    schemaVersion: 3,
     occurrenceRecords: mergeLatestById(
       recordedCurrent.occurrenceRecords ?? [],
       nextStore.occurrenceRecords ?? [],

@@ -12,28 +12,9 @@ import type {
   MonthlySavingsContribution,
   MonthlySavingsTarget,
   MonthlySalarySettings,
-  PlanAccount,
 } from "./types";
 
 const DEFAULT_PAYDAY = 28;
-
-export const defaultPlanAccounts: PlanAccount[] = [
-  {
-    id: "acct-primary",
-    name: "Cuenta principal",
-    purposes: ["salary", "daily"],
-  },
-  {
-    id: "acct-expenses",
-    name: "Cuenta gastos",
-    purposes: ["expenses"],
-  },
-  {
-    id: "acct-savings",
-    name: "Cuenta ahorro",
-    purposes: ["savings", "investment"],
-  },
-];
 
 export const defaultFinanceStore: FinanceStore = {
   incomeEvents: [
@@ -58,14 +39,12 @@ export const defaultFinanceStore: FinanceStore = {
   monthlySavingsTargets: {
     "2026-06": 300,
   },
-  accounts: defaultPlanAccounts,
 };
 
 export const emptyFinanceStore: FinanceStore = {
   incomeEvents: [],
   monthlySalary: {},
   monthlySavingsTargets: {},
-  accounts: defaultPlanAccounts,
 };
 
 export function toMonthId(monthDate: Date | string | null | undefined): string {
@@ -321,7 +300,7 @@ export function materializeClosedOccurrenceRecords(
   const closedThrough = toDateOnly(subDays(startOfMonth(today), 1));
   const firstDate = earliestOccurrenceDate(store);
   if (!firstDate || firstDate > closedThrough) {
-    return { ...store, schemaVersion: 2, occurrenceRecords: store.occurrenceRecords ?? [] };
+    return { ...store, schemaVersion: 3, occurrenceRecords: store.occurrenceRecords ?? [] };
   }
 
   const existingById = new Map(
@@ -369,11 +348,7 @@ export function materializeClosedOccurrenceRecords(
       paidAt: occurrence.override?.paidAt ?? existing?.paidAt,
       amountPaid:
         occurrence.override?.amountPaid ?? existing?.amountPaid,
-      source:
-        existing?.source ??
-        (sourceFromOccurrence(occurrence) === "bank-import"
-          ? "bank-import"
-          : options.source ?? "native"),
+      source: existing?.source ?? options.source ?? "native",
       createdAt: existing?.createdAt ?? evidenceTime,
       updatedAt: evidenceTime,
     } satisfies ExpenseOccurrenceRecord;
@@ -382,7 +357,7 @@ export function materializeClosedOccurrenceRecords(
 
   return {
     ...store,
-    schemaVersion: 2,
+    schemaVersion: 3,
     occurrenceRecords: [
       ...(store.occurrenceRecords ?? []).filter(
         (record) => !materializedIds.has(record.id),
@@ -453,15 +428,6 @@ function earliestOccurrenceDate(store: ExpenseStore): string | null {
     ...(store.occurrenceRecords ?? []).map((record) => record.occurrenceDate),
   ].filter(Boolean);
   return dates.sort()[0] ?? null;
-}
-
-function sourceFromOccurrence(
-  occurrence: ExpenseOccurrence,
-): ExpenseOccurrenceRecord["source"] {
-  const note = occurrence.override?.note?.toLowerCase() ?? "";
-  return note.includes("importacion bancaria") || note.includes("conciliado con")
-    ? "bank-import"
-    : "native";
 }
 
 export function createIncomeEvent(input: {

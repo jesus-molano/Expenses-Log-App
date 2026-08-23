@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import webpush from "web-push";
 import type { UUID } from "@/data/supabase/database.types";
+import type { ExpenseOccurrence } from "@/domain/types";
 import { createSupabaseServiceClient } from "@/data/supabase/admin-client";
 import {
   buildDailyReminder,
@@ -28,6 +29,7 @@ type DeliverySummary = {
 };
 
 const REMINDER_KIND = "last_chance";
+const DELIVERY_LEASE_SECONDS = 15 * 60;
 
 function authorizeCron(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -98,15 +100,23 @@ async function handleDailyReminders(request: Request) {
     .from("app_stores")
     .select("user_id, store");
   if (storesError) {
-    return NextResponse.json({ error: storesError.message }, { status: 500 });
+    console.error("Could not load stores for push reminders", storesError);
+    return NextResponse.json(
+      { code: "PUSH_STORES_UNAVAILABLE" },
+      { status: 500 },
+    );
   }
 
   const { data: subscriptions, error: subscriptionsError } = await admin
     .from("push_subscriptions")
     .select("user_id, endpoint, p256dh, auth");
   if (subscriptionsError) {
+    console.error(
+      "Could not load subscriptions for push reminders",
+      subscriptionsError,
+    );
     return NextResponse.json(
-      { error: subscriptionsError.message },
+      { code: "PUSH_SUBSCRIPTIONS_UNAVAILABLE" },
       { status: 500 },
     );
   }
@@ -136,21 +146,34 @@ async function handleDailyReminders(request: Request) {
     const reminder = buildDailyReminder(storeRow.store);
     if (!reminder) continue;
 
-    const reminderKey = buildReminderDeliveryKey(reminder);
-    const alreadyDelivered = await hasReminderDelivery(
-      admin,
-      storeRow.user_id,
-      reminderKey,
-    );
-    if (alreadyDelivered) {
-      summary.duplicateDeliveriesSkipped += 1;
-      continue;
+    const claimedOccurrences: Array<{
+      occurrence: ExpenseOccurrence;
+      reminderKey: string;
+      claimToken: UUID;
+    }> = [];
+    for (const occurrence of reminder.occurrences) {
+      const reminderKey = buildReminderDeliveryKey(occurrence);
+      const claimToken = await claimReminderDelivery(
+        admin,
+        storeRow.user_id,
+        reminderKey,
+      );
+      if (!claimToken) {
+        summary.duplicateDeliveriesSkipped += 1;
+        continue;
+      }
+      claimedOccurrences.push({ occurrence, reminderKey, claimToken });
     }
+    if (!claimedOccurrences.length) continue;
 
     summary.usersWithReminders += 1;
+    const pendingReminder = {
+      ...reminder,
+      occurrences: claimedOccurrences.map(({ occurrence }) => occurrence),
+    };
     const payload = JSON.stringify({
-      title: dailyReminderTitle(reminder),
-      body: dailyReminderBody(reminder),
+      title: dailyReminderTitle(pendingReminder),
+      body: dailyReminderBody(pendingReminder),
       url: "/",
     });
     let userNotificationsSent = 0;
@@ -174,7 +197,23 @@ async function handleDailyReminders(request: Request) {
     }
 
     if (userNotificationsSent > 0) {
-      await recordReminderDelivery(admin, storeRow.user_id, reminderKey);
+      for (const { reminderKey, claimToken } of claimedOccurrences) {
+        await markReminderDelivered(
+          admin,
+          storeRow.user_id,
+          reminderKey,
+          claimToken,
+        );
+      }
+    } else {
+      for (const { reminderKey, claimToken } of claimedOccurrences) {
+        await releaseReminderDelivery(
+          admin,
+          storeRow.user_id,
+          reminderKey,
+          claimToken,
+        );
+      }
     }
   }
 
@@ -189,49 +228,62 @@ export async function POST(request: Request) {
   return handleDailyReminders(request);
 }
 
-function buildReminderDeliveryKey(reminder: ReturnType<typeof buildDailyReminder>) {
-  if (!reminder) return "";
-
-  return reminder.occurrences
-    .map(
-      (occurrence) =>
-        `${occurrence.template.id}:${occurrence.occurrenceDate}:${occurrence.estimatedChargeDate}`,
-    )
-    .sort()
-    .join("|");
+export function buildReminderDeliveryKey(occurrence: ExpenseOccurrence) {
+  return `${occurrence.template.id}:${occurrence.occurrenceDate}:${occurrence.estimatedChargeDate}`;
 }
 
-async function hasReminderDelivery(
+async function claimReminderDelivery(
   admin: NonNullable<ReturnType<typeof createSupabaseServiceClient>>,
   userId: UUID,
   reminderKey: string,
 ) {
-  const { data, error } = await admin
+  const { data, error } = await admin.rpc("claim_push_reminder_delivery", {
+    p_user_id: userId,
+    p_reminder_key: reminderKey,
+    p_kind: REMINDER_KIND,
+    p_lease_seconds: DELIVERY_LEASE_SECONDS,
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+async function markReminderDelivered(
+  admin: NonNullable<ReturnType<typeof createSupabaseServiceClient>>,
+  userId: UUID,
+  reminderKey: string,
+  claimToken: UUID,
+) {
+  const { error } = await admin
     .from("push_reminder_deliveries")
-    .select("id")
+    .update({
+      status: "delivered",
+      delivered_at: new Date().toISOString(),
+      claim_token: null,
+    })
     .eq("user_id", userId)
     .eq("reminder_key", reminderKey)
     .eq("kind", REMINDER_KIND)
-    .maybeSingle();
+    .eq("status", "claimed")
+    .eq("claim_token", claimToken);
 
-  if (error && !error.message.includes("push_reminder_deliveries")) throw error;
-  return Boolean(data);
+  if (error) throw error;
 }
 
-async function recordReminderDelivery(
+async function releaseReminderDelivery(
   admin: NonNullable<ReturnType<typeof createSupabaseServiceClient>>,
   userId: UUID,
   reminderKey: string,
+  claimToken: UUID,
 ) {
-  const { error } = await admin.from("push_reminder_deliveries").upsert(
-    {
-      user_id: userId,
-      reminder_key: reminderKey,
-      kind: REMINDER_KIND,
-      delivered_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,reminder_key,kind", ignoreDuplicates: true },
-  );
+  const { error } = await admin
+    .from("push_reminder_deliveries")
+    .delete()
+    .eq("user_id", userId)
+    .eq("reminder_key", reminderKey)
+    .eq("kind", REMINDER_KIND)
+    .eq("status", "claimed")
+    .eq("claim_token", claimToken);
 
-  if (error && !error.message.includes("push_reminder_deliveries")) throw error;
+  if (error) throw error;
 }

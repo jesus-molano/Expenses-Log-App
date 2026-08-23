@@ -97,7 +97,10 @@ export type Database = {
           user_id: UUID;
           reminder_key: string;
           kind: string;
-          delivered_at: string;
+          status: string;
+          claimed_at: string | null;
+          claim_token: UUID | null;
+          delivered_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -105,7 +108,10 @@ export type Database = {
           user_id: UUID;
           reminder_key: string;
           kind: string;
-          delivered_at?: string;
+          status?: string;
+          claimed_at?: string | null;
+          claim_token?: UUID | null;
+          delivered_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -113,14 +119,27 @@ export type Database = {
           user_id?: UUID;
           reminder_key?: string;
           kind?: string;
-          delivered_at?: string;
+          status?: string;
+          claimed_at?: string | null;
+          claim_token?: UUID | null;
+          delivered_at?: string | null;
           created_at?: string;
         };
         Relationships: [];
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      claim_push_reminder_delivery: {
+        Args: {
+          p_user_id: UUID;
+          p_reminder_key: string;
+          p_kind: string;
+          p_lease_seconds?: number;
+        };
+        Returns: UUID | null;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

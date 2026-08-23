@@ -9,12 +9,19 @@ Mobile-first recurring expense tracker inspired by iPhone Reminders.
 - One-tap paid state with occurrence overrides.
 - Weekend charge estimate for Spain/Canary defaults.
 - Tags/categories, local persistence and Supabase sync.
-- Bank import from CSV/XLS/XLSX with expense matching, merchant aliases,
-  reviewed duplicates, one-off income and salary detection.
-- Per-expense pre-charge reminders with optional Web Push fallback the day
-  before the estimated charge.
+- Manual-first expense capture; text analysis remains an optional secondary
+  shortcut.
+- Plan split into current month, annual projection and monthly review. It keeps
+  fixed salary/payday, habitual savings goal, actual monthly savings and
+  one-off income as separate concepts.
+- No bank aggregation or spreadsheet import: the app intentionally tracks
+  recurring commitments and manual payments, not every small transaction.
+- Per-expense Web Push reminders in the configured pre-charge window, with
+  catch-up, device health/test controls and recoverable delivery leases.
 - Optional AI quick entry through Gemini; local parser fallback if no key exists.
-- PWA manifest, service worker and best-effort web notifications.
+- Build-aware offline PWA after the first production visit, including internal
+  navigation between Expenses, Plan and Settings.
+- Eight Noctalia-aligned themes with semantic chart and UI colors.
 - Supabase SSR helpers, Next 16 `proxy.ts` session refresh and RLS schema.
 
 ## Setup
@@ -25,6 +32,13 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+The development server intentionally does not keep a service worker registered.
+Test the real offline flow with the production build used by Playwright:
+
+```bash
+npm run e2e
+```
 
 ## Documentacion
 
@@ -66,10 +80,17 @@ VAPID_SUBJECT=mailto:you@example.com
 
 The Vercel cron in `vercel.json` calls `/api/push/daily-reminders` every day
 at `08:00 UTC`. The endpoint sends one Web Push reminder to each saved
-subscription when that user's synced store has an enabled, undismissed
-pre-charge reminder one day before the estimated charge.
+subscription when that user's synced store has an enabled, undismissed charge
+inside its configured reminder window. A 15-minute per-occurrence lease avoids
+concurrent duplicate deliveries and lets a later cron recover work abandoned by
+a crash. A row is marked delivered only after one device accepts the push.
 
-Apply `supabase/schema.sql` in the Supabase SQL editor to create tables and RLS policies.
+For a new Supabase project, apply `supabase/schema.sql`. Existing projects must
+also apply the pending files in `supabase/migrations/`, including the push lease
+migration. No migration is applied automatically by the web build.
+
+`public/sw.js` is generated from `src/pwa/sw.ts` by `npm run build` and is
+intentionally ignored by Git.
 
 ## Verify
 
@@ -77,4 +98,5 @@ Apply `supabase/schema.sql` in the Supabase SQL editor to create tables and RLS 
 npm run lint
 npm run test
 npm run build
+npm run e2e
 ```

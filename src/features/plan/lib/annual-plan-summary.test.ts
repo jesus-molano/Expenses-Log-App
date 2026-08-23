@@ -54,10 +54,7 @@ function storeWith({
       incomeEvents: [],
       monthlySalary: {},
       monthlySavingsTargets,
-      accounts: [],
     },
-    bankMovements: [],
-    bankMerchantAliases: [],
     preferences: {
       theme: "vice-afterglow",
       language: "es",

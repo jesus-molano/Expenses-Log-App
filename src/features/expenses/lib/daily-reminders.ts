@@ -1,6 +1,6 @@
 import { toDateOnly } from "@/domain/calendar";
 import type { ExpenseOccurrence, ExpenseStore } from "@/domain/types";
-import { buildPushLastChanceReminders } from "./last-chance-reminders";
+import { buildPushDueReminders } from "./last-chance-reminders";
 
 export type DailyReminder = {
   date: string;
@@ -11,7 +11,7 @@ export function buildDailyReminder(
   store: ExpenseStore,
   today = new Date(),
 ): DailyReminder | null {
-  const occurrences = buildPushLastChanceReminders(store, today).map(
+  const occurrences = buildPushDueReminders(store, today).map(
     (reminder) => reminder.occurrence,
   );
 

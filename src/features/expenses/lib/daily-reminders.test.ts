@@ -37,15 +37,12 @@ function store(templates: ExpenseTemplate[]): ExpenseStore {
       incomeEvents: [],
       monthlySalary: {},
       monthlySavingsTargets: {},
-      accounts: [],
     },
-    bankMovements: [],
-    bankMerchantAliases: [],
   };
 }
 
 describe("daily reminders", () => {
-  it("returns last chance expenses one day before charge", () => {
+  it("returns expenses inside their configured push window", () => {
     const reminder = buildDailyReminder(
       store([
         template({ id: "spotify", name: "Spotify", dueDay: 12 }),
@@ -59,6 +56,24 @@ describe("daily reminders", () => {
     ]);
     expect(dailyReminderTitle(reminder!)).toBe("Revisa este cobro");
     expect(dailyReminderBody(reminder!)).toBe("Spotify se cobrará pronto.");
+  });
+
+  it("catches up before the charge when the configured day was missed", () => {
+    const reminder = buildDailyReminder(
+      store([
+        template({
+          id: "insurance",
+          name: "Seguro",
+          dueDay: 15,
+          reminder: { enabled: true, daysBeforeCharge: 5 },
+        }),
+      ]),
+      new Date("2026-06-13T08:00:00"),
+    );
+
+    expect(reminder?.occurrences.map((item) => item.template.name)).toEqual([
+      "Seguro",
+    ]);
   });
 
   it("does not remind paid occurrences", () => {

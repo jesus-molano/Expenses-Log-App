@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 
 export default function Error({
@@ -9,6 +10,10 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    console.error("Unhandled application error", error);
+  }, [error]);
+
   return (
     <main className="app-page app-page-safe grid min-h-dvh place-items-center px-6 text-center">
       <div className="app-section-card max-w-sm p-5">
@@ -19,7 +24,7 @@ export default function Error({
           No se pudo cargar esta vista
         </h1>
         <p className="mt-2 text-sm text-[var(--app-text-muted)]">
-          {error.message}
+          Inténtalo de nuevo. Tus datos guardados en este dispositivo no se han borrado.
         </p>
         <Button
           type="button"

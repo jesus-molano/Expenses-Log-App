@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { OfflineLink } from "@/components/ui/OfflineLink";
 import { t } from "@/shared/i18n";
 import { useSettingsController } from "../hooks/use-settings-controller";
 import { SettingsDialogs } from "./SettingsDialogs";
@@ -20,15 +20,15 @@ export function SettingsView({ from }: { from?: "money" | "expenses" }) {
   return (
     <main className="app-page app-page-safe px-4">
       <div className="mx-auto max-w-2xl">
-        <Link
+        <OfflineLink
           href={settings.backHref}
           className="app-back-link inline-flex h-10 items-center gap-2 rounded-full px-3 text-sm font-medium"
         >
           <ArrowLeft size={18} />
           {settings.backLabel}
-        </Link>
+        </OfflineLink>
 
-        <Card variant="section" className="mt-4 p-4">
+        <Card variant="section" className="app-settings-card mt-4 p-4">
           <header>
             <h1 className="text-2xl font-semibold text-[var(--app-text)]">
               {t("settings.title")}

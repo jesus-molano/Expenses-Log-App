@@ -2,19 +2,16 @@ import type { ExpenseCategory, ExpenseStore, ExpenseTemplate } from "./types";
 import { defaultFinanceStore, emptyFinanceStore } from "./finance";
 
 export const emptyStore: ExpenseStore = {
+  schemaVersion: 3,
   categories: [],
   templates: [],
   overrides: [],
   finance: emptyFinanceStore,
-  bankMovements: [],
-  bankMerchantAliases: [],
   deleted: {
     categories: [],
     templates: [],
     overrides: [],
     incomeEvents: [],
-    bankMovements: [],
-    bankMerchantAliases: [],
   },
   preferences: {
     theme: "vice-afterglow",
@@ -41,6 +38,7 @@ const categories: ExpenseCategory[] = [
 ];
 
 export const demoStore: ExpenseStore = {
+  schemaVersion: 3,
   categories,
   templates: [
     template("exp-home-expenses", "Gastos de casa", "Piso y suministros", 660, "cat-home", "2026-01-01", 1),
@@ -76,25 +74,11 @@ export const demoStore: ExpenseStore = {
     paid("ovr-gym-jun", "exp-gym", "2026-06-01", 50),
   ],
   finance: defaultFinanceStore,
-  bankMovements: [],
-  bankMerchantAliases: [
-    {
-      id: "alias-apple-icloud",
-      userId: "demo",
-      merchantKey: "apple",
-      templateId: "exp-icloud",
-      label: "APPLE",
-      createdAt: "2026-01-01T09:00:00.000Z",
-      updatedAt: "2026-01-01T09:00:00.000Z",
-    },
-  ],
   deleted: {
     categories: [],
     templates: [],
     overrides: [],
     incomeEvents: [],
-    bankMovements: [],
-    bankMerchantAliases: [],
   },
   preferences: {
     theme: "vice-afterglow",

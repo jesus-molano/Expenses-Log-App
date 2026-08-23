@@ -43,11 +43,9 @@ export function buildLastChanceReminders(
     .sort((left, right) => left.daysUntilCharge - right.daysUntilCharge);
 }
 
-export function buildPushLastChanceReminders(
+export function buildPushDueReminders(
   store: ExpenseStore,
   today = new Date(),
 ): LastChanceReminder[] {
-  return buildLastChanceReminders(store, today).filter(
-    (reminder) => reminder.daysUntilCharge === 1,
-  );
+  return buildLastChanceReminders(store, today);
 }

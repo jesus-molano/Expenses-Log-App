@@ -61,12 +61,12 @@ describe("mergeExpenseStores", () => {
     const merged = mergeExpenseStores(
       {
         ...emptyStore,
-        schemaVersion: 2,
+        schemaVersion: 3,
         occurrenceRecords: [localRecord],
       },
       {
         ...emptyStore,
-        schemaVersion: 2,
+        schemaVersion: 3,
         occurrenceRecords: [cloudRecord],
       },
     );
@@ -89,7 +89,7 @@ describe("mergeExpenseStores", () => {
     };
     const deletedLocal: ExpenseStore = {
       ...emptyStore,
-      schemaVersion: 2,
+      schemaVersion: 3,
       finance: {
         ...emptyStore.finance,
         monthlySavingsContributions: {},
@@ -101,7 +101,7 @@ describe("mergeExpenseStores", () => {
     };
     const cloud: ExpenseStore = {
       ...emptyStore,
-      schemaVersion: 2,
+      schemaVersion: 3,
       finance: {
         ...emptyStore.finance,
         monthlySavingsContributions: {

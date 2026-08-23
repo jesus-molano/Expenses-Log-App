@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createSupabaseServiceClient } from "@/data/supabase/admin-client";
 import { toDatabaseUuid } from "@/data/supabase/database.types";
 import { createClient } from "@/utils/supabase/server";
 
@@ -18,10 +17,11 @@ const unsubscribeSchema = z.object({
 
 export async function GET() {
   const publicKey = process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
 
-  if (!publicKey) {
+  if (!publicKey || !privateKey) {
     return NextResponse.json(
-      { error: "Configura VAPID_PUBLIC_KEY para activar push real." },
+      { code: "PUSH_NOT_CONFIGURED" },
       { status: 503 },
     );
   }
@@ -41,9 +41,8 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient();
-  const admin = createSupabaseServiceClient();
 
-  if (!supabase || !admin) {
+  if (!supabase) {
     return NextResponse.json({
       mode: "demo",
       message: "Suscripción recibida. Configura Supabase para guardarla.",
@@ -57,22 +56,26 @@ export async function POST(request: Request) {
 
   if (userError || !user) {
     return NextResponse.json(
-      { error: "Inicia sesión para guardar avisos push." },
+      { code: "UNAUTHENTICATED" },
       { status: 401 },
     );
   }
 
-  const { error } = await admin.from("push_subscriptions").upsert({
-    user_id: toDatabaseUuid(user.id),
-    endpoint: parsed.data.endpoint,
-    p256dh: parsed.data.keys.p256dh,
-    auth: parsed.data.keys.auth,
-    updated_at: new Date().toISOString(),
-  });
+  const { error } = await supabase.from("push_subscriptions").upsert(
+    {
+      user_id: toDatabaseUuid(user.id),
+      endpoint: parsed.data.endpoint,
+      p256dh: parsed.data.keys.p256dh,
+      auth: parsed.data.keys.auth,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "endpoint" },
+  );
 
   if (error) {
+    console.error("Could not save push subscription", error);
     return NextResponse.json(
-      { error: "No se pudo guardar la suscripción." },
+      { code: "PUSH_SUBSCRIPTION_SAVE_FAILED" },
       { status: 500 },
     );
   }
@@ -92,9 +95,8 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = await createClient();
-  const admin = createSupabaseServiceClient();
 
-  if (!supabase || !admin) {
+  if (!supabase) {
     return NextResponse.json({
       mode: "demo",
       message: "Suscripción desactivada en este dispositivo.",
@@ -108,20 +110,21 @@ export async function DELETE(request: Request) {
 
   if (userError || !user) {
     return NextResponse.json(
-      { error: "Inicia sesión para desactivar avisos push guardados." },
+      { code: "UNAUTHENTICATED" },
       { status: 401 },
     );
   }
 
-  const { error } = await admin
+  const { error } = await supabase
     .from("push_subscriptions")
     .delete()
     .eq("user_id", toDatabaseUuid(user.id))
     .eq("endpoint", parsed.data.endpoint);
 
   if (error) {
+    console.error("Could not delete push subscription", error);
     return NextResponse.json(
-      { error: "No se pudo borrar la suscripción." },
+      { code: "PUSH_SUBSCRIPTION_DELETE_FAILED" },
       { status: 500 },
     );
   }

@@ -23,6 +23,12 @@ type MonthlyTrendChartProps = {
   isCompactChart: boolean;
 };
 
+const chartSeriesColors = {
+  expenses: "var(--app-chart-expenses)",
+  savings: "var(--app-chart-savings)",
+  capacity: "var(--app-chart-capacity)",
+} as const;
+
 export function MonthlyTrendChart({
   language,
   moneySeries,
@@ -34,15 +40,15 @@ export function MonthlyTrendChart({
     <>
       <div className="app-chart-legend mt-3 flex flex-wrap gap-x-3 gap-y-2 text-xs font-semibold">
         <ChartLegendItem
-          color="var(--app-chart-expenses)"
+          color={chartSeriesColors.expenses}
           label={t("money.fixedExpenses", language)}
         />
         <ChartLegendItem
-          color="var(--app-chart-savings)"
+          color={chartSeriesColors.savings}
           label={language === "es" ? "Ahorro real" : "Actual savings"}
         />
         <ChartLegendItem
-          color="var(--app-chart-capacity)"
+          color={chartSeriesColors.capacity}
           label={language === "es" ? "Capacidad máxima" : "Maximum capacity"}
         />
       </div>
@@ -78,12 +84,12 @@ export function MonthlyTrendChart({
                 >
                   <stop
                     offset="0%"
-                    stopColor="var(--app-chart-expenses)"
+                    stopColor={chartSeriesColors.expenses}
                     stopOpacity={0.94}
                   />
                   <stop
                     offset="100%"
-                    stopColor="var(--app-chart-expenses)"
+                    stopColor={chartSeriesColors.expenses}
                     stopOpacity={0.42}
                   />
                 </linearGradient>
@@ -96,12 +102,12 @@ export function MonthlyTrendChart({
                 >
                   <stop
                     offset="0%"
-                    stopColor="var(--app-chart-savings)"
+                    stopColor={chartSeriesColors.savings}
                     stopOpacity={0.96}
                   />
                   <stop
                     offset="100%"
-                    stopColor="var(--app-chart-savings)"
+                    stopColor={chartSeriesColors.savings}
                     stopOpacity={0.44}
                   />
                 </linearGradient>
@@ -168,7 +174,7 @@ export function MonthlyTrendChart({
                 type="monotone"
                 dataKey="capacity"
                 name={language === "es" ? "Capacidad máxima" : "Maximum capacity"}
-                stroke="var(--app-chart-capacity)"
+                stroke={chartSeriesColors.capacity}
                 strokeWidth={2}
                 strokeDasharray="6 5"
                 dot={false}
@@ -228,6 +234,7 @@ function ChartLegendItem({ color, label }: { color: string; label: string }) {
 
 type ChartTooltipPayload = {
   color?: string;
+  dataKey?: string | number;
   name?: string;
   value?: number | string;
 };
@@ -253,7 +260,7 @@ function ChartTooltip({ active, label, payload }: ChartTooltipProps) {
               <span
                 aria-hidden="true"
                 className="size-2 rounded-full"
-                style={{ background: entry.color }}
+                style={{ backgroundColor: getTooltipSeriesColor(entry) }}
               />
               <span className="min-w-0 truncate">{entry.name}</span>
             </span>
@@ -265,6 +272,21 @@ function ChartTooltip({ active, label, payload }: ChartTooltipProps) {
       </div>
     </div>
   );
+}
+
+export function getTooltipSeriesColor(entry: ChartTooltipPayload) {
+  if (
+    typeof entry.dataKey === "string" &&
+    entry.dataKey in chartSeriesColors
+  ) {
+    return chartSeriesColors[
+      entry.dataKey as keyof typeof chartSeriesColors
+    ];
+  }
+
+  return entry.color?.startsWith("url(")
+    ? "var(--app-text-muted)"
+    : (entry.color ?? "var(--app-text-muted)");
 }
 
 function compactMoneyAxis(value: number) {

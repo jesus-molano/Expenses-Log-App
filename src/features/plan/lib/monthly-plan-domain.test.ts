@@ -30,7 +30,6 @@ const finance: FinanceStore = {
     "2026-05": 300,
     "2026-06": 300,
   },
-  accounts: [],
 };
 
 const templates: ExpenseTemplate[] = [

@@ -22,7 +22,6 @@ import { applyAppTheme } from "@/shared/theme";
 import {
   addExpenseToStore,
   addIncomeEventToStore,
-  confirmBankImportInStore,
   clearExpensesFromStore,
   clearIncomeFromStore,
   deleteExpenseFromStore,
@@ -39,7 +38,6 @@ import {
   updateMonthlyExpenseOccurrenceInStore,
   updateMonthlySalaryInStore,
   updateMonthlySavingsContributionInStore,
-  updateMonthlySavingsInStore,
   updateMonthlySavingsTargetInStore,
   updateThemeInStore,
 } from "./store-commands";
@@ -49,7 +47,6 @@ import type {
   MonthlyExpenseOverrideInput,
   MonthlySalaryInput,
   MonthlySavingsContributionInput,
-  MonthlySavingsInput,
   MonthlySavingsTargetInput,
 } from "./store-types";
 import { preserveClosedOccurrenceRecords } from "./store-history";
@@ -124,7 +121,7 @@ function useExpenseStoreValue() {
     await persistence.persistImmediately(
       {
         ...clearedStore,
-        schemaVersion: 2,
+        schemaVersion: 3,
         occurrenceRecords: [],
         deleted: {
           ...clearedStore.deleted,
@@ -195,10 +192,6 @@ function useExpenseStoreValue() {
     persist(updateMonthlySavingsContributionInStore(store, input));
   }
 
-  function updateMonthlySavings(input: MonthlySavingsInput) {
-    persist(updateMonthlySavingsInStore(store, input));
-  }
-
   function updateMonthlySalary(input: MonthlySalaryInput) {
     persist(updateMonthlySalaryInStore(store, input));
   }
@@ -229,10 +222,6 @@ function useExpenseStoreValue() {
     persist(updateLanguageInStore(store, language));
   }
 
-  function confirmBankImport(input: Parameters<typeof confirmBankImportInStore>[1]) {
-    persist(confirmBankImportInStore(store, input));
-  }
-
   return {
     store,
     persist,
@@ -249,7 +238,6 @@ function useExpenseStoreValue() {
     updateMoneySettings,
     updateMonthlySavingsTarget,
     updateMonthlySavingsContribution,
-    updateMonthlySavings,
     updateMonthlySalary,
     addIncomeEvent,
     deleteIncomeEvent,
@@ -257,7 +245,6 @@ function useExpenseStoreValue() {
     updateMonthlyExpenseOccurrence,
     updateTheme,
     updateLanguage,
-    confirmBankImport,
     syncStatus: persistence.syncStatus,
     syncMessage: persistence.syncMessage,
     isHydrated: persistence.isHydrated,

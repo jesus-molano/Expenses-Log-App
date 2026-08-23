@@ -28,12 +28,18 @@ Hay tests de:
 - API de parseo AI/local.
 - Limpieza de sync metadata.
 - Service worker y fallback offline.
+- Navegacion interna entre Gastos, Plan y Ajustes sin red, incluidas las dos
+  procedencias de Ajustes.
 - Persistencia local y normalizacion de store.
+- Migracion v3, incluida la prioridad de pagos corregidos sobre movimientos
+  bancarios legacy.
 - Politica de sync y mensajes.
 - Comandos de store.
+- Rutas push, concurrencia y recuperacion de un lease abandonado.
 - Recurrencias, finanzas, parser, labels, timeline y DnD.
 - Estilos del design system.
-- Flujos e2e de dashboard y accesibilidad critica.
+- Flujos e2e de dashboard, tooltip de la grafica, menus sin recorte y
+  accesibilidad critica.
 
 ## Cuando agregar tests
 
@@ -42,7 +48,7 @@ Agregar o actualizar Vitest cuando se toque:
 - Recurrencias, fechas o calculos monetarios.
 - Parser local o contrato de parseo AI.
 - Store commands.
-- Normalizacion, importacion bancaria o merge cloud/local.
+- Normalizacion, migraciones de store o merge cloud/local.
 - Preferencias de tema/idioma.
 - APIs route handlers con seguridad o fallback.
 
@@ -80,9 +86,12 @@ Cambios de API/auth:
 Cambios PWA:
 
 - Validar carga inicial.
-- Validar reload offline basico.
+- Validar reload offline y navegacion interna entre las rutas principales.
 - Revisar cache name y assets precacheados si cambian iconos o shell.
-- Confirmar que bundles `/_next/` no quedan cacheados de forma obsoleta.
+- Confirmar que API, origenes externos y peticiones no GET siguen fuera del
+  cache.
+- Borrar el artefacto versionado antiguo si reaparece; `public/sw.js` debe ser
+  generado por build e ignorado por Git.
 
 Cambios UI:
 
@@ -100,4 +109,6 @@ Cambios UI:
 - El contenido no debe quedar tapado por bottom nav o safe area.
 - Los overlays deben gestionar foco y cierre.
 - Los menus deben soportar teclado basico.
+- Los listbox deben poder salir de su superficie padre o usar scroll propio sin
+  cortar opciones.
 - El swipe no debe bloquear scroll vertical normal.

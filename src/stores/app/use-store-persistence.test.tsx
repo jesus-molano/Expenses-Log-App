@@ -143,7 +143,7 @@ describe("useStorePersistence", () => {
     expect(onHydrate).toHaveBeenCalledTimes(1);
     expect(onHydrate).toHaveBeenCalledWith(
       expect.objectContaining({
-        schemaVersion: 2,
+        schemaVersion: 3,
         templates: [expect.objectContaining({ id: "initial" })],
       }),
     );
@@ -192,7 +192,7 @@ describe("useStorePersistence", () => {
     await waitFor(() =>
       expect(onHydrate).toHaveBeenCalledWith(
         expect.objectContaining({
-          schemaVersion: 2,
+          schemaVersion: 3,
           templates: [expect.objectContaining({ id: "local" })],
         }),
       ),

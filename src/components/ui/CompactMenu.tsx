@@ -81,6 +81,13 @@ export function CompactMenu({
   }
 
   function handleTriggerKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "Escape" && open) {
+      event.preventDefault();
+      onOpenChange(false);
+      focusTrigger();
+      return;
+    }
+
     if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
     event.preventDefault();
     openWithKeyboardRef.current = true;

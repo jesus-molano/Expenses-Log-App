@@ -22,10 +22,14 @@ visuales hardcodeados cuando exista un token semantico.
 
 Temas soportados:
 
-- `dark`
-- `rose-pine`
+- `atlas`
+- `obsidian-amber`
+- `vice-afterglow` (predeterminado)
 - `catppuccin`
-- `light`
+- `rose-pine`
+- `nord`
+- `dracula`
+- `tokyo-night`
 
 El tema activo se aplica con `data-theme` en `<html>`. Los colores funcionales
 deben usar variables como `--app-accent`, `--app-danger`, `--app-success`,
@@ -79,6 +83,8 @@ Expectativas minimas:
   Escape para cerrar y restauracion de foco.
 - `CompactMenu` soporta roles `menu` o `listbox`, Escape, flechas y foco al
   abrir/cerrar.
+- Los menus flotantes no deben quedar recortados por la superficie padre. Si el
+  contenido no cabe en pantalla, el panel mantiene scroll vertical propio.
 - Botones icon-only necesitan nombre accesible.
 - Estados focus-visible deben ser visibles con tokens del sistema.
 - Overlays deben bloquear scroll de fondo cuando estan abiertos.

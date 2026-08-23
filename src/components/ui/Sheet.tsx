@@ -19,6 +19,7 @@ const focusableSelector = [
   "input:not(:disabled)",
   "select:not(:disabled)",
   "textarea:not(:disabled)",
+  "summary",
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
@@ -26,7 +27,11 @@ function getFocusableElements(panel: HTMLElement): HTMLElement[] {
   return Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector))
     .filter((element) => {
       const hidden = element.getAttribute("aria-hidden") === "true";
-      return !hidden && element.tabIndex >= 0;
+      const closedDetails = element.closest("details:not([open])");
+      const hiddenByClosedDetails =
+        closedDetails !== null &&
+        element !== closedDetails.querySelector(":scope > summary");
+      return !hidden && !hiddenByClosedDetails && element.tabIndex >= 0;
     });
 }
 

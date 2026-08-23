@@ -18,20 +18,15 @@ La app usa:
 
 ## Service worker
 
-`public/sw.js` usa cache `expense-reminders-v5`.
+Serwist genera `public/sw.js` desde `src/pwa/sw.ts` durante el build. El archivo
+generado no se versiona.
 
-Precachea una shell minima:
-
-- `/`
-- manifest
-- iconos principales
-- favicon
-- apple touch icon
-
-Para navegaciones, intenta red y actualiza el cache de `/`. Si no hay red,
-responde con la shell cacheada. Para assets del mismo origen, intenta red,
-cachea respuestas correctas y cae a cache si falla. Las rutas `/_next/` se piden
-a red para evitar servir bundles obsoletos.
+La app precachea los recursos del build y las variantes de Ajustes necesarias.
+Las navegaciones usan `NetworkFirst` y caen a la shell precacheada. Los enlaces
+entre Gastos, Plan y Ajustes hacen una navegación de documento si el navegador
+está offline, por lo que no dependen de una respuesta RSC nueva. Las respuestas
+RSC GET usan un cache separado y limitado. Los assets estáticos usan caches con
+caducidad. API, origenes externos y peticiones no GET usan solo red.
 
 El service worker tambien maneja:
 
@@ -70,8 +65,11 @@ Endpoints principales:
   sobredimensionada de Supabase Auth. GET responde 405.
 - `/api/push/subscribe`: guarda suscripciones push.
 - `/api/push/test`: prueba notificaciones.
+- `/api/push/status`: verifica que el endpoint actual sigue registrado y muestra
+  el ultimo envio programado completado.
 - `/api/push/daily-reminders`: endpoint llamado por cron para recordatorios.
-- `/api/account`: operaciones de cuenta.
+- `/api/account`: borra el usuario autenticado; las filas dependientes se
+  eliminan mediante claves foraneas `ON DELETE CASCADE`.
 
 ## AI y rate limit
 
@@ -100,16 +98,31 @@ credenciales server-side y debe protegerse con `CRON_SECRET`.
 Las suscripciones push se guardan en Supabase y el cron consulta stores de
 usuario para enviar recordatorios de cobro.
 
-El cron solo envia el recordatorio de pre-cobro cuando:
+Ajustes diferencia permiso local, suscripcion del navegador y registro remoto.
+Puede resincronizar el dispositivo y enviar una notificacion de prueba. La
+configuracion se considera disponible solo cuando existen las dos claves VAPID.
+
+El cron envia recordatorios pendientes cuando:
 
 - El gasto tiene `reminder.enabled`.
 - La ocurrencia sigue `due`.
-- Falta exactamente 1 dia para `estimatedChargeDate`.
+- Faltan entre 0 y `daysBeforeCharge` dias para `estimatedChargeDate`; esta
+  ventana permite recuperar una ejecucion diaria perdida.
 - El usuario no descarto el aviso para esa `estimatedChargeDate`.
 - Hay al menos una suscripcion push guardada para el usuario.
 
-El endpoint registra entregas en `push_reminder_deliveries` con una clave por
-usuario, tipo y ocurrencias incluidas para evitar duplicados.
+El endpoint reclama cada ocurrencia en `push_reminder_deliveries` con una clave
+por usuario, template y fechas. La reclamacion es un lease atomico de 15 minutos:
+otra ejecucion no puede enviar a la vez, pero puede recuperar el trabajo si el
+proceso anterior cae. La fila solo pasa a `delivered` cuando al menos un
+dispositivo acepta el push. Si todos fallan, se libera inmediatamente. Esta
+estrategia prioriza no perder avisos; una caida posterior a la aceptacion del
+proveedor y anterior al marcado final puede producir un duplicado excepcional.
+
+La funcion SQL `claim_push_reminder_delivery` usa `security invoker`. Solo
+`service_role` tiene permiso de ejecucion. La migracion
+`20260823215337_push_delivery_leases.sql` añade estado, token y tiempo de claim;
+debe aplicarse antes de desplegar el route handler nuevo.
 
 ## Variables de entorno
 

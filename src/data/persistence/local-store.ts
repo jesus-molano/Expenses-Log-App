@@ -53,7 +53,7 @@ export function mergeExpenseStores(
   );
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     categories: mergeLatestById(
       normalizedCloudStore.categories,
       normalizedLocalStore.categories,
@@ -93,9 +93,6 @@ export function mergeExpenseStores(
         normalizedLocalStore.finance.monthlySavingsContributions,
         deleted.savingsContributions,
       ),
-      accounts: normalizedLocalStore.finance.accounts.length
-        ? normalizedLocalStore.finance.accounts
-        : normalizedCloudStore.finance.accounts,
     },
     preferences: {
       theme:
@@ -107,16 +104,6 @@ export function mergeExpenseStores(
         normalizedCloudStore.preferences?.language ??
         "es",
     },
-    bankMovements: mergeLatestById(
-      normalizedCloudStore.bankMovements,
-      normalizedLocalStore.bankMovements,
-      deleted.bankMovements,
-    ),
-    bankMerchantAliases: mergeAliases(
-      normalizedCloudStore.bankMerchantAliases,
-      normalizedLocalStore.bankMerchantAliases,
-      deleted.bankMerchantAliases,
-    ),
     deleted,
   };
 }
@@ -130,11 +117,6 @@ function mergeDeletedIds(
     templates: mergeIdLists(base?.templates, incoming?.templates),
     overrides: mergeIdLists(base?.overrides, incoming?.overrides),
     incomeEvents: mergeIdLists(base?.incomeEvents, incoming?.incomeEvents),
-    bankMovements: mergeIdLists(base?.bankMovements, incoming?.bankMovements),
-    bankMerchantAliases: mergeIdLists(
-      base?.bankMerchantAliases,
-      incoming?.bankMerchantAliases,
-    ),
     occurrenceRecords: mergeIdLists(
       base?.occurrenceRecords,
       incoming?.occurrenceRecords,
@@ -151,22 +133,6 @@ function mergeIdLists(
   incoming: string[] | undefined,
 ): string[] {
   return Array.from(new Set([...(base ?? []), ...(incoming ?? [])]));
-}
-
-function mergeAliases(
-  base: ExpenseStore["bankMerchantAliases"],
-  incoming: ExpenseStore["bankMerchantAliases"],
-  deletedIds: string[] = [],
-): ExpenseStore["bankMerchantAliases"] {
-  const deleted = new Set(deletedIds);
-  const byRelationship = new Map<string, ExpenseStore["bankMerchantAliases"][number]>();
-
-  for (const alias of [...base, ...incoming]) {
-    if (deleted.has(alias.id)) continue;
-    byRelationship.set(`${alias.templateId}:${alias.merchantKey}`, alias);
-  }
-
-  return Array.from(byRelationship.values());
 }
 
 function mergeMonthlyRecord<T>(

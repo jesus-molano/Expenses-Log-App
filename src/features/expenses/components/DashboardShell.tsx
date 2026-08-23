@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { Landmark, Settings, WalletCards } from "lucide-react";
 import { useEffect } from "react";
+import { OfflineLink } from "@/components/ui/OfflineLink";
 import type { AppLanguage } from "@/domain/types";
 import type { PanelChromeState } from "@/features/expenses/lib/scroll-chrome-state";
 import { t } from "@/shared/i18n";
@@ -58,13 +58,13 @@ export function DashboardShell({
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {headerAction}
-                <Link
+                <OfflineLink
                   href={`/settings?from=${activeTab}`}
                   aria-label={t("common.settings", language)}
                   className="app-icon-button size-10 min-h-10 min-w-10 shrink-0"
                 >
                   <Settings size={18} />
-                </Link>
+                </OfflineLink>
               </div>
             </div>
           </section>
@@ -110,13 +110,13 @@ function ChromeTab({
   label: string;
 }) {
   return (
-    <Link
+    <OfflineLink
       href={href}
       data-active={active ? "true" : "false"}
       className="app-bottom-nav-tab inline-flex items-center justify-center gap-2"
     >
       {icon}
       <span>{label}</span>
-    </Link>
+    </OfflineLink>
   );
 }

@@ -3,7 +3,7 @@ import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore, ExpenseTemplate } from "@/domain/types";
 import {
   buildLastChanceReminders,
-  buildPushLastChanceReminders,
+  buildPushDueReminders,
 } from "./last-chance-reminders";
 
 function template(overrides: Partial<ExpenseTemplate>): ExpenseTemplate {
@@ -135,17 +135,41 @@ describe("last chance reminders", () => {
     expect(reminders).toEqual([]);
   });
 
-  it("push reminders only include the day-before window", () => {
-    const reminders = buildPushLastChanceReminders(
+  it("push reminders use the configured window and allow catch-up", () => {
+    const reminders = buildPushDueReminders(
       store([
-        template({ id: "tomorrow", name: "Tomorrow", dueDay: 15 }),
-        template({ id: "later", name: "Later", dueDay: 16 }),
+        template({
+          id: "tomorrow",
+          name: "Tomorrow",
+          dueDay: 15,
+          reminder: { enabled: true, daysBeforeCharge: 1 },
+        }),
+        template({
+          id: "configured-five",
+          name: "Configured five",
+          dueDay: 19,
+          reminder: { enabled: true, daysBeforeCharge: 5 },
+        }),
+        template({
+          id: "catch-up",
+          name: "Catch up",
+          dueDay: 17,
+          reminder: { enabled: true, daysBeforeCharge: 5 },
+        }),
+        template({
+          id: "too-far",
+          name: "Too far",
+          dueDay: 20,
+          reminder: { enabled: true, daysBeforeCharge: 5 },
+        }),
       ]),
       new Date("2026-06-14T09:00:00"),
     );
 
     expect(reminders.map((reminder) => reminder.occurrence.template.name)).toEqual([
       "Tomorrow",
+      "Catch up",
+      "Configured five",
     ]);
   });
 });
