@@ -1,4 +1,5 @@
 import type { AppLanguage, AppTheme, ExpenseStore } from "@/domain/types";
+import { DEFAULT_THEME } from "@/shared/theme";
 
 export function updateThemeInStore(
   store: ExpenseStore,
@@ -22,7 +23,7 @@ export function updateLanguageInStore(
     ...store,
     preferences: {
       ...store.preferences,
-      theme: store.preferences?.theme ?? "dark",
+      theme: store.preferences?.theme ?? DEFAULT_THEME,
       language,
     },
   };

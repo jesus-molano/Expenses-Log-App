@@ -82,6 +82,7 @@ export function dismissLastChanceReminderInStore(
   store: ExpenseStore,
   occurrence: ExpenseOccurrence,
 ): ExpenseStore {
+  const updatedAt = new Date().toISOString();
   const existing = occurrence.override;
   const nextOverride: ExpenseOccurrenceOverride = {
     id: existing?.id ?? createId("ovr"),
@@ -97,8 +98,9 @@ export function dismissLastChanceReminderInStore(
     paidAt: existing?.paidAt,
     amountPaid: existing?.amountPaid,
     note: existing?.note,
-    reminderDismissedAt: new Date().toISOString(),
+    reminderDismissedAt: updatedAt,
     reminderDismissedChargeDate: occurrence.estimatedChargeDate,
+    updatedAt,
   };
 
   return {
@@ -178,8 +180,31 @@ export function togglePaidInStore(
 ): ExpenseStore {
   const existing = occurrence.override;
   const isPaid = occurrence.status === "paid";
+  const updatedAt = new Date().toISOString();
   const overrides = isPaid
-    ? store.overrides.filter((override) => override.id !== existing?.id)
+    ? occurrence.record
+      ? [
+          ...store.overrides.filter(
+            (override) =>
+              !(
+                override.templateId === occurrence.template.id &&
+                override.occurrenceDate === occurrence.occurrenceDate
+              ),
+          ),
+          {
+            id: existing?.id ?? createId("ovr"),
+            userId: existing?.userId ?? "demo",
+            templateId: occurrence.template.id,
+            occurrenceDate: occurrence.occurrenceDate,
+            dueDate: persistableDueDate(
+              occurrence.occurrenceDate,
+              occurrence.dueDate,
+            ),
+            status: "due" as const,
+            updatedAt,
+          },
+        ]
+      : store.overrides.filter((override) => override.id !== existing?.id)
     : [
         ...store.overrides.filter(
           (override) =>
@@ -198,8 +223,9 @@ export function togglePaidInStore(
             occurrence.dueDate,
           ),
           status: "paid" as const,
-          paidAt: new Date().toISOString(),
+          paidAt: updatedAt,
           amountPaid: occurrence.template.amount,
+          updatedAt,
         },
       ];
 
@@ -217,6 +243,7 @@ export function skipOccurrenceInStore(
   store: ExpenseStore,
   occurrence: ExpenseOccurrence,
 ): ExpenseStore {
+  const updatedAt = new Date().toISOString();
   const overrides = [
     ...store.overrides.filter(
       (override) =>
@@ -237,6 +264,7 @@ export function skipOccurrenceInStore(
       sortOrder: occurrence.override?.sortOrder,
       status: "skipped" as const,
       note: "Skipped from monthly plan occurrence",
+      updatedAt,
     },
   ];
 
@@ -262,6 +290,7 @@ export function moveOccurrenceInStore(
     paidAt: existing?.paidAt,
     amountPaid: existing?.amountPaid,
     note: existing?.note,
+    updatedAt: new Date().toISOString(),
   };
 
   const overrides = [
@@ -355,6 +384,7 @@ export function updateMonthlyExpenseOccurrenceInStore(
         ? Math.max(Number(input.amount), 0.01)
         : undefined,
     note: existing?.note,
+    updatedAt: now,
   };
 
   return {
@@ -460,6 +490,7 @@ function applyBankMatch(
       note: existingOverride?.note ?? `Conciliado con ${movement.description}`,
       reminderDismissedAt: existingOverride?.reminderDismissedAt,
       reminderDismissedChargeDate: existingOverride?.reminderDismissedChargeDate,
+      updatedAt: new Date().toISOString(),
     } satisfies ExpenseOccurrenceOverride;
   });
 

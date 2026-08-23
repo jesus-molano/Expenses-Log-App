@@ -1,13 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Inter } from "next/font/google";
 import { PwaRegister } from "@/app/providers/PwaRegister";
 import { ThemeApplier } from "@/app/providers/ThemeApplier";
 import { ExpenseStoreProvider } from "@/stores/app/use-expense-store";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -18,7 +19,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Expense Reminders",
   description: "Seguimiento inteligente de gastos recurrentes",
-  manifest: "/manifest.webmanifest?v=5",
+  manifest: "/manifest.webmanifest?v=6",
   appleWebApp: {
     capable: true,
     title: "Expense Log",
@@ -61,8 +62,8 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      data-theme="dark"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      data-theme="vice-afterglow"
+      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <ThemeApplier />

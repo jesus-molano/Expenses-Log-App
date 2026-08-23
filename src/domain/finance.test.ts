@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildAccountAllocations,
   buildMonthlyMoneyPlan,
   defaultFinanceStore,
+  emptyFinanceStore,
+  generateStoreOccurrences,
   getMonthlySalarySettings,
   getMonthlySavingsTarget,
+  materializeClosedOccurrenceRecords,
 } from "./finance";
 import { generateOccurrences } from "./recurrence";
-import type { ExpenseOccurrence, MonthlyMoneyPlan, PlanAccount } from "./types";
+import type {
+  ExpenseOccurrence,
+  ExpenseStore,
+} from "./types";
 
 function occurrence(
   name: string,
@@ -41,30 +46,6 @@ function occurrence(
   };
 }
 
-const accountPlan: MonthlyMoneyPlan = {
-  month: "2026-06",
-  incomeTotal: 3239.16,
-  salaryIncomeTotal: 2200,
-  extraIncomeTotal: 1039.16,
-  plannedExpensesTotal: 451.99,
-  expensesContribution: 451.99,
-  savingsContribution: 600,
-  remainingContribution: 2187.17,
-  investmentContribution: 0,
-  shortfall: 0,
-};
-
-function account(
-  id: string,
-  purposes: PlanAccount["purposes"],
-): PlanAccount {
-  return {
-    id,
-    name: id,
-    purposes,
-  };
-}
-
 describe("finance", () => {
   it("allocates income to expenses, savings and main account", () => {
     const plan = buildMonthlyMoneyPlan({
@@ -74,7 +55,8 @@ describe("finance", () => {
     });
 
     expect(plan.expensesContribution).toBe(660);
-    expect(plan.savingsContribution).toBe(300);
+    expect(plan.savingsTarget).toBe(300);
+    expect(plan.savingsContribution).toBe(0);
     expect(plan.remainingContribution).toBe(1280);
   });
 
@@ -166,77 +148,99 @@ describe("finance", () => {
     expect(getMonthlySavingsTarget(finance, "2026-08")).toBe(800);
   });
 
-  it("does not show a duplicated amount for one consolidated account", () => {
-    const [allocation] = buildAccountAllocations(
-      [
-        account("Sabadell", [
-          "salary",
-          "expenses",
-          "daily",
-          "savings",
-          "investment",
-          "other",
-        ]),
+  it("keeps closed occurrences stable after a template is edited or deleted", () => {
+    const template = occurrence("Internet", 60, "2026-06-08").template;
+    const base: ExpenseStore = {
+      schemaVersion: 2,
+      categories: [
+        {
+          id: "cat",
+          userId: "demo",
+          name: "Servicios",
+          icon: "WalletCards",
+          tone: "blue",
+        },
       ],
-      accountPlan,
+      templates: [{ ...template, endDate: "2026-06-30" }],
+      overrides: [],
+      occurrenceRecords: [],
+      finance: emptyFinanceStore,
+      bankMovements: [],
+      bankMerchantAliases: [],
+      preferences: { theme: "vice-afterglow", language: "es" },
+    };
+    const recorded = materializeClosedOccurrenceRecords(base, {
+      today: new Date("2026-08-10T12:00:00"),
+    });
+
+    const edited: ExpenseStore = {
+      ...recorded,
+      categories: [{ ...recorded.categories[0], name: "Renombrada" }],
+      templates: [
+        {
+          ...recorded.templates[0],
+          name: "Internet nuevo",
+          amount: 99,
+          updatedAt: "2026-08-10T12:00:00.000Z",
+        },
+      ],
+    };
+    const editedJune = generateStoreOccurrences(
+      edited,
+      "2026-06-01",
+      "2026-06-30",
+    );
+    const deletedJune = generateStoreOccurrences(
+      { ...edited, templates: [] },
+      "2026-06-01",
+      "2026-06-30",
     );
 
-    expect(allocation.isConsolidated).toBe(true);
-    expect(allocation.showAmount).toBe(false);
-    expect(allocation.assignedAmount).toBeCloseTo(accountPlan.incomeTotal);
+    expect(editedJune[0].template).toMatchObject({
+      name: "Internet",
+      amount: 60,
+    });
+    expect(editedJune[0].record?.categoryName).toBe("Servicios");
+    expect(deletedJune[0].template).toMatchObject({
+      name: "Internet",
+      amount: 60,
+    });
   });
 
-  it("subtracts savings from the salary account when savings has its own destination", () => {
-    const allocations = buildAccountAllocations(
-      [
-        account("Nomina", ["salary", "expenses", "daily"]),
-        account("Ahorro", ["savings"]),
-      ],
-      accountPlan,
+  it("indexes a moved historical record by its effective due date", () => {
+    const template = occurrence("Seguro", 120, "2026-06-10").template;
+    const recorded = materializeClosedOccurrenceRecords(
+      {
+        schemaVersion: 2,
+        categories: [],
+        templates: [{ ...template, endDate: "2026-06-30" }],
+        overrides: [],
+        occurrenceRecords: [],
+        finance: emptyFinanceStore,
+        bankMovements: [],
+        bankMerchantAliases: [],
+      },
+      { today: new Date("2026-08-10T12:00:00") },
     );
-
-    expect(allocations.find((item) => item.account.id === "Nomina"))
-      .toMatchObject({
-        assignedAmount:
-          accountPlan.expensesContribution + accountPlan.remainingContribution,
-        showAmount: true,
-      });
-    expect(allocations.find((item) => item.account.id === "Ahorro"))
-      .toMatchObject({
-        assignedAmount: accountPlan.savingsContribution,
-        showAmount: true,
-      });
-  });
-
-  it("assigns planned expenses only to the expenses account", () => {
-    const allocations = buildAccountAllocations(
-      [
-        account("Nomina", ["salary", "daily", "savings"]),
-        account("Gastos", ["expenses"]),
+    const moved: ExpenseStore = {
+      ...recorded,
+      overrides: [
+        {
+          id: "move-june",
+          userId: "demo",
+          templateId: template.id,
+          occurrenceDate: "2026-06-10",
+          dueDate: "2026-07-02",
+          status: "due",
+          updatedAt: "2026-07-01T12:00:00.000Z",
+        },
       ],
-      accountPlan,
-    );
+    };
 
-    expect(allocations.find((item) => item.account.id === "Gastos"))
-      .toMatchObject({
-        assignedAmount: accountPlan.expensesContribution,
-        showAmount: true,
-      });
+    expect(generateStoreOccurrences(moved, "2026-06-01", "2026-06-30"))
+      .toHaveLength(0);
+    expect(generateStoreOccurrences(moved, "2026-07-01", "2026-07-31"))
+      .toMatchObject([{ dueDate: "2026-07-02" }]);
   });
 
-  it("keeps investment and other as tags without amounts", () => {
-    const allocations = buildAccountAllocations(
-      [
-        account("Nomina", ["salary", "expenses", "daily", "savings"]),
-        account("Inversion", ["investment", "other"]),
-      ],
-      accountPlan,
-    );
-
-    expect(allocations.find((item) => item.account.id === "Inversion"))
-      .toMatchObject({
-        assignedAmount: 0,
-        showAmount: false,
-      });
-  });
 });

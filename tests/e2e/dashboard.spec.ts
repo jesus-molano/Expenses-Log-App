@@ -109,16 +109,17 @@ test("requires a full left swipe before paying an expense", async ({ page }) => 
   await expect(page.getByText("Pagado").first()).toBeVisible();
 });
 
-test("opens plan and configuration sheet", async ({ page }) => {
+test("edits plan settings and monthly savings without losing either value", async ({ page }) => {
   await loadDemoStore(page);
   await page.goto("/");
 
   await page.getByRole("link", { name: "Plan" }).click();
   await expect(page).toHaveURL(/\/money$/);
   await expect(
-    page.getByRole("heading", { name: "Plan del mes" }),
+    page.getByRole("heading", { level: 1, name: /Plan de/ }),
   ).toBeVisible();
-  await expect(page.getByText("Ingreso puntual")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Plan de este mes" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recibos pendientes" })).toBeVisible();
 
   await page.getByRole("button", { name: "Configurar" }).click();
   await expect(page.getByRole("heading", { name: "Configurar Plan" })).toBeVisible();
@@ -126,17 +127,40 @@ test("opens plan and configuration sheet", async ({ page }) => {
   await page.getByLabel("Sueldo").fill("3000");
   await page.getByRole("button", { name: /Cambiar día de cobro/ }).click();
   await page.getByRole("button", { name: "25" }).click();
-  await page.getByLabel("Ahorro este mes").fill("450");
-  const accountNames = page.getByLabel("Nombre de cuenta");
-  await accountNames.nth(0).fill("Cuenta principal test");
-  await accountNames.nth(1).fill("Cuenta gastos test");
-  await accountNames.nth(2).fill("Cuenta ahorro test");
   await page.getByRole("button", { name: "Guardar configuración" }).click();
+  await expect(page.getByText(/Fijo 3\.?000,00\s*€/)).toBeVisible();
 
-  await expect(page.getByText("Cuenta gastos test")).toBeVisible();
-  await expect(page.getByText("Cuenta ahorro test")).toBeVisible();
-  await expect(page.getByText("Cuenta principal test")).toBeVisible();
-  await expect(page.getByText("450,00 €").first()).toBeVisible();
+  await page.getByRole("button", { name: /Ahorro de este mes/ }).click();
+  await page.getByLabel("Objetivo mensual").fill("450");
+  await page.getByLabel("Transferencia real").fill("325");
+  await page.getByRole("button", { name: "Guardar ahorro" }).click();
+
+  const savingsAction = page.getByRole("button", { name: /Ahorro de este mes/ });
+  await expect(savingsAction).toContainText("Real 325,00 €");
+  await expect(savingsAction).toContainText("objetivo 450,00 €");
+});
+
+test("marks a pending receipt as paid directly from plan", async ({ page }) => {
+  await page.setViewportSize({ width: 481, height: 881 });
+  await loadDemoStore(page);
+  await page.goto("/money");
+
+  const payButton = page.getByRole("button", {
+    name: "Marcar Movistar como pagado",
+  });
+  await expect(payButton).toBeVisible();
+  const expenseRow = page.locator(".app-monthly-expense-row").filter({
+    has: payButton,
+  });
+  const actionButtons = expenseRow.getByRole("button");
+  await expect(actionButtons).toHaveCount(3);
+  const actionTops = await actionButtons.evaluateAll((buttons) =>
+    buttons.map((button) => button.getBoundingClientRect().top),
+  );
+  expect(Math.max(...actionTops) - Math.min(...actionTops)).toBeLessThanOrEqual(1);
+  await payButton.click();
+
+  await expect(payButton).toHaveCount(0);
 });
 
 test("sheet closes with Escape and restores focus", async ({ page }) => {
@@ -168,6 +192,8 @@ test("sheet closes with Escape and restores focus", async ({ page }) => {
 test("compact menus support keyboard navigation and Escape", async ({ page }) => {
   await loadDemoStore(page);
   await page.goto("/settings");
+
+  await expect(page.getByText("Importar movimientos bancarios")).toHaveCount(0);
 
   const languageButton = page.getByRole("button", { name: "ES", exact: true });
   await languageButton.focus();

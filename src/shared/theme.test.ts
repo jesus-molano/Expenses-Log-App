@@ -1,12 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { isAppTheme } from "./theme";
+import {
+  APP_THEMES,
+  DEFAULT_THEME,
+  isAppTheme,
+  normalizeAppTheme,
+} from "./theme";
 
 describe("theme", () => {
   it("accepts every supported app theme", () => {
-    expect(isAppTheme("dark")).toBe(true);
-    expect(isAppTheme("rose-pine")).toBe(true);
-    expect(isAppTheme("catppuccin")).toBe(true);
-    expect(isAppTheme("light")).toBe(true);
+    expect(APP_THEMES).toHaveLength(8);
+    APP_THEMES.forEach((theme) => expect(isAppTheme(theme)).toBe(true));
+  });
+
+  it("migrates legacy themes to Vice Afterglow", () => {
+    expect(normalizeAppTheme("dark")).toBe(DEFAULT_THEME);
+    expect(normalizeAppTheme("light")).toBe(DEFAULT_THEME);
+    expect(normalizeAppTheme("rose-pine")).toBe("rose-pine");
+    expect(normalizeAppTheme("catppuccin")).toBe("catppuccin");
   });
 
   it("rejects unknown themes", () => {

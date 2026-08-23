@@ -28,7 +28,9 @@ export function LastChanceReminderToast({
         </p>
         <p className="mt-0.5 text-xs leading-relaxed text-[var(--app-text-muted)]">
           {occurrence.template.name} {t("expenses.lastChanceReminderBody", language)}{" "}
-          {formatCurrency(occurrence.template.amount)}
+          <span className="app-money">
+            {formatCurrency(occurrence.template.amount)}
+          </span>
           {" · "}
           {daysUntilCharge === 0
             ? t("common.today", language)

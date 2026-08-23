@@ -2,6 +2,7 @@
 
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore } from "@/domain/types";
+import { latestUpdated, mergeLatestById } from "./merge-by-id";
 import { normalizeExpenseStore } from "./store-normalization";
 
 const STORAGE_KEY = "expense-log-store-v1";
@@ -52,35 +53,46 @@ export function mergeExpenseStores(
   );
 
   return {
-    categories: mergeById(
+    schemaVersion: 2,
+    categories: mergeLatestById(
       normalizedCloudStore.categories,
       normalizedLocalStore.categories,
       deleted.categories,
     ),
-    templates: mergeById(
+    templates: mergeLatestById(
       normalizedCloudStore.templates,
       normalizedLocalStore.templates,
       deleted.templates,
     ),
-    overrides: mergeById(
+    overrides: mergeLatestById(
       normalizedCloudStore.overrides,
       normalizedLocalStore.overrides,
       deleted.overrides,
     ),
+    occurrenceRecords: mergeLatestById(
+      normalizedCloudStore.occurrenceRecords ?? [],
+      normalizedLocalStore.occurrenceRecords ?? [],
+      deleted.occurrenceRecords,
+    ),
     finance: {
-      incomeEvents: mergeById(
+      incomeEvents: mergeLatestById(
         normalizedCloudStore.finance.incomeEvents,
         normalizedLocalStore.finance.incomeEvents,
         deleted.incomeEvents,
       ),
-      monthlySalary: {
-        ...normalizedCloudStore.finance.monthlySalary,
-        ...normalizedLocalStore.finance.monthlySalary,
-      },
-      monthlySavingsTargets: {
-        ...normalizedCloudStore.finance.monthlySavingsTargets,
-        ...normalizedLocalStore.finance.monthlySavingsTargets,
-      },
+      monthlySalary: mergeMonthlyRecord(
+        normalizedCloudStore.finance.monthlySalary,
+        normalizedLocalStore.finance.monthlySalary,
+      ),
+      monthlySavingsTargets: mergeMonthlyRecord(
+        normalizedCloudStore.finance.monthlySavingsTargets,
+        normalizedLocalStore.finance.monthlySavingsTargets,
+      ),
+      monthlySavingsContributions: mergeContributionRecord(
+        normalizedCloudStore.finance.monthlySavingsContributions,
+        normalizedLocalStore.finance.monthlySavingsContributions,
+        deleted.savingsContributions,
+      ),
       accounts: normalizedLocalStore.finance.accounts.length
         ? normalizedLocalStore.finance.accounts
         : normalizedCloudStore.finance.accounts,
@@ -89,13 +101,13 @@ export function mergeExpenseStores(
       theme:
         normalizedLocalStore.preferences?.theme ??
         normalizedCloudStore.preferences?.theme ??
-        "dark",
+        "vice-afterglow",
       language:
         normalizedLocalStore.preferences?.language ??
         normalizedCloudStore.preferences?.language ??
         "es",
     },
-    bankMovements: mergeById(
+    bankMovements: mergeLatestById(
       normalizedCloudStore.bankMovements,
       normalizedLocalStore.bankMovements,
       deleted.bankMovements,
@@ -107,22 +119,6 @@ export function mergeExpenseStores(
     ),
     deleted,
   };
-}
-
-function mergeById<T extends { id: string }>(
-  base: T[],
-  incoming: T[],
-  deletedIds: string[] = [],
-): T[] {
-  const deleted = new Set(deletedIds);
-  const map = new Map<string, T>();
-  for (const item of base) {
-    if (!deleted.has(item.id)) map.set(item.id, item);
-  }
-  for (const item of incoming) {
-    if (!deleted.has(item.id)) map.set(item.id, item);
-  }
-  return Array.from(map.values());
 }
 
 function mergeDeletedIds(
@@ -138,6 +134,14 @@ function mergeDeletedIds(
     bankMerchantAliases: mergeIdLists(
       base?.bankMerchantAliases,
       incoming?.bankMerchantAliases,
+    ),
+    occurrenceRecords: mergeIdLists(
+      base?.occurrenceRecords,
+      incoming?.occurrenceRecords,
+    ),
+    savingsContributions: mergeIdLists(
+      base?.savingsContributions,
+      incoming?.savingsContributions,
     ),
   };
 }
@@ -163,4 +167,28 @@ function mergeAliases(
   }
 
   return Array.from(byRelationship.values());
+}
+
+function mergeMonthlyRecord<T>(
+  cloud: Record<string, T> | undefined,
+  local: Record<string, T> | undefined,
+): Record<string, T> {
+  const result = { ...(cloud ?? {}) };
+  for (const [monthId, value] of Object.entries(local ?? {})) {
+    result[monthId] = latestUpdated(result[monthId], value);
+  }
+  return result;
+}
+
+function mergeContributionRecord(
+  cloud: NonNullable<ExpenseStore["finance"]["monthlySavingsContributions"]> | undefined,
+  local: NonNullable<ExpenseStore["finance"]["monthlySavingsContributions"]> | undefined,
+  deletedIds: string[] = [],
+) {
+  const deleted = new Set(deletedIds);
+  return Object.fromEntries(
+    Object.entries(mergeMonthlyRecord(cloud, local)).filter(
+      ([, contribution]) => !deleted.has(contribution.id),
+    ),
+  );
 }

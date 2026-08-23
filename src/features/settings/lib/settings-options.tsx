@@ -5,10 +5,14 @@ export const SETTINGS_THEMES: Array<{
   label: string;
   swatches: [string, string, string];
 }> = [
-  { id: "dark", label: "Dark", swatches: ["#0b1220", "#3b82f6", "#06b6d4"] },
-  { id: "rose-pine", label: "Rosé Pine", swatches: ["#191724", "#ebbcba", "#9ccfd8"] },
-  { id: "catppuccin", label: "Catppuccin", swatches: ["#11111b", "#cba6f7", "#74c7ec"] },
-  { id: "light", label: "Light", swatches: ["#f7f9fc", "#2563eb", "#0891b2"] },
+  { id: "atlas", label: "Atlas", swatches: ["#14171c", "#ff5b4d", "#83a7c4"] },
+  { id: "obsidian-amber", label: "Obsidian Amber", swatches: ["#0a0907", "#ffc857", "#ff9f1c"] },
+  { id: "vice-afterglow", label: "Vice Afterglow", swatches: ["#0c0d1b", "#f77e9c", "#9b89f5"] },
+  { id: "catppuccin", label: "Catppuccin Mocha", swatches: ["#1e1e2e", "#cba6f7", "#fab387"] },
+  { id: "rose-pine", label: "Rosé Pine Moon", swatches: ["#191724", "#c4a7e7", "#9ccfd8"] },
+  { id: "nord", label: "Nord Night", swatches: ["#2e3440", "#8fbcbb", "#88c0d0"] },
+  { id: "dracula", label: "Dracula Violet", swatches: ["#282a36", "#bd93f9", "#ff79c6"] },
+  { id: "tokyo-night", label: "Tokyo Night City", swatches: ["#1a1b26", "#7aa2f7", "#bb9af7"] },
 ];
 
 export const SETTINGS_LANGUAGES: Array<{ id: AppLanguage; label: string }> = [

@@ -9,7 +9,6 @@ import { SettingsDialogs } from "./SettingsDialogs";
 import {
   AccountRow,
   DangerRows,
-  ImportExportRow,
   LanguageRow,
   NotificationsRow,
   ThemeRow,
@@ -44,7 +43,6 @@ export function SettingsView({ from }: { from?: "money" | "expenses" }) {
             <NotificationsRow settings={settings} />
             <ThemeRow settings={settings} />
             <LanguageRow settings={settings} />
-            <ImportExportRow settings={settings} />
             <DangerRows settings={settings} />
           </div>
 

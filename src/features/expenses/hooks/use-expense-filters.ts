@@ -1,9 +1,8 @@
 "use client";
 
 import { addDays, addMonths, endOfMonth, startOfMonth } from "date-fns";
-import { useMemo } from "react";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
-import { generateOccurrences } from "@/domain/recurrence";
+import { generateStoreOccurrences } from "@/domain/finance";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
 import { buildRecurringOverview } from "../lib/recurring-overview";
 import { buildTimelineSections } from "../lib/timeline";
@@ -21,39 +20,26 @@ export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
     ),
   );
 
-  const occurrences = useMemo(
-    () =>
-      generateOccurrences(
-        store.templates,
-        store.overrides,
-        windowStart,
-        timelineWindowEnd,
-        language,
-      ),
-    [store.templates, store.overrides, windowStart, timelineWindowEnd, language],
+  const occurrences = generateStoreOccurrences(
+    store,
+    windowStart,
+    timelineWindowEnd,
+    language,
   );
 
-  const recurringOverviewItems = useMemo(
-    () =>
-      buildRecurringOverview({
-        templates: store.templates,
-        overrides: store.overrides,
-        windowStart,
-        windowEnd: currentMonthEnd,
-        language,
-      }),
-    [store.templates, store.overrides, windowStart, currentMonthEnd, language],
-  );
+  const recurringOverviewItems = buildRecurringOverview({
+    templates: store.templates,
+    overrides: store.overrides,
+    windowStart,
+    windowEnd: currentMonthEnd,
+    language,
+  });
 
-  const visibleOccurrences = useMemo(
-    () =>
-      occurrences.filter(
-        (occurrence) =>
-          occurrence.status !== "skipped" &&
-          (occurrence.occurrenceDate <= currentMonthEnd ||
-            occurrence.dueDate <= timelineWindowEnd),
-      ),
-    [occurrences, currentMonthEnd, timelineWindowEnd],
+  const visibleOccurrences = occurrences.filter(
+    (occurrence) =>
+      occurrence.status !== "skipped" &&
+      (occurrence.occurrenceDate <= currentMonthEnd ||
+        occurrence.dueDate <= timelineWindowEnd),
   );
 
   const pendingTotal = visibleOccurrences

@@ -47,10 +47,9 @@ export function MonthlyExpenseBreakdown({
       tone="danger"
     >
       <div className="app-monthly-table" data-tone="expense">
-        <div className="app-monthly-table-head">
+        <div className="app-monthly-table-head app-monthly-expense-table-head">
           <span>{t("money.expenseItem", language)}</span>
           <span>{t("money.amountColumn", language)}</span>
-          <span aria-hidden="true" />
           <span aria-hidden="true" />
         </div>
         <div className="app-monthly-table-body" data-integrated-list="true">

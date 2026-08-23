@@ -1,7 +1,10 @@
 import { endOfMonth, startOfMonth } from "date-fns";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
-import { getMonthlySavingsTarget, toMonthId } from "@/domain/finance";
-import { generateOccurrences } from "@/domain/recurrence";
+import {
+  generateStoreOccurrences,
+  getMonthlySavingsTarget,
+  toMonthId,
+} from "@/domain/finance";
 import type { ExpenseStore } from "@/domain/types";
 
 export type AnnualPlanSummary = {
@@ -32,9 +35,8 @@ export function buildAnnualPlanSummary({
     };
   }
 
-  const annualOccurrences = generateOccurrences(
-    store.templates,
-    store.overrides,
+  const annualOccurrences = generateStoreOccurrences(
+    store,
     `${firstMonthId}-01`,
     toDateOnly(endOfMonth(new Date(selectedYear, 11, 1))),
   );
@@ -66,9 +68,8 @@ function getFirstMonthWithData(
   selectedYear: number,
 ): string | null {
   const monthIds = new Set<string>();
-  const yearOccurrences = generateOccurrences(
-    store.templates,
-    store.overrides,
+  const yearOccurrences = generateStoreOccurrences(
+    store,
     `${selectedYear}-01-01`,
     `${selectedYear}-12-31`,
   );
@@ -111,7 +112,8 @@ function estimateSavingsFromFirstDataMonth({
   const averageTarget =
     explicitTargets.length > 0
       ? explicitTargets.reduce(
-          (sum, [, amount]) => sum + Math.max(Number(amount), 0),
+          (sum, [monthId]) =>
+            sum + getMonthlySavingsTarget(store.finance, monthId),
           0,
         ) /
         explicitTargets.length

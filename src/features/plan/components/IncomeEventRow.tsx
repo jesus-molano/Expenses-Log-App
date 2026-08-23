@@ -85,7 +85,7 @@ export function IncomeEventRow({
           {event.receivedAt}
         </p>
       </div>
-      <p className="text-sm font-semibold text-[var(--app-text)]">
+      <p className="app-money text-sm font-semibold text-[var(--app-text)]">
         {formatCurrency(event.amount)}
       </p>
       <IconButton

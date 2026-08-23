@@ -1,6 +1,6 @@
 import type { ExpenseStore } from "@/domain/types";
 import { readLanguageCookie } from "@/shared/i18n";
-import { readThemeCookie } from "@/shared/theme";
+import { DEFAULT_THEME, readThemeCookie } from "@/shared/theme";
 
 export function applyRuntimePreferences(store: ExpenseStore): ExpenseStore {
   const theme = readThemeCookie();
@@ -12,7 +12,7 @@ export function applyRuntimePreferences(store: ExpenseStore): ExpenseStore {
     ...store,
     preferences: {
       ...store.preferences,
-      theme: theme ?? store.preferences?.theme ?? "dark",
+      theme: theme ?? store.preferences?.theme ?? DEFAULT_THEME,
       language: language ?? store.preferences?.language ?? "es",
     },
   };

@@ -95,7 +95,7 @@ function ExpenseDetailForm({
                 {editor.form.name || template.name}
               </h1>
             </div>
-            <p className="shrink-0 text-xl font-semibold text-[var(--app-text)]">
+            <p className="app-money shrink-0 text-xl font-semibold text-[var(--app-text)]">
               {formatCurrency(editor.previewAmount)}
             </p>
           </div>
@@ -140,5 +140,4 @@ function ExpenseDetailForm({
     </main>
   );
 }
-
 

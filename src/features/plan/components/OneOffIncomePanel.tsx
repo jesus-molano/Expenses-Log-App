@@ -46,7 +46,7 @@ export function OneOffIncomePanel({
           </span>
           <span className="truncate">{t("money.oneOffIncome", language)}</span>
         </h2>
-        <p className="shrink-0 text-right text-sm font-semibold text-[var(--app-success)]">
+        <p className="app-money shrink-0 text-right text-sm font-semibold text-[var(--app-success)]">
           {formatCurrency(extraIncomeTotal)}
         </p>
       </header>
@@ -57,6 +57,7 @@ export function OneOffIncomePanel({
           onChange={(event) => onExtraNameChange(event.target.value)}
           className="input-control"
           placeholder={t("money.extraNamePlaceholder", language)}
+          aria-label={t("money.extraNamePlaceholder", language)}
         />
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
           <input
@@ -65,6 +66,7 @@ export function OneOffIncomePanel({
             onChange={(event) => onExtraAmountChange(event.target.value)}
             className="input-control min-w-0"
             placeholder={t("money.extraAmountPlaceholder", language)}
+            aria-label={t("money.extraAmountPlaceholder", language)}
           />
           <Button type="submit" size="lg" variant="secondary">
             {t("money.addIncome", language)}
@@ -92,4 +94,3 @@ export function OneOffIncomePanel({
     </form>
   );
 }
-

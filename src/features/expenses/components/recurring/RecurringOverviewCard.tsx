@@ -40,7 +40,7 @@ export function RecurringOverviewCard({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <p className="text-sm font-semibold text-[var(--app-text)]">
+          <p className="app-money text-sm font-semibold text-[var(--app-text)]">
             {formatCurrency(item.template.amount)}
           </p>
           <Link

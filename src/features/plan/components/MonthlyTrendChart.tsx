@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Bar,
-  BarChart,
+  ComposedChart,
   CartesianGrid,
+  Line,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -33,25 +34,31 @@ export function MonthlyTrendChart({
     <>
       <div className="app-chart-legend mt-3 flex flex-wrap gap-x-3 gap-y-2 text-xs font-semibold">
         <ChartLegendItem
-          color="var(--app-chart-income)"
-          label={t("money.income", language)}
-        />
-        <ChartLegendItem
           color="var(--app-chart-expenses)"
           label={t("money.fixedExpenses", language)}
         />
         <ChartLegendItem
-          color="var(--app-chart-free)"
-          label={t("money.free", language)}
+          color="var(--app-chart-savings)"
+          label={language === "es" ? "Ahorro real" : "Actual savings"}
+        />
+        <ChartLegendItem
+          color="var(--app-chart-capacity)"
+          label={language === "es" ? "Capacidad máxima" : "Maximum capacity"}
         />
       </div>
       <div
         ref={containerRef}
+        role="img"
+        aria-label={
+          language === "es"
+            ? "Comparación mensual de gastos recurrentes, ahorro real y capacidad máxima"
+            : "Monthly comparison of recurring expenses, actual savings and maximum capacity"
+        }
         className="app-chart-shell mt-4 h-52 min-h-52 min-w-0 overflow-hidden"
       >
         {ready ? (
           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-            <BarChart
+            <ComposedChart
               data={moneySeries}
               barGap={isCompactChart ? 2 : 4}
               barCategoryGap={isCompactChart ? "24%" : "32%"}
@@ -62,24 +69,6 @@ export function MonthlyTrendChart({
               }
             >
               <defs>
-                <linearGradient
-                  id="chartIncomeGradient"
-                  x1="0"
-                  x2="0"
-                  y1="0"
-                  y2="1"
-                >
-                  <stop
-                    offset="0%"
-                    stopColor="var(--app-chart-income)"
-                    stopOpacity={0.96}
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor="var(--app-chart-income)"
-                    stopOpacity={0.46}
-                  />
-                </linearGradient>
                 <linearGradient
                   id="chartExpensesGradient"
                   x1="0"
@@ -99,7 +88,7 @@ export function MonthlyTrendChart({
                   />
                 </linearGradient>
                 <linearGradient
-                  id="chartFreeGradient"
+                  id="chartSavingsGradient"
                   x1="0"
                   x2="0"
                   y1="0"
@@ -107,12 +96,12 @@ export function MonthlyTrendChart({
                 >
                   <stop
                     offset="0%"
-                    stopColor="var(--app-chart-free)"
+                    stopColor="var(--app-chart-savings)"
                     stopOpacity={0.96}
                   />
                   <stop
                     offset="100%"
-                    stopColor="var(--app-chart-free)"
+                    stopColor="var(--app-chart-savings)"
                     stopOpacity={0.44}
                   />
                 </linearGradient>
@@ -132,7 +121,7 @@ export function MonthlyTrendChart({
                   fontWeight: 600,
                 }}
                 height={28}
-                interval={0}
+                interval={isCompactChart ? 1 : 0}
                 minTickGap={0}
                 tickMargin={8}
               />
@@ -162,13 +151,6 @@ export function MonthlyTrendChart({
                 content={<ChartTooltip />}
               />
               <Bar
-                dataKey="income"
-                name={t("money.income", language)}
-                fill="url(#chartIncomeGradient)"
-                maxBarSize={18}
-                radius={[7, 7, 2, 2]}
-              />
-              <Bar
                 dataKey="expenses"
                 name={t("money.fixedExpenses", language)}
                 fill="url(#chartExpensesGradient)"
@@ -176,13 +158,23 @@ export function MonthlyTrendChart({
                 radius={[7, 7, 2, 2]}
               />
               <Bar
-                dataKey="remaining"
-                name={t("money.free", language)}
-                fill="url(#chartFreeGradient)"
+                dataKey="savings"
+                name={language === "es" ? "Ahorro real" : "Actual savings"}
+                fill="url(#chartSavingsGradient)"
                 maxBarSize={18}
                 radius={[7, 7, 2, 2]}
               />
-            </BarChart>
+              <Line
+                type="monotone"
+                dataKey="capacity"
+                name={language === "es" ? "Capacidad máxima" : "Maximum capacity"}
+                stroke="var(--app-chart-capacity)"
+                strokeWidth={2}
+                strokeDasharray="6 5"
+                dot={false}
+                connectNulls
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         ) : null}
       </div>
@@ -265,7 +257,7 @@ function ChartTooltip({ active, label, payload }: ChartTooltipProps) {
               />
               <span className="min-w-0 truncate">{entry.name}</span>
             </span>
-            <span className="font-semibold text-[var(--app-text)]">
+            <span className="app-money font-semibold text-[var(--app-text)]">
               {formatCurrency(Number(entry.value ?? 0))}
             </span>
           </div>

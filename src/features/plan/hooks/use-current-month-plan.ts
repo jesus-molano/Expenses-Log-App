@@ -3,8 +3,11 @@
 import { useMemo } from "react";
 import { endOfMonth, startOfMonth } from "date-fns";
 import { toDateOnly } from "@/domain/calendar";
-import { buildMonthlyMoneyPlan, isEventInMonth } from "@/domain/finance";
-import { generateOccurrences } from "@/domain/recurrence";
+import {
+  buildMonthlyMoneyPlan,
+  generateStoreOccurrences,
+  isEventInMonth,
+} from "@/domain/finance";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
 
 export function useCurrentMonthPlan(
@@ -14,14 +17,13 @@ export function useCurrentMonthPlan(
 ) {
   const occurrences = useMemo(
     () =>
-      generateOccurrences(
-        store.templates,
-        store.overrides,
+      generateStoreOccurrences(
+        store,
         toDateOnly(startOfMonth(today)),
         toDateOnly(endOfMonth(today)),
         language,
       ),
-    [store.templates, store.overrides, today, language],
+    [store, today, language],
   );
 
   const plan = useMemo(

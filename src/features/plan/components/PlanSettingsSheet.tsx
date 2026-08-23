@@ -2,9 +2,8 @@
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Sheet } from "@/components/ui/Sheet";
-import type { AppLanguage, PlanAccount } from "@/domain/types";
+import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
-import { PlanAccountFields } from "./PlanAccountFields";
 import { PlanPaydayField } from "./PlanPaydayField";
 import { PlanSettingsHeader } from "./PlanSettingsHeader";
 
@@ -12,13 +11,9 @@ type PlanSettingsSheetProps = {
   language: AppLanguage;
   salaryAmount: string;
   salaryDay: number;
-  savingsTarget: string;
-  accounts: PlanAccount[];
   dayPickerOpen: boolean;
   onSalaryAmountChange: (value: string) => void;
   onSalaryDayChange: (value: number) => void;
-  onSavingsTargetChange: (value: string) => void;
-  onAccountsChange: (value: PlanAccount[]) => void;
   onDayPickerOpenChange: (open: boolean) => void;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -28,13 +23,9 @@ export function PlanSettingsSheet({
   language,
   salaryAmount,
   salaryDay,
-  savingsTarget,
-  accounts,
   dayPickerOpen,
   onSalaryAmountChange,
   onSalaryDayChange,
-  onSavingsTargetChange,
-  onAccountsChange,
   onDayPickerOpenChange,
   onClose,
   onSubmit,
@@ -66,22 +57,6 @@ export function PlanSettingsSheet({
             onOpenChange={onDayPickerOpenChange}
             onSalaryDayChange={onSalaryDayChange}
           />
-
-          <Field label={t("money.monthlySavings", language)}>
-            <input
-              value={savingsTarget}
-              inputMode="decimal"
-              placeholder="300,00"
-              onChange={(event) => onSavingsTargetChange(event.target.value)}
-              className="input-control"
-            />
-          </Field>
-
-          <PlanAccountFields
-            language={language}
-            accounts={accounts}
-            onAccountsChange={onAccountsChange}
-          />
         </div>
 
         <Button type="submit" className="mt-5 w-full" variant="primary" size="lg">
@@ -91,4 +66,3 @@ export function PlanSettingsSheet({
     </Sheet>
   );
 }
-

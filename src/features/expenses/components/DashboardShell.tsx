@@ -52,7 +52,7 @@ export function DashboardShell({
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--app-text-subtle)]">
                   {headlineTitle}
                 </p>
-                <p className="mt-1 text-[32px] font-semibold leading-none text-[var(--app-text)]">
+                <p className="app-money mt-1 text-[32px] font-semibold leading-none text-[var(--app-text)]">
                   {headlineLabel}
                 </p>
               </div>
@@ -76,7 +76,7 @@ export function DashboardShell({
       </div>
 
       <nav
-        aria-label="Secciones"
+        aria-label={language === "es" ? "Secciones" : "Sections"}
         className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2"
       >
         <div className="app-bottom-nav mx-auto grid max-w-md grid-cols-2 gap-2 p-1.5 text-sm font-semibold">

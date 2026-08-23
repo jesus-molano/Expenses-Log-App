@@ -29,7 +29,7 @@ export function TimelineSectionHeader({
         </p>
       </div>
       {section.items.length > 1 && section.total > 0 ? (
-        <p className="shrink-0 text-sm font-semibold text-[var(--app-text)]">
+        <p className="app-money shrink-0 text-sm font-semibold text-[var(--app-text)]">
           {formatCurrency(section.total)}
         </p>
       ) : null}

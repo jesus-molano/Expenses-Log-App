@@ -123,7 +123,7 @@ function IncomeCandidateSummary({
           </p>
         ) : null}
       </div>
-      <p className="shrink-0 text-right text-base font-semibold text-[var(--app-success)]">
+      <p className="app-money shrink-0 text-right text-base font-semibold text-[var(--app-success)]">
         {formatCurrency(amount)}
       </p>
     </div>
@@ -151,7 +151,9 @@ function IncomeDuplicateWarning({
         <p className="truncate">
           {formatShortDate(duplicate.movement.bookedAt)}
           {" · "}
-          {formatCurrency(Math.abs(duplicate.movement.amount))}
+          <span className="app-money">
+            {formatCurrency(Math.abs(duplicate.movement.amount))}
+          </span>
           {" · "}
           {duplicate.movement.description}
         </p>

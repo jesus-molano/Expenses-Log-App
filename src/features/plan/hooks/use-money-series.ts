@@ -4,8 +4,11 @@ import { useMemo } from "react";
 import { endOfMonth, format, startOfMonth } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import { toDateOnly } from "@/domain/calendar";
-import { buildMonthlyMoneyPlan, isEventInMonth } from "@/domain/finance";
-import { generateOccurrences } from "@/domain/recurrence";
+import {
+  buildMonthlyMoneyPlan,
+  generateStoreOccurrences,
+  isEventInMonth,
+} from "@/domain/finance";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
 import type { MoneySeriesItem } from "../types";
 
@@ -21,9 +24,8 @@ export function useMoneySeries(
 
     return Array.from({ length: 12 }, (_, index) => {
       const monthDate = new Date(selectedYear, index, 1);
-      const monthOccurrences = generateOccurrences(
-        store.templates,
-        store.overrides,
+      const monthOccurrences = generateStoreOccurrences(
+        store,
         toDateOnly(startOfMonth(monthDate)),
         toDateOnly(endOfMonth(monthDate)),
         language,
@@ -59,9 +61,7 @@ export function useMoneySeries(
   }, [
     language,
     selectedYear,
-    store.finance,
-    store.overrides,
-    store.templates,
+    store,
     today,
   ]);
 
@@ -80,8 +80,11 @@ export function useMoneySeries(
         ).getFullYear(),
       );
     }
+    for (const record of store.occurrenceRecords ?? []) {
+      years.add(new Date(`${record.dueDate}T00:00:00`).getFullYear());
+    }
     return Array.from(years).sort((a, b) => b - a);
-  }, [store.finance.incomeEvents, store.overrides, store.templates, today]);
+  }, [store, today]);
 
   return { moneySeries, availableYears };
 }

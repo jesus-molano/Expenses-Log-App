@@ -4,8 +4,7 @@ import { useMemo } from "react";
 import { endOfMonth, format, startOfMonth } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import { toDateOnly } from "@/domain/calendar";
-import { isEventInMonth } from "@/domain/finance";
-import { generateOccurrences } from "@/domain/recurrence";
+import { generateStoreOccurrences, isEventInMonth } from "@/domain/finance";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
 import type { MoneySeriesItem } from "../types";
 
@@ -54,14 +53,13 @@ export function useMonthlyComparisonData({
 
   const selectedMonthOccurrences = useMemo(
     () =>
-      generateOccurrences(
-        store.templates,
-        store.overrides,
+      generateStoreOccurrences(
+        store,
         toDateOnly(startOfMonth(selectedMonthDate)),
         toDateOnly(endOfMonth(selectedMonthDate)),
         language,
       ).filter((occurrence) => occurrence.status !== "skipped"),
-    [selectedMonthDate, store.overrides, store.templates, language],
+    [selectedMonthDate, store, language],
   );
 
   const visibleSelectedMonthOccurrences = selectedExpensesExpanded

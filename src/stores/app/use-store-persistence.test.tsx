@@ -141,7 +141,12 @@ describe("useStorePersistence", () => {
     await waitFor(() => expect(saveCloudStore).toHaveBeenCalled());
 
     expect(onHydrate).toHaveBeenCalledTimes(1);
-    expect(onHydrate).toHaveBeenCalledWith(initialStore);
+    expect(onHydrate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        schemaVersion: 2,
+        templates: [expect.objectContaining({ id: "initial" })],
+      }),
+    );
     expect(onPersist.mock.calls[0][0].templates.map((item: { id: string }) => item.id))
       .toEqual(["latest"]);
     expect(vi.mocked(saveCloudStore).mock.calls[0][2].templates.map((item) => item.id))
@@ -184,7 +189,14 @@ describe("useStorePersistence", () => {
 
     renderHook(() => useStorePersistence({ onHydrate }));
 
-    await waitFor(() => expect(onHydrate).toHaveBeenCalledWith(localStore));
+    await waitFor(() =>
+      expect(onHydrate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          schemaVersion: 2,
+          templates: [expect.objectContaining({ id: "local" })],
+        }),
+      ),
+    );
 
     act(() => {
       currentUser = user;

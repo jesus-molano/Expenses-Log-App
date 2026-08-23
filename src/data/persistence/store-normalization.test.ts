@@ -18,10 +18,20 @@ describe("normalizeExpenseStore", () => {
           "2026-06": {
             amount: 2000,
             dayOfMonth: 28,
+            updatedAt: "2026-06-01T00:00:00.000Z",
           },
         },
         monthlySavingsTargets: {
-          "2026-06": 300,
+          "2026-06": {
+            amount: 300,
+            updatedAt: "2026-06-01T00:00:00.000Z",
+          },
+        },
+        monthlySavingsContributions: {
+          "2026-06": {
+            amount: 300,
+            source: "legacy",
+          },
         },
         accounts: [
           {
@@ -32,7 +42,7 @@ describe("normalizeExpenseStore", () => {
         ],
       },
       preferences: {
-        theme: "light",
+        theme: "vice-afterglow",
         language: "en",
       },
     });
@@ -50,7 +60,16 @@ describe("normalizeExpenseStore", () => {
           },
         },
         monthlySavingsTargets: {
-          "2026-06": 300,
+          "2026-06": {
+            amount: 300,
+            updatedAt: "2026-06-01T00:00:00.000Z",
+          },
+        },
+        monthlySavingsContributions: {
+          "2026-06": {
+            amount: 300,
+            source: "legacy",
+          },
         },
         accounts: [
           {
@@ -61,7 +80,7 @@ describe("normalizeExpenseStore", () => {
         ],
       },
       preferences: {
-        theme: "light",
+        theme: "vice-afterglow",
         language: "en",
       },
     });
@@ -78,10 +97,11 @@ describe("normalizeExpenseStore", () => {
       incomeEvents: [],
       monthlySalary: {},
       monthlySavingsTargets: {},
+      monthlySavingsContributions: {},
       accounts: emptyFinanceStore.accounts,
     });
     expect(store.preferences).toEqual({
-      theme: "dark",
+      theme: "vice-afterglow",
       language: "es",
     });
   });
@@ -95,10 +115,11 @@ describe("normalizeExpenseStore", () => {
         incomeEvents: [],
         monthlySalary: {},
         monthlySavingsTargets: {},
+        monthlySavingsContributions: {},
         accounts: emptyFinanceStore.accounts,
       },
       preferences: {
-        theme: "dark",
+        theme: "vice-afterglow",
         language: "es",
       },
     });
@@ -201,7 +222,7 @@ describe("normalizeExpenseStore", () => {
     });
   });
 
-  it("materializes paid overrides for imported alias occurrences before today only", () => {
+  it("does not invent paid occurrences from merchant aliases", () => {
     const store = normalizeExpenseStore({
       categories: [],
       templates: [
@@ -259,22 +280,48 @@ describe("normalizeExpenseStore", () => {
       ],
     });
 
-    expect(store.overrides).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          templateId: "tpl-import",
-          occurrenceDate: "2000-01-01",
-          status: "paid",
-          amountPaid: 39.9,
-        }),
-      ]),
+    expect(store.overrides).toEqual([]);
+  });
+
+  it("migrates only explicit legacy savings through the current month", () => {
+    const store = normalizeExpenseStore(
+      {
+        finance: {
+          monthlySavingsTargets: {
+            "2026-06": 300,
+            "2026-09": 450,
+          },
+        },
+      },
+      new Date("2026-08-23T12:00:00"),
     );
-    expect(
-      store.overrides.some(
-        (override) =>
-          override.templateId === "tpl-future" &&
-          override.occurrenceDate === "2999-01-01",
-      ),
-    ).toBe(false);
+
+    expect(store.finance.monthlySavingsContributions).toMatchObject({
+      "2026-06": {
+        amount: 300,
+        source: "legacy",
+      },
+    });
+    expect(store.finance.monthlySavingsContributions?.["2026-09"])
+      .toBeUndefined();
+  });
+
+  it("keeps v2 savings goals separate from real contributions", () => {
+    const store = normalizeExpenseStore(
+      {
+        schemaVersion: 2,
+        finance: {
+          monthlySavingsTargets: {
+            "2026-06": { amount: 300, updatedAt: "2026-06-01T00:00:00.000Z" },
+          },
+        },
+      },
+      new Date("2026-08-23T12:00:00"),
+    );
+
+    expect(store.finance.monthlySavingsTargets["2026-06"]).toMatchObject({
+      amount: 300,
+    });
+    expect(store.finance.monthlySavingsContributions).toEqual({});
   });
 });

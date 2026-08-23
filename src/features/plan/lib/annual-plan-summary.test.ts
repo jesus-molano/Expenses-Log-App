@@ -59,7 +59,7 @@ function storeWith({
     bankMovements: [],
     bankMerchantAliases: [],
     preferences: {
-      theme: "dark",
+      theme: "vice-afterglow",
       language: "es",
     },
   };

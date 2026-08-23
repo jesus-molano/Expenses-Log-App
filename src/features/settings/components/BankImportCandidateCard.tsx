@@ -121,7 +121,7 @@ function CandidateSummary({
           </p>
         ) : null}
       </div>
-      <p className="shrink-0 text-right text-base font-semibold text-[var(--app-text)]">
+      <p className="app-money shrink-0 text-right text-base font-semibold text-[var(--app-text)]">
         {formatCurrency(amount)}
       </p>
     </div>
@@ -149,7 +149,9 @@ function DuplicateWarning({
         <p className="truncate">
           {formatShortDate(duplicate.movement.bookedAt)}
           {" · "}
-          {formatCurrency(Math.abs(duplicate.movement.amount))}
+          <span className="app-money">
+            {formatCurrency(Math.abs(duplicate.movement.amount))}
+          </span>
           {" · "}
           {duplicate.movement.description}
         </p>

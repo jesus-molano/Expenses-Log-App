@@ -2,7 +2,7 @@ import { cn } from "@/shared/ui";
 
 type IconButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "default" | "danger" | "ghost";
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "touch";
 };
 
 const variants = {
@@ -15,6 +15,7 @@ const sizes = {
   sm: "app-icon-button-sm",
   md: "app-icon-button-md",
   lg: "app-icon-button-lg",
+  touch: "app-icon-button-touch",
 };
 
 export function IconButton({

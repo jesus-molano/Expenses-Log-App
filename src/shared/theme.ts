@@ -1,8 +1,20 @@
 import type { AppTheme } from "@/domain/types";
 
-export const DEFAULT_THEME: AppTheme = "dark";
+export const APP_THEMES = [
+  "atlas",
+  "obsidian-amber",
+  "vice-afterglow",
+  "catppuccin",
+  "rose-pine",
+  "nord",
+  "dracula",
+  "tokyo-night",
+] as const satisfies readonly AppTheme[];
+
+export const DEFAULT_THEME: AppTheme = "vice-afterglow";
 
 export function normalizeAppTheme(value: unknown): AppTheme {
+  if (value === "dark" || value === "light") return DEFAULT_THEME;
   return isAppTheme(value) ? value : DEFAULT_THEME;
 }
 
@@ -29,14 +41,10 @@ export function readThemeCookie(): AppTheme | null {
     .find((cookie) => cookie.startsWith("expense-theme="))
     ?.split("=")[1];
 
+  if (value === "dark" || value === "light") return DEFAULT_THEME;
   return isAppTheme(value) ? value : null;
 }
 
 export function isAppTheme(value: unknown): value is AppTheme {
-  return (
-    value === "dark" ||
-    value === "rose-pine" ||
-    value === "catppuccin" ||
-    value === "light"
-  );
+  return APP_THEMES.some((theme) => theme === value);
 }

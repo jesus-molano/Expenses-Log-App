@@ -1,21 +1,27 @@
-import { emptyFinanceStore } from "@/domain/finance";
+import {
+  emptyFinanceStore,
+  materializeClosedOccurrenceRecords,
+  toMonthId,
+} from "@/domain/finance";
 import { buildDateWithDay, toDateOnly } from "@/domain/calendar";
-import { generateTemplateDates } from "@/domain/recurrence";
 import type {
-  BankMerchantAlias,
   BankMovement,
   ExpenseOccurrenceOverride,
   ExpenseStore,
   ExpenseTemplate,
   FinanceStore,
+  MonthlySavingsContribution,
+  MonthlySavingsTarget,
 } from "@/domain/types";
 import { normalizeAppLanguage } from "@/shared/i18n";
 import { normalizeAppTheme } from "@/shared/theme";
 
 const STORE_KEYS = [
   "categories",
+  "schemaVersion",
   "templates",
   "overrides",
+  "occurrenceRecords",
   "finance",
   "bankMovements",
   "bankMerchantAliases",
@@ -31,20 +37,141 @@ function recordOrEmpty<T>(value: unknown): Record<string, T> {
   return isRecord(value) ? (value as Record<string, T>) : {};
 }
 
-function normalizeFinanceStore(value: unknown): FinanceStore {
+function normalizeFinanceStore(
+  value: unknown,
+  legacyStore: boolean,
+  today: Date,
+): FinanceStore {
   const finance = isRecord(value) ? value : {};
   const accounts = Array.isArray(finance.accounts)
     ? (finance.accounts as FinanceStore["accounts"])
     : [];
 
+  const monthlySavingsTargets = normalizeSavingsTargets(
+    finance.monthlySavingsTargets,
+  );
+  const monthlySavingsContributions = normalizeSavingsContributions(
+    finance.monthlySavingsContributions,
+  );
+
+  if (legacyStore) {
+    const currentMonthId = toMonthId(today);
+    for (const [monthId, target] of Object.entries(monthlySavingsTargets)) {
+      if (monthId > currentMonthId || monthlySavingsContributions[monthId]) {
+        continue;
+      }
+      const amount = Math.max(target.amount, 0);
+      if (amount <= 0) continue;
+      const timestamp = target.updatedAt;
+      monthlySavingsContributions[monthId] = {
+        id: `saving:${monthId}`,
+        userId: "demo",
+        monthId,
+        amount,
+        source: "legacy",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+    }
+  }
+
   return {
     incomeEvents: Array.isArray(finance.incomeEvents)
       ? (finance.incomeEvents as FinanceStore["incomeEvents"])
       : [],
-    monthlySalary: recordOrEmpty(finance.monthlySalary),
-    monthlySavingsTargets: recordOrEmpty(finance.monthlySavingsTargets),
+    monthlySalary: normalizeMonthlySalary(finance.monthlySalary),
+    monthlySavingsTargets,
+    monthlySavingsContributions,
     accounts: accounts.length ? accounts : emptyFinanceStore.accounts,
   };
+}
+
+function normalizeMonthlySalary(
+  value: unknown,
+): FinanceStore["monthlySalary"] {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
+      if (!/^\d{4}-\d{2}$/.test(monthId) || !isRecord(entry)) return [];
+      return [
+        [
+          monthId,
+          {
+            amount: Math.max(Number(entry.amount ?? 0), 0),
+            dayOfMonth: Math.min(
+              Math.max(Number(entry.dayOfMonth ?? 28), 1),
+              31,
+            ),
+            updatedAt:
+              typeof entry.updatedAt === "string"
+                ? entry.updatedAt
+                : monthTimestamp(monthId),
+          },
+        ],
+      ];
+    }),
+  );
+}
+
+function normalizeSavingsTargets(
+  value: unknown,
+): Record<string, MonthlySavingsTarget> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
+      if (!/^\d{4}-\d{2}$/.test(monthId)) return [];
+      const amount =
+        typeof entry === "number"
+          ? entry
+          : isRecord(entry)
+            ? Number(entry.amount ?? 0)
+            : 0;
+      const updatedAt =
+        isRecord(entry) && typeof entry.updatedAt === "string"
+          ? entry.updatedAt
+          : monthTimestamp(monthId);
+      return [[monthId, { amount: Math.max(Number(amount), 0), updatedAt }]];
+    }),
+  );
+}
+
+function normalizeSavingsContributions(
+  value: unknown,
+): Record<string, MonthlySavingsContribution> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
+      if (!/^\d{4}-\d{2}$/.test(monthId) || !isRecord(entry)) return [];
+      const timestamp =
+        typeof entry.updatedAt === "string"
+          ? entry.updatedAt
+          : monthTimestamp(monthId);
+      return [
+        [
+          monthId,
+          {
+            id:
+              typeof entry.id === "string" ? entry.id : `saving:${monthId}`,
+            userId:
+              typeof entry.userId === "string" ? entry.userId : "demo",
+            monthId,
+            amount: Math.max(Number(entry.amount ?? 0), 0),
+            transferredAt:
+              typeof entry.transferredAt === "string"
+                ? entry.transferredAt
+                : undefined,
+            source: entry.source === "legacy" ? "legacy" : "manual",
+            createdAt:
+              typeof entry.createdAt === "string"
+                ? entry.createdAt
+                : timestamp,
+            updatedAt: timestamp,
+          } satisfies MonthlySavingsContribution,
+        ],
+      ];
+    }),
+  );
+}
+
+function monthTimestamp(monthId: string) {
+  return `${monthId}-01T00:00:00.000Z`;
 }
 
 function normalizeDeletedIds(value: unknown): NonNullable<ExpenseStore["deleted"]> {
@@ -57,6 +184,8 @@ function normalizeDeletedIds(value: unknown): NonNullable<ExpenseStore["deleted"
     incomeEvents: stringArray(deleted.incomeEvents),
     bankMovements: stringArray(deleted.bankMovements),
     bankMerchantAliases: stringArray(deleted.bankMerchantAliases),
+    occurrenceRecords: stringArray(deleted.occurrenceRecords),
+    savingsContributions: stringArray(deleted.savingsContributions),
   };
 }
 
@@ -66,11 +195,16 @@ function stringArray(value: unknown): string[] {
     : [];
 }
 
-export function normalizeExpenseStore(value: unknown): ExpenseStore {
+export function normalizeExpenseStore(
+  value: unknown,
+  today: Date = new Date(),
+): ExpenseStore {
   const store = isRecord(value) ? value : {};
   const preferences = isRecord(store.preferences) ? store.preferences : {};
+  const legacyStore = store.schemaVersion !== 2;
 
-  return normalizeImportedPaidOccurrenceDates({
+  const base: ExpenseStore = {
+    schemaVersion: 2,
     categories: Array.isArray(store.categories)
       ? (store.categories as ExpenseStore["categories"])
       : [],
@@ -80,7 +214,10 @@ export function normalizeExpenseStore(value: unknown): ExpenseStore {
     overrides: Array.isArray(store.overrides)
       ? (store.overrides as ExpenseStore["overrides"])
       : [],
-    finance: normalizeFinanceStore(store.finance),
+    occurrenceRecords: Array.isArray(store.occurrenceRecords)
+      ? (store.occurrenceRecords as ExpenseStore["occurrenceRecords"])
+      : [],
+    finance: normalizeFinanceStore(store.finance, legacyStore, today),
     bankMovements: Array.isArray(store.bankMovements)
       ? (store.bankMovements as ExpenseStore["bankMovements"])
       : [],
@@ -92,6 +229,14 @@ export function normalizeExpenseStore(value: unknown): ExpenseStore {
       theme: normalizeAppTheme(preferences.theme),
       language: normalizeAppLanguage(preferences.language),
     },
+  };
+  const normalized = legacyStore
+    ? normalizeImportedPaidOccurrenceDates(base)
+    : base;
+
+  return materializeClosedOccurrenceRecords(normalized, {
+    today,
+    source: legacyStore ? "legacy-derived" : "native",
   });
 }
 
@@ -129,7 +274,19 @@ export function assignExpenseStoreOwner(
         ...event,
         userId,
       })),
+      monthlySavingsContributions: Object.fromEntries(
+        Object.entries(store.finance.monthlySavingsContributions ?? {}).map(
+          ([monthId, contribution]) => [
+            monthId,
+            { ...contribution, userId },
+          ],
+        ),
+      ),
     },
+    occurrenceRecords: (store.occurrenceRecords ?? []).map((record) => ({
+      ...record,
+      userId,
+    })),
     bankMovements: store.bankMovements.map((movement) => ({
       ...movement,
       userId,
@@ -170,7 +327,6 @@ function normalizeImportedPaidOccurrenceDates(store: ExpenseStore): ExpenseStore
         ...bankMovements.flatMap((movement) =>
           paidOverrideFromMatchedBankMovement(movement, templatesById),
         ),
-        ...paidOverridesFromImportedPastOccurrences(store, templatesById),
       ],
     ),
   };
@@ -249,48 +405,6 @@ function paidOverrideFromMatchedBankMovement(
       note: `Conciliado con ${movement.description}`,
     },
   ];
-}
-
-function paidOverridesFromImportedPastOccurrences(
-  store: ExpenseStore,
-  templatesById: Map<string, ExpenseTemplate>,
-): ExpenseOccurrenceOverride[] {
-  const today = toDateOnly(new Date());
-  const yesterday = previousDate(today);
-  if (yesterday < "1900-01-01") return [];
-
-  return store.bankMerchantAliases.flatMap((alias) => {
-    const template = templatesById.get(alias.templateId);
-    if (!template) return [];
-
-    return generateTemplateDates(template, template.startDate, yesterday).map(
-      (occurrenceDate) =>
-        paidOverrideFromImportedAlias(template, alias, occurrenceDate),
-    );
-  });
-}
-
-function paidOverrideFromImportedAlias(
-  template: ExpenseTemplate,
-  alias: BankMerchantAlias,
-  occurrenceDate: string,
-): ExpenseOccurrenceOverride {
-  return {
-    id: `ovr-import-alias-${template.id}-${occurrenceDate}`,
-    userId: template.userId,
-    templateId: template.id,
-    occurrenceDate,
-    status: "paid",
-    paidAt: `${occurrenceDate}T12:00:00.000Z`,
-    amountPaid: template.amount,
-    note: `Conciliado desde importacion bancaria: ${alias.label}`,
-  };
-}
-
-function previousDate(date: string) {
-  const value = new Date(`${date}T00:00:00`);
-  value.setDate(value.getDate() - 1);
-  return toDateOnly(value);
 }
 
 function occurrenceDateForImportedMovement(

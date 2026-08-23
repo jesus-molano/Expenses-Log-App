@@ -45,7 +45,7 @@ export function ExpenseRowContent({
 
       <div className="shrink-0 text-right">
         <p
-          className={`text-[14px] font-semibold ${
+          className={`app-money text-[14px] font-semibold ${
             paid ? "app-row-paid" : "text-[var(--app-text)]"
           }`}
         >

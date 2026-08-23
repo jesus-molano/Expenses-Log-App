@@ -285,6 +285,10 @@
   letter-spacing: 0.04em;
 }
 
+.app-monthly-expense-table-head {
+  grid-template-columns: minmax(0, 1fr) minmax(5.75rem, auto) 5.75rem;
+}
+
 .app-monthly-table-head > :nth-child(2),
 .app-monthly-table-body[data-integrated-list="true"] .app-monthly-table-row:not([data-editing="true"]) > :nth-child(2) {
   text-align: left;
@@ -308,6 +312,25 @@
 
 .app-monthly-table-body[data-integrated-list="true"] .app-monthly-table-row:not([data-editing="true"]) {
   grid-template-columns: minmax(0, 1fr) minmax(5.75rem, auto) 2rem 2rem;
+}
+
+.app-monthly-table-body[data-integrated-list="true"] .app-monthly-expense-row:not([data-editing="true"]) {
+  grid-template-columns: minmax(0, 1fr) minmax(5.75rem, auto) 5.75rem;
+}
+
+.app-monthly-table-body[data-integrated-list="true"] .app-monthly-expense-row[data-has-pay-action="true"]:not([data-editing="true"]) {
+  grid-template-columns: minmax(0, 1fr) minmax(5.75rem, auto) auto;
+}
+
+@media (max-width: 359px) {
+  .app-monthly-table-body[data-integrated-list="true"] .app-monthly-expense-row[data-has-pay-action="true"]:not([data-editing="true"]) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .app-monthly-table-body[data-integrated-list="true"] .app-monthly-expense-row[data-has-pay-action="true"]:not([data-editing="true"]) > :nth-child(3) {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
 }
 
 .app-monthly-table-body[data-integrated-list="true"] .app-monthly-table-row + .app-monthly-table-row {
@@ -664,6 +687,13 @@
   height: 3rem;
   min-width: 3rem;
   min-height: 3rem;
+}
+
+.app-icon-button-touch {
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
 }
 
 .app-icon-button > svg {
@@ -1650,12 +1680,4 @@
 
 .app-expense-row-paid {
   opacity: 0.82;
-}
-
-:root[data-theme="light"] .app-expense-row-paid {
-  opacity: 0.9;
-}
-
-:root[data-theme="light"] .app-expense-row-paid article {
-  background-color: color-mix(in srgb, var(--app-surface) 92%, var(--app-bg-soft)) !important;
 }

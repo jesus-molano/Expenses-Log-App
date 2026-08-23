@@ -36,7 +36,6 @@ export function usePlanSettingsForm({
   const [savingsTarget, setSavingsTarget] = useState(
     formatMoneyInput(getMonthlySavingsTarget(finance, savingsMonthId), language),
   );
-  const [accounts, setAccounts] = useState<PlanAccount[]>(finance.accounts);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
 
@@ -47,7 +46,6 @@ export function usePlanSettingsForm({
     setSavingsTarget(
       formatMoneyInput(getMonthlySavingsTarget(finance, savingsMonthId), language),
     );
-    setAccounts(finance.accounts);
     setDayPickerOpen(false);
   }
 
@@ -68,7 +66,7 @@ export function usePlanSettingsForm({
       salaryDay,
       savingsMonthId,
       savingsTarget: parseMoneyInput(savingsTarget),
-      accounts,
+      accounts: finance.accounts,
     });
     closeSettings();
   }
@@ -77,13 +75,11 @@ export function usePlanSettingsForm({
     salaryAmount,
     salaryDay,
     savingsTarget,
-    accounts,
     settingsOpen,
     dayPickerOpen,
     setSalaryAmount,
     setSalaryDay,
     setSavingsTarget,
-    setAccounts,
     setDayPickerOpen,
     openSettings,
     closeSettings,

@@ -73,6 +73,7 @@ export type ExpenseOccurrenceOverride = {
   note?: string;
   reminderDismissedAt?: string;
   reminderDismissedChargeDate?: string;
+  updatedAt?: string;
 };
 
 export type ExpenseOccurrence = {
@@ -85,6 +86,7 @@ export type ExpenseOccurrence = {
   status: OccurrenceStatus;
   sortOrder: number;
   override?: ExpenseOccurrenceOverride;
+  record?: ExpenseOccurrenceRecord;
 };
 
 export type DraftExpense = {
@@ -118,6 +120,23 @@ export type IncomeEvent = {
 export type MonthlySalarySettings = {
   amount: number;
   dayOfMonth: number;
+  updatedAt?: string;
+};
+
+export type MonthlySavingsTarget = {
+  amount: number;
+  updatedAt: string;
+};
+
+export type MonthlySavingsContribution = {
+  id: string;
+  userId: string;
+  monthId: string;
+  amount: number;
+  transferredAt?: string;
+  source: "manual" | "legacy";
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type PlanAccountPurpose =
@@ -137,8 +156,36 @@ export type PlanAccount = {
 export type FinanceStore = {
   incomeEvents: IncomeEvent[];
   monthlySalary: Record<string, MonthlySalarySettings>;
-  monthlySavingsTargets: Record<string, number>;
+  monthlySavingsTargets: Record<string, number | MonthlySavingsTarget>;
+  monthlySavingsContributions?: Record<string, MonthlySavingsContribution>;
   accounts: PlanAccount[];
+};
+
+export type ExpenseOccurrenceRecordSource =
+  | "native"
+  | "legacy-derived"
+  | "bank-import";
+
+export type ExpenseOccurrenceRecord = {
+  id: string;
+  userId: string;
+  templateId: string;
+  occurrenceDate: string;
+  monthId: string;
+  dueDate: string;
+  name: string;
+  description: string;
+  plannedAmount: number;
+  currency: "EUR";
+  categoryId: string;
+  categoryName: string;
+  status: OccurrenceStatus;
+  sortOrder: number;
+  paidAt?: string;
+  amountPaid?: number;
+  source: ExpenseOccurrenceRecordSource;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type BankMovement = {
@@ -170,15 +217,48 @@ export type BankMerchantAlias = {
   updatedAt: string;
 };
 
-export type AppTheme = "dark" | "rose-pine" | "catppuccin" | "light";
+export type AppTheme =
+  | "atlas"
+  | "obsidian-amber"
+  | "vice-afterglow"
+  | "catppuccin"
+  | "rose-pine"
+  | "nord"
+  | "dracula"
+  | "tokyo-night";
 export type AppLanguage = "es" | "en";
 
 export type MonthlyMoneyPlan = {
   month: string;
+  phase: "registered" | "current" | "projected";
+  plannedIncomeTotal: number;
   incomeTotal: number;
+  fixedIncomeTotal: number;
   salaryIncomeTotal: number;
   extraIncomeTotal: number;
   plannedExpensesTotal: number;
+  paidExpensesTotal: number;
+  pendingExpensesTotal: number;
+  expectedExpensesTotal: number;
+  plannedExpenseCount: number;
+  paidExpenseCount: number;
+  pendingExpenseCount: number;
+  savingsTarget: number;
+  savingsActual: number;
+  savingsReserved: number;
+  savingsGoalRemaining: number;
+  maxSavingsCapacity: number;
+  freeAccordingToPlan: number;
+  billsShortfall: number;
+  savingsGoalShortfall: number;
+  nextPending?: {
+    id: string;
+    name: string;
+    dueDate: string;
+    amount: number;
+    overdue: boolean;
+  };
+  // Compatibilidad temporal con los consumidores del reparto existente.
   expensesContribution: number;
   savingsContribution: number;
   remainingContribution: number;
@@ -187,9 +267,11 @@ export type MonthlyMoneyPlan = {
 };
 
 export type ExpenseStore = {
+  schemaVersion?: 2;
   categories: ExpenseCategory[];
   templates: ExpenseTemplate[];
   overrides: ExpenseOccurrenceOverride[];
+  occurrenceRecords?: ExpenseOccurrenceRecord[];
   finance: FinanceStore;
   bankMovements: BankMovement[];
   bankMerchantAliases: BankMerchantAlias[];
@@ -200,6 +282,8 @@ export type ExpenseStore = {
     incomeEvents?: string[];
     bankMovements?: string[];
     bankMerchantAliases?: string[];
+    occurrenceRecords?: string[];
+    savingsContributions?: string[];
   };
   preferences?: {
     theme: AppTheme;

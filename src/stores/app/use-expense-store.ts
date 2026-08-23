@@ -5,11 +5,8 @@ import {
   createElement,
   useCallback,
   useContext,
-  useEffect,
-  useRef,
   useState,
 } from "react";
-import { AppBootSplash } from "@/app/providers/AppBootSplash";
 import type {
   AppLanguage,
   AppTheme,
@@ -19,6 +16,7 @@ import type {
   ExpenseStore,
 } from "@/domain/types";
 import { emptyStore } from "@/domain/seed";
+import { materializeClosedOccurrenceRecords } from "@/domain/finance";
 import { persistLanguagePreference, t } from "@/shared/i18n";
 import { applyAppTheme } from "@/shared/theme";
 import {
@@ -40,6 +38,8 @@ import {
   updateMoneySettingsInStore,
   updateMonthlyExpenseOccurrenceInStore,
   updateMonthlySalaryInStore,
+  updateMonthlySavingsContributionInStore,
+  updateMonthlySavingsInStore,
   updateMonthlySavingsTargetInStore,
   updateThemeInStore,
 } from "./store-commands";
@@ -48,16 +48,16 @@ import type {
   MoneySettingsInput,
   MonthlyExpenseOverrideInput,
   MonthlySalaryInput,
+  MonthlySavingsContributionInput,
+  MonthlySavingsInput,
   MonthlySavingsTargetInput,
 } from "./store-types";
+import { preserveClosedOccurrenceRecords } from "./store-history";
 import { useStorePersistence } from "./use-store-persistence";
 
 type ExpenseStoreContextValue = ReturnType<typeof useExpenseStoreValue>;
 
 const ExpenseStoreContext = createContext<ExpenseStoreContextValue | null>(null);
-const FORCE_SPLASH_PREVIEW = false;
-const BOOT_SPLASH_INTRO_MS = 1_200;
-const BOOT_SPLASH_EXIT_MS = 420;
 
 export function ExpenseStoreProvider({
   children,
@@ -65,98 +65,11 @@ export function ExpenseStoreProvider({
   children: React.ReactNode;
 }) {
   const value = useExpenseStoreValue();
-  const [showSplash, setShowSplash] = useState(() => !FORCE_SPLASH_PREVIEW);
-  const [splashExiting, setSplashExiting] = useState(false);
-  const splashStartedAtRef = useRef(0);
-  const hiddenAtRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    splashStartedAtRef.current = Date.now();
-  }, []);
-
-  useEffect(() => {
-    if (!value.isHydrated) return;
-
-    if (splashStartedAtRef.current === 0) {
-      splashStartedAtRef.current = Date.now();
-    }
-
-    const visibleFor = Date.now() - splashStartedAtRef.current;
-    const exitDelay = Math.max(0, BOOT_SPLASH_INTRO_MS - visibleFor);
-    const exitTimer = window.setTimeout(() => setSplashExiting(true), exitDelay);
-    const hideTimer = window.setTimeout(
-      () => setShowSplash(false),
-      exitDelay + BOOT_SPLASH_EXIT_MS,
-    );
-
-    return () => {
-      window.clearTimeout(exitTimer);
-      window.clearTimeout(hideTimer);
-    };
-  }, [value.isHydrated]);
-
-  useEffect(() => {
-    if (!value.isHydrated) return;
-
-    function runResumeSplash(holdMs = 260) {
-      setShowSplash(true);
-      setSplashExiting(false);
-
-      const exitTimer = window.setTimeout(() => setSplashExiting(true), holdMs);
-      const hideTimer = window.setTimeout(
-        () => setShowSplash(false),
-        holdMs + BOOT_SPLASH_EXIT_MS,
-      );
-
-      return () => {
-        window.clearTimeout(exitTimer);
-        window.clearTimeout(hideTimer);
-      };
-    }
-
-    let cleanupResumeSplash: (() => void) | null = null;
-
-    function handleVisibilityChange() {
-      if (document.visibilityState === "hidden") {
-        cleanupResumeSplash?.();
-        setShowSplash(true);
-        setSplashExiting(false);
-        hiddenAtRef.current = Date.now();
-        return;
-      }
-
-      const hiddenFor = hiddenAtRef.current
-        ? Date.now() - hiddenAtRef.current
-        : 0;
-      hiddenAtRef.current = null;
-
-      cleanupResumeSplash?.();
-      cleanupResumeSplash = runResumeSplash(hiddenFor < 900 ? 80 : 260);
-    }
-
-    function handlePageShow(event: PageTransitionEvent) {
-      if (!event.persisted) return;
-      cleanupResumeSplash?.();
-      cleanupResumeSplash = runResumeSplash();
-    }
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("pageshow", handlePageShow);
-
-    return () => {
-      cleanupResumeSplash?.();
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("pageshow", handlePageShow);
-    };
-  }, [value.isHydrated]);
 
   return createElement(
     ExpenseStoreContext.Provider,
     { value },
-    FORCE_SPLASH_PREVIEW || showSplash
-      ? createElement(AppBootSplash, { exiting: !FORCE_SPLASH_PREVIEW && splashExiting })
-      : null,
-    !FORCE_SPLASH_PREVIEW && value.isHydrated
+    value.isHydrated
       ? createElement(
           "div",
           { className: "app-hydrated-content", "data-state": "ready" },
@@ -184,7 +97,10 @@ function useExpenseStoreValue() {
   const persistence = useStorePersistence({ onHydrate: hydrateStore });
 
   function persist(nextStore: ExpenseStore) {
-    persistence.persist(nextStore, setStore);
+    persistence.persist(
+      preserveClosedOccurrenceRecords(store, nextStore),
+      setStore,
+    );
   }
 
   function addExpense(draft: DraftExpense, options: CreateExpenseOptions = {}) {
@@ -192,16 +108,34 @@ function useExpenseStoreValue() {
   }
 
   async function deleteExpense(templateId: string) {
+    const recordedStore = materializeClosedOccurrenceRecords(store);
     await persistence.persistImmediately(
-      deleteExpenseFromStore(store, templateId),
+      deleteExpenseFromStore(recordedStore, templateId),
       setStore,
       t("settings.savingChanges"),
     );
   }
 
   async function clearExpenses() {
+    const occurrenceRecordIds = (store.occurrenceRecords ?? []).map(
+      (record) => record.id,
+    );
+    const clearedStore = clearExpensesFromStore(store);
     await persistence.persistImmediately(
-      clearExpensesFromStore(store),
+      {
+        ...clearedStore,
+        schemaVersion: 2,
+        occurrenceRecords: [],
+        deleted: {
+          ...clearedStore.deleted,
+          occurrenceRecords: Array.from(
+            new Set([
+              ...(clearedStore.deleted?.occurrenceRecords ?? []),
+              ...occurrenceRecordIds,
+            ]),
+          ),
+        },
+      },
       setStore,
       t("settings.clearingCloudExpenses"),
     );
@@ -255,6 +189,16 @@ function useExpenseStoreValue() {
     persist(updateMonthlySavingsTargetInStore(store, input));
   }
 
+  function updateMonthlySavingsContribution(
+    input: MonthlySavingsContributionInput,
+  ) {
+    persist(updateMonthlySavingsContributionInStore(store, input));
+  }
+
+  function updateMonthlySavings(input: MonthlySavingsInput) {
+    persist(updateMonthlySavingsInStore(store, input));
+  }
+
   function updateMonthlySalary(input: MonthlySalaryInput) {
     persist(updateMonthlySalaryInStore(store, input));
   }
@@ -304,6 +248,8 @@ function useExpenseStoreValue() {
     moveOccurrenceOnly,
     updateMoneySettings,
     updateMonthlySavingsTarget,
+    updateMonthlySavingsContribution,
+    updateMonthlySavings,
     updateMonthlySalary,
     addIncomeEvent,
     deleteIncomeEvent,

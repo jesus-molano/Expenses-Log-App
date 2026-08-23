@@ -23,6 +23,7 @@ import {
   updateLanguageInStore,
   updateMoneySettingsInStore,
   updateMonthlySalaryInStore,
+  updateMonthlySavingsInStore,
   updateMonthlySavingsTargetInStore,
   updateThemeInStore,
 } from "./store-commands";
@@ -679,7 +680,9 @@ describe("store commands", () => {
     });
     expect(financeStore.finance).toMatchObject({
       monthlySavingsTargets: {
-        "2026-06": 250,
+        "2026-06": {
+          amount: 250,
+        },
       },
       accounts: [
         {
@@ -741,11 +744,34 @@ describe("store commands", () => {
 
     expect(updated.finance).toMatchObject({
       monthlySavingsTargets: {
-        "2026-06": 250,
-        "2026-07": 800,
+        "2026-06": {
+          amount: 250,
+        },
+        "2026-07": {
+          amount: 800,
+        },
       },
     });
     expect(updated.finance.monthlySalary).toEqual(withSettings.finance.monthlySalary);
+  });
+
+  it("updates a savings goal and its real contribution atomically", () => {
+    const updated = updateMonthlySavingsInStore(emptyStore, {
+      monthId: "2026-08-01",
+      savingsTarget: 500,
+      amount: 325,
+      transferredAt: "2026-08-05",
+    });
+
+    expect(updated.finance.monthlySavingsTargets["2026-08"])
+      .toMatchObject({ amount: 500 });
+    expect(updated.finance.monthlySavingsContributions?.["2026-08"])
+      .toMatchObject({
+        id: "saving:2026-08:test-id",
+        amount: 325,
+        transferredAt: "2026-08-05",
+        source: "manual",
+      });
   });
 
   it("updates only the salary settings for a selected month", () => {

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { AppLanguage } from "@/domain/types";
 import { clearExpenseLocalData } from "@/data/persistence/local-store";
 import { t } from "@/shared/i18n";
+import { DEFAULT_THEME } from "@/shared/theme";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { createClient } from "@/utils/supabase/client";
 import { useNotificationSettings } from "./use-notification-settings";
@@ -42,7 +43,7 @@ export function useSettingsController({
     disableNotifications,
   } = useNotificationSettings(setMessage);
 
-  const currentTheme = store.preferences?.theme ?? "dark";
+  const currentTheme = store.preferences?.theme ?? DEFAULT_THEME;
   const currentLanguage = store.preferences?.language ?? "es";
   const selectedTheme =
     SETTINGS_THEMES.find((theme) => theme.id === currentTheme) ??

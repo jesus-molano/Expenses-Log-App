@@ -1,8 +1,8 @@
-const CACHE_NAME = "expense-reminders-v5";
+const CACHE_NAME = "expense-reminders-v6";
 const OFFLINE_URL = "/";
 const APP_SHELL_ASSETS = [
   OFFLINE_URL,
-  "/manifest.webmanifest?v=5",
+  "/manifest.webmanifest?v=6",
   "/icon-192.png?v=5",
   "/icon-512.png?v=5",
   "/apple-touch-icon.png?v=5",

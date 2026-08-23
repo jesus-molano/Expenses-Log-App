@@ -10,7 +10,7 @@ import {
   simpleHash,
   titleFromMovement,
 } from "./bank-import-utils";
-import { generateOccurrences } from "./recurrence";
+import { generateStoreOccurrences } from "./finance";
 import type {
   BankMovement,
   DraftExpense,
@@ -234,9 +234,8 @@ export function matchBankMovements(
   const incomes = movements.filter((movement) => movement.amount > 0);
   const dateRange = movementDateRange(expenses);
   const occurrences = dateRange
-    ? generateOccurrences(
-        store.templates,
-        store.overrides,
+    ? generateStoreOccurrences(
+        store,
         dateRange.from,
         dateRange.to,
         store.preferences?.language ?? "es",

@@ -22,7 +22,7 @@ export function MoneyStat({
         </p>
       </div>
       <div className="mt-1 flex min-w-0 items-center justify-between gap-2">
-        <p className="app-stat-value min-w-0 truncate text-base font-semibold">
+        <p className="app-money app-stat-value min-w-0 truncate text-base font-semibold">
           {value}
         </p>
         {action}

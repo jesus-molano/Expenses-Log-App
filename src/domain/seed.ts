@@ -17,7 +17,7 @@ export const emptyStore: ExpenseStore = {
     bankMerchantAliases: [],
   },
   preferences: {
-    theme: "dark",
+    theme: "vice-afterglow",
     language: "es",
   },
 };
@@ -97,7 +97,7 @@ export const demoStore: ExpenseStore = {
     bankMerchantAliases: [],
   },
   preferences: {
-    theme: "dark",
+    theme: "vice-afterglow",
     language: "es",
   },
 };

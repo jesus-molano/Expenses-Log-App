@@ -13,6 +13,17 @@ export type MonthlySavingsTargetInput = {
   savingsTarget: number;
 };
 
+export type MonthlySavingsContributionInput = {
+  monthId: string;
+  amount: number;
+  transferredAt?: string;
+};
+
+export type MonthlySavingsInput = MonthlySavingsTargetInput & {
+  amount: number;
+  transferredAt?: string;
+};
+
 export type MonthlySalaryInput = {
   monthId: string;
   salaryAmount: number;

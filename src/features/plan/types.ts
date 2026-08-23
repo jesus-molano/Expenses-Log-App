@@ -8,6 +8,10 @@ export type MoneySeriesItem = {
   savings: number;
   shortfall: number;
   hasRecords: boolean;
+  phase?: "registered" | "current" | "projected";
+  plannedExpenses?: number;
+  paid?: number;
+  pending?: number;
+  savingsGoal?: number;
+  capacity?: number;
 };
-
-export type { PlanAccount, PlanAccountPurpose } from "@/domain/types";

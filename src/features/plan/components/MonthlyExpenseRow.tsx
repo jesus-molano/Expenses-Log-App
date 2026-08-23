@@ -29,6 +29,7 @@ export function MonthlyExpenseRow({
   today,
   skipLabel,
   onSkip,
+  onTogglePaid,
   onUpdate,
 }: {
   occurrence: ExpenseOccurrence;
@@ -37,6 +38,7 @@ export function MonthlyExpenseRow({
   today: string;
   skipLabel: string;
   onSkip: () => void;
+  onTogglePaid?: () => void;
   onUpdate: (input: MonthlyExpenseUpdateInput) => void;
 }) {
   const locale = language === "en" ? enUS : es;
@@ -155,7 +157,10 @@ export function MonthlyExpenseRow({
       : t("common.pending", language);
 
   return (
-    <div className="app-list-item app-monthly-table-row grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 px-3 py-2">
+    <div
+      className="app-list-item app-monthly-table-row app-monthly-expense-row grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-2"
+      data-has-pay-action={onTogglePaid ? "true" : undefined}
+    >
       <div className="min-w-0">
         <p
           className={`truncate text-sm font-semibold ${
@@ -174,7 +179,7 @@ export function MonthlyExpenseRow({
         </p>
       </div>
       <p
-        className={`text-sm font-semibold ${
+        className={`app-money text-sm font-semibold ${
           isPaid
             ? "text-[var(--app-text-subtle)] line-through"
             : "text-[var(--app-text)]"
@@ -182,24 +187,42 @@ export function MonthlyExpenseRow({
       >
         {formatCurrency(occurrence.template.amount)}
       </p>
-      <IconButton
-        type="button"
-        onClick={editor.openEditor}
-        aria-label={t("common.edit", language)}
-        size="sm"
-      >
-        <Pencil size={14} />
-      </IconButton>
-      <IconButton
-        type="button"
-        onClick={onSkip}
-        aria-label={skipLabel}
-        title={skipLabel}
-        variant="danger"
-        size="sm"
-      >
-        <X size={15} />
-      </IconButton>
+      <div className="flex shrink-0 items-center gap-1">
+        {onTogglePaid ? (
+          <IconButton
+            type="button"
+            onClick={onTogglePaid}
+            aria-label={
+              language === "es"
+                ? `Marcar ${occurrence.template.name} como pagado`
+                : `Mark ${occurrence.template.name} as paid`
+            }
+            title={language === "es" ? "Marcar como pagado" : "Mark as paid"}
+            size="touch"
+            className="text-[var(--app-success)]"
+          >
+            <Check size={15} />
+          </IconButton>
+        ) : null}
+        <IconButton
+          type="button"
+          onClick={editor.openEditor}
+          aria-label={t("common.edit", language)}
+          size="touch"
+        >
+          <Pencil size={14} />
+        </IconButton>
+        <IconButton
+          type="button"
+          onClick={onSkip}
+          aria-label={skipLabel}
+          title={skipLabel}
+          variant="danger"
+          size="touch"
+        >
+          <X size={15} />
+        </IconButton>
+      </div>
     </div>
   );
 }
