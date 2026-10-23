@@ -375,7 +375,7 @@ test("cancels an analysis without starting another one", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "Nuevo gasto" })).toHaveCount(0);
 });
 
-test("dictates an expense and reviews it in the form", async ({ page }) => {
+async function fakeDictation(page: Page) {
   await loadDemoStore(page);
   // Reconocedor falso: devuelve una frase final poco después de arrancar.
   await page.addInitScript(() => {
@@ -404,9 +404,9 @@ test("dictates an expense and reviews it in the form", async ({ page }) => {
       webkitSpeechRecognition: FakeRecognition,
     });
   });
-  let sentText = "";
+  const sent: string[] = [];
   await page.route("**/api/ai/parse-expenses", async (route) => {
-    sentText = JSON.parse(route.request().postData() ?? "{}").text;
+    sent.push(JSON.parse(route.request().postData() ?? "{}").text);
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
@@ -432,9 +432,26 @@ test("dictates an expense and reviews it in the form", async ({ page }) => {
   await expect(dictate).toBeVisible();
   await dictate.click();
   await expect(page.getByText("Escuchando…")).toBeVisible();
+  return sent;
+}
+
+test("dictates an expense and reviews it in the form", async ({ page }) => {
+  const sent = await fakeDictation(page);
 
   await expect(page.getByRole("heading", { name: "Nuevo gasto" })).toBeVisible({ timeout: 6_000 });
-  expect(sentText).toBe("Netflix 12,99 el 5");
+  expect(sent).toEqual(["Netflix 12,99 el 5"]);
+});
+
+test("analyzing while dictating ends the dictation and sends the text once", async ({ page }) => {
+  const sent = await fakeDictation(page);
+
+  await expect(page.getByPlaceholder("Ej: Luz 64,75 mensual día 8")).toHaveValue("Netflix 12,99 el 5");
+  await page.getByRole("button", { name: "Analizar texto" }).click();
+
+  await expect(page.getByRole("heading", { name: "Nuevo gasto" })).toBeVisible();
+  // Pasado el plazo de silencio no llega un segundo análisis.
+  await page.waitForTimeout(2_500);
+  expect(sent).toEqual(["Netflix 12,99 el 5"]);
 });
 
 test("Back closes the open sheet instead of leaving the screen", async ({ page }) => {
