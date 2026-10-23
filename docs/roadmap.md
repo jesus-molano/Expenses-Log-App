@@ -44,6 +44,11 @@ Estado:
   - Mes activo con `monthClosures`, tarjeta "Octubre al día · Pasar a noviembre", aviso al pagar el último recibo y "Volver a octubre".
   - Selector de mes en Gastos (un año atrás y el mes siguiente). Plan sigue al mes activo.
   - `monthClosures` se escribe sin esperar la semana de passthrough: si un build antiguo lo descarta, el mes activo vuelve al natural y no se pierde ningún dato.
+- **F1b: hecho.**
+  - Cliente Gemini con cabecera, esquema, thinking por modelo, respaldo y plazo de 10 s.
+  - Normalizador común con el parser local, que se reescribe (NFD, día antes que importe, frecuencias y meses).
+  - Captura con la IA primero, varios gastos con revisión y "Guardar N".
+  - El script de evaluación con la clave real (`scripts/eval-ai-parse.mjs`) queda pendiente: no hay clave en este entorno.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 

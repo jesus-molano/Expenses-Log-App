@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
+import type { CapturedDraft } from "@/domain/expense-capture";
 import type {
   AppLanguage,
   CreateExpenseOptions,
@@ -11,11 +12,14 @@ import type {
 } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
+import { inferredFieldsLabel } from "../lib/capture-labels";
 import { ExpenseForm } from "./ExpenseForm";
 
 type ExpenseFormSheetProps = {
   open: boolean;
   draft: DraftExpense;
+  // Lo que la captura con IA no encontró o dedujo, para revisarlo.
+  review?: Pick<CapturedDraft, "missingFields" | "inferredFields"> | null;
   language?: AppLanguage;
   onClose: () => void;
   onSave: (draft: DraftExpense, options?: CreateExpenseOptions) => void;
@@ -24,14 +28,17 @@ type ExpenseFormSheetProps = {
 export function ExpenseFormSheet({
   open,
   draft,
+  review = null,
   language = "es",
   onClose,
   onSave,
 }: ExpenseFormSheetProps) {
   const [form, setForm] = useState(draft);
+  // Sin importe (captura que no lo encontró), el campo empieza vacío.
   const [amountText, setAmountText] = useState(() =>
-    formatMoneyInput(draft.amount, language),
+    draft.amount > 0 ? formatMoneyInput(draft.amount, language) : "",
   );
+  const toReview = inferredFieldsLabel(review?.inferredFields ?? [], language);
   const [initialStatus, setInitialStatus] =
     useState<Extract<OccurrenceStatus, "due" | "paid">>("due");
   const today = new Date();
@@ -91,6 +98,18 @@ export function ExpenseFormSheet({
         </div>
 
         <div className="grid gap-4 px-5 pb-5">
+          {review?.missingFields.includes("amount") || toReview ? (
+            <p className="app-section-card p-3 text-xs text-[var(--app-text-muted)]">
+              {[
+                review?.missingFields.includes("amount")
+                  ? t("expenses.captureMissingAmount", language)
+                  : null,
+                toReview || null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          ) : null}
           <ExpenseForm
             form={form}
             amountText={amountText}

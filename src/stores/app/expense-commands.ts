@@ -87,6 +87,17 @@ function normalizeDraftStartDate(draft: DraftExpense, startDate: string): DraftE
   };
 }
 
+// Varios borradores de una captura, en un solo cambio del store. Solo los
+// que tienen importe: uno sin él no es un gasto que se pueda guardar.
+export function addExpensesToStore(
+  store: ExpenseStore,
+  drafts: DraftExpense[],
+): ExpenseStore {
+  return drafts
+    .filter((draft) => Number.isFinite(draft.amount) && draft.amount > 0)
+    .reduce((current, draft) => addExpenseToStore(current, draft), store);
+}
+
 export function dismissLastChanceReminderInStore(
   store: ExpenseStore,
   occurrence: ExpenseOccurrence,

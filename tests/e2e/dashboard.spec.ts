@@ -77,11 +77,11 @@ test("creates and pays a parsed recurring expense", async ({ page }) => {
 
   await expect(page.getByText("Por pagar")).toBeVisible();
   await page.getByRole("button", { name: "Añadir gasto" }).click();
-  await page.locator("summary").filter({ hasText: "Analizar texto" }).click();
   await page
     .getByPlaceholder("Ej: Luz 64,75 mensual día 8")
     .fill("Spotify 10,99 mensual el dia 12 musica");
-  await page.getByRole("button", { name: "Analizar texto" }).click({ force: true });
+  // Intro analiza el texto.
+  await page.getByPlaceholder("Ej: Luz 64,75 mensual día 8").press("Enter");
 
   await expect(page.getByRole("heading", { name: "Nuevo gasto" })).toBeVisible();
   await page.getByRole("button", { name: "Guardar gasto" }).click();
@@ -205,12 +205,15 @@ test("sheet closes with Escape and restores focus", async ({ page }) => {
 
   const closeButton = dialog.getByRole("button", { name: "Cerrar" });
   const manualButton = dialog.getByRole("button", { name: "Manual" });
-  const textSummary = dialog.locator("summary");
   await expect(closeButton).toBeFocused();
-  await expect(manualButton).toHaveClass(/app-button-primary/);
+  // La captura por texto va primero; el alta manual queda como alternativa.
+  await expect(dialog.getByRole("textbox", { name: "Analizar texto" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Analizar texto" })).toHaveClass(
+    /app-button-primary/,
+  );
 
   await page.keyboard.press("Shift+Tab");
-  await expect(textSummary).toBeFocused();
+  await expect(manualButton).toBeFocused();
 
   await page.keyboard.press("Tab");
   await expect(closeButton).toBeFocused();
@@ -283,4 +286,48 @@ test("mobile shell routes render without runtime errors", async ({ page }) => {
     await expect(page.locator("main").first()).toBeVisible();
     await expect(page.locator("body")).not.toContainText("Unhandled Runtime Error");
   }
+});
+
+test("reviews and saves several expenses captured at once", async ({ page }) => {
+  await loadDemoStore(page);
+  await page.route("**/api/ai/parse-expenses", async (route) => {
+    const draft = (name: string, amount: number, dueDay: number) => ({
+      name,
+      description: "",
+      amount,
+      categoryName: "Suscripciones",
+      startDate: "2026-06-01",
+      dueDay,
+      recurrence: { frequency: "monthly" },
+    });
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        provider: "gemini",
+        expenses: [draft("Tidal", 10.99, 3), draft("Audible", 0, 9), draft("Dropbox", 11.99, 14)],
+        review: [
+          { missingFields: [], inferredFields: [] },
+          { missingFields: ["amount"], inferredFields: [] },
+          { missingFields: [], inferredFields: ["dueDay"] },
+        ],
+      }),
+    });
+  });
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Añadir gasto" }).click();
+  await page.getByRole("button", { name: "Netflix 12,99 el 5" }).click();
+  await page.getByRole("button", { name: "Analizar texto" }).click();
+
+  const review = page.getByRole("dialog", { name: "Revisa los gastos" });
+  await expect(review).toBeVisible();
+  await expect(review.getByText("Falta el importe")).toBeVisible();
+  await expect(review.getByText("Revisa: día de cobro")).toBeVisible();
+  await expect(review.getByRole("checkbox", { name: "Incluir Audible" })).toBeDisabled();
+  await review.getByRole("button", { name: "Guardar 2" }).click();
+
+  await expect(review).toBeHidden();
+  await expect(page.locator('[data-expense-row="true"]').filter({ hasText: "Tidal" }).first()).toBeAttached();
+  await expect(page.locator('[data-expense-row="true"]').filter({ hasText: "Dropbox" }).first()).toBeAttached();
+  await expect(page.locator('[data-expense-row="true"]').filter({ hasText: "Audible" })).toHaveCount(0);
 });

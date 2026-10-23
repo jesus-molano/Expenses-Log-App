@@ -1,0 +1,149 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Gemini expense capture contract > uses only schema keywords Gemini accepts 1`] = `
+{
+  "properties": {
+    "expenses": {
+      "items": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+          "annualMonth": {
+            "anyOf": [
+              {
+                "maximum": 12,
+                "minimum": 1,
+                "type": "integer",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+          "categoryName": {
+            "anyOf": [
+              {
+                "enum": [
+                  "Casa",
+                ],
+                "type": "string",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+          "dueDay": {
+            "anyOf": [
+              {
+                "maximum": 31,
+                "minimum": 1,
+                "type": "integer",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+          "frequency": {
+            "anyOf": [
+              {
+                "enum": [
+                  "once",
+                  "monthly",
+                  "quarterly",
+                  "yearly",
+                  "custom",
+                ],
+                "type": "string",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+          "name": {
+            "type": "string",
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "day",
+                  "week",
+                  "month",
+                  "year",
+                ],
+                "type": "string",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+        },
+        "propertyOrdering": [
+          "name",
+          "amount",
+          "categoryName",
+          "frequency",
+          "interval",
+          "unit",
+          "dueDay",
+          "annualMonth",
+          "startDate",
+        ],
+        "required": [
+          "name",
+          "amount",
+          "categoryName",
+          "frequency",
+          "interval",
+          "unit",
+          "dueDay",
+          "annualMonth",
+          "startDate",
+        ],
+        "type": "object",
+      },
+      "maxItems": 10,
+      "type": "array",
+    },
+  },
+  "required": [
+    "expenses",
+  ],
+  "type": "object",
+}
+`;

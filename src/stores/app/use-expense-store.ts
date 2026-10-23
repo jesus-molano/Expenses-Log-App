@@ -22,6 +22,7 @@ import { persistLanguagePreference, t } from "@/shared/i18n";
 import { applyAppTheme } from "@/shared/theme";
 import {
   addExpenseToStore,
+  addExpensesToStore,
   addIncomeEventToStore,
   clearExpensesFromStore,
   clearIncomeFromStore,
@@ -116,6 +117,10 @@ function useExpenseStoreValue() {
 
   function addExpense(draft: DraftExpense, options: CreateExpenseOptions = {}) {
     persist(addExpenseToStore(current(), draft, options));
+  }
+
+  function addExpenses(drafts: DraftExpense[]) {
+    persist(addExpensesToStore(store, drafts));
   }
 
   async function deleteExpense(templateId: string) {
@@ -248,6 +253,7 @@ function useExpenseStoreValue() {
     store,
     persist,
     addExpense,
+    addExpenses,
     deleteExpense,
     clearExpenses,
     clearIncome,
