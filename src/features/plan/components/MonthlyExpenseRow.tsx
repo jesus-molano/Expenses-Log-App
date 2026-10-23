@@ -10,6 +10,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { formatCurrency } from "@/domain/calendar";
 import { PRESET_EXPENSE_CATEGORIES } from "@/domain/categories";
+import { isOccurrenceOverdue } from "@/domain/pending";
 import type {
   AppLanguage,
   ExpenseCategory,
@@ -152,7 +153,7 @@ export function MonthlyExpenseRow({
   }
 
   const isPaid = occurrence.status === "paid";
-  const isOverdue = occurrence.status !== "paid" && occurrence.dueDate < today;
+  const isOverdue = isOccurrenceOverdue(occurrence, today);
   const status = isPaid
     ? t("common.paid", language)
     : isOverdue

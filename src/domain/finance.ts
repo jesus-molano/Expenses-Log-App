@@ -1,6 +1,6 @@
 import { endOfMonth, parseISO, startOfMonth, subDays } from "date-fns";
 import { estimateChargeDate, toDateOnly } from "./calendar";
-import { monthPendingSummary } from "./pending";
+import { isOccurrenceOverdue, monthPendingSummary } from "./pending";
 import { generateOccurrences } from "./recurrence";
 import type {
   AppLanguage,
@@ -223,7 +223,7 @@ export function buildMonthlyMoneyPlan({
         name: nextOccurrence.template.name,
         dueDate: nextOccurrence.dueDate,
         amount: nextOccurrence.template.amount,
-        overdue: nextOccurrence.dueDate < todayDateOnly,
+        overdue: isOccurrenceOverdue(nextOccurrence, todayDateOnly),
       }
     : undefined;
 

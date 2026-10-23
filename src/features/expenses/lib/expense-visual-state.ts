@@ -1,3 +1,4 @@
+import { isOccurrenceOverdue } from "@/domain/pending";
 import type { ExpenseOccurrence } from "@/domain/types";
 
 export type ExpenseVisualState = "paid" | "overdue" | "estimated" | "pending";
@@ -7,7 +8,7 @@ export function resolveExpenseVisualState(
   today: string,
 ): ExpenseVisualState {
   if (occurrence.status === "paid") return "paid";
-  if (occurrence.dueDate < today) return "overdue";
+  if (isOccurrenceOverdue(occurrence, today)) return "overdue";
   if (occurrence.estimatedChargeDate !== occurrence.dueDate) return "estimated";
   return "pending";
 }

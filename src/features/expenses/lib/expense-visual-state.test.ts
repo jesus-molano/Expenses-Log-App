@@ -23,6 +23,27 @@ describe("expense visual state", () => {
       ),
     ).toBe("estimated");
     expect(resolveExpenseVisualState(occurrence(), today)).toBe("pending");
+    expect(
+      resolveExpenseVisualState(
+        occurrence({
+          dueDate: "2026-06-06",
+          estimatedChargeDate: "2026-06-08",
+          status: "skipped",
+        }),
+        today,
+      ),
+    ).toBe("estimated");
+  });
+
+  it("keeps a weekend due date out of overdue until its charge day passes", () => {
+    const weekend = occurrence({
+      dueDate: "2026-06-06",
+      estimatedChargeDate: "2026-06-08",
+    });
+
+    expect(resolveExpenseVisualState(weekend, "2026-06-07")).toBe("estimated");
+    expect(resolveExpenseVisualState(weekend, "2026-06-08")).toBe("estimated");
+    expect(resolveExpenseVisualState(weekend, "2026-06-09")).toBe("overdue");
   });
 
   it("maps the shared state to the matching timeline dot class", () => {
