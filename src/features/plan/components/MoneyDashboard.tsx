@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { type FormEvent, useMemo, useState } from "react";
-import { format, startOfMonth, subMonths } from "date-fns";
+import { format, parseISO, subMonths } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import { Button } from "@/components/ui/Button";
 import { MoneyInput } from "@/components/ui/MoneyInput";
@@ -14,6 +14,7 @@ import {
   isEventInMonth,
   toMonthId,
 } from "@/domain/finance";
+import { resolveActiveMonth } from "@/domain/budget-month";
 import type { AppLanguage } from "@/domain/types";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
@@ -62,8 +63,16 @@ export function MoneyDashboard() {
   const today = useCurrentDate();
   const currentYear = today.getFullYear();
   const todayDateOnly = toDateOnly(today);
-  const currentMonthId = toMonthId(today);
-  const currentMonthDate = useMemo(() => startOfMonth(today), [today]);
+  // "Este mes" es el mes activo: tras pasar a noviembre, Plan y Gastos
+  // cuentan lo mismo.
+  const currentMonthId = resolveActiveMonth(
+    todayDateOnly,
+    store.finance.monthClosures,
+  );
+  const currentMonthDate = useMemo(
+    () => parseISO(`${currentMonthId}-01`),
+    [currentMonthId],
+  );
   const currentOccurrences = useMemo(
     () => occurrencesForMonth(store, currentMonthDate, language),
     [currentMonthDate, language, store],

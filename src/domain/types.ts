@@ -142,11 +142,20 @@ export type MonthlySavingsContribution = {
   updatedAt: string;
 };
 
+// Mes dado por terminado para pasar al siguiente. Reabrirlo guarda
+// `reopenedAt` en lugar de borrar la entrada, para que el merge lo respete.
+export type MonthClosure = {
+  closedAt: string;
+  updatedAt: string;
+  reopenedAt?: string;
+};
+
 export type FinanceStore = {
   incomeEvents: IncomeEvent[];
   monthlySalary: Record<string, MonthlySalarySettings>;
   monthlySavingsTargets: Record<string, number | MonthlySavingsTarget>;
   monthlySavingsContributions?: Record<string, MonthlySavingsContribution>;
+  monthClosures?: Record<string, MonthClosure>;
 };
 
 export type ExpenseOccurrenceRecordSource = "native" | "legacy-derived";

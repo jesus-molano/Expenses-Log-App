@@ -96,6 +96,36 @@ describe("normalizeExpenseStore", () => {
     });
   });
 
+  it("keeps valid month closures and drops malformed ones", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      finance: {
+        monthClosures: {
+          "2026-10": { closedAt: "2026-10-28T10:00:00.000Z" },
+          "2026-09": {
+            closedAt: "2026-09-29T10:00:00.000Z",
+            reopenedAt: "2026-09-29T11:00:00.000Z",
+            updatedAt: "2026-09-29T11:00:00.000Z",
+          },
+          october: { closedAt: "2026-10-28T10:00:00.000Z" },
+          "2026-08": { closedAt: "not a date" },
+        },
+      },
+    });
+
+    expect(store.finance.monthClosures).toEqual({
+      "2026-10": {
+        closedAt: "2026-10-28T10:00:00.000Z",
+        updatedAt: "2026-10-28T10:00:00.000Z",
+      },
+      "2026-09": {
+        closedAt: "2026-09-29T10:00:00.000Z",
+        reopenedAt: "2026-09-29T11:00:00.000Z",
+        updatedAt: "2026-09-29T11:00:00.000Z",
+      },
+    });
+  });
+
   it("falls back to a safe empty shape for invalid payloads", () => {
     expect(normalizeExpenseStore(null)).toMatchObject({
       categories: [],

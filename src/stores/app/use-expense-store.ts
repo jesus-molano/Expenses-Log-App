@@ -24,12 +24,14 @@ import {
   addIncomeEventToStore,
   clearExpensesFromStore,
   clearIncomeFromStore,
+  closeMonthInStore,
   deleteExpenseFromStore,
   deleteIncomeEventFromStore,
   dismissLastChanceReminderInStore,
   moveOccurrenceInStore,
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
+  reopenMonthInStore,
   skipOccurrenceInStore,
   togglePaidInStore,
   updateIncomeEventInStore,
@@ -214,6 +216,14 @@ function useExpenseStoreValue() {
     persist(updateMonthlyExpenseOccurrenceInStore(store, input));
   }
 
+  function closeMonth(monthId: string) {
+    persist(closeMonthInStore(store, monthId));
+  }
+
+  function reopenMonth(monthId: string) {
+    persist(reopenMonthInStore(store, monthId));
+  }
+
   function updateTheme(theme: AppTheme) {
     applyAppTheme(theme);
     persist(updateThemeInStore(store, theme));
@@ -245,6 +255,8 @@ function useExpenseStoreValue() {
     deleteIncomeEvent,
     updateIncomeEvent,
     updateMonthlyExpenseOccurrence,
+    closeMonth,
+    reopenMonth,
     updateTheme,
     updateLanguage,
     syncStatus: persistence.syncStatus,

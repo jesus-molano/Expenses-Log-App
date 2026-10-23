@@ -199,6 +199,42 @@ describe("month boundary", () => {
   });
 });
 
+describe("viewed month", () => {
+  it("shows the next month with its own pending total before it starts", () => {
+    // Octubre está pagado; en noviembre el alquiler ya está pagado y la luz no.
+    const store: ExpenseStore = {
+      ...emptyStore,
+      templates: [
+        monthlyTemplate("rent", "2026-10-01", 1),
+        monthlyTemplate("power", "2026-10-12", 12),
+      ],
+      overrides: [
+        paidOverride("rent", "2026-10-01"),
+        paidOverride("power", "2026-10-12"),
+        paidOverride("rent", "2026-11-01"),
+      ],
+    };
+
+    const { result } = renderHook(() =>
+      useExpenseFilters(store, "es", new Date(2026, 9, 28, 10), "2026-11"),
+    );
+
+    expect(result.current.pendingTotal).toBe(100);
+    expect(
+      result.current.visibleOccurrences.map((item) => item.dueDate),
+    ).toEqual(expect.arrayContaining(["2026-11-01", "2026-11-12", "2026-12-01"]));
+    expect(
+      result.current.visibleOccurrences.some((item) => item.dueDate < "2026-11-01"),
+    ).toBe(false);
+    expect(
+      result.current.timelineSections.find((section) => section.id === "month-start"),
+    ).toMatchObject({ title: "noviembre empieza en 4 días", anchorDate: "2026-11-01" });
+    expect(
+      result.current.timelineSections.some((section) => section.id === "today"),
+    ).toBe(false);
+  });
+});
+
 function monthlyTemplate(
   id: string,
   startDate: string,

@@ -138,6 +138,10 @@ Reglas para campos nuevos:
 - Excepcion: tombstones como `deleted.monthlySalary` se escriben ya. Si un build
   antiguo los descarta, se vuelve al comportamiento anterior (el dato borrado
   puede reaparecer al fusionar), nunca a perder datos.
+- Excepcion: `finance.monthClosures` (meses cerrados para pasar al siguiente)
+  tambien. Si un build antiguo lo descarta, el mes activo vuelve a ser el
+  natural. Se fusiona por mes con el `updatedAt` mas reciente; reabrir guarda
+  `reopenedAt` en vez de borrar la entrada.
 
 ## Cola de guardado
 

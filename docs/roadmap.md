@@ -38,6 +38,12 @@ Estado:
   - Parser de importes y fechas imposibles (F0b-1).
   - Overrides con id determinista, upsert y rekey (F0b-2).
   - Sync duradero (F0b-3): cambios pendientes persistidos, fusión al hidratar, reintentos, flush al salir y tombstones de sueldo por versión.
+- **F1a-1 y F1a-2: hechos.**
+  - "Atrasado" según el día de cargo estimado.
+  - `ActionToast` con deshacer, por encima del FAB.
+  - Mes activo con `monthClosures`, tarjeta "Octubre al día · Pasar a noviembre", aviso al pagar el último recibo y "Volver a octubre".
+  - Selector de mes en Gastos (un año atrás y el mes siguiente). Plan sigue al mes activo.
+  - `monthClosures` se escribe sin esperar la semana de passthrough: si un build antiguo lo descarta, el mes activo vuelve al natural y no se pierde ningún dato.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
@@ -232,7 +238,7 @@ Estado:
 - `isOccurrenceOverdue` basado en `estimatedChargeDate` (lo que vence en fin de semana no sale "Atrasado" el día del cobro).
 - **Toast genérico con acciones** (`src/components/ui/ActionToast.tsx` más un hook en la feature, a partir de `.app-last-chance-toast`): `role=status`, deshacer con patch inverso y `--app-toast-offset` por encima del FAB (M20).
 
-### F1a-2 — Mes activo (solo con el passthrough de PR 0 desplegado al menos 1 semana)
+### F1a-2 — Mes activo
 - **Regla de atribución:** una ocurrencia pertenece al mes de su `dueDate` en todos los totales de Gastos y Plan.
   - `paidAt` solo se muestra ("pagado el 28 oct · cubre noviembre").
   - "Hasta el cobro" excluye lo ya pagado.

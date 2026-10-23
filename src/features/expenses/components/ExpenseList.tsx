@@ -16,6 +16,8 @@ type ExpenseListProps = {
   sections: TimelineSection[];
   categories: ExpenseCategory[];
   today: string;
+  // Mes que se mira: el arrastre de la serie solo se ofrece dentro de él.
+  monthId?: string;
   language?: AppLanguage;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
   onMoveOccurrenceOnly: (
@@ -30,14 +32,19 @@ export function ExpenseList({
   sections,
   categories,
   today,
+  monthId = today.slice(0, 7),
   language = "es",
   onTogglePaid,
   onMoveOccurrenceOnly,
   onMoveOccurrenceSeries,
 }: ExpenseListProps) {
   const locale = language === "en" ? enUS : es;
-  const currentMonth = today.slice(0, 7);
-  const { focusIndex, focusRef } = useTimelineInitialFocus(sections, today);
+  const currentMonth = monthId;
+  const { focusIndex, focusRef } = useTimelineInitialFocus(
+    sections,
+    today,
+    `${today}:${monthId}`,
+  );
   const dnd = useExpenseDnd({
     sections,
     currentMonth,

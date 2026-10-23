@@ -6,7 +6,7 @@ import {
   toMonthId,
   updateIncomeEvent,
 } from "@/domain/finance";
-import type { ExpenseStore } from "@/domain/types";
+import type { ExpenseStore, MonthClosure } from "@/domain/types";
 import type {
   IncomeEventInput,
   MoneySettingsInput,
@@ -255,4 +255,46 @@ function mergeDeletedIds(
   next: string[],
 ): string[] {
   return Array.from(new Set([...(current ?? []), ...next]));
+}
+
+export function closeMonthInStore(
+  store: ExpenseStore,
+  monthId: string,
+  now: Date = new Date(),
+): ExpenseStore {
+  const timestamp = now.toISOString();
+  return withMonthClosure(store, monthId, {
+    closedAt: timestamp,
+    updatedAt: timestamp,
+  });
+}
+
+// Reabrir no borra el cierre: un borrado no sobreviviría al merge con la nube.
+export function reopenMonthInStore(
+  store: ExpenseStore,
+  monthId: string,
+  now: Date = new Date(),
+): ExpenseStore {
+  const closure = store.finance.monthClosures?.[monthId];
+  if (!closure) return store;
+  const timestamp = now.toISOString();
+  return withMonthClosure(store, monthId, {
+    ...closure,
+    reopenedAt: timestamp,
+    updatedAt: timestamp,
+  });
+}
+
+function withMonthClosure(
+  store: ExpenseStore,
+  monthId: string,
+  closure: MonthClosure,
+): ExpenseStore {
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      monthClosures: { ...store.finance.monthClosures, [monthId]: closure },
+    },
+  };
 }
