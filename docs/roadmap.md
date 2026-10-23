@@ -34,6 +34,15 @@ Estado:
   - `/settings` estática y limpieza de cachés obsoletas.
   - `verify-sw.mjs` y harness `npm run e2e:offline`.
   - El harness reproduce el cuelgue con una red que acepta conexiones y no responde (el caso de los datos móviles sin cobertura real): falla antes de 1b y pasa con 1b.
+- **PR 1c: hecho.**
+  - `useOnlineStatus` (`src/shared/hooks`) y chip "Sin conexión" en las cabeceras de Gastos, Plan y Ajustes, con `role="status"` y sin mover la cabecera a 360 px (e2e con `setOffline`).
+  - Harness: escenario con un build hecho con `NEXT_DEPLOYMENT_ID` (assets con `?dpl=`), compilado en `.e2e-builds/` y reutilizado mientras no cambie el build base. Falla si el precache deja de ignorar `dpl` y pasa con él. Antes de abrir sin red se vacía la caché HTTP de Chromium, para que todo salga de las cachés del service worker.
+  - Proyecto `webkit-iphone` solo con `dead`/`blackhole`. Aquí se salta con el motivo: Playwright 1.62.1 y WebKit sin instalar.
+  - `docs/platform.md`: qué se precachea y cómo responde cada petición, según `sw.ts` y `serwist.config.mjs`.
+  - Pendiente de 1c:
+    - Correr WebKit de verdad: subir `@playwright/test` a 1.64 o más e instalar WebKit, también en CI.
+    - El build `dpl` solo cubre el arranque en frío con el servidor parado. La actualización entre dos builds `dpl` y la variante `blackhole` se dejan fuera por tiempo de ejecución; el cuelgue ya lo cubre el build base.
+  - Pendiente de 1b, documentado: las woff2 de `next/font` y los iconos con `?v=5` no están en el precache. Se guardan en runtime en la primera visita con el service worker al mando; si faltan, la app abre con la fuente del sistema.
 - **F0b-1, F0b-2 y F0b-3: hechos.**
   - Parser de importes y fechas imposibles (F0b-1).
   - Overrides con id determinista, upsert y rekey (F0b-2).
@@ -184,7 +193,7 @@ Estado:
     - **S4:** el spec actual con `context.route` abortando también las peticiones del SW.
   - Correr primero sobre `main` y anotar qué escenarios fallan. Tras el fix, todos deben arrancar en menos de 5 s y sin `requestfailed` en `/_next/static`. Proyecto Chromium Pixel 7.
 
-### PR 1c — Offline: cierre
+### PR 1c — Offline: cierre (hecho, ver Estado)
 - Hook `use-online-status` y chip "Sin conexión" en las cabeceras.
 - Builds DPL (`NEXT_DEPLOYMENT_ID`) en el harness.
 - Proyecto WebKit, solo con `dead`/`blackhole`. Requiere Playwright 1.64 o superior; si no, `test.skip` con el motivo.
