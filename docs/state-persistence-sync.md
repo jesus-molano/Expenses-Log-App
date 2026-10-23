@@ -101,7 +101,8 @@ La mezcla actual usa ids:
 - Entidades cloud como base.
 - Entidades locales como entrada con prioridad final, salvo que la de la nube
   tenga un `updatedAt` mas reciente (plantillas, categorias, ingresos,
-  registros).
+  registros). Una version con `updatedAt` gana a otra sin el: una categoria
+  renombrada no vuelve a su nombre antiguo por una copia que nunca tuvo fecha.
 - Tombstones combinados para filtrar elementos borrados.
 - Mapas mensuales de salario y ahorro: cloud + local, con local al final.
 - Sueldos borrados: `deleted.monthlySalary` guarda la hora del borrado

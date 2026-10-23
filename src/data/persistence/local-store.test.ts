@@ -319,6 +319,23 @@ describe("mergeExpenseStores with categories and contract details", () => {
     ]);
   });
 
+  it("keeps a rename over an old copy of the category that never had an update time", () => {
+    const category = { id: "ocio", userId: "demo", icon: "Gamepad2", tone: "violet" as const };
+    const renamed = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [{ ...category, name: "Caprichos", updatedAt: "2026-10-22T00:00:00.000Z" }],
+    });
+    const stale = normalizeExpenseStore({ ...emptyStore, categories: [{ ...category, name: "Ocio" }] });
+
+    // El dispositivo con la copia antigua fusiona sus cambios con la nube.
+    expect(mergeExpenseStores(stale, renamed).categories).toEqual([
+      expect.objectContaining({ name: "Caprichos" }),
+    ]);
+    expect(mergeExpenseStores(renamed, stale).categories).toEqual([
+      expect.objectContaining({ name: "Caprichos" }),
+    ]);
+  });
+
   it("does not bring back a category deleted on another device", () => {
     const category = { id: "viajes", userId: "demo", name: "Viajes", icon: "Tag", tone: "rose" as const };
     const local = normalizeExpenseStore({ ...emptyStore, categories: [category] });
