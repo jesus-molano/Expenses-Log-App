@@ -2,6 +2,7 @@ import {
   materializeClosedOccurrenceRecords,
   toMonthId,
 } from "@/domain/finance";
+import { dedupeOverrides } from "@/domain/overrides";
 import {
   buildDateWithDay,
   normalizeDateOnly,
@@ -268,6 +269,7 @@ export function normalizeExpenseStore(
       ? (store.bankMovements as LegacyBankMovement[])
       : [];
 
+  const deleted = normalizeDeletedIds(store.deleted, keepUnknownKeys);
   const base: ExpenseStore = {
     ...(keepUnknownKeys ? unknownEntries(store, STORE_KEYS) : {}),
     schemaVersion: 3,
@@ -278,7 +280,10 @@ export function normalizeExpenseStore(
       ? normalizeTemplates(store.templates, today)
       : [],
     overrides: Array.isArray(store.overrides)
-      ? (store.overrides as ExpenseStore["overrides"])
+      ? dedupeOverrides(
+          store.overrides.filter(isRecord) as ExpenseStore["overrides"],
+          deleted.overrides,
+        )
       : [],
     occurrenceRecords: normalizeOccurrenceRecords(store.occurrenceRecords),
     finance: normalizeFinanceStore(
@@ -287,7 +292,7 @@ export function normalizeExpenseStore(
       today,
       keepUnknownKeys,
     ),
-    deleted: normalizeDeletedIds(store.deleted, keepUnknownKeys),
+    deleted,
     preferences: {
       ...(keepUnknownKeys ? unknownEntries(preferences, PREFERENCE_KEYS) : {}),
       theme: normalizeAppTheme(preferences.theme),

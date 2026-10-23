@@ -262,7 +262,7 @@ describe("normalizeExpenseStore", () => {
 
     expect(store.overrides).toEqual([
       expect.objectContaining({
-        id: "ovr-manual-correction",
+        id: "ovr:tpl-dazn:2026-06-13",
         occurrenceDate: "2026-06-13",
         paidAt: "2026-06-16T18:30:00.000Z",
         amountPaid: 12.5,

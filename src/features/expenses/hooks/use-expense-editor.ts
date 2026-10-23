@@ -13,6 +13,7 @@ import {
 } from "@/features/expenses/lib/expense-actions";
 import { t } from "@/shared/i18n";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
+import { updateExpenseTemplateInStore } from "@/stores/app/store-commands";
 import type { useExpenseStore } from "@/stores/app/use-expense-store";
 
 type UseExpenseEditorOptions = {
@@ -55,27 +56,21 @@ export function useExpenseEditor({
     if (amount === null || amount <= 0) return;
     const categoryResult = findOrCreateCategory(store, form.categoryName);
 
-    persist({
-      ...categoryResult.store,
-      templates: categoryResult.store.templates.map((item) =>
-        item.id === template.id
-          ? {
-              ...item,
-              name: form.name.trim() || t("expenses.newExpense", language),
-              description: form.description.trim(),
-              amount,
-              categoryId: categoryResult.categoryId,
-              startDate: form.startDate || item.startDate,
-              dueDay: Math.min(Math.max(Number(form.dueDay), 1), 31),
-              endDate: form.endDate || undefined,
-              recurrence: form.recurrence,
-              reminder: form.reminder,
-              updatedAt: new Date().toISOString(),
-            }
-          : item,
-      ),
-    });
-    router.push("/");
+    persist(
+      updateExpenseTemplateInStore(categoryResult.store, template.id, {
+        name: form.name.trim() || t("expenses.newExpense", language),
+        description: form.description.trim(),
+        amount,
+        categoryId: categoryResult.categoryId,
+        startDate: form.startDate || template.startDate,
+        dueDay: Math.min(Math.max(Number(form.dueDay), 1), 31),
+        endDate: form.endDate || undefined,
+        recurrence: form.recurrence,
+        reminder: form.reminder,
+      }),
+    );
+    // replace: volver atrás desde el listado no debe reabrir el editor.
+    router.replace("/");
   }
 
   async function removeExpense() {
