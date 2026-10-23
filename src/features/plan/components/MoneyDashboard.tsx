@@ -23,7 +23,7 @@ import {
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
 import { useActionToast } from "@/features/expenses/hooks/use-action-toast";
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
-import { formatPeriodRange } from "@/features/expenses/lib/month-view";
+import { periodRangeLabel } from "@/features/expenses/lib/month-view";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { t } from "@/shared/i18n";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
@@ -123,8 +123,7 @@ export function MoneyDashboard() {
     cycle,
   );
   const monthLabel = format(currentMonthDate, "MMMM yyyy", { locale });
-  const periodLabel =
-    cycle.anchor === "payday" ? formatPeriodRange(activeMonth.range, language) : null;
+  const periodLabel = periodRangeLabel(currentMonthId, cycle, language);
   const insights = usePlanInsights({
     store,
     monthId: currentMonthId,
@@ -512,11 +511,7 @@ export function MoneyDashboard() {
         <MonthSummarySheet
           summary={monthSummary.summary}
           language={language}
-          periodLabel={
-            cycle.anchor === "payday"
-              ? formatPeriodRange(periodRange(monthSummary.summary.monthId, cycle), language)
-              : null
-          }
+          periodLabel={periodRangeLabel(monthSummary.summary.monthId, cycle, language)}
           onClose={monthSummary.close}
         />
       ) : null}

@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { enUS, es } from "date-fns/locale";
-import { addMonthId } from "@/domain/budget-month";
+import { addMonthId, monthRange } from "@/domain/budget-month";
 import {
   periodRange,
   type BudgetCycle,
@@ -46,6 +46,20 @@ export function formatPeriodRange(range: DateRange, language: AppLanguage) {
   const locale = language === "en" ? enUS : es;
   const day = (date: string) => format(parseISO(date), "d MMM", { locale });
   return `${day(range.start)} – ${day(range.end)}`;
+}
+
+// Los días del mes de presupuesto solo cuando no coinciden con el mes natural
+// (con el ciclo anclado al cobro); null si no hace falta decirlos.
+export function periodRangeLabel(
+  monthId: string,
+  cycle: BudgetCycle,
+  language: AppLanguage,
+) {
+  const range = periodRange(monthId, cycle);
+  const calendar = monthRange(monthId);
+  return range.start === calendar.start && range.end === calendar.end
+    ? null
+    : formatPeriodRange(range, language);
 }
 
 // Primer día en que se puede soltar un gasto al arrastrar con el ciclo

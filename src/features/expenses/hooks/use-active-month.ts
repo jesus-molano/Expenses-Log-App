@@ -13,7 +13,6 @@ import {
   paymentSettlesMonth,
   shouldSuggestAdvance,
 } from "@/domain/budget-month";
-import { periodRange } from "@/domain/budget-cycle";
 import { toDateOnly } from "@/domain/calendar";
 import type { AppLanguage, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
 import {
@@ -67,9 +66,6 @@ export function useActiveMonth({
   return {
     ...context,
     viewMonthId,
-    // Días del mes que se mira, solo cuando no es el natural (ciclo anclado
-    // al cobro): la cabecera los muestra para que se entienda el corte.
-    viewRange: paydayCycle ? periodRange(viewMonthId, context.cycle) : null,
     dropFloorDate: paydayCycle
       ? cycleDropFloorDate({
           viewMonthId,

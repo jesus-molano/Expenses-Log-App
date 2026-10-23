@@ -34,7 +34,7 @@ import { canMoveOccurrence } from "@/features/expenses/lib/dnd-move-policy";
 import {
   capitalize,
   formatMonthName,
-  formatPeriodRange,
+  periodRangeLabel,
 } from "@/features/expenses/lib/month-view";
 import {
   markNewExpenseIntentHandled,
@@ -211,7 +211,7 @@ export function ExpenseDashboard({
       <div className="mb-5 grid gap-3">
         <MonthBar
           monthId={month.viewMonthId}
-          rangeLabel={month.viewRange ? formatPeriodRange(month.viewRange, language) : null}
+          rangeLabel={periodRangeLabel(month.viewMonthId, month.cycle, language)}
           activeMonthId={month.activeMonthId}
           calendarMonthId={month.calendarMonthId}
           language={language}
@@ -349,11 +349,7 @@ export function ExpenseDashboard({
         <MonthSummarySheet
           summary={monthSummary.summary}
           language={language}
-          periodLabel={
-            month.cycle.anchor === "payday"
-              ? formatPeriodRange(periodRange(monthSummary.summary.monthId, month.cycle), language)
-              : null
-          }
+          periodLabel={periodRangeLabel(monthSummary.summary.monthId, month.cycle, language)}
           onClose={monthSummary.close}
         />
       ) : null}

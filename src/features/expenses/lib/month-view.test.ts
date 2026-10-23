@@ -5,6 +5,7 @@ import {
   cycleDropFloorDate,
   formatMonthName,
   formatPeriodRange,
+  periodRangeLabel,
 } from "./month-view";
 
 describe("month view", () => {
@@ -23,6 +24,18 @@ describe("month view", () => {
     expect(formatPeriodRange({ start: "2026-10-28", end: "2026-11-27" }, "es")).toBe(
       "28 oct – 27 nov",
     );
+  });
+
+  it("only names the days of a month that does not match the calendar", () => {
+    const payday = (dayOfMonth: number): BudgetCycle => ({
+      anchor: "payday",
+      monthlySalary: { "2026-01": { amount: 2000, dayOfMonth } },
+    });
+
+    expect(periodRangeLabel("2026-11", payday(28), "es")).toBe("28 oct – 27 nov");
+    expect(periodRangeLabel("2026-11", payday(1), "es")).toBeNull();
+    expect(periodRangeLabel("2026-11", { anchor: "payday", monthlySalary: {} }, "es")).toBeNull();
+    expect(periodRangeLabel("2026-11", { anchor: "calendar" }, "es")).toBeNull();
   });
 
   it("only lets a drag land inside the open cycle and calendar month", () => {
