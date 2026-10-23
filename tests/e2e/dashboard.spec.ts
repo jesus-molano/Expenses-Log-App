@@ -527,3 +527,21 @@ test("the add expense shortcut opens the form only once", async ({ page }) => {
   await page.waitForTimeout(300);
   await expect(form).toHaveCount(0);
 });
+
+test("a new series amount can start next month without touching this one", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-23T10:00:00"));
+  await loadDemoStore(page);
+  await page.goto("/expenses/exp-game-pass");
+
+  await expect(page.getByRole("heading", { name: "Game Pass" })).toBeVisible();
+  const scope = page.getByRole("group", { name: "¿Desde cuándo vale el nuevo importe?" });
+  await expect(scope).toHaveCount(0);
+  await page.getByLabel("Importe").fill("20");
+  await expect(scope).toBeVisible();
+  await scope.getByRole("button", { name: "Desde el mes que viene" }).click();
+  await page.getByRole("button", { name: "Guardar cambios" }).click();
+
+  await expect(page).toHaveURL(/\/$/);
+  const october = page.locator('[data-expense-row="true"][data-timeline-date="2026-10-12"]').filter({ hasText: "Game Pass" });
+  await expect(october).toContainText("12,00");
+});

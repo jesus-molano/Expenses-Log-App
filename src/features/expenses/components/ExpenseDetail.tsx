@@ -11,6 +11,7 @@ import type {
 } from "@/domain/types";
 import { useExpenseEditor } from "@/features/expenses/hooks/use-expense-editor";
 import { localizedRecurrenceLabel } from "@/features/expenses/lib/recurrence-label";
+import type { SeriesAmountScope } from "@/stores/app/store-commands";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { t } from "@/shared/i18n";
 import { ExpenseForm } from "@/features/expenses/components/ExpenseForm";
@@ -57,6 +58,43 @@ export function ExpenseDetail({ id }: { id: string }) {
       expenseStore={expenseStore}
       language={language}
     />
+  );
+}
+
+function AmountScopeChoice({
+  scope,
+  language,
+  onChange,
+}: {
+  scope: SeriesAmountScope;
+  language: AppLanguage;
+  onChange: (scope: SeriesAmountScope) => void;
+}) {
+  return (
+    <fieldset className="app-section-card mt-4 border-[color-mix(in_srgb,var(--app-warning)_28%,transparent)] p-3">
+      <legend className="sr-only">{t("expenses.amountScopeTitle", language)}</legend>
+      <p className="text-sm font-semibold text-[var(--app-text)]">
+        {t("expenses.amountScopeTitle", language)}
+      </p>
+      <p className="mt-1 text-xs text-[var(--app-text-muted)]">
+        {t("expenses.amountScopeBody", language)}
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {(["current", "next"] as const).map((option) => (
+          <Button
+            key={option}
+            type="button"
+            size="sm"
+            className="h-auto min-h-10 py-2"
+            variant={scope === option ? "primary" : "secondary"}
+            aria-pressed={scope === option}
+            onClick={() => onChange(option)}
+          >
+            {t(option === "current" ? "expenses.amountScopeCurrent" : "expenses.amountScopeNext", language)}
+          </Button>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
@@ -109,6 +147,14 @@ function ExpenseDetailForm({
               onAmountTextChange={editor.setAmountText}
             />
           </div>
+
+          {editor.amountChanged ? (
+            <AmountScopeChoice
+              scope={editor.amountScope}
+              language={language}
+              onChange={editor.setAmountScope}
+            />
+          ) : null}
 
           <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
             <Button type="submit">

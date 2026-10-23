@@ -13,7 +13,11 @@ import {
 } from "@/features/expenses/lib/expense-actions";
 import { t } from "@/shared/i18n";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
-import { updateExpenseTemplateInStore } from "@/stores/app/store-commands";
+import {
+  keepAmountBeforeSeriesChange,
+  type SeriesAmountScope,
+  updateExpenseTemplateInStore,
+} from "@/stores/app/store-commands";
 import type { useExpenseStore } from "@/stores/app/use-expense-store";
 
 type UseExpenseEditorOptions = {
@@ -47,6 +51,10 @@ export function useExpenseEditor({
   }));
 
   const previewAmount = parseMoneyInput(amountText) ?? 0;
+  // Un importe nuevo pregunta desde cuándo vale; lo pasado y lo pagado no
+  // cambian nunca.
+  const [amountScope, setAmountScope] = useState<SeriesAmountScope>("current");
+  const amountChanged = previewAmount > 0 && previewAmount !== template.amount;
 
   function saveExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,9 +63,15 @@ export function useExpenseEditor({
     // El campo valida antes de enviar; esto solo protege de un importe vacío.
     if (amount === null || amount <= 0) return;
     const categoryResult = findOrCreateCategory(store, form.categoryName);
+    const withHistoryKept = keepAmountBeforeSeriesChange(
+      categoryResult.store,
+      template.id,
+      amount,
+      { scope: amountScope },
+    );
 
     persist(
-      updateExpenseTemplateInStore(categoryResult.store, template.id, {
+      updateExpenseTemplateInStore(withHistoryKept, template.id, {
         name: form.name.trim() || t("expenses.newExpense", language),
         description: form.description.trim(),
         amount,
@@ -83,6 +97,9 @@ export function useExpenseEditor({
     form,
     amountText,
     previewAmount,
+    amountChanged,
+    amountScope,
+    setAmountScope,
     deleteOpen,
     setForm,
     setAmountText,
