@@ -18,6 +18,7 @@ type TimelineDayGroupProps = {
   activeOccurrence: ExpenseOccurrence | null;
   activeDropTarget: DropTarget | null;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
+  onOpenOccurrence: (occurrence: ExpenseOccurrence) => void;
 };
 
 export function TimelineDayGroup({
@@ -30,6 +31,7 @@ export function TimelineDayGroup({
   activeOccurrence,
   activeDropTarget,
   onTogglePaid,
+  onOpenOccurrence,
 }: TimelineDayGroupProps) {
   return (
     <div className="space-y-1.5">
@@ -48,6 +50,7 @@ export function TimelineDayGroup({
           today={today}
           language={language}
           onTogglePaid={onTogglePaid}
+          onOpenOccurrence={onOpenOccurrence}
           dropPosition={
             activeDropTarget?.rowId === occurrence.id
               ? activeDropTarget.position

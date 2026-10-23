@@ -19,6 +19,8 @@ type ExpenseRowProps = {
   today: string;
   language?: AppLanguage;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
+  // Tocar la fila (sin deslizar ni arrastrar) abre sus acciones.
+  onOpenOccurrence?: (occurrence: ExpenseOccurrence) => void;
   dropPosition?: "before" | "after" | null;
   dragging?: boolean;
 };
@@ -29,6 +31,7 @@ export function ExpenseRow({
   today,
   language = "es",
   onTogglePaid,
+  onOpenOccurrence,
   dropPosition = null,
   dragging = false,
 }: ExpenseRowProps) {
@@ -70,6 +73,12 @@ export function ExpenseRow({
     setDragRef(node);
   }
 
+  function openFromTap() {
+    // Un deslizamiento o un arrastre acaban con un click que no es un toque.
+    if (dragActive || !swipe.wasTap()) return;
+    onOpenOccurrence?.(occurrence);
+  }
+
   function stopButtonPointer(event: React.PointerEvent<HTMLButtonElement>) {
     event.stopPropagation();
   }
@@ -95,6 +104,7 @@ export function ExpenseRow({
       data-timeline-date={occurrence.dueDate}
       data-expense-row="true"
       data-expense-row-id={occurrence.id}
+      onClick={openFromTap}
       className={`relative overflow-visible rounded-2xl ${
         dragActive ? "z-0" : ""
       } ${

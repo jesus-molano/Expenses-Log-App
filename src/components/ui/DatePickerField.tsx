@@ -138,7 +138,11 @@ export function DatePickerField({
   }
 
   function openPicker() {
-    setVisibleMonth(selectedDate ?? fallbackMonth);
+    // Una fecha anterior al mínimo abre en el primer mes que se puede elegir.
+    const minDate = parseDate(min);
+    setVisibleMonth(
+      selectedDate && !(minDate && isBefore(selectedDate, minDate)) ? selectedDate : fallbackMonth,
+    );
     setActiveSelector(null);
     setOpen(true);
   }

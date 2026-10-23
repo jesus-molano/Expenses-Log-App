@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { useRouter } from "next/navigation";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ActionToast } from "@/components/ui/ActionToast";
 import type { ExpenseOccurrence } from "@/domain/types";
@@ -9,6 +10,7 @@ import { ExpenseList } from "@/features/expenses/components/ExpenseList";
 import { LastChanceReminderToast } from "@/features/expenses/components/LastChanceReminderToast";
 import { MonthBar } from "@/features/expenses/components/MonthBar";
 import { MonthCloseCard } from "@/features/expenses/components/MonthCloseCard";
+import { OccurrenceActionSheet } from "@/features/expenses/components/OccurrenceActionSheet";
 import {
   AddExpenseButton,
   QuickCapture,
@@ -45,6 +47,9 @@ export function ExpenseDashboard({
     addExpense,
     addExpenses,
     togglePaid,
+    skipOccurrence,
+    restoreOccurrence,
+    updateMonthlyExpenseOccurrence,
     dismissLastChanceReminder,
     moveOccurrenceOnly,
     moveOccurrenceSeries,
@@ -88,7 +93,10 @@ export function ExpenseDashboard({
   });
   const chrome = useScrollChrome();
   const runViewTransition = useViewTransitionAction();
+  const router = useRouter();
   const [recurringOpen, setRecurringOpen] = useState(false);
+  // Cobro tocado en la lista: abre sus acciones.
+  const [selectedOccurrence, setSelectedOccurrence] = useState<ExpenseOccurrence | null>(null);
   const [hiddenReminderId, setHiddenReminderId] = useState<string | null>(null);
   const lastChanceReminder = buildLastChanceReminders(store, now).find(
     (reminder) => reminder.occurrence.id !== hiddenReminderId,
@@ -114,8 +122,13 @@ export function ExpenseDashboard({
   }
 
   function togglePaidWithMonthCheck(occurrence: ExpenseOccurrence) {
+    payWithMonthCheck(occurrence, () => togglePaid(occurrence));
+  }
+
+  // Si el pago deja el mes al día, se ofrece pasar al siguiente.
+  function payWithMonthCheck(occurrence: ExpenseOccurrence, pay: () => void) {
     const settles = month.settlesMonth(occurrence);
-    runViewTransition(() => togglePaid(occurrence));
+    runViewTransition(pay);
     if (!settles) return;
     actionToast.show({
       message: capitalize(
@@ -133,6 +146,40 @@ export function ExpenseDashboard({
       onAction: advanceMonth,
     });
   }
+
+  function payOtherAmount(occurrence: ExpenseOccurrence, amount: number) {
+    payWithMonthCheck(occurrence, () =>
+      updateMonthlyExpenseOccurrence({
+        templateId: occurrence.template.id,
+        occurrenceDate: occurrence.occurrenceDate,
+        dueDate: occurrence.dueDate,
+        name: occurrence.template.name,
+        amount,
+        categoryId: occurrence.template.categoryId,
+        status: "paid",
+      }),
+    );
+  }
+
+  function skipWithUndo(occurrence: ExpenseOccurrence) {
+    runViewTransition(() => skipOccurrence(occurrence));
+    actionToast.show({
+      message: t("expenses.occurrenceSkipped", language).replace(
+        "{name}",
+        occurrence.template.name,
+      ),
+      actionLabel: t("common.undo", language),
+      onAction: () => {
+        runViewTransition(() => restoreOccurrence(occurrence));
+        actionToast.dismiss();
+      },
+    });
+  }
+
+  // No se mueve a un mes ya cerrado.
+  const openMonthStart = `${
+    month.activeMonthId > month.calendarMonthId ? month.activeMonthId : month.calendarMonthId
+  }-01`;
 
   return (
     <DashboardShell
@@ -191,6 +238,7 @@ export function ExpenseDashboard({
         autoScroll={!showCloseCard}
         language={language}
         onTogglePaid={togglePaidWithMonthCheck}
+        onOpenOccurrence={setSelectedOccurrence}
         onMoveOccurrenceOnly={(occurrence, dueDate, sortOrder) =>
           runViewTransition(() => moveOccurrenceOnly(occurrence, dueDate, sortOrder))
         }
@@ -247,6 +295,23 @@ export function ExpenseDashboard({
         onClose={capture.closeForm}
         onSave={capture.saveForm}
       />
+
+      {selectedOccurrence ? (
+        <OccurrenceActionSheet
+          key={selectedOccurrence.id}
+          occurrence={selectedOccurrence}
+          minMoveDate={openMonthStart}
+          language={language}
+          onClose={() => setSelectedOccurrence(null)}
+          onTogglePaid={togglePaidWithMonthCheck}
+          onPayAmount={payOtherAmount}
+          onMove={(occurrence, dueDate) =>
+            runViewTransition(() => moveOccurrenceOnly(occurrence, dueDate))
+          }
+          onSkip={skipWithUndo}
+          onEditSeries={(occurrence) => router.push(`/expenses/${occurrence.template.id}`)}
+        />
+      ) : null}
 
       <RecurringOverviewSheet
         open={recurringOpen}

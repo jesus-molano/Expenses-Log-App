@@ -113,6 +113,8 @@ test("requires a full left swipe before paying an expense", async ({ page }) => 
 
   await swipeRow(page, "Movistar", 240);
   await expect(page.getByText("Pagado").first()).toBeVisible();
+  // Deslizar no cuenta como tocar: no abre las acciones del cobro.
+  await expect(page.getByRole("dialog", { name: "Movistar" })).toHaveCount(0);
 });
 
 test("edits plan settings and monthly savings without losing either value", async ({ page }) => {
@@ -526,6 +528,65 @@ test("the add expense shortcut opens the form only once", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Añadir gasto" })).toBeVisible();
   await page.waitForTimeout(300);
   await expect(form).toHaveCount(0);
+async function openRowActions(page: Page, name: string) {
+  const row = page.locator('[data-expense-row="true"]').filter({ hasText: name }).first();
+  await row.scrollIntoViewIfNeeded();
+  await row.click();
+  const sheet = page.getByRole("dialog", { name });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
+test("tapping a charge opens its actions: pay a different amount", async ({ page }) => {
+  await loadDemoStore(page);
+  await page.goto("/");
+  await expect(page.getByText("Atrasado")).toBeVisible();
+
+  const sheet = await openRowActions(page, "Movistar");
+  await sheet.getByRole("button", { name: "Pagado con otro importe" }).click();
+  await sheet.getByLabel("Importe cobrado").fill("61,50");
+  await sheet.getByRole("button", { name: "Guardar pago" }).click();
+
+  await expect(sheet).toBeHidden();
+  const row = page.locator('[data-expense-row="true"]').filter({ hasText: "Movistar" }).first();
+  await expect(row).toContainText("61,50");
+  await expect(row.getByRole("article")).toHaveAccessibleName(/pagado/i);
+});
+
+test("skipping a charge from its actions can be undone", async ({ page }) => {
+  await loadDemoStore(page);
+  await page.goto("/");
+  await expect(page.getByText("Atrasado")).toBeVisible();
+  const rows = page.locator('[data-expense-row="true"]').filter({ hasText: "Movistar" });
+  const before = await rows.count();
+
+  const sheet = await openRowActions(page, "Movistar");
+  await sheet.getByRole("button", { name: "Saltar este mes" }).click();
+
+  await expect(rows).toHaveCount(before - 1);
+  await page.getByRole("button", { name: "Deshacer" }).click();
+  await expect(rows).toHaveCount(before);
+});
+
+test("moving only one charge from its actions", async ({ page }) => {
+  await loadDemoStore(page);
+  await page.goto("/");
+  await expect(page.getByText("Atrasado")).toBeVisible();
+
+  const sheet = await openRowActions(page, "Movistar");
+  await sheet.getByRole("button", { name: "Mover solo este cobro" }).click();
+  // El cobro atrasado de septiembre solo se puede mover al mes abierto.
+  await expect(sheet.getByRole("button", { name: "Nueva fecha" })).toContainText("8 sep");
+  await sheet.getByRole("button", { name: "Nueva fecha" }).click();
+  const picker = page.getByRole("dialog", { name: "Nueva fecha" });
+  await expect(picker).toContainText(/oct/i);
+  await picker.getByRole("button", { name: "27", exact: true }).click();
+  await sheet.getByRole("button", { name: "Mover", exact: true }).click();
+
+  await expect(sheet).toBeHidden();
+  await expect(
+    page.locator('[data-expense-row="true"][data-timeline-date="2026-10-27"]').filter({ hasText: "Movistar" }),
+  ).toHaveCount(1);
 });
 
 test("a new series amount can start next month without touching this one", async ({ page }) => {

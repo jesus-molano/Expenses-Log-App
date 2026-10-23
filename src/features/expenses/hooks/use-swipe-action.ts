@@ -11,6 +11,8 @@ import {
   type SwipeState,
 } from "../lib/swipe-state";
 
+const TAP_SLOP_PX = 8;
+
 type SwipeActionOptions = {
   disabled?: boolean;
   revealThreshold?: number;
@@ -35,6 +37,8 @@ export function useSwipeAction({
     maxDistance,
   };
   const origin = useRef({ x: 0, y: 0 });
+  // Si el último gesto se desplazó, el click que lo sigue no es un toque.
+  const movedRef = useRef(false);
   const stateRef = useRef<SwipeState>(createSwipeState());
   const [state, setState] = useState<SwipeState>(() => createSwipeState());
 
@@ -49,6 +53,7 @@ export function useSwipeAction({
 
     event.currentTarget.setPointerCapture?.(event.pointerId);
     origin.current = { x: event.clientX, y: event.clientY };
+    movedRef.current = false;
     setSwipeState({ x: 0, phase: "dragging", blocked: false });
   }
 
@@ -60,6 +65,9 @@ export function useSwipeAction({
 
     const deltaX = event.clientX - origin.current.x;
     const deltaY = event.clientY - origin.current.y;
+    if (Math.abs(deltaX) > TAP_SLOP_PX || Math.abs(deltaY) > TAP_SLOP_PX) {
+      movedRef.current = true;
+    }
 
     if (shouldPreventScroll(deltaX, deltaY, thresholds)) {
       event.preventDefault();
@@ -94,6 +102,7 @@ export function useSwipeAction({
   return {
     x: state.x,
     phase: state.phase,
+    wasTap: () => !movedRef.current,
     direction: swipeDirection(state.phase),
     swipingLeft: swipeDirection(state.phase) === "left",
     swipingRight: swipeDirection(state.phase) === "right",

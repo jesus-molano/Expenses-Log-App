@@ -56,6 +56,8 @@ Estado:
   - Atrás cierra la hoja abierta (`src/components/ui/sheet-history.ts`).
   - Pendiente de F2a: `OccurrenceActionSheet`, `ConfirmActionDialog` con `useDialogA11y` y M22.
 - **Cambios de importe de una serie: hecho.** Al editar el importe, lo ya pasado y lo ya pagado no cambian (meses anteriores como registros; mes cerrado con "Pasar al mes siguiente", cobros pagados y adelantados con override) y el editor pregunta "Desde este mes" o "Desde el mes que viene" (`keepAmountBeforeSeriesChange`). Para un solo mes, se edita el cobro.
+  - Tocar un gasto abre sus acciones (`OccurrenceActionSheet`, M19): pagar o deshacer, pagar con otro importe, mover solo este cobro (no a un mes cerrado), saltar este mes con "Deshacer" y editar la serie. Deslizar o arrastrar no cuentan como toque.
+  - Pendiente de F2a: `ConfirmActionDialog` con `useDialogA11y` y M22.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
@@ -370,7 +372,7 @@ Estado:
   - Micrófono `IconButton` de 44 px con `aria-pressed` y región `aria-live`, dentro del textarea de `QuickCapture`.
   - Sin soporte: pista "usa el micrófono del teclado".
   - Shortcut "Añadir por voz" → `/expenses/new?mode=voice`, con `mode` leído en cliente para que la página siga siendo estática. Arrancar exige un toque.
-- **`OccurrenceActionSheet`** (al tocar un gasto; sobre `Sheet` y `useMonthlyExpenseRowEditor`): pagar, pagar con otro importe, mover solo este, saltar o restaurar, editar la serie y finalizar. Resuelve M19.
+- **`OccurrenceActionSheet`** (al tocar un gasto; sobre `Sheet`): pagar, pagar con otro importe, mover solo este, saltar (restaurar desde el aviso "Deshacer") y editar la serie. Resuelve M19. Hecho; "finalizar la serie" queda en la pantalla de edición.
 - **`useSheetBackButton`** en `Sheet`: pushState al abrir y `popstate` cierra la hoja (Atrás en Android). Con test e2e.
 - **`ConfirmActionDialog`:** foco, Escape y bloqueo de scroll, con `useDialogA11y` extraído de `Sheet.tsx`.
 - **M22.** `router.replace` tras guardar en el detalle, más una guarda de cambios sin guardar.
