@@ -49,6 +49,12 @@ Estado:
   - Normalizador común con el parser local, que se reescribe (NFD, día antes que importe, frecuencias y meses).
   - Captura con la IA primero, varios gastos con revisión y "Guardar N".
   - El script de evaluación con la clave real (`scripts/eval-ai-parse.mjs`) queda pendiente: no hay clave en este entorno.
+- **F2a (voz y Atrás): hecho.**
+  - Dictado del navegador en la captura (Chromium fuera de iOS): micrófono con `aria-pressed`, fin por toque, 30 s, 2 s de silencio o salir de la app, y un único análisis con revisión.
+  - Errores y sin conexión con pista para usar el micrófono del teclado; en iOS/Safari solo la pista.
+  - Atajos del manifest "Añadir gasto" y "Añadir por voz" (`/expenses/new?mode=voice`).
+  - Atrás cierra la hoja abierta (`src/components/ui/sheet-history.ts`).
+  - Pendiente de F2a: `OccurrenceActionSheet`, `ConfirmActionDialog` con `useDialogA11y` y M22.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 

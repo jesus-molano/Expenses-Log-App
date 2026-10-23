@@ -11,6 +11,21 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#020617",
     theme_color: "#020617",
     orientation: "portrait",
+    // Accesos directos al mantener pulsado el icono (Android).
+    shortcuts: [
+      {
+        name: "Añadir gasto",
+        short_name: "Añadir",
+        url: "/expenses/new",
+        icons: [{ src: "/icon-192.png?v=5", sizes: "192x192", type: "image/png" }],
+      },
+      {
+        name: "Añadir por voz",
+        short_name: "Por voz",
+        url: "/expenses/new?mode=voice",
+        icons: [{ src: "/icon-192.png?v=5", sizes: "192x192", type: "image/png" }],
+      },
+    ],
     icons: [
       {
         src: "/icon-192.png?v=5",

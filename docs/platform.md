@@ -146,6 +146,25 @@ Esto evita meter Supabase Auth en cada request API.
 - Rechaza backslashes y caracteres nulos.
 - Usa `/settings` como fallback.
 
+## Voz y atajos
+
+- Dictado con el reconocimiento del navegador (Web Speech API) en la hoja de
+  captura, solo en Chromium fuera de iOS (`features/expenses/lib/voice-support.ts`).
+  En iOS y Safari falta o se cuelga en apps instaladas: alli se muestra una pista
+  para usar el microfono del teclado.
+- El dictado termina al tocar de nuevo, a los 30 s, tras 2 s sin una frase nueva,
+  si no se oye nada o al salir de la app, y lanza un unico analisis. En Android
+  `continuous` no tiene efecto: se reinicia la misma instancia tras cada frase.
+- El reconocimiento de Chrome envia el audio a Google y necesita conexion; sin
+  ella el microfono avisa. Tras un fallo de servicio sin resultados (por ejemplo
+  en Brave) se oculta durante la sesion.
+- El manifest tiene atajos "Añadir gasto" (`/expenses/new`) y "Añadir por voz"
+  (`/expenses/new?mode=voice`). `mode` se lee en cliente y el precache lo ignora,
+  asi que la pagina sigue siendo estatica. Dictar siempre exige un toque.
+- Atras (boton o gesto de Android) cierra la hoja de encima
+  (`src/components/ui/sheet-history.ts`): cada hoja añade una entrada al
+  historial con la misma URL y la quita al cerrarse desde la propia hoja.
+
 ## APIs internas
 
 Endpoints principales:

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { cn } from "@/shared/ui";
+import { registerSheet } from "./sheet-history";
 import { useBodyScrollLock } from "./use-body-scroll-lock";
 
 type SheetProps = {
@@ -44,8 +45,20 @@ export function Sheet({
   onBackdropClick,
 }: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onBackdropClick);
 
   useBodyScrollLock(true);
+
+  useEffect(() => {
+    onCloseRef.current = onBackdropClick;
+  }, [onBackdropClick]);
+
+  // Atrás cierra la hoja (solo si tiene forma de cerrarse).
+  const closable = Boolean(onBackdropClick);
+  useEffect(() => {
+    if (!closable) return;
+    return registerSheet(() => onCloseRef.current?.());
+  }, [closable]);
 
   useEffect(() => {
     const previouslyFocused =

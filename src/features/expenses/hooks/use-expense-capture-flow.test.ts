@@ -17,11 +17,12 @@ function setup(result: CaptureResult) {
     ),
     cancel: vi.fn(),
     reset: vi.fn(),
+    setQuickText: vi.fn(),
   } as unknown as ReturnType<typeof useQuickExpenseParser>;
   const addExpense = vi.fn();
   const addExpenses = vi.fn();
   const hook = renderHook(() =>
-    useExpenseCaptureFlow({ parser, initialFormOpen: false, addExpense, addExpenses }),
+    useExpenseCaptureFlow({ parser, language: "es", initialFormOpen: false, addExpense, addExpenses }),
   );
   return {
     hook,

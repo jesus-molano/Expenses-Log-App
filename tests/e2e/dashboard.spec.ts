@@ -374,3 +374,100 @@ test("cancels an analysis without starting another one", async ({ page }) => {
   expect(requests).toBe(1);
   await expect(page.getByRole("dialog", { name: "Nuevo gasto" })).toHaveCount(0);
 });
+
+test("dictates an expense and reviews it in the form", async ({ page }) => {
+  await loadDemoStore(page);
+  // Reconocedor falso: devuelve una frase final poco después de arrancar.
+  await page.addInitScript(() => {
+    class FakeRecognition {
+      lang = "";
+      continuous = false;
+      interimResults = false;
+      maxAlternatives = 1;
+      onresult: ((event: unknown) => void) | null = null;
+      onerror: ((event: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      start() {
+        setTimeout(() => {
+          this.onresult?.({
+            resultIndex: 0,
+            results: [{ isFinal: true, 0: { transcript: "Netflix 12,99 el 5" } }],
+          });
+        }, 200);
+      }
+      stop() {}
+      abort() {}
+    }
+    // Chromium trae SpeechRecognition sin prefijo; se sustituyen los dos.
+    Object.assign(window, {
+      SpeechRecognition: FakeRecognition,
+      webkitSpeechRecognition: FakeRecognition,
+    });
+  });
+  let sentText = "";
+  await page.route("**/api/ai/parse-expenses", async (route) => {
+    sentText = JSON.parse(route.request().postData() ?? "{}").text;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        provider: "gemini",
+        expenses: [
+          {
+            name: "Netflix",
+            description: "",
+            amount: 12.99,
+            categoryName: "Suscripciones",
+            startDate: "2026-06-01",
+            dueDay: 5,
+            recurrence: { frequency: "monthly" },
+          },
+        ],
+        review: [{ missingFields: [], inferredFields: [] }],
+      }),
+    });
+  });
+  await page.goto("/expenses/new?mode=voice");
+
+  const dictate = page.getByRole("button", { name: "Dictar" });
+  await expect(dictate).toBeVisible();
+  await dictate.click();
+  await expect(page.getByText("Escuchando…")).toBeVisible();
+
+  await expect(page.getByRole("heading", { name: "Nuevo gasto" })).toBeVisible({ timeout: 6_000 });
+  expect(sentText).toBe("Netflix 12,99 el 5");
+});
+
+test("Back closes the open sheet instead of leaving the screen", async ({ page }) => {
+  await loadDemoStore(page);
+  await page.goto("/money");
+  await page.getByRole("link", { name: "Gastos" }).click();
+  await expect(page).toHaveURL(/\/$/);
+
+  const addButton = page.getByRole("button", { name: "Añadir gasto" });
+  const capture = page.getByRole("dialog", { name: "Añadir gasto" });
+
+  await addButton.click();
+  await expect(capture).toBeVisible();
+  await page.goBack();
+  await expect(capture).toHaveCount(0);
+  await expect(page).toHaveURL(/\/$/);
+
+  // Cerrar con la X no deja una entrada suelta en el historial.
+  await addButton.click();
+  await capture.getByRole("button", { name: "Cerrar" }).click();
+  await expect(capture).toHaveCount(0);
+
+  // De la captura al formulario: el formulario no se cierra solo.
+  await addButton.click();
+  await capture.getByRole("button", { name: "Manual" }).click();
+  const form = page.getByRole("dialog", { name: "Nuevo gasto" });
+  await expect(form).toBeVisible();
+  await page.waitForTimeout(300);
+  await expect(form).toBeVisible();
+  await page.goBack();
+  await expect(form).toHaveCount(0);
+  await expect(page).toHaveURL(/\/$/);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/money$/);
+});

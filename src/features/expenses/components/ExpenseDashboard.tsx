@@ -66,9 +66,18 @@ export function ExpenseDashboard({
     [store.categories],
   );
   const quickParser = useQuickExpenseParser({ language, categories: categoryNames });
+  // `?mode=voice` (atajo "Añadir por voz") se lee en el cliente para que la
+  // página siga siendo estática y precacheada.
+  const [voiceShortcut] = useState(
+    () =>
+      initialNewExpense &&
+      new URLSearchParams(window.location.search).get("mode") === "voice",
+  );
   const capture = useExpenseCaptureFlow({
     parser: quickParser,
-    initialFormOpen: initialNewExpense,
+    language,
+    initialFormOpen: initialNewExpense && !voiceShortcut,
+    initialCaptureOpen: voiceShortcut,
     addExpense,
     addExpenses,
   });
@@ -198,6 +207,7 @@ export function ExpenseDashboard({
         statusTone={quickParser.statusTone}
         isParsing={quickParser.status === "loading"}
         needsLogin={quickParser.needsLogin}
+        dictation={capture.dictation}
         language={language}
         onClose={capture.closeCapture}
         onValueChange={quickParser.setQuickText}

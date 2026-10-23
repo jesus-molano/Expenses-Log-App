@@ -2,10 +2,15 @@
 
 import { useRef, useState } from "react";
 import type { CapturedDraft } from "@/domain/expense-capture";
-import type { CreateExpenseOptions, DraftExpense } from "@/domain/types";
+import type {
+  AppLanguage,
+  CreateExpenseOptions,
+  DraftExpense,
+} from "@/domain/types";
 import { createEmptyDraft } from "../lib/dashboard-config";
 import type { CaptureReason } from "../lib/capture-labels";
 import type { useQuickExpenseParser } from "./use-quick-expense-parser";
+import { useSpeechDictation } from "./use-speech-dictation";
 
 type Review = Pick<CapturedDraft, "missingFields" | "inferredFields">;
 // Un id estable por borrador: la selección no depende de la posición, que
@@ -17,16 +22,21 @@ type InitialStatus = NonNullable<CreateExpenseOptions["initialStatus"]>;
 // y revisión de varios. El dashboard solo compone.
 export function useExpenseCaptureFlow({
   parser,
+  language,
   initialFormOpen,
+  initialCaptureOpen = false,
   addExpense,
   addExpenses,
 }: {
   parser: ReturnType<typeof useQuickExpenseParser>;
+  language: AppLanguage;
   initialFormOpen: boolean;
+  // Atajo "Añadir por voz": abre la captura; dictar exige un toque.
+  initialCaptureOpen?: boolean;
   addExpense: (draft: DraftExpense, options?: CreateExpenseOptions) => void;
   addExpenses: (drafts: DraftExpense[], options?: CreateExpenseOptions) => void;
 }) {
-  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureOpen, setCaptureOpen] = useState(initialCaptureOpen);
   const [formOpen, setFormOpen] = useState(initialFormOpen);
   const [draft, setDraft] = useState<DraftExpense>(() => createEmptyDraft());
   const [draftReview, setDraftReview] = useState<Review | null>(null);
@@ -63,9 +73,20 @@ export function useExpenseCaptureFlow({
     setEditingId(null);
   }
 
-  async function analyze() {
+  // Lo dictado se analiza una sola vez al terminar y siempre pasa por
+  // revisión (formulario o lista).
+  const dictation = useSpeechDictation({
+    language,
+    onTranscript: parser.setQuickText,
+    onFinish: (text) => {
+      parser.setQuickText(text);
+      void analyze(text);
+    },
+  });
+
+  async function analyze(textOverride?: string) {
     const request = ++requestRef.current;
-    const result = await parser.parse();
+    const result = await parser.parse(textOverride);
     if (request !== requestRef.current) return;
     if (!result || result.drafts.length === 0) return;
 
@@ -121,19 +142,24 @@ export function useExpenseCaptureFlow({
     excludedIds,
     reviewStatus,
     isIdle: !captureOpen && !formOpen && !reviewItems,
+    dictation,
     openCapture: () => setCaptureOpen(true),
     closeCapture: () => {
+      dictation.cancel();
       supersede();
       setCaptureOpen(false);
     },
     cancelAnalysis: supersede,
     openManualForm: () => {
+      dictation.cancel();
       supersede();
       setCaptureOpen(false);
       setNotice(null);
       openForm(createEmptyDraft());
     },
-    analyze,
+    // Analizar mientras se dicta termina el dictado, que entrega el texto
+    // completo y lo analiza una sola vez.
+    analyze: () => (dictation.listening ? dictation.stop() : void analyze()),
     closeForm: () => {
       setFormOpen(false);
       setEditingId(null);

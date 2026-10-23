@@ -1,11 +1,12 @@
 ﻿import Link from "next/link";
-import { LogIn, Pencil, Plus, Sparkles, X } from "lucide-react";
+import { LogIn, Mic, Pencil, Plus, Sparkles, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Sheet } from "@/components/ui/Sheet";
 import { CAPTURE_TEXT_MAX_LENGTH } from "@/domain/expense-capture";
 import type { AppLanguage } from "@/domain/types";
-import { t } from "@/shared/i18n";
+import { t, type TranslationKey } from "@/shared/i18n";
+import type { DictationError } from "../lib/voice-support";
 import { cn } from "@/shared/ui";
 
 type QuickCaptureProps = {
@@ -15,6 +16,12 @@ type QuickCaptureProps = {
   statusTone: "neutral" | "success" | "warning";
   isParsing: boolean;
   needsLogin: boolean;
+  dictation: {
+    supported: boolean;
+    listening: boolean;
+    error: DictationError | null;
+    toggle: () => void;
+  };
   language: AppLanguage;
   onClose: () => void;
   onValueChange: (value: string) => void;
@@ -45,6 +52,16 @@ export function AddExpenseButton({
   );
 }
 
+const DICTATION_ERRORS: Record<DictationError, TranslationKey> = {
+  offline: "expenses.dictationOffline",
+  "not-allowed": "expenses.dictationNotAllowed",
+  "no-speech": "expenses.dictationNoSpeech",
+  network: "expenses.dictationUnavailable",
+  "service-not-allowed": "expenses.dictationUnavailable",
+  "audio-capture": "expenses.dictationNoMicrophone",
+  "language-not-supported": "expenses.dictationLanguage",
+};
+
 const EXAMPLES: Record<AppLanguage, string[]> = {
   es: [
     "Netflix 12,99 el 5",
@@ -65,6 +82,7 @@ export function QuickCapture({
   statusTone,
   isParsing,
   needsLogin,
+  dictation,
   language,
   onClose,
   onValueChange,
@@ -73,6 +91,14 @@ export function QuickCapture({
   onManualAdd,
 }: QuickCaptureProps) {
   if (!open) return null;
+
+  const dictationMessage = dictation.listening
+    ? t("expenses.dictationListening", language)
+    : dictation.error
+      ? t(DICTATION_ERRORS[dictation.error], language)
+      : dictation.supported
+        ? ""
+        : t("expenses.dictationKeyboardHint", language);
 
   return (
     <Sheet
@@ -111,35 +137,64 @@ export function QuickCapture({
           <label className="sr-only" htmlFor="quick-expense-text">
             {t("expenses.analyzeText", language)}
           </label>
-          <textarea
-            id="quick-expense-text"
-            value={value}
-            rows={3}
-            maxLength={CAPTURE_TEXT_MAX_LENGTH}
-            aria-describedby="quick-expense-hint"
-            onChange={(event) => {
-              const textarea = event.currentTarget;
-              textarea.style.height = "auto";
-              textarea.style.height = `${textarea.scrollHeight}px`;
-              onValueChange(textarea.value);
-            }}
-            onKeyDown={(event) => {
-              // Con teclado físico, Intro analiza; Mayús+Intro o un teclado
-              // componiendo (IME) no. En pantallas táctiles no hay Mayús+Intro:
-              // Intro hace otra línea y se analiza con el botón.
-              if (
-                event.key === "Enter" &&
-                !event.shiftKey &&
-                !event.nativeEvent.isComposing &&
-                !window.matchMedia("(pointer: coarse)").matches
-              ) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
-            }}
-            placeholder={t("expenses.quickPlaceholder", language)}
-            className="input-control h-auto min-h-24 w-full resize-none py-3 leading-relaxed"
-          />
+          <div className="relative">
+            <textarea
+              id="quick-expense-text"
+              value={value}
+              rows={3}
+              maxLength={CAPTURE_TEXT_MAX_LENGTH}
+              aria-describedby="quick-expense-hint"
+              onChange={(event) => {
+                const textarea = event.currentTarget;
+                textarea.style.height = "auto";
+                textarea.style.height = `${textarea.scrollHeight}px`;
+                onValueChange(textarea.value);
+              }}
+              onKeyDown={(event) => {
+                // Con teclado físico, Intro analiza; Mayús+Intro o un teclado
+                // componiendo (IME) no. En pantallas táctiles no hay
+                // Mayús+Intro: Intro hace otra línea y se analiza con el botón.
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing &&
+                  !window.matchMedia("(pointer: coarse)").matches
+                ) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              placeholder={t("expenses.quickPlaceholder", language)}
+              className={cn(
+                "input-control h-auto min-h-24 w-full resize-none py-3 leading-relaxed",
+                dictation.supported && "pr-14",
+              )}
+            />
+            {dictation.supported ? (
+              <IconButton
+                type="button"
+                size="touch"
+                variant={dictation.listening ? "default" : "ghost"}
+                onClick={dictation.toggle}
+                disabled={isParsing}
+                aria-pressed={dictation.listening}
+                aria-label={
+                  dictation.listening
+                    ? t("expenses.dictationStop", language)
+                    : t("expenses.dictationStart", language)
+                }
+                className={cn(
+                  "absolute bottom-2 right-2",
+                  dictation.listening && "app-dictation-active",
+                )}
+              >
+                {dictation.listening ? <Square size={16} /> : <Mic size={18} />}
+              </IconButton>
+            ) : null}
+          </div>
+          <p aria-live="polite" className="min-h-4 text-xs text-[var(--app-text-muted)]">
+            {dictationMessage}
+          </p>
           <p id="quick-expense-hint" className="text-xs text-[var(--app-text-muted)]">
             {t("expenses.captureHint", language)}
           </p>
