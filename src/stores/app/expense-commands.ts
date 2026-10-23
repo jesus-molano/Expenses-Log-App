@@ -1,5 +1,7 @@
-import { startOfMonth } from "date-fns";
+import { endOfMonth, startOfMonth } from "date-fns";
+import { addMonthId, resolveActiveMonth } from "@/domain/budget-month";
 import { normalizeDateOnly, toDateOnly } from "@/domain/calendar";
+import { generateStoreOccurrences } from "@/domain/finance";
 import { occurrenceKeyOf, overrideIdFor } from "@/domain/overrides";
 import { firstChargeAlreadyPassed, firstOccurrenceDate } from "@/domain/recurrence";
 import type {
@@ -269,6 +271,56 @@ export function moveOccurrenceSeriesInStore(
 
 // Cambia la serie y recoloca los overrides de los meses abiertos si cambia su
 // calendario, para que el pago o el movimiento de este mes no se pierda.
+// Desde cuándo vale un importe nuevo de la serie.
+export type SeriesAmountScope = "current" | "next";
+
+// Antes de cambiar el importe de una serie, lo que ya pasó o ya está pagado
+// conserva el importe anterior: los meses anteriores al del calendario ya son
+// registros, y aquí se fijan con un override los cobros de un mes cerrado con
+// "Pasar al mes siguiente", los ya pagados (también los adelantados del mes
+// que viene) y, si el cambio vale desde el mes que viene, los del mes activo.
+export function keepAmountBeforeSeriesChange(
+  store: ExpenseStore,
+  templateId: string,
+  nextAmount: number,
+  { scope = "current", today = new Date() }: { scope?: SeriesAmountScope; today?: Date } = {},
+): ExpenseStore {
+  const template = store.templates.find((item) => item.id === templateId);
+  if (!template || template.amount === nextAmount) return store;
+
+  const todayId = toDateOnly(today);
+  const activeMonthId = resolveActiveMonth(todayId, store.finance?.monthClosures);
+  const from = `${todayId.slice(0, 7)}-01`;
+  const to = toDateOnly(endOfMonth(new Date(`${addMonthId(activeMonthId, 1)}-01T00:00:00`)));
+  const now = today.toISOString();
+
+  return generateStoreOccurrences(store, from, to)
+    .filter(
+      (occurrence) =>
+        occurrence.template.id === templateId &&
+        !occurrence.record &&
+        occurrence.override?.amount === undefined,
+    )
+    .filter((occurrence) => {
+      const monthId = occurrence.dueDate.slice(0, 7);
+      return (
+        occurrence.status === "paid" ||
+        monthId < activeMonthId ||
+        (scope === "next" && monthId === activeMonthId)
+      );
+    })
+    .reduce(
+      (current, occurrence) =>
+        upsertOccurrenceOverride(
+          current,
+          keyOf(occurrence),
+          { amount: template.amount },
+          { defaults: { status: occurrence.status }, now },
+        ),
+      store,
+    );
+}
+
 export function updateExpenseTemplateInStore(
   store: ExpenseStore,
   templateId: string,
