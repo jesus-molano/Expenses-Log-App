@@ -14,6 +14,7 @@ import type {
   CreateExpenseOptions,
   DraftExpense,
   ExpenseOccurrence,
+  ExpenseReminderSettings,
   ExpenseStore,
   ExpenseTemplate,
   PreviousChargesResolution,
@@ -445,6 +446,16 @@ export function updateExpenseTemplateInStore(
     next,
     today,
   );
+}
+
+// Aviso propio de un gasto (la campana de la fila). undefined lo devuelve al
+// aviso por defecto de Ajustes.
+export function setTemplateReminderInStore(
+  store: ExpenseStore,
+  templateId: string,
+  reminder: ExpenseReminderSettings | undefined,
+): ExpenseStore {
+  return updateExpenseTemplateInStore(store, templateId, { reminder });
 }
 
 export function updateMonthlyExpenseOccurrenceInStore(

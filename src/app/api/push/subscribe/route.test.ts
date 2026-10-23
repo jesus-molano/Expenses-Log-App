@@ -30,6 +30,8 @@ function mockSupabase(
     user?: User | null;
     stored?: Array<{ endpoint: string; updated_at: string }>;
     upsertError?: { code: string; message: string } | null;
+    // Respuestas propias del upsert (p. ej. sin la migración de salud).
+    upsert?: ReturnType<typeof vi.fn>;
     // Sin la migración de F0c-2 el RPC no existe y se usa el upsert.
     rpcError?: { code: string; message: string } | null;
   } = {},
@@ -41,9 +43,9 @@ function mockSupabase(
         ? { code: "PGRST202", message: "Could not find the function public.claim_push_subscription" }
         : options.rpcError,
   });
-  const upsert = vi
-    .fn()
-    .mockResolvedValue({ error: options.upsertError ?? null });
+  const upsert =
+    options.upsert ??
+    vi.fn().mockResolvedValue({ error: options.upsertError ?? null });
   const deleteQuery = {
     eq: vi.fn(),
     in: vi.fn().mockResolvedValue({ error: null }),
@@ -114,7 +116,7 @@ describe("/api/push/subscribe", () => {
     expect(await response.json()).toMatchObject({ mode: "demo" });
   });
 
-  it("stores an authenticated device under its user", async () => {
+  it("stores an authenticated device under its user and forgets past failures", async () => {
     const { upsert, deleteQuery } = mockSupabase();
     const response = await POST(request("POST", { endpoint, keys }));
 
@@ -126,9 +128,66 @@ describe("/api/push/subscribe", () => {
         endpoint,
         p256dh: "key",
         auth: "auth",
+        failure_count: 0,
       }),
       { onConflict: "endpoint" },
     );
+  });
+
+  it("still saves the device before the health migration is applied", async () => {
+    const upsert = vi
+      .fn()
+      .mockResolvedValueOnce({ error: { code: "PGRST204" } })
+      .mockResolvedValueOnce({ error: null });
+    mockSupabase({ upsert });
+    const response = await POST(request("POST", { endpoint, keys }));
+
+    expect(response.status).toBe(200);
+    expect(upsert).toHaveBeenCalledTimes(2);
+    expect(upsert.mock.calls[1][0]).not.toHaveProperty("failure_count");
+  });
+
+  it("replaces the previous endpoint of a renewed subscription", async () => {
+    const previousEndpoint = "https://fcm.googleapis.com/fcm/send/old-device";
+    const { deleteQuery } = mockSupabase();
+    const response = await POST(
+      request("POST", { endpoint, keys, previousEndpoint }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(deleteQuery.eq).toHaveBeenCalledWith("user_id", user.id);
+    expect(deleteQuery.eq).toHaveBeenCalledWith("endpoint", previousEndpoint);
+  });
+
+  it("does not evict another device for the endpoint a renewal replaces", async () => {
+    const stored = storedSubscriptions(10);
+    const { deleteQuery } = mockSupabase({ stored });
+    const response = await POST(
+      request("POST", { endpoint, keys, previousEndpoint: stored[0].endpoint }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(deleteQuery.in).not.toHaveBeenCalled();
+    expect(deleteQuery.eq).toHaveBeenCalledWith("endpoint", stored[0].endpoint);
+  });
+
+  it("removes the replaced endpoint before the claim RPC makes room", async () => {
+    const stored = storedSubscriptions(10);
+    const { deleteQuery, rpc } = mockSupabase({ stored, rpcError: null });
+    const previousEndpoint = stored[9].endpoint;
+    const response = await POST(request("POST", { endpoint, keys, previousEndpoint }));
+
+    expect(response.status).toBe(200);
+    // El RPC borra en la base de datos lo que pase de 10: la antigua tiene que
+    // haberse ido ya para que no se lleve otro dispositivo.
+    const removal = deleteQuery.eq.mock.calls.findIndex(
+      ([column, value]) => column === "endpoint" && value === previousEndpoint,
+    );
+    expect(removal).toBeGreaterThanOrEqual(0);
+    expect(deleteQuery.eq.mock.invocationCallOrder[removal]).toBeLessThan(
+      rpc.mock.invocationCallOrder[0],
+    );
+    expect(deleteQuery.in).not.toHaveBeenCalled();
   });
 
   it("replaces the least recently updated device beyond ten", async () => {
@@ -187,12 +246,17 @@ describe("/api/push/subscribe", () => {
 
   it("reports a failed claim without falling back", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const { upsert } = mockSupabase({ rpcError: { code: "42501", message: "permission denied" } });
+    // 42501 se reserva para el endpoint de otra cuenta (409); cualquier otro
+    // fallo del RPC es un error del guardado.
+    const { upsert } = mockSupabase({
+      rpcError: { code: "22023", message: "invalid push subscription" },
+    });
     const response = await POST(
       request("POST", { endpoint, keys: { p256dh: "key", auth: "auth" } }),
     );
 
     expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ code: "PUSH_SUBSCRIPTION_SAVE_FAILED" });
     expect(upsert).not.toHaveBeenCalled();
   });
 

@@ -16,7 +16,10 @@ create table if not exists public.push_subscriptions (
   p256dh text not null,
   auth text not null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  failure_count integer not null default 0,
+  last_failure_at timestamptz,
+  last_success_at timestamptz
 );
 
 create index if not exists push_subscriptions_user_id_idx
@@ -329,6 +332,9 @@ begin
     set user_id = excluded.user_id,
         p256dh = excluded.p256dh,
         auth = excluded.auth,
+        -- Reclamar es el latido de la app (migracion
+        -- 20261023220000_push_subscription_health.sql): olvida los fallos.
+        failure_count = 0,
         updated_at = now()
   returning subscription.id into claimed_id;
 

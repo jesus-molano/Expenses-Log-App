@@ -219,6 +219,39 @@ describe("csvToStore", () => {
     );
   });
 
+  it("keeps an expense's own reminder apart from the default one", () => {
+    const withReminders = normalizeExpenseStore(
+      {
+        ...emptyStore,
+        templates: [
+          template("light", "Luz", 40, "cat-home", "2026-10-03"),
+          template("water", "Agua", 20, "cat-home", "2026-10-04", {
+            reminder: { enabled: false, daysBeforeCharge: 3 },
+          }),
+          template("gas", "Gas", 30, "cat-home", "2026-10-05", {
+            reminder: { enabled: true, daysBeforeCharge: 5 },
+          }),
+        ],
+      },
+      today,
+    );
+    const csv = storeToCsv(withReminders, { today });
+
+    // Vacío sigue el aviso por defecto de Ajustes; "off" es un aviso propio
+    // apagado, que no avisa aunque el de Ajustes esté encendido.
+    expect(
+      rowsOf(csv)
+        .filter((row) => row.type === "expense")
+        .map((row) => row.reminder_days),
+    ).toEqual(["", "off", "5"]);
+    const { store: imported } = csvToStore(csv, { now: today });
+    const reminderOf = (id: string) =>
+      imported.templates.find((item) => item.id === id)?.reminder;
+    expect(reminderOf("light")).toBeUndefined();
+    expect(reminderOf("water")).toEqual({ enabled: false, daysBeforeCharge: 3 });
+    expect(reminderOf("gas")).toEqual({ enabled: true, daysBeforeCharge: 5 });
+  });
+
   it("reuses the categories that already exist with the same name", () => {
     const { store: imported } = csvToStore(storeToCsv(store, { today, language: "en" }), {
       now: today,

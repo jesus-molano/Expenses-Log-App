@@ -8,6 +8,7 @@ import {
   toMonthId,
 } from "@/domain/finance";
 import { overrideIdFor } from "@/domain/overrides";
+import { DEFAULT_REMINDER_PREFERENCES } from "@/domain/reminder-schedule";
 import { emptyStore } from "@/domain/seed";
 import { foldText } from "@/domain/text";
 import type {
@@ -16,6 +17,7 @@ import type {
   ExpenseOccurrence,
   ExpenseOccurrenceOverride,
   ExpenseOccurrenceRecord,
+  ExpenseReminderSettings,
   ExpenseStore,
   ExpenseTemplate,
   OccurrenceStatus,
@@ -71,6 +73,7 @@ const FREQUENCIES = ["once", "monthly", "quarterly", "yearly"] as const;
 const UNITS = ["day", "week", "month", "year"] as const;
 const STATUSES: OccurrenceStatus[] = ["due", "paid", "skipped"];
 const MAX_REMINDER_DAYS = 30;
+const REMINDER_OFF = "off";
 
 export function storeToCsv(
   store: ExpenseStore,
@@ -95,9 +98,7 @@ export function storeToCsv(
       end_date: template.endDate ?? "",
       due_day: String(template.dueDay),
       active: template.active ? "true" : "false",
-      reminder_days: template.reminder?.enabled
-        ? String(template.reminder.daysBeforeCharge)
-        : "",
+      reminder_days: reminderCell(template.reminder),
       description: protectSpreadsheetText(template.description),
       updated_at: template.updatedAt,
     }),
@@ -271,7 +272,7 @@ function templateFromRow(row: CsvRow, context: RowContext): ExpenseTemplate | nu
   const startDate = normalizeDateOnly(row.start_date) ?? context.today;
   const endDate = normalizeDateOnly(row.end_date);
   const updatedAt = readTimestamp(row.updated_at) ?? context.nowIso;
-  const reminderDays = readInteger(row.reminder_days, 0, MAX_REMINDER_DAYS);
+  const reminder = reminderFromCell(row.reminder_days);
 
   return {
     id: row.expense_id || `exp-${crypto.randomUUID()}`,
@@ -285,9 +286,7 @@ function templateFromRow(row: CsvRow, context: RowContext): ExpenseTemplate | nu
     ...(endDate && endDate >= startDate ? { endDate } : {}),
     dueDay: readInteger(row.due_day, 1, 31) ?? Number(startDate.slice(8, 10)),
     recurrence: recurrenceFromRow(row, startDate),
-    ...(reminderDays !== null
-      ? { reminder: { enabled: true, daysBeforeCharge: reminderDays } }
-      : {}),
+    ...(reminder ? { reminder } : {}),
     active: !/^(false|0|no|n)$/i.test(row.active ?? ""),
     createdAt: updatedAt,
     updatedAt,
@@ -449,6 +448,25 @@ function createCategoryRegistry(existing: ExpenseCategory[]) {
 
 function readText(value: string | undefined) {
   return unprotectSpreadsheetText(value ?? "").trim();
+}
+
+// Aviso propio del gasto: los días de antelación, "off" si está apagado o
+// vacío si sigue el aviso por defecto de Ajustes. Apagado y por defecto no son
+// lo mismo: con el aviso por defecto encendido, el segundo sí avisa.
+function reminderCell(reminder: ExpenseReminderSettings | undefined) {
+  if (!reminder) return "";
+  return reminder.enabled ? String(reminder.daysBeforeCharge) : REMINDER_OFF;
+}
+
+function reminderFromCell(value: string | undefined): ExpenseReminderSettings | undefined {
+  if (/^(off|false|no|n)$/i.test(value ?? "")) {
+    return {
+      enabled: false,
+      daysBeforeCharge: DEFAULT_REMINDER_PREFERENCES.defaultDaysBefore,
+    };
+  }
+  const days = readInteger(value, 0, MAX_REMINDER_DAYS);
+  return days === null ? undefined : { enabled: true, daysBeforeCharge: days };
 }
 
 function readInteger(value: string | undefined, min: number, max: number) {

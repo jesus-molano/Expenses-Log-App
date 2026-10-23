@@ -18,7 +18,9 @@ El hook expone:
   y move series.
 - Comandos financieros: salario, objetivo de ahorro, aportacion real, ingresos,
   overrides mensuales y cerrar o reabrir un mes.
-- Comandos de preferencias: tema e idioma.
+- Comandos de preferencias: tema, idioma y ajustes de avisos
+  (`updateReminderPreferences`), y el aviso propio de un gasto
+  (`setTemplateReminder`, la campana de la fila).
 - Copias: `importStore`, `restoreSnapshot` y `takeSnapshot` (ver "Copias,
   exportar e importar").
 - Estado de sync: `syncStatus`, `syncMessage`, `isHydrated`.
@@ -36,7 +38,8 @@ Los comandos se dividen por responsabilidad:
   `upsertOccurrenceOverride` y se guardan con un solo persist.
 - `finance-commands`: modifica salario mensual, objetivos, aportaciones reales
   e ingresos.
-- `preference-commands`: actualiza tema e idioma en el store.
+- `preference-commands`: actualiza tema, idioma y ajustes de avisos en el
+  store.
 - `backup-commands`: combina o sustituye el store con uno importado o con una
   copia.
 
@@ -165,7 +168,12 @@ La mezcla actual usa ids:
   hasta esa hora, tambien copias antiguas de otro dispositivo; uno editado
   despues se conserva.
 - Preferencias: local, luego cloud, luego defaults. Son de cada dispositivo:
-  las cookies de tema e idioma mandan sobre el store al cargar.
+  las cookies de tema e idioma mandan sobre el store al cargar. Excepcion:
+  `preferences.reminders` (ajustes de avisos, que lee el cron) gana la version
+  con el `updatedAt` mas reciente, de cualquier dispositivo.
+- Aviso de un gasto: `template.reminder` viaja con la plantilla (merge por
+  `updatedAt`). Sin el, el gasto sigue el aviso por defecto de
+  `preferences.reminders`.
 - Categorias: llevan `updatedAt` desde F0c-2 y se fusionan por entidad como
   plantillas, ingresos o registros. Las antiguas no lo tienen y gana la local;
   los builds anteriores conservan el campo porque no reescriben las entidades.
@@ -210,6 +218,12 @@ Reglas para campos nuevos:
   tambien. Si un build antiguo lo descarta, el mes activo vuelve a ser el
   natural. Se fusiona por mes con el `updatedAt` mas reciente; reabrir guarda
   `reopenedAt` en vez de borrar la entrada.
+- Excepcion: `preferences.reminders` (ajustes de avisos) tambien, solo cuando
+  el usuario los cambia. Un build con passthrough lo conserva como clave
+  desconocida; uno anterior lo descarta y los avisos vuelven a los valores
+  por defecto (solo los gastos con aviso propio, a las 8), sin perder datos.
+  La normalizacion corrige valores imposibles (hora, antelacion, zona) y
+  conserva las claves que añada un build mas nuevo dentro del objeto.
 - El cierre con restos (F1a-3) no añade campos: cada resto se resuelve con
   overrides (pagado, saltado o movido al primer dia del mes siguiente: el 1
   o, con el ciclo anclado al cobro, el dia de cobro), el ahorro con
@@ -281,7 +295,9 @@ Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/Ba
   (para que Excel lea las tildes), coma como separador e importes con punto y
   dos decimales (`2200.00`). La columna `type` distingue:
   - `expense`: una fila por gasto (frecuencia, intervalo, mes anual, rrule,
-    inicio, fin, dia de cobro, aviso, descripcion).
+    inicio, fin, dia de cobro, aviso, descripcion). `reminder_days` lleva los
+    dias de antelacion del aviso propio, `off` si el aviso propio esta apagado
+    o nada si el gasto sigue el aviso por defecto de Ajustes.
   - `occurrence`: el historico hasta el final del mes actual (los meses
     cerrados tambien de gastos borrados) y, de despues, solo los cobros con
     cambios (por ejemplo, pagados por adelantado).

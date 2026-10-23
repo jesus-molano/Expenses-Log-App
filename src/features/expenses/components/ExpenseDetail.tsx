@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatCurrency } from "@/domain/calendar";
+import { resolveReminderPreferences } from "@/domain/reminder-schedule";
 import type {
   AppLanguage,
   ExpenseTemplate,
@@ -153,6 +154,7 @@ function ExpenseDetailForm({
               form={editor.form}
               amountText={editor.amountText}
               language={language}
+              reminderPreferences={resolveReminderPreferences(expenseStore.store)}
               onFormChange={editor.setForm}
               onAmountTextChange={editor.setAmountText}
             />

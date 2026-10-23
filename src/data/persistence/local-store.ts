@@ -15,6 +15,7 @@ import {
   withBalanceCheckins,
   withBudgetCycle,
   withMonthClosures,
+  withReminderPreferences,
 } from "./store-normalization";
 import { SYNC_META_KEY } from "./sync-meta-store";
 
@@ -202,6 +203,14 @@ export function mergeExpenseStores(
         normalizedLocalStore.preferences?.language ??
         normalizedCloudStore.preferences?.language ??
         "es",
+      // Los ajustes de avisos los lee el cron: gana la última edición, de
+      // cualquier dispositivo, en lugar de la copia local.
+      ...withReminderPreferences(
+        latestUpdatedOptional(
+          normalizedCloudStore.preferences?.reminders,
+          normalizedLocalStore.preferences?.reminders,
+        ),
+      ),
     },
     deleted,
   };
@@ -259,6 +268,11 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 
 function isStringList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function latestUpdatedOptional<T>(cloud: T | undefined, local: T | undefined) {
+  if (local === undefined) return cloud;
+  return latestUpdated(cloud, local);
 }
 
 function mergeIdLists(

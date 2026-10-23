@@ -1,4 +1,5 @@
 import webpush from "web-push";
+import type { PushNotificationPayload } from "@/pwa/push-payload";
 import { isAllowedPushEndpoint } from "./push-endpoints";
 
 export type StoredPushSubscriptionKeys = {
@@ -11,9 +12,9 @@ export type StoredPushSubscriptionKeys = {
 // el resto de dispositivos ni de usuarios del cron.
 export const PUSH_SEND_TIMEOUT_MS = 5_000;
 
-// Cuánto guarda el servicio push un aviso para un dispositivo sin conexión.
-// El cron vuelve a avisar al día siguiente; la prueba solo sirve al momento.
-export const REMINDER_PUSH_TTL_SECONDS = 24 * 60 * 60;
+// Cuánto guarda el servicio push la notificación de prueba para un
+// dispositivo sin conexión: solo sirve al momento. Los avisos del cron llevan
+// su propio TTL por tipo (`REMINDER_TTL_SECONDS` en reminder-notifications).
 export const TEST_PUSH_TTL_SECONDS = 5 * 60;
 
 export function configureWebPush() {
@@ -42,7 +43,7 @@ export class PushEndpointNotAllowedError extends Error {
 // `push_subscriptions` directamente, sin pasar por la API.
 export async function sendWebPush(
   subscription: StoredPushSubscriptionKeys,
-  payload: string,
+  payload: PushNotificationPayload,
   { ttlSeconds }: { ttlSeconds: number },
 ) {
   if (!isAllowedPushEndpoint(subscription.endpoint)) {
@@ -54,8 +55,12 @@ export async function sendWebPush(
       endpoint: subscription.endpoint,
       keys: { p256dh: subscription.p256dh, auth: subscription.auth },
     },
-    payload,
-    { TTL: ttlSeconds, timeout: PUSH_SEND_TIMEOUT_MS },
+    JSON.stringify(payload),
+    {
+      TTL: ttlSeconds,
+      timeout: PUSH_SEND_TIMEOUT_MS,
+      urgency: "normal",
+    },
   );
 }
 

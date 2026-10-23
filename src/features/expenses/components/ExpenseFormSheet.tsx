@@ -14,6 +14,7 @@ import type {
   CreateExpenseOptions,
   DraftExpense,
   OccurrenceStatus,
+  ReminderPreferences,
 } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
@@ -34,6 +35,7 @@ type ExpenseFormSheetProps = {
   // Por qué el borrador viene del análisis local, si es el caso.
   notice?: CaptureReason | null;
   language?: AppLanguage;
+  reminderPreferences?: ReminderPreferences;
   onClose: () => void;
   onSave: (draft: DraftExpense, options?: CreateExpenseOptions) => void;
 };
@@ -44,6 +46,7 @@ export function ExpenseFormSheet({
   review = null,
   notice = null,
   language = "es",
+  reminderPreferences,
   onClose,
   onSave,
 }: ExpenseFormSheetProps) {
@@ -132,6 +135,7 @@ export function ExpenseFormSheet({
             form={form}
             amountText={amountText}
             language={language}
+            reminderPreferences={reminderPreferences}
             onFormChange={setForm}
             onAmountTextChange={setAmountText}
           />

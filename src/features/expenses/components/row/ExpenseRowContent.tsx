@@ -10,6 +10,10 @@ type ExpenseRowContentProps = {
   category?: ExpenseCategory;
   today: string;
   language: AppLanguage;
+  // Control al principio de la segunda línea (la campana de aviso en la
+  // lista): lejos del centro de la fila, que abre las acciones, y del borde
+  // derecho, donde empieza el gesto de pagar.
+  metaAccessory?: React.ReactNode;
 };
 
 export function ExpenseRowContent({
@@ -17,6 +21,7 @@ export function ExpenseRowContent({
   category,
   today,
   language,
+  metaAccessory,
 }: ExpenseRowContentProps) {
   const paid = occurrence.status === "paid";
   const statusToneClass = expenseStatusToneClass(occurrence, today);
@@ -46,6 +51,7 @@ export function ExpenseRowContent({
       </div>
 
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+        {metaAccessory}
         {category ? (
           <span
             className={`app-expense-row-category min-w-0 max-w-full break-words px-2 py-0.5 text-[11px] font-medium leading-tight ${categoryToneClass(

@@ -15,6 +15,9 @@ const subscriptionSchema = z.object({
     p256dh: z.string().min(1).max(256),
     auth: z.string().min(1).max(256),
   }),
+  // El navegador renovó la suscripción (`pushsubscriptionchange` o clave VAPID
+  // nueva): la anterior ya no sirve y se borra.
+  previousEndpoint: z.string().url().max(MAX_PUSH_ENDPOINT_LENGTH).optional(),
 });
 
 // Para borrar basta con que sea una URL: así se pueden limpiar también filas
@@ -94,9 +97,33 @@ export async function POST(request: Request) {
     );
   }
 
+  // El navegador renovó la suscripción: la anterior ya no recibe nada y no
+  // cuenta para el límite de dispositivos. Se borra antes de guardar la nueva
+  // porque `claim_push_subscription` hace sitio dentro de la base de datos:
+  // con la antigua aún guardada, una renovación con 10 dispositivos borraría
+  // otro dispositivo en lugar de ella.
+  const previousEndpoint =
+    parsed.data.previousEndpoint &&
+    parsed.data.previousEndpoint !== parsed.data.endpoint
+      ? parsed.data.previousEndpoint
+      : null;
+
+  if (previousEndpoint) {
+    const { error: cleanupError } = await supabase
+      .from("push_subscriptions")
+      .delete()
+      .eq("user_id", userId)
+      .eq("endpoint", previousEndpoint);
+    // Si falla, la antigua acabará podada por el cron (404/410).
+    if (cleanupError) {
+      console.error("Could not remove replaced push subscription", cleanupError);
+    }
+  }
+
   try {
-    // RPC que reclama el endpoint (con la migración de F0c-2) o, sin ella, el
-    // upsert de siempre.
+    // También es el latido del dispositivo: renueva updated_at y pone a cero
+    // los fallos. RPC que reclama el endpoint (con la migración de F0c-2) o,
+    // sin ella, el upsert de siempre.
     await savePushSubscription(supabase, user.id, parsed.data);
   } catch (error) {
     if ((error as { code?: string } | null)?.code === RLS_VIOLATION) {
@@ -117,7 +144,10 @@ export async function POST(request: Request) {
   // el guardado falla. Si el borrado falla o dos altas coinciden, el usuario
   // se pasa por poco y el cron solo envía a los más recientes; la restricción
   // en la base de datos llega con la migración de F0c-2.
-  const evicted = pushEndpointsToEvict(stored ?? [], parsed.data.endpoint);
+  const evicted = pushEndpointsToEvict(
+    (stored ?? []).filter((subscription) => subscription.endpoint !== previousEndpoint),
+    parsed.data.endpoint,
+  );
   if (evicted.length) {
     const { error: evictError } = await supabase
       .from("push_subscriptions")

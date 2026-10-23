@@ -21,12 +21,14 @@ function query(result: { data: unknown; error: unknown }) {
   const value = {
     select: vi.fn(),
     eq: vi.fn(),
+    in: vi.fn(),
     order: vi.fn(),
     limit: vi.fn(),
     maybeSingle: vi.fn().mockResolvedValue(result),
   };
   value.select.mockReturnValue(value);
   value.eq.mockReturnValue(value);
+  value.in.mockReturnValue(value);
   value.order.mockReturnValue(value);
   value.limit.mockReturnValue(value);
   return value;
@@ -65,6 +67,7 @@ function mockSupabase(options?: {
       table === "push_subscriptions" ? subscriptionQuery : deliveryQuery,
     ),
   } as unknown as AppSupabaseClient);
+  return { deliveryQuery };
 }
 
 afterEach(() => {
@@ -86,8 +89,8 @@ describe("/api/push/status", () => {
     expect(await response.json()).toEqual({ mode: "ready", registered: false });
   });
 
-  it("returns registration and latest scheduled delivery", async () => {
-    mockSupabase();
+  it("returns registration and latest scheduled delivery of any kind", async () => {
+    const { deliveryQuery } = mockSupabase();
     const response = await POST(request({ endpoint }));
 
     expect(response.status).toBe(200);
@@ -96,6 +99,20 @@ describe("/api/push/status", () => {
       registered: true,
       subscriptionUpdatedAt: "2026-08-23T10:00:00.000Z",
       lastScheduledDeliveryAt: "2026-08-23T08:00:00.000Z",
+      failureCount: 0,
     });
+    expect(deliveryQuery.in).toHaveBeenCalledWith(
+      "kind",
+      expect.arrayContaining(["last_chance", "charge_day", "charge_check", "month_close", "payday"]),
+    );
+  });
+
+  it("reports recent delivery failures once the migration exists", async () => {
+    mockSupabase({
+      subscription: { updated_at: "2026-08-23T10:00:00.000Z", failure_count: 2 },
+    });
+    const response = await POST(request({ endpoint }));
+
+    expect(await response.json()).toMatchObject({ registered: true, failureCount: 2 });
   });
 });

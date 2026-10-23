@@ -74,6 +74,16 @@ Estado:
   - Hoja de acciones revisada: "Editar la serie" navega (sustituye la entrada de la hoja en el historial), "Pagado con otro importe" solo apunta lo pagado (la fila pagada muestra lo pagado), mover solo toca el cobro y no se ofrece para lo pagado de un mes cerrado ni más allá del mes siguiente, Intro la abre desde el teclado y los clicks de lector de pantalla cuentan.
   - Cada mes del listado muestra solo sus cobros (más lo pendiente que arrastra); al final, "Noviembre empieza con N cobros en sus primeros días" con "Ver noviembre".
   - Pendiente de F2a: `ConfirmActionDialog` con `useDialogA11y` y M22.
+- **F2b (avisos 2.0 y pulido PWA): hecho.**
+  - Ajustes › Recordatorios (`preferences.reminders`, sincronizado y fusionado por `updatedAt`): aviso por defecto para los gastos sin ajuste propio, antelación de mensuales (1-5 días) y de trimestrales/anuales (7, 14 o 30), etapas "el día del cargo" y "¿se cobró?", avisos de mes al día y de día de cobro, y hora de los push en la zona del dispositivo.
+  - Campana en cada recibo pendiente (al principio de la segunda línea, lejos del toque que abre las acciones y del gesto de pagar) con aviso y "Deshacer"; el formulario ofrece hasta 30 días en trimestrales y anuales y "Usar el ajuste general".
+  - Cron (`src/app/api/push/daily-reminders`): día y hora en la zona del usuario, una notificación por etapa en su idioma con nombre, importe, fecha, `tag`, número del badge y enlace `/?occurrence=<id>`; `TTL` por tipo y `timeout` de 5 s. Cada etapa se reclama con su `kind` en el mismo RPC (`last_chance`, `charge_day`, `charge_check`, `month_close`, `payday`). Un usuario que falla no corta el envío al resto.
+  - El enlace se lee en cliente: cambia al mes del cobro, lo resalta y abre su hoja de acciones; si ya no existe, lo dice.
+  - M12: `pushsubscriptionchange` en el service worker, latido diario de la suscripción desde cualquier pantalla (renueva la suscripción si cambia la clave VAPID) y `failure_count` con poda al quinto fallo. La migración `20261023220000_push_subscription_health.sql` es solo aditiva y todo funciona antes de aplicarla.
+  - PWA: atajo "Plan", `setAppBadge` con los vencidos y los de hoy (también desde el push), `theme-color` por tema, iconos maskable con margen y badge monocromo (`scripts/generate-pwa-icons.mjs`), y guía de instalación en iPhone/iPad en Ajustes.
+  - Pendiente del dueño: aplicar la migración y, para que la hora elegida se respete, ejecutar el cron cada hora (Vercel Pro con `0 * * * *` en `vercel.json`, o el workflow `push-reminders.yml` con la variable `PUSH_CRON_URL` y el secreto `CRON_SECRET` en GitHub). Con el cron diario de las 08:00 UTC, los avisos llegan en esa ejecución si la hora elegida ya pasó.
+  - Integración con F0c-1 y F0c-2: un solo módulo de envío (`src/data/push/web-push-sender.ts`: lista de servicios push al enviar, `timeout` de 5 s y el TTL de cada tipo), el alta por `claim_push_subscription` (que con la migración de salud también pone `failure_count` a 0) con el upsert de salud como respaldo si el RPC no existe, y `toReminderStore` (`src/features/expenses/lib/reminder-store.ts`) delante del cron. Conserva todos los gastos bien formados, con o sin aviso propio: el aviso por defecto, el mes al día, el día de cobro y el número del icono los necesitan.
+  - Diferido: `renewal` y `weekly_digest` (§6 del informe, fuera del alcance de F2b) y acciones dentro de la notificación ("Pagado" sin abrir la app): necesitan que el service worker escriba en el store.
 - **F0c-1 (seguridad sin migración): hecho.**
   - `/auth/callback` solo redirige a rutas de la app: rechaza controles, DEL y `\`, y comprueba el origen con `new URL` (M14).
   - El cron procesa cada usuario en su propio `try/catch`, cierra siempre sus leases y cuenta `errors`; el store pasa por `toReminderStore` (M11).
@@ -272,7 +282,7 @@ Estado:
   - Hecho en `src/shared/safe-redirect.ts`: también cae al fallback una ruta que se normaliza a `//host` (`/.//evil.com`). Tests de `%09`/`%0A`/`%0D`, `//`, `/\`, URLs absolutas y segmentos `.`/`..`.
 - **M11.** try/catch por usuario en el cron, liberando los leases.
   - Hecho: cada lease se cierra por separado (marcado o liberado) aunque falle una reclamación a medias o el envío, y la respuesta lleva `errors`, `invalidStoresSkipped` y `blockedEndpointsSkipped`.
-  - `toReminderStore` sustituye a `isExpenseStore`: solo gastos activos con aviso y bien formados, y overrides legibles.
+  - `toReminderStore` sustituye a `isExpenseStore`: solo gastos activos con aviso y bien formados, y overrides legibles. Con F2b vive en `src/features/expenses/lib/reminder-store.ts` y conserva todos los gastos bien formados (con o sin aviso propio), porque el aviso por defecto, el mes al día y el día de cobro los necesitan.
   - El `CRON_SECRET` se compara en tiempo constante.
 - **M15.** En el sign-out, quitar la suscripción push y no fusionar los datos de otro owner.
   - Hecho: `DELETE` + `unsubscribe()` antes del `signOut` (plazo de 4 s) y hoja "Salir y conservar los datos aquí" / "Salir y borrar los datos de este dispositivo", con aviso si hay cambios sin subir. Borrar la cuenta también anula la suscripción del navegador.
@@ -281,7 +291,7 @@ Estado:
   - **Diferido a F0c-2:** el RPC `claim_push_subscription`, que necesita migración.
 - **M13** (parte de la app): lista de hosts push permitidos, `{timeout:5000, TTL}` y `Promise.allSettled`.
   - Hecho: FCM, autopush de Mozilla, `*.push.apple.com` y `*.notify.windows.com`, con forma estricta (`https`, sin usuario, puerto ni `\`) para que web-push, que usa `url.parse`, vea el mismo host. Se comprueba en `subscribe`, en `test` y en el envío, y el cron se salta las filas de otros hosts.
-  - TTL de 24 h para el recordatorio y de 5 minutos para la prueba.
+  - TTL de 24 h para el recordatorio y de 5 minutos para la prueba. Con F2b, cada tipo de aviso lleva su propio TTL (`REMINDER_TTL_SECONDS`); la prueba sigue en 5 minutos.
   - Máximo 10 suscripciones por usuario en la API (se borran las actualizadas hace más tiempo) y en el envío del cron.
   - **Diferido a F0c-2:** el límite en la base de datos y revocar el INSERT directo del rol `authenticated` en `push_subscriptions` (ambos son migración).
 - Siguen diferidos, como bajos del informe: el error ignorado de `exchangeCodeForSession`, el sujeto VAPID por defecto y la paginación y `maxDuration` del cron.
@@ -452,7 +462,7 @@ Estado:
 - **M22.** `router.replace` tras guardar en el detalle, más una guarda de cambios sin guardar.
 - Reutiliza el `ActionToast` de F1a-1.
 
-### F2b — Avisos 2.0 y pulido PWA
+### F2b — Avisos 2.0 y pulido PWA (hecho; ver Estado)
 - **Avisos:**
   - Aviso por defecto en Ajustes y campana en las filas.
   - Antelación de 7/14/30 días para anuales y trimestrales.
@@ -550,7 +560,7 @@ Estado:
 - **F1a-3:** `tests/e2e/month-close-leftovers.spec.ts` con el reloj el 28-oct a las 10:00 y el 1-nov a las 00:05: cerrar con restos (pagar, mover, ahorro, empezar), resto sin resolver como "Pendiente de octubre", Plan siguiendo al mes visto, pagar desde Revisión, año siguiente en diciembre y cobros anteriores de un gasto nuevo.
 - **F1b:** tests de la ruta; `scripts/eval-ai-parse.mjs` con los umbrales indicados. En el navegador: "Netflix 12,99 el 5 y gimnasio 35 al mes" → 2 tarjetas → guardar.
 - **F2a:** en Chrome Android, dictar → texto en vivo → análisis → revisión. Probar también en modo avión, con el permiso denegado y en Brave. En iOS, el micrófono está oculto. Tests con `SpeechRecognition` mockeado.
-- **F2b:** push de prueba y deep link a la ocurrencia.
+- **F2b:** push de prueba y deep link a la ocurrencia. Tests de dominio (etapas, antelación, zona horaria), del cron (kinds, hora, aislamiento por usuario, `failure_count`) y e2e (`tests/e2e/reminders.spec.ts`). En el dispositivo: activar avisos, "Probar", tocar la notificación y comprobar que abre el cobro; en iPhone, instalar con la guía de Ajustes.
 
 ## Pendiente de confirmar al implementar
 - Qué modelos da el nivel gratuito con la clave del dueño (PR 0).

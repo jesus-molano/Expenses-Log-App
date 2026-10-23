@@ -11,6 +11,7 @@ import {
   sendWebPush,
   TEST_PUSH_TTL_SECONDS,
 } from "@/data/push/web-push-sender";
+import { t } from "@/shared/i18n";
 import { createClient } from "@/utils/supabase/server";
 
 const subscriptionSchema = z.object({
@@ -18,6 +19,7 @@ const subscriptionSchema = z.object({
     .string()
     .max(MAX_PUSH_ENDPOINT_LENGTH)
     .refine(isAllowedPushEndpoint),
+  language: z.enum(["es", "en"]).optional(),
 });
 
 export async function POST(request: Request) {
@@ -77,14 +79,17 @@ export async function POST(request: Request) {
     );
   }
 
+  const language = parsed.data.language ?? "es";
   try {
     await sendWebPush(
       subscription,
-      JSON.stringify({
-        title: "Expense Reminders",
-        body: "Notificación de prueba lista.",
+      {
+        title: t("reminders.pushTestTitle", language),
+        body: t("reminders.pushTestBody", language),
         url: "/",
-      }),
+        tag: "push-test",
+        lang: language,
+      },
       { ttlSeconds: TEST_PUSH_TTL_SECONDS },
     );
   } catch (error) {

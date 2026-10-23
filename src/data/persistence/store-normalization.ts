@@ -4,6 +4,10 @@ import {
 } from "@/domain/finance";
 import { dedupeOverrides } from "@/domain/overrides";
 import {
+  sanitizeReminderPreferences,
+  sanitizeTemplateReminder,
+} from "@/domain/reminder-schedule";
+import {
   buildDateWithDay,
   isValidDateOnly,
   normalizeDateOnly,
@@ -55,7 +59,7 @@ export const DELETED_KEYS = [
   "monthlySalary",
 ] as const;
 
-export const PREFERENCE_KEYS = ["theme", "language"] as const;
+export const PREFERENCE_KEYS = ["theme", "language", "reminders"] as const;
 
 // Datos de versiones antiguas que la normalización v3 descarta a propósito.
 const RETIRED_KEYS = [
@@ -221,6 +225,13 @@ function normalizeMonthClosures(value: unknown): Record<string, MonthClosure> {
   );
 }
 
+// Los ajustes de avisos solo se escriben cuando el usuario los cambia: un store
+// sin ellos sigue los valores por defecto.
+export function withReminderPreferences(value: unknown) {
+  const reminders = sanitizeReminderPreferences(value);
+  return reminders ? { reminders } : {};
+}
+
 // Solo se escribe cuando hay algún cierre, para no añadir la clave a todos los
 // stores.
 export function withMonthClosures(closures: Record<string, MonthClosure>) {
@@ -384,6 +395,7 @@ export function normalizeExpenseStore(
       ...(keepUnknownKeys ? unknownEntries(preferences, PREFERENCE_KEYS) : {}),
       theme: normalizeAppTheme(preferences.theme),
       language: normalizeAppLanguage(preferences.language),
+      ...withReminderPreferences(preferences.reminders),
     },
   };
   const normalized = needsBankMigration
@@ -429,17 +441,36 @@ function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
     const dueDay = Number.isInteger(Number(template.dueDay))
       ? Math.min(Math.max(Number(template.dueDay), 1), 31)
       : Number(startDate.slice(8, 10));
+    // Un aviso ilegible se descarta: el gasto pasa a seguir el de Ajustes.
+    const reminder = sanitizeTemplateReminder(template.reminder);
 
     if (
       startDate === template.startDate &&
       endDate === template.endDate &&
-      dueDay === template.dueDay
+      dueDay === template.dueDay &&
+      sameReminder(reminder, template.reminder)
     ) {
       return template;
     }
 
-    return { ...template, startDate, endDate, dueDay };
+    const repaired = { ...template, startDate, endDate, dueDay, reminder };
+    if (!reminder) delete repaired.reminder;
+    return repaired;
   });
+}
+
+function sameReminder(
+  sanitized: ExpenseTemplate["reminder"],
+  original: unknown,
+) {
+  if (!sanitized || !original || typeof original !== "object") {
+    return !sanitized && original === undefined;
+  }
+  const raw = original as Record<string, unknown>;
+  return (
+    raw.enabled === sanitized.enabled &&
+    raw.daysBeforeCharge === sanitized.daysBeforeCharge
+  );
 }
 
 function normalizeOccurrenceRecords(
