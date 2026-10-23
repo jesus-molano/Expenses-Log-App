@@ -92,6 +92,44 @@ describe("selectCarryOverOccurrences", () => {
     expect(withUnpaid.map((item) => item.dueDate)).toEqual(["2026-10-28"]);
   });
 
+  it("does not invent an unpaid bill in a closed month after the due day changes", () => {
+    const today = new Date(2026, 10, 3, 9);
+    const closed = materializeClosedOccurrenceRecords(
+      {
+        ...emptyStore,
+        templates: [template("internet", "2026-08-28", 28)],
+        overrides: [paidOverride("internet", "2026-10-28")],
+      },
+      { today },
+    );
+    const moved: ExpenseStore = {
+      ...closed,
+      templates: closed.templates.map((item) => ({ ...item, dueDay: 10 })),
+    };
+
+    expect(selectCarryOverOccurrences(moved, today)).toEqual([]);
+    expect(
+      occurrencesDueBetween(moved, "2026-10-01", "2026-10-31").map((item) => item.dueDate),
+    ).toEqual(["2026-10-28"]);
+  });
+
+  it("keeps a bill paid today visible so it can be undone", () => {
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+    const occurrenceDate = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}-15`;
+    const store: ExpenseStore = {
+      ...emptyStore,
+      templates: [template("gym", occurrenceDate, 15)],
+      overrides: [
+        { ...paidOverride("gym", occurrenceDate), paidAt: now.toISOString() },
+      ],
+    };
+
+    expect(
+      selectCarryOverOccurrences(store, now).map((item) => item.status),
+    ).toEqual(["paid"]);
+  });
+
   it("does not bring back bills whose expense was deleted", () => {
     const withHistory = materializeClosedOccurrenceRecords(
       {

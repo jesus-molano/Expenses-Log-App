@@ -31,7 +31,12 @@ export function ListItem({
           </span>
         ) : null}
         <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-[var(--app-text)]">
+          <span
+            className={cn(
+              "block text-sm font-semibold text-[var(--app-text)]",
+              wrapDescription ? "break-words" : "truncate",
+            )}
+          >
             {title}
           </span>
           {description ? (

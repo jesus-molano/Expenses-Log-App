@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { writeOfflineDiagnostic } from "@/features/settings/lib/offline-readiness";
+import { writeOfflineDiagnostic } from "@/data/persistence/offline-diagnostic-store";
 import { isPrecacheFailedMessage } from "@/pwa/cache-policy";
 
 const UPDATE_CHECK_INTERVAL_MS = 60_000;
@@ -24,6 +24,7 @@ export function PwaRegister() {
 
     let registration: ServiceWorkerRegistration | null = null;
     let lastUpdateCheck = Date.now();
+    const watchedWorkers = new WeakSet<ServiceWorker>();
 
     // El service worker avisa de la URL que tumba la instalación del precache.
     const recordPrecacheFailure = (event: MessageEvent<unknown>) => {
@@ -35,7 +36,9 @@ export function PwaRegister() {
     // "redundant" sin llegar a "installed". Se guarda para verlo en Ajustes.
     const watchInstallingWorker = () => {
       const worker = registration?.installing;
-      if (!worker) return;
+      if (!worker || watchedWorkers.has(worker)) return;
+      watchedWorkers.add(worker);
+      const startedAt = new Date();
       let installed = false;
       worker.addEventListener("statechange", () => {
         if (worker.state === "installed" || worker.state === "activated") {
@@ -43,7 +46,10 @@ export function PwaRegister() {
         }
         if (worker.state === "redundant" && !installed) {
           console.error("Service worker installation failed");
-          writeOfflineDiagnostic({ url: "", status: 0 });
+          writeOfflineDiagnostic(
+            { url: "", status: 0 },
+            { keepDetailedSince: startedAt },
+          );
         }
       });
     };

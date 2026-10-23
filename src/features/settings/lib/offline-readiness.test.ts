@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  OFFLINE_DIAGNOSTIC_KEY,
-  clearOfflineDiagnostic,
-  parseOfflineDiagnostic,
-  readOfflineDiagnostic,
   resolveOfflineReadiness,
-  writeOfflineDiagnostic,
+  shouldClearOfflineDiagnostic,
 } from "./offline-readiness";
 
 const base = {
@@ -52,15 +48,11 @@ describe("resolveOfflineReadiness", () => {
     ).toBe("preparing");
   });
 
-  it("detects the legacy service worker that does not answer", () => {
-    expect(resolveOfflineReadiness(base)).toBe("legacy");
-    expect(
-      resolveOfflineReadiness({
-        ...base,
-        hasRegistration: false,
-        hasLegacyCache: true,
-      }),
-    ).toBe("legacy");
+  it("only blames the legacy worker when its cache is present", () => {
+    expect(resolveOfflineReadiness({ ...base, hasLegacyCache: true })).toBe(
+      "legacy",
+    );
+    expect(resolveOfflineReadiness(base)).toBe("unknown");
   });
 
   it("reports a missing service worker", () => {
@@ -70,32 +62,16 @@ describe("resolveOfflineReadiness", () => {
   });
 });
 
-describe("offline diagnostics storage", () => {
-  it("writes, reads and clears the last failure", () => {
-    const values = new Map<string, string>();
-    const storage = {
-      getItem: (key: string) => values.get(key) ?? null,
-      setItem: (key: string, value: string) => void values.set(key, value),
-      removeItem: (key: string) => void values.delete(key),
-    };
-
-    writeOfflineDiagnostic(
-      { url: "/settings?from=money", status: 503 },
-      new Date("2026-10-23T10:00:00.000Z"),
-      storage,
-    );
-    expect(readOfflineDiagnostic(storage)).toEqual({
-      at: "2026-10-23T10:00:00.000Z",
-      url: "/settings?from=money",
-      status: 503,
-    });
-
-    clearOfflineDiagnostic(storage);
-    expect(values.has(OFFLINE_DIAGNOSTIC_KEY)).toBe(false);
-  });
-
-  it("ignores malformed values", () => {
-    expect(parseOfflineDiagnostic("{")).toBeNull();
-    expect(parseOfflineDiagnostic(JSON.stringify({ url: 1 }))).toBeNull();
+describe("shouldClearOfflineDiagnostic", () => {
+  it("keeps a failure while a newer worker is still installing", () => {
+    expect(
+      shouldClearOfflineDiagnostic({ readiness: "ready", isInstalling: true }),
+    ).toBe(false);
+    expect(
+      shouldClearOfflineDiagnostic({ readiness: "ready", isInstalling: false }),
+    ).toBe(true);
+    expect(
+      shouldClearOfflineDiagnostic({ readiness: "failed", isInstalling: false }),
+    ).toBe(false);
   });
 });

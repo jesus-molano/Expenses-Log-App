@@ -113,9 +113,6 @@ main {
 
 /* Pantalla de carga: visible hasta que la app hidrata, también sin JavaScript. */
 .app-boot-shell {
-  display: grid;
-  align-content: start;
-  gap: 0.875rem;
   min-height: 100dvh;
 }
 

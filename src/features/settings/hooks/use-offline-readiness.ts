@@ -9,13 +9,17 @@ import {
 import {
   clearOfflineDiagnostic,
   readOfflineDiagnostic,
-  resolveOfflineReadiness,
   type OfflineDiagnostic,
+} from "@/data/persistence/offline-diagnostic-store";
+import {
+  resolveOfflineReadiness,
+  shouldClearOfflineDiagnostic,
   type OfflineReadiness,
   type OfflineStatus,
 } from "../lib/offline-readiness";
 
-const STATUS_TIMEOUT_MS = 1_000;
+// Un service worker parado puede tardar en arrancar para responder.
+const STATUS_TIMEOUT_MS = 3_000;
 
 type OfflineReadinessState = {
   readiness: OfflineReadiness;
@@ -62,16 +66,19 @@ async function readOfflineReadiness(): Promise<OfflineReadinessState> {
       ? (await caches.keys().catch(() => [])).some(isLegacyCacheName)
       : false;
   const lastFailure = readOfflineDiagnostic();
+  const isInstalling = Boolean(registration?.installing ?? registration?.waiting);
   const readiness = resolveOfflineReadiness({
     supported: true,
     hasRegistration: Boolean(registration),
-    isInstalling: Boolean(registration?.installing ?? registration?.waiting),
+    isInstalling,
     status,
     hasLegacyCache,
     lastFailure,
   });
 
-  if (readiness === "ready" && lastFailure) clearOfflineDiagnostic();
+  if (lastFailure && shouldClearOfflineDiagnostic({ readiness, isInstalling })) {
+    clearOfflineDiagnostic();
+  }
 
   return {
     readiness,

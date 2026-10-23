@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/Button";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { useOfflineReadiness } from "../../hooks/use-offline-readiness";
+import type { OfflineDiagnostic } from "@/data/persistence/offline-diagnostic-store";
 import type {
-  OfflineDiagnostic,
   OfflineReadiness,
   OfflineStatus,
 } from "../../lib/offline-readiness";
@@ -39,6 +39,7 @@ function offlineDescription(
     unsupported: t("settings.offlineUnsupported", language),
     missing: t("settings.offlineMissing", language),
     legacy: t("settings.offlineLegacy", language),
+    unknown: t("settings.offlineUnknown", language),
     failed: t("settings.offlineFailedGeneric", language),
     preparing: t("settings.offlinePreparing", language),
   }[readiness];
@@ -46,7 +47,7 @@ function offlineDescription(
 
 function offlineIcon(readiness: OfflineReadiness | undefined) {
   if (readiness === "ready") return <CheckCircle2 size={18} />;
-  if (readiness === "failed" || readiness === "legacy") {
+  if (readiness === "failed" || readiness === "legacy" || readiness === "unknown") {
     return <AlertTriangle size={18} />;
   }
   if (readiness === "preparing" || !readiness) {
@@ -73,9 +74,7 @@ export function OfflineRow({ language }: { language: AppLanguage }) {
             onClick={() => void check()}
             disabled={checking}
           >
-            {checking
-              ? t("settings.offlineCheckingShort", language)
-              : t("settings.offlineCheck", language)}
+            {t("settings.offlineCheck", language)}
           </Button>
         )
       }

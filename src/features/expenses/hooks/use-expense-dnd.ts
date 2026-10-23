@@ -7,6 +7,7 @@ import type {
 } from "@dnd-kit/core";
 import { useEffect, useRef, useState } from "react";
 import type { ExpenseOccurrence } from "@/domain/types";
+import { isDropTargetAllowed, resolveDragMove } from "../lib/dnd-move-policy";
 import { getDropSortOrder } from "../lib/dnd-sort-order";
 import { rowFirstCollisionDetection } from "../lib/expense-dnd-collision";
 import {
@@ -30,6 +31,7 @@ type DragScrollAnchor = {
 
 type UseExpenseDndOptions = {
   sections: TimelineSection[];
+  currentMonth: string;
   onMoveOccurrenceOnly: (
     occurrence: ExpenseOccurrence,
     dueDate: string,
@@ -43,6 +45,7 @@ type UseExpenseDndOptions = {
 
 export function useExpenseDnd({
   sections,
+  currentMonth,
   onMoveOccurrenceOnly,
   onMoveOccurrenceSeries,
 }: UseExpenseDndOptions) {
@@ -99,7 +102,8 @@ export function useExpenseDnd({
 
   function handleDragMove(event: DragMoveEvent) {
     autoScrollWithDrag(event);
-    setActiveDropTarget(getDropTargetFromEvent(event));
+    const target = getDropTargetFromEvent(event);
+    setActiveDropTarget(isDropTargetAllowed(target, currentMonth) ? target : null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -110,8 +114,16 @@ export function useExpenseDnd({
     cleanupDrag(anchor);
 
     if (!occurrence || !target) return;
-    if (target.date !== occurrence.dueDate || target.rowId) {
+
+    const action = resolveDragMove({ occurrence, target, currentMonth });
+    if (action === "series") {
       scheduleSeriesMove(occurrence, target.date, target);
+    } else if (action === "single") {
+      onMoveOccurrenceOnly(
+        occurrence,
+        target.date,
+        getDropSortOrder({ sections, occurrenceId: occurrence.id, target }),
+      );
     }
   }
 

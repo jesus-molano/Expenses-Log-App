@@ -43,6 +43,13 @@ reparar:
 
 - El precache usa `concurrency: 4`. Durante `install`, los 429 y 5xx se
   reintentan dos veces (a 1 s y a 3 s).
+- Si una URL sigue fallando, la instalacion se rechaza en el acto. Serwist 9.5
+  deja colgada la promesa de su precache cuando una entrada falla, y Chromium
+  no da la instalacion por fallida hasta que se resuelven todas las promesas
+  de `waitUntil`. Por eso `sw.ts` registra los listeners de Serwist a mano y le
+  pasa un evento cuyo `waitUntil` no registra esa promesa. La unica promesa
+  registrada compite entre el exito de Serwist y el rechazo del plugin de
+  diagnostico.
 - Si una URL sigue fallando, el service worker envia `PRECACHE_FAILED` con la
   ruta y el status a todas las ventanas. `PwaRegister` lo guarda en
   `localStorage['offline-diag-v1']`, igual que una instalacion que acaba en
@@ -58,7 +65,10 @@ reparar:
   mucho una vez por minuto) y pide `navigator.storage.persist()`.
 
 La logica pura comun vive en `src/pwa/cache-policy.ts` y
-`src/features/settings/lib/offline-readiness.ts`.
+`src/features/settings/lib/offline-readiness.ts`. El diagnostico guardado vive
+en `src/data/persistence/offline-diagnostic-store.ts`. Un fallo generico (sin
+URL) no sustituye a uno con URL de la misma instalacion, y no se borra mientras
+haya una instalacion nueva en curso.
 
 ### Arranque sin pantalla vacia
 
@@ -72,12 +82,17 @@ el HTML prerenderizado:
 
 El script inline `boot-guard` del `<head>` (`src/app/providers/boot-guard-script.ts`)
 no depende del runtime de Next. `next/script` con `beforeInteractive` no sirve
-aqui, porque lo ejecuta el propio runtime. El script:
+aqui, porque lo ejecuta el propio runtime. Next coloca antes sus preloads, CSS
+y chunks. El script:
 
 - Aplica idioma y tema desde cookies.
-- Recoge los errores de carga de recursos para esa lista.
-- Con `?sw-reset=1` y conexion, desregistra el service worker y borra sus
-  caches (nunca `localStorage`).
+- Recoge los errores de carga posteriores y, al cargar el documento, recupera
+  de `performance` los anteriores.
+- Escribe solo en nodos que React no compara al hidratar
+  (`dangerouslySetInnerHTML` mas `suppressHydrationWarning`).
+- A los 6 s anuncia la ayuda en la region `role="status"`.
+- Con `?sw-reset=1`, y solo si una peticion real a la red responde, desregistra
+  el service worker y borra sus caches (nunca `localStorage`).
 
 `src/app/global-error.tsx` cubre los errores del layout raiz.
 

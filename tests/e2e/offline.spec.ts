@@ -78,3 +78,33 @@ test("loads and edits the main app routes after going offline", async ({
   ).toBeVisible();
   await expect(settingsPage.getByRole("link", { name: "Plan" })).toBeVisible();
 });
+
+test("shows in Ajustes the precache URL that blocks offline use", async ({
+  context,
+  page,
+}) => {
+  await context.route(
+    (url) => url.pathname === "/money",
+    (route) => route.fulfill({ status: 500, body: "boom" }),
+  );
+
+  await page.goto("/settings?from=expenses");
+  const row = page.getByText("Uso sin conexión").locator("..");
+
+  await expect(async () => {
+    await page.getByRole("button", { name: "Comprobar" }).click();
+    await expect(row).toContainText("/money (500)", { timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+
+  // La instalación fallida se abandona enseguida, no tras el timeout del navegador.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async () => {
+          const registration = await navigator.serviceWorker.getRegistration();
+          return Boolean(registration?.installing);
+        }),
+      { timeout: 15_000 },
+    )
+    .toBe(false);
+});

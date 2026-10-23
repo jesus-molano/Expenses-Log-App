@@ -3,37 +3,10 @@ import { toDateOnly } from "./calendar";
 import { occurrencesDueBetween } from "./finance";
 import type { AppLanguage, ExpenseOccurrence, ExpenseStore } from "./types";
 
-export type MonthPendingSummary = {
-  total: number;
-  count: number;
-  items: ExpenseOccurrence[];
-  // Parte del total que vence este mes pero se cobra el siguiente (fin de semana).
-  spillToNextMonthTotal: number;
-};
-
-// Regla única de "Por pagar" del mes: lo pendiente cuyo dueDate cae en el mes.
-export function monthPendingSummary(
-  occurrences: ExpenseOccurrence[],
-  monthId: string,
-): MonthPendingSummary {
-  const items = occurrences.filter(
-    (occurrence) =>
-      occurrence.status === "due" && occurrence.dueDate.slice(0, 7) === monthId,
-  );
-
-  return {
-    total: sumPlannedAmounts(items),
-    count: items.length,
-    items,
-    spillToNextMonthTotal: sumPlannedAmounts(
-      items.filter(
-        (occurrence) => occurrence.estimatedChargeDate.slice(0, 7) > monthId,
-      ),
-    ),
-  };
-}
+export { monthPendingSummary, type MonthPendingSummary } from "./pending";
 
 // Lo que quedó pendiente el mes anterior, para que no desaparezca el día 1.
+// Lo pagado hoy se mantiene visible para poder deshacerlo desde la misma fila.
 // Los gastos borrados conservan su historial, pero no vuelven a reclamar pago.
 export function selectCarryOverOccurrences(
   store: ExpenseStore,
@@ -41,6 +14,7 @@ export function selectCarryOverOccurrences(
   language: AppLanguage = "es",
 ): ExpenseOccurrence[] {
   const previousMonth = subMonths(startOfMonth(today), 1);
+  const todayId = toDateOnly(today);
   const templateIds = new Set(store.templates.map((template) => template.id));
 
   return occurrencesDueBetween(
@@ -50,13 +24,15 @@ export function selectCarryOverOccurrences(
     language,
   ).filter(
     (occurrence) =>
-      occurrence.status === "due" && templateIds.has(occurrence.template.id),
+      templateIds.has(occurrence.template.id) &&
+      (occurrence.status === "due" ||
+        (occurrence.status === "paid" && paidOn(occurrence) === todayId)),
   );
 }
 
-function sumPlannedAmounts(occurrences: ExpenseOccurrence[]) {
-  return occurrences.reduce(
-    (sum, occurrence) => sum + occurrence.template.amount,
-    0,
-  );
+function paidOn(occurrence: ExpenseOccurrence) {
+  const paidAt = occurrence.override?.paidAt ?? occurrence.record?.paidAt;
+  if (!paidAt) return null;
+  const date = new Date(paidAt);
+  return Number.isNaN(date.getTime()) ? null : toDateOnly(date);
 }

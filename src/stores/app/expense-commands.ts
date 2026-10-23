@@ -300,6 +300,12 @@ export function moveOccurrenceOnlyInStore(
   dueDate: string,
   sortOrder?: number,
 ): ExpenseStore {
+  // Una ocurrencia de un mes cerrado lleva una plantilla sintética: su dueDay
+  // no es el de la serie y no debe escribirse en ella.
+  if (occurrence.record) {
+    return moveOccurrenceInStore(store, occurrence, dueDate, sortOrder);
+  }
+
   const restoredSeriesStore = {
     ...store,
     templates: store.templates.map((template) =>

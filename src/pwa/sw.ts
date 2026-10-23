@@ -125,6 +125,11 @@ const runtimeCaching: RuntimeCaching[] = [
   },
 ];
 
+// Rechaza la instalación en curso. Serwist 9.5 no propaga los fallos del
+// precache (su `parallel` deja la promesa colgada) y el navegador tardaría
+// minutos en abandonar la instalación.
+let failCurrentInstall: ((error: Error) => void) | null = null;
+
 // La instalación del precache es todo o nada: una sola URL con error deja
 // activo el service worker anterior. Reintenta los errores temporales y avisa a
 // la app de la URL que falla para poder diagnosticarlo desde Ajustes.
@@ -143,11 +148,14 @@ const precacheDiagnosticsPlugin: SerwistPlugin = {
     }
     if (current.status >= 400) {
       await reportPrecacheFailure(request.url, current.status);
+      failCurrentInstall?.(new Error(`Precache failed: ${request.url}`));
     }
     return current;
   },
   fetchDidFail: async ({ event, request }) => {
-    if (event?.type === "install") await reportPrecacheFailure(request.url, 0);
+    if (event?.type !== "install") return;
+    await reportPrecacheFailure(request.url, 0);
+    failCurrentInstall?.(new Error(`Precache failed: ${request.url}`));
   },
 };
 
@@ -172,7 +180,31 @@ const serwist = new Serwist({
   },
 });
 
-serwist.addEventListeners();
+// Equivale a serwist.addEventListeners(), pero la instalación falla en cuanto
+// una entrada del precache falla, en lugar de quedarse colgada. Chromium no da
+// por fallida la instalación hasta que se resuelven todas las promesas de
+// waitUntil, así que Serwist recibe un evento cuyo waitUntil no registra la
+// suya: la única que cuenta es la carrera entre su éxito y el fallo.
+self.addEventListener("install", (event) => {
+  const failed = new Promise<never>((_, reject) => {
+    failCurrentInstall = reject;
+  });
+  const installEvent = new Proxy(event, {
+    get(target, property) {
+      if (property === "waitUntil") return () => undefined;
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  event.waitUntil(
+    Promise.race([serwist.handleInstall(installEvent), failed]).finally(() => {
+      failCurrentInstall = null;
+    }),
+  );
+});
+self.addEventListener("activate", serwist.handleActivate);
+self.addEventListener("fetch", serwist.handleFetch);
+self.addEventListener("message", serwist.handleCache);
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -1,7 +1,10 @@
+import type { OfflineDiagnostic } from "@/data/persistence/offline-diagnostic-store";
+
 export type OfflineReadiness =
   | "unsupported"
   | "missing"
   | "legacy"
+  | "unknown"
   | "failed"
   | "preparing"
   | "ready";
@@ -10,14 +13,6 @@ export type OfflineStatus = {
   expected: number;
   cached: number;
 };
-
-export type OfflineDiagnostic = {
-  at: string;
-  url: string;
-  status: number;
-};
-
-export const OFFLINE_DIAGNOSTIC_KEY = "offline-diag-v1";
 
 export function resolveOfflineReadiness({
   supported,
@@ -40,67 +35,21 @@ export function resolveOfflineReadiness({
   }
   if (lastFailure) return "failed";
   if (isInstalling || status) return "preparing";
-  // Hay un service worker activo que no responde al estado: es el anterior a
-  // Serwist, que offline sirve el HTML pero no el JavaScript.
-  if (hasRegistration || hasLegacyCache) return "legacy";
+  // La caché del service worker escrito a mano anterior a Serwist identifica
+  // la versión antigua, que sin conexión sirve el HTML pero no el JavaScript.
+  if (hasLegacyCache) return "legacy";
+  if (hasRegistration) return "unknown";
   return "missing";
 }
 
-export function parseOfflineDiagnostic(
-  raw: string | null,
-): OfflineDiagnostic | null {
-  if (!raw) return null;
-  try {
-    const value = JSON.parse(raw) as Partial<OfflineDiagnostic>;
-    return typeof value.at === "string" &&
-      typeof value.url === "string" &&
-      typeof value.status === "number"
-      ? { at: value.at, url: value.url, status: value.status }
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-export function readOfflineDiagnostic(
-  storage: Pick<Storage, "getItem"> | undefined = safeLocalStorage(),
-): OfflineDiagnostic | null {
-  try {
-    return parseOfflineDiagnostic(storage?.getItem(OFFLINE_DIAGNOSTIC_KEY) ?? null);
-  } catch {
-    return null;
-  }
-}
-
-export function writeOfflineDiagnostic(
-  diagnostic: Omit<OfflineDiagnostic, "at">,
-  now = new Date(),
-  storage: Pick<Storage, "setItem"> | undefined = safeLocalStorage(),
-) {
-  try {
-    storage?.setItem(
-      OFFLINE_DIAGNOSTIC_KEY,
-      JSON.stringify({ ...diagnostic, at: now.toISOString() }),
-    );
-  } catch {
-    // El diagnóstico es opcional; nunca debe romper la app.
-  }
-}
-
-export function clearOfflineDiagnostic(
-  storage: Pick<Storage, "removeItem"> | undefined = safeLocalStorage(),
-) {
-  try {
-    storage?.removeItem(OFFLINE_DIAGNOSTIC_KEY);
-  } catch {
-    // Igual que al escribir: sin almacenamiento no hay diagnóstico.
-  }
-}
-
-function safeLocalStorage(): Storage | undefined {
-  try {
-    return typeof window === "undefined" ? undefined : window.localStorage;
-  } catch {
-    return undefined;
-  }
+// Un fallo de una instalación nueva no debe borrarse solo porque la versión
+// activa (anterior) siga lista.
+export function shouldClearOfflineDiagnostic({
+  readiness,
+  isInstalling,
+}: {
+  readiness: OfflineReadiness;
+  isInstalling: boolean;
+}) {
+  return readiness === "ready" && !isInstalling;
 }

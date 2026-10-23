@@ -1,5 +1,6 @@
 import { endOfMonth, parseISO, startOfMonth, subDays } from "date-fns";
 import { estimateChargeDate, toDateOnly } from "./calendar";
+import { monthPendingSummary } from "./pending";
 import { generateOccurrences } from "./recurrence";
 import type {
   AppLanguage,
@@ -159,9 +160,8 @@ export function buildMonthlyMoneyPlan({
   const paidOccurrences = relevantOccurrences.filter(
     (occurrence) => occurrence.status === "paid",
   );
-  const pendingOccurrences = relevantOccurrences.filter(
-    (occurrence) => occurrence.status === "due",
-  );
+  const pendingSummary = monthPendingSummary(relevantOccurrences, month);
+  const pendingOccurrences = pendingSummary.items;
   const plannedExpensesTotal = relevantOccurrences.reduce(
     (sum, occurrence) => sum + occurrence.template.amount,
     0,
@@ -171,10 +171,7 @@ export function buildMonthlyMoneyPlan({
       sum + (occurrence.override?.amountPaid ?? occurrence.record?.amountPaid ?? occurrence.template.amount),
     0,
   );
-  const pendingExpensesTotal = pendingOccurrences.reduce(
-    (sum, occurrence) => sum + occurrence.template.amount,
-    0,
-  );
+  const pendingExpensesTotal = pendingSummary.total;
   const expectedExpensesTotal = paidExpensesTotal + pendingExpensesTotal;
   const contribution = getMonthlySavingsContribution(finance, month);
   const savingsActual = Math.max(Number(contribution?.amount ?? 0), 0);
@@ -270,17 +267,19 @@ export function generateStoreOccurrences(
       ? [occurrenceFromRecord(record, override, language)]
       : [];
   });
-  const recordKeys = new Set(
+  // Un mes cerrado queda representado por sus registros: si la serie cambió
+  // de día después, no se generan ocurrencias nuevas (fantasma) en ese mes.
+  const recordedTemplateMonths = new Set(
     (store.occurrenceRecords ?? []).map(
-      (record) => `${record.templateId}:${record.occurrenceDate}`,
+      (record) => `${record.templateId}:${record.occurrenceDate.slice(0, 7)}`,
     ),
   );
 
   return [
     ...dynamic.filter(
       (occurrence) =>
-        !recordKeys.has(
-          `${occurrence.template.id}:${occurrence.occurrenceDate}`,
+        !recordedTemplateMonths.has(
+          `${occurrence.template.id}:${occurrence.occurrenceDate.slice(0, 7)}`,
         ),
     ),
     ...records,
