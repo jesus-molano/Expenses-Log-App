@@ -65,12 +65,20 @@ test("opens the charge a notification points to", async ({ page }) => {
   await seed(page);
   await page.goto("/?occurrence=exp-netflix%3A2026-10-29");
 
+  // Se abren las acciones del cobro, con la fila resaltada detrás.
+  const sheet = page.getByRole("dialog", { name: "Netflix" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Pagado con otro importe" })).toBeVisible();
   const netflix = row(page, "exp-netflix:2026-10-29");
   await expect(netflix).toHaveAttribute("data-highlighted", "true");
-  await expect(netflix).toBeFocused();
-  await expect(netflix).toBeInViewport();
   // El parámetro se quita: recargar no repite el salto.
   await expect(page).toHaveURL(/\/$/);
+
+  // Al cerrar, el foco vuelve a la fila.
+  await sheet.getByRole("button", { name: "Cerrar" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(netflix).toBeFocused();
+  await expect(netflix).toBeInViewport();
 });
 
 test("moves to the month of a charge outside the current one", async ({ page }) => {
@@ -78,6 +86,7 @@ test("moves to the month of a charge outside the current one", async ({ page }) 
   await page.goto("/?occurrence=exp-insurance%3A2026-11-20");
 
   await expect(page.getByText("Por pagar · noviembre")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Seguro hogar" })).toBeVisible();
   await expect(row(page, "exp-insurance:2026-11-20")).toHaveAttribute(
     "data-highlighted",
     "true",

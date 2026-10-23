@@ -47,12 +47,13 @@
   border-radius: var(--app-radius-sm);
 }
 
-/* Campana de aviso de la fila: 28 px visibles, 44 px de zona táctil. */
+/* Campana de aviso de la fila: 24 px visibles y 40 px de ancho táctil, sin
+   subir hasta el nombre ni llegar al centro de la fila. */
 .app-row-bell {
   position: relative;
   display: inline-grid;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 1.5rem;
+  height: 1.5rem;
   flex-shrink: 0;
   place-items: center;
   border-radius: var(--app-radius-pill);
@@ -65,7 +66,7 @@
 .app-row-bell::before {
   content: "";
   position: absolute;
-  inset: -0.5rem;
+  inset: -0.125rem -0.5rem -0.5rem;
 }
 
 .app-row-bell:hover {

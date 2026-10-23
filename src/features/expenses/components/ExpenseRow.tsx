@@ -153,7 +153,7 @@ export function ExpenseRow({
           category={category}
           today={today}
           language={language}
-          statusAccessory={
+          metaAccessory={
             <ReminderBellButton occurrence={occurrence} language={language} />
           }
         />

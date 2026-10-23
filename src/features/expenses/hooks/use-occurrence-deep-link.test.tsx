@@ -45,6 +45,7 @@ function render(overrides: Partial<Parameters<typeof useOccurrenceDeepLink>[0]> 
     viewMonthId: "2026-10",
     visibleOccurrences: october,
     showMonth: vi.fn(),
+    onOpen: vi.fn(),
     onMissing: vi.fn(),
     ...overrides,
   };
@@ -79,6 +80,10 @@ describe("useOccurrenceDeepLink", () => {
     // El estado de las capas del historial se conserva.
     expect(window.history.state).toEqual({ layer: 1 });
     expect(options.showMonth).not.toHaveBeenCalled();
+    // Abre las acciones del cobro, con el objeto de la lista.
+    expect(options.onOpen).toHaveBeenCalledWith(
+      october.find((occurrence) => occurrence.id === "exp-rent:2026-10-01"),
+    );
 
     vi.advanceTimersByTime(4_000);
     expect(row.dataset.highlighted).toBeUndefined();
@@ -104,6 +109,7 @@ describe("useOccurrenceDeepLink", () => {
     const { result, options } = render();
 
     expect(options.onMissing).toHaveBeenCalledTimes(1);
+    expect(options.onOpen).not.toHaveBeenCalled();
     expect(window.location.search).toBe("");
     expect(result.current.openedFromLink).toBe(true);
   });
