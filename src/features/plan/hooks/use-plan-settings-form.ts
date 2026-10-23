@@ -7,7 +7,7 @@ import {
   getMonthlySavingsTarget,
 } from "@/domain/finance";
 import type { AppLanguage, FinanceStore } from "@/domain/types";
-import { formatMoneyInput, parseMoneyInput } from "../lib/money-input";
+import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 
 export type PlanSettingsInput = {
   salaryAmount: number;
@@ -60,11 +60,14 @@ export function usePlanSettingsForm({
 
   function submitSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const salary = parseMoneyInput(salaryAmount);
+    const target = parseMoneyInput(savingsTarget);
+    if (salary === null || target === null) return;
     onSave({
-      salaryAmount: parseMoneyInput(salaryAmount),
+      salaryAmount: salary,
       salaryDay,
       savingsMonthId,
-      savingsTarget: parseMoneyInput(savingsTarget),
+      savingsTarget: target,
     });
     closeSettings();
   }

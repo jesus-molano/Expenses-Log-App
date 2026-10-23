@@ -29,7 +29,12 @@ Estado:
   - Fila "Uso sin conexión" en Ajustes y diagnóstico de instalación del precache.
   - Hidratación resistente a fallos de Supabase y `global-error`.
   - Ver `docs/platform.md`.
-- **Siguiente puerta:** el dueño abre Ajustes con conexión en su Android y comparte el estado de la fila "Uso sin conexión". Decide PR 1b.
+- **PR 1b: hecho.**
+  - Navigation preload desactivado, cortes de red a los 6 s y `dpl` ignorado.
+  - `/settings` estática y limpieza de cachés obsoletas.
+  - `verify-sw.mjs` y harness `npm run e2e:offline`.
+  - El harness reproduce el cuelgue con una red que acepta conexiones y no responde (el caso de los datos móviles sin cobertura real): falla antes de 1b y pasa con 1b.
+- **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
 **Decisiones del dueño:**
@@ -207,6 +212,7 @@ Estado:
    - Si el RPC no existe (PGRST202), caer a `upsert` y registrarlo. `isMissingAppStoresError` deja de tratar ese error como "sin nube".
    - Pull al volver a primer plano (throttle de 30-60 s) y `storage`/BroadcastChannel entre pestañas.
    - `updatedAt` en el resto de entidades fusionables.
+   - Reconciliar overrides huérfanos tras fusionar: el rekey de un cambio de día solo corre en el dispositivo que edita, así que un pago hecho en otro con la fecha antigua queda en una clave que la plantilla ya no genera. Repetir el rekey de los meses abiertos contra las plantillas actuales después de `mergeExpenseStores`.
 3. Aplicar la migración en producción **antes** de mergear: las previews comparten la base de datos.
 4. **Contract** (revocar la escritura directa en `app_stores`) en un PR posterior. Revertir el cliente es seguro.
 

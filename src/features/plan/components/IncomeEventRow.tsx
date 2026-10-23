@@ -2,6 +2,7 @@
 
 import { Check, Pencil, X } from "lucide-react";
 import { DatePickerField } from "@/components/ui/DatePickerField";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 import { IconButton } from "@/components/ui/IconButton";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage, IncomeEvent } from "@/domain/types";
@@ -57,11 +58,13 @@ export function IncomeEventRow({
           </IconButton>
         </div>
         <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2">
-          <input
+          <MoneyInput
             value={editor.amount}
-            inputMode="decimal"
-            onChange={(event) => editor.setAmount(event.target.value)}
-            className="input-control h-11 min-w-0"
+            onValueChange={editor.setAmount}
+            invalidMessage={t("expenses.amountInvalid", language)}
+            blockSubmit={false}
+            aria-label={t("expenses.amount", language)}
+            className="h-11 min-w-0"
           />
           <DatePickerField
             value={editor.receivedAt}

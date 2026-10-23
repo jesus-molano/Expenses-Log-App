@@ -1,6 +1,7 @@
 ﻿import type { FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage, IncomeEvent } from "@/domain/types";
 import { t } from "@/shared/i18n";
@@ -60,11 +61,11 @@ export function OneOffIncomePanel({
           aria-label={t("money.extraNamePlaceholder", language)}
         />
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-          <input
+          <MoneyInput
             value={extraAmount}
-            inputMode="decimal"
-            onChange={(event) => onExtraAmountChange(event.target.value)}
-            className="input-control min-w-0"
+            onValueChange={onExtraAmountChange}
+            invalidMessage={t("expenses.amountInvalid", language)}
+            className="min-w-0"
             placeholder={t("money.extraAmountPlaceholder", language)}
             aria-label={t("money.extraAmountPlaceholder", language)}
           />

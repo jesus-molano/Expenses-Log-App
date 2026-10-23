@@ -11,12 +11,21 @@ npm run lint
 npm run test
 npm run build
 npm run e2e
+npm run e2e:offline
 ```
 
 - `lint`: ESLint y reglas de Next/TypeScript.
 - `test`: Vitest para dominio, stores, persistencia, helpers y APIs testeables.
-- `build`: build de Next y validacion de boundaries.
+- `build`: build de Next, service worker y `scripts/verify-sw.mjs`.
 - `e2e`: Playwright para flujos de navegador.
+- `e2e:offline`: arranques en frio sin conexion (`tests/e2e-offline`). Necesita
+  un `npm run build` previo, porque cada test arranca y para su propio
+  `next start` en el puerto 3200.
+  - Prepara el service worker con conexion y cierra el navegador.
+  - Vuelve a abrir cada ruta principal con el servidor caido (`dead`) y con un
+    servidor que acepta conexiones y nunca responde (`blackhole`).
+  - Si el Chromium instalado no coincide con el de Playwright, usa
+    `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/ruta/a/chromium`.
 
 Para cambios solo documentales, basta revisar diff, formato Markdown y enlaces.
 

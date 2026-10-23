@@ -1,5 +1,6 @@
 ﻿import type { FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Field } from "@/components/ui/Field";
 import { Sheet } from "@/components/ui/Sheet";
 import type { AppLanguage } from "@/domain/types";
@@ -61,12 +62,12 @@ export function MonthlySalaryDialog({
 
         <div className="mt-5 grid gap-3">
           <Field label={t("money.salary", language)}>
-            <input
+            <MoneyInput
               value={amount}
-              inputMode="decimal"
+              allowZero
               placeholder="2.200,00"
-              onChange={(event) => onAmountChange(event.target.value)}
-              className="input-control"
+              onValueChange={onAmountChange}
+              invalidMessage={t("money.amountInvalid", language)}
               autoFocus
             />
           </Field>

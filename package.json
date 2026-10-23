@@ -4,12 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && serwist build serwist.config.mjs",
+    "build": "next build && serwist build serwist.config.mjs && node scripts/verify-sw.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:offline": "playwright test -c playwright.offline.config.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

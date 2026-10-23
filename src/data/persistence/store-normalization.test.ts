@@ -262,7 +262,7 @@ describe("normalizeExpenseStore", () => {
 
     expect(store.overrides).toEqual([
       expect.objectContaining({
-        id: "ovr-manual-correction",
+        id: "ovr:tpl-dazn:2026-06-13",
         occurrenceDate: "2026-06-13",
         paidAt: "2026-06-16T18:30:00.000Z",
         amountPaid: 12.5,
@@ -435,5 +435,24 @@ describe("normalizeExpenseStore", () => {
 
     expect("legacyOnly" in store).toBe(false);
     expect("legacyFinance" in store.finance).toBe(false);
+  });
+  it("repairs impossible template dates instead of breaking the store", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      categories: [],
+      overrides: [],
+      templates: [
+        { id: "clamped", startDate: "2026-11-31", dueDay: 31, createdAt: "2026-10-01T00:00:00.000Z" },
+        { id: "garbage", startDate: "soon", endDate: "", dueDay: "x", createdAt: "2026-10-05T00:00:00.000Z" },
+        { id: "ended", startDate: "2026-06-01", endDate: "someday", dueDay: 1 },
+        "not a template",
+      ],
+    });
+
+    expect(store.templates).toMatchObject([
+      { id: "clamped", startDate: "2026-11-30", dueDay: 31 },
+      { id: "garbage", startDate: "2026-10-05", endDate: undefined, dueDay: 5 },
+      { id: "ended", startDate: "2026-06-01", endDate: "2026-06-01" },
+    ]);
   });
 });

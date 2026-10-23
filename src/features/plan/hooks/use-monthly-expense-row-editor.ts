@@ -6,7 +6,7 @@ import type {
   ExpenseCategory,
   ExpenseOccurrence,
 } from "@/domain/types";
-import { formatMoneyInput, parseMoneyInput } from "../lib/money-input";
+import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 
 export type MonthlyExpenseUpdateInput = {
   templateId: string;
@@ -54,12 +54,14 @@ export function useMonthlyExpenseRowEditor({
   }
 
   function save() {
+    const parsedAmount = parseMoneyInput(amount);
+    if (parsedAmount === null || parsedAmount <= 0) return;
     onUpdate({
       templateId: occurrence.template.id,
       occurrenceDate: occurrence.occurrenceDate,
       dueDate,
       name,
-      amount: parseMoneyInput(amount),
+      amount: parsedAmount,
       categoryName,
       status,
     });

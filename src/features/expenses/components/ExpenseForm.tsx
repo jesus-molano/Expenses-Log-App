@@ -2,6 +2,7 @@ import { BellRing } from "lucide-react";
 import { Surface } from "@/components/ui/Surface";
 import type { AppLanguage, DraftExpense } from "@/domain/types";
 import { t } from "@/shared/i18n";
+import { isValidPositiveMoneyInput } from "@/shared/money";
 import {
   CategoryPicker,
   ExpenseField,
@@ -56,6 +57,14 @@ export function ExpenseForm({
           inputMode="decimal"
           value={amountText}
           onChange={(event) => onAmountTextChange(event.target.value)}
+          ref={(input) =>
+            input?.setCustomValidity(
+              isValidPositiveMoneyInput(amountText)
+                ? ""
+                : t("expenses.amountInvalid", language),
+            )
+          }
+          aria-invalid={!isValidPositiveMoneyInput(amountText) || undefined}
           required
           className="input-control"
           placeholder={t("expenses.amountPlaceholder", language)}

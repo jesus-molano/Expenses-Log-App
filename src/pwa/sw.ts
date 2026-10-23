@@ -13,15 +13,21 @@ import {
   NetworkOnly,
   Serwist,
   StaleWhileRevalidate,
+  disableNavigationPreload,
 } from "serwist";
 import {
+  NETWORK_RESPONSE_TIMEOUT_MS,
+  RSC_RESPONSE_TIMEOUT_MS,
   OFFLINE_STATUS_REQUEST,
   OFFLINE_STATUS_RESPONSE,
   PRECACHE_FAILED_MESSAGE,
+  PRECACHE_IGNORED_URL_PARAMS,
   PRECACHE_RETRY_DELAYS_MS,
   countCachedPrecacheKeys,
   describePrecacheUrl,
+  isObsoleteCacheName,
   isTransientStatus,
+  stripDeploymentQuery,
   type OfflineStatusResponse,
   type PrecacheFailedMessage,
 } from "./cache-policy";
@@ -34,10 +40,44 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+// Aborta la petición si la red no devuelve cabeceras a tiempo, para que la
+// estrategia caiga a la caché o al fallback en lugar de quedarse colgada.
+// Solo corta la espera de la respuesta, no la descarga de un cuerpo lento.
+function abortIfNoResponse(timeoutMs: number): SerwistPlugin {
+  return {
+    requestWillFetch: async ({ request, state }) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      if (state) state.abortTimer = timer;
+      return new Request(request, { signal: controller.signal });
+    },
+    fetchDidSucceed: async ({ response, state }) => {
+      clearTimeout(state?.abortTimer as ReturnType<typeof setTimeout>);
+      return response;
+    },
+    fetchDidFail: async ({ state }) => {
+      clearTimeout(state?.abortTimer as ReturnType<typeof setTimeout>);
+    },
+  };
+}
+
+// Vercel añade ?dpl=<despliegue> a los assets con Skew Protection; la clave de
+// caché no debe depender de él para que un asset cacheado siga sirviendo.
+const ignoreDeploymentQuery: SerwistPlugin = {
+  cacheKeyWillBeUsed: async ({ request }) => stripDeploymentQuery(request.url),
+};
+
 const runtimeCaching: RuntimeCaching[] = [
   {
     matcher: ({ sameOrigin, url }) =>
       sameOrigin && url.pathname.startsWith("/api/"),
+    handler: new NetworkOnly(),
+  },
+  // El callback de OAuth lleva un código de un solo uso: sin caché, sin corte
+  // por tiempo y sin el fallback a "/".
+  {
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && url.pathname.startsWith("/auth/"),
     handler: new NetworkOnly(),
   },
   {
@@ -52,6 +92,8 @@ const runtimeCaching: RuntimeCaching[] = [
     handler: new CacheFirst({
       cacheName: "next-static",
       plugins: [
+        ignoreDeploymentQuery,
+        abortIfNoResponse(NETWORK_RESPONSE_TIMEOUT_MS),
         new ExpirationPlugin({
           maxEntries: 128,
           maxAgeSeconds: 30 * 24 * 60 * 60,
@@ -67,6 +109,7 @@ const runtimeCaching: RuntimeCaching[] = [
       cacheName: "pages",
       networkTimeoutSeconds: 3,
       plugins: [
+        abortIfNoResponse(NETWORK_RESPONSE_TIMEOUT_MS),
         new ExpirationPlugin({
           maxEntries: 16,
           maxAgeSeconds: 7 * 24 * 60 * 60,
@@ -83,6 +126,8 @@ const runtimeCaching: RuntimeCaching[] = [
     handler: new StaleWhileRevalidate({
       cacheName: "app-assets",
       plugins: [
+        ignoreDeploymentQuery,
+        abortIfNoResponse(NETWORK_RESPONSE_TIMEOUT_MS),
         new ExpirationPlugin({
           maxEntries: 128,
           maxAgeSeconds: 30 * 24 * 60 * 60,
@@ -98,8 +143,9 @@ const runtimeCaching: RuntimeCaching[] = [
       (url.searchParams.has("_rsc") || request.headers.get("RSC") === "1"),
     handler: new NetworkFirst({
       cacheName: "pages-rsc",
-      networkTimeoutSeconds: 3,
+      networkTimeoutSeconds: RSC_RESPONSE_TIMEOUT_MS / 1000,
       plugins: [
+        abortIfNoResponse(RSC_RESPONSE_TIMEOUT_MS),
         new ExpirationPlugin({
           maxEntries: 32,
           maxAgeSeconds: 24 * 60 * 60,
@@ -115,6 +161,7 @@ const runtimeCaching: RuntimeCaching[] = [
       cacheName: "same-origin",
       networkTimeoutSeconds: 3,
       plugins: [
+        abortIfNoResponse(NETWORK_RESPONSE_TIMEOUT_MS),
         new ExpirationPlugin({
           maxEntries: 64,
           maxAgeSeconds: 24 * 60 * 60,
@@ -164,11 +211,14 @@ const serwist = new Serwist({
   precacheOptions: {
     cleanupOutdatedCaches: true,
     concurrency: 4,
+    ignoreURLParametersMatching: PRECACHE_IGNORED_URL_PARAMS,
     plugins: [precacheDiagnosticsPlugin],
   },
   skipWaiting: true,
   clientsClaim: true,
-  navigationPreload: true,
+  // Con navigation preload, una ruta precacheada espera a la respuesta de red
+  // precargada antes de usar la caché; si la red se cuelga, la app no abre.
+  navigationPreload: false,
   runtimeCaching,
   fallbacks: {
     entries: [
@@ -205,6 +255,24 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", serwist.handleActivate);
 self.addEventListener("fetch", serwist.handleFetch);
 self.addEventListener("message", serwist.handleCache);
+
+// navigationPreload: false no basta: la preferencia vive en el registro y la
+// activó la versión anterior.
+disableNavigationPreload();
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((cacheNames) =>
+        Promise.all(
+          cacheNames
+            .filter(isObsoleteCacheName)
+            .map((cacheName) => caches.delete(cacheName)),
+        ),
+      ),
+  );
+});
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

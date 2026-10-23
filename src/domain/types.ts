@@ -74,6 +74,9 @@ export type ExpenseOccurrenceOverride = {
   reminderDismissedAt?: string;
   reminderDismissedChargeDate?: string;
   updatedAt?: string;
+  // Último cambio de estado (status, paidAt, amountPaid). Al fusionar, el
+  // estado sale de aquí y el resto de campos de `updatedAt`.
+  statusUpdatedAt?: string;
 };
 
 export type ExpenseOccurrence = {

@@ -7,6 +7,7 @@ import {
   clearIncomeFromStore,
   deleteExpenseFromStore,
   dismissLastChanceReminderInStore,
+  moveOccurrenceInStore,
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
   skipOccurrenceInStore,
@@ -87,6 +88,19 @@ describe("store commands", () => {
     expect(moved.overrides).toEqual([
       expect.objectContaining({ occurrenceDate: "2026-09-30", dueDate: "2026-10-06" }),
     ]);
+  });
+
+  it("stores an impossible draft date as the last day of its month", () => {
+    const added = addExpenseToStore(emptyStore, {
+      ...draft,
+      startDate: "2026-11-31",
+      dueDay: 31,
+    });
+
+    expect(added.templates[0]).toMatchObject({
+      startDate: "2026-11-30",
+      dueDay: 31,
+    });
   });
 
   it("clears only expense data", () => {
@@ -380,7 +394,7 @@ describe("store commands", () => {
     });
   });
 
-  it("normalizes estimated weekend charge dates from monthly expense edits", () => {
+  it("keeps a move to the following Monday when editing the month row", () => {
     const added = addExpenseToStore(emptyStore, {
       ...draft,
       name: "Dazn",
@@ -403,6 +417,56 @@ describe("store commands", () => {
       occurrenceDate: "2026-06-13",
       status: "due",
     });
-    expect(updated.overrides[0].dueDate).toBeUndefined();
+    expect(updated.overrides[0].dueDate).toBe("2026-06-15");
+  });
+
+  it("keeps a move when the occurrence is later paid, skipped or edited", () => {
+    const added = addExpenseToStore(emptyStore, {
+      ...draft,
+      name: "Gym",
+      dueDay: 31,
+      startDate: "2026-10-31",
+    });
+    // Vence el sábado 31 y se mueve a mano al lunes 2, su día de cargo.
+    const saturday = {
+      ...occurrenceFrom(added),
+      id: `${added.templates[0].id}:2026-10-31`,
+      occurrenceDate: "2026-10-31",
+      dueDate: "2026-10-31",
+      estimatedChargeDate: "2026-11-02",
+    };
+    const moved = moveOccurrenceInStore(added, saturday, "2026-11-02");
+    const movedOccurrence = { ...saturday, dueDate: "2026-11-02" };
+
+    for (const next of [
+      togglePaidInStore(moved, movedOccurrence),
+      skipOccurrenceInStore(moved, movedOccurrence),
+    ]) {
+      expect(next.overrides[0].dueDate).toBe("2026-11-02");
+    }
+  });
+
+  it("ignores a monthly row edit without a positive amount", () => {
+    const added = addExpenseToStore(emptyStore, draft);
+    const template = added.templates[0];
+
+    expect(
+      updateMonthlyExpenseOccurrenceInStore(added, {
+        templateId: template.id,
+        occurrenceDate: "2026-06-13",
+        dueDate: "2026-06-13",
+        name: template.name,
+        amount: Number.NaN,
+        categoryId: template.categoryId,
+        status: "due",
+      }),
+    ).toBe(added);
+  });
+
+  it("stamps the first payment of a new expense", () => {
+    const added = addExpenseToStore(emptyStore, draft, { initialStatus: "paid" });
+
+    expect(added.overrides[0].updatedAt).toEqual(expect.any(String));
+    expect(added.overrides[0].statusUpdatedAt).toBe(added.overrides[0].updatedAt);
   });
 });

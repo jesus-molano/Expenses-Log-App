@@ -10,11 +10,8 @@ import type {
   OccurrenceStatus,
 } from "@/domain/types";
 import { t } from "@/shared/i18n";
+import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 import { ExpenseForm } from "./ExpenseForm";
-import {
-  formatEuroInput,
-  parseEuroInput,
-} from "./ExpenseFormControls";
 
 type ExpenseFormSheetProps = {
   open: boolean;
@@ -33,7 +30,7 @@ export function ExpenseFormSheet({
 }: ExpenseFormSheetProps) {
   const [form, setForm] = useState(draft);
   const [amountText, setAmountText] = useState(() =>
-    formatEuroInput(draft.amount, language),
+    formatMoneyInput(draft.amount, language),
   );
   const [initialStatus, setInitialStatus] =
     useState<Extract<OccurrenceStatus, "due" | "paid">>("due");
@@ -50,10 +47,13 @@ export function ExpenseFormSheet({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const amount = parseMoneyInput(amountText);
+    // El campo valida antes de enviar; esto solo protege de un importe vacío.
+    if (amount === null || amount <= 0) return;
     onSave(
       {
         ...form,
-        amount: Math.max(parseEuroInput(amountText), 0.01),
+        amount,
       },
       {
         initialStatus: isPastCurrentMonthDay ? initialStatus : "due",

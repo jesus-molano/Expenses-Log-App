@@ -25,6 +25,11 @@ export function PwaRegister() {
     let registration: ServiceWorkerRegistration | null = null;
     let lastUpdateCheck = Date.now();
     const watchedWorkers = new WeakSet<ServiceWorker>();
+    // La página sigue con el build que la abrió aunque se active uno nuevo:
+    // se recarga la próxima vez que pase a segundo plano, si no se está
+    // editando nada.
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloadWhenHidden = false;
 
     // El service worker avisa de la URL que tumba la instalación del precache.
     const recordPrecacheFailure = (event: MessageEvent<unknown>) => {
@@ -52,6 +57,20 @@ export function PwaRegister() {
           );
         }
       });
+    };
+
+    const markUpdateActivated = () => {
+      if (hadController) reloadWhenHidden = true;
+    };
+
+    const reloadIfUpdatedWhileHidden = () => {
+      if (
+        document.visibilityState === "hidden" &&
+        reloadWhenHidden &&
+        !isEditing()
+      ) {
+        window.location.reload();
+      }
     };
 
     const checkForUpdateWhenVisible = () => {
@@ -85,8 +104,10 @@ export function PwaRegister() {
     };
 
     navigator.serviceWorker.addEventListener("message", recordPrecacheFailure);
+    navigator.serviceWorker.addEventListener("controllerchange", markUpdateActivated);
     navigator.serviceWorker.startMessages();
     document.addEventListener("visibilitychange", checkForUpdateWhenVisible);
+    document.addEventListener("visibilitychange", reloadIfUpdatedWhileHidden);
 
     if (document.readyState === "complete") {
       register();
@@ -97,10 +118,26 @@ export function PwaRegister() {
     return () => {
       window.removeEventListener("load", register);
       navigator.serviceWorker.removeEventListener("message", recordPrecacheFailure);
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        markUpdateActivated,
+      );
       document.removeEventListener("visibilitychange", checkForUpdateWhenVisible);
+      document.removeEventListener("visibilitychange", reloadIfUpdatedWhileHidden);
       registration?.removeEventListener("updatefound", watchInstallingWorker);
     };
   }, []);
 
   return null;
+}
+
+// Una hoja abierta o un campo con foco: recargar perdería lo que se escribe.
+function isEditing() {
+  const active = document.activeElement;
+  return (
+    Boolean(document.querySelector('[role="dialog"][aria-modal="true"]')) ||
+    active instanceof HTMLInputElement ||
+    active instanceof HTMLTextAreaElement ||
+    active instanceof HTMLSelectElement
+  );
 }

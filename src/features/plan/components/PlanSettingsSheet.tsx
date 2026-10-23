@@ -1,5 +1,6 @@
 ﻿import type { FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Field } from "@/components/ui/Field";
 import { Sheet } from "@/components/ui/Sheet";
 import type { AppLanguage } from "@/domain/types";
@@ -45,12 +46,12 @@ export function PlanSettingsSheet({
 
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={t("money.salary", language)}>
-            <input
+            <MoneyInput
               value={salaryAmount}
-              inputMode="decimal"
+              allowZero
               placeholder="2.200,00"
-              onChange={(event) => onSalaryAmountChange(event.target.value)}
-              className="input-control"
+              onValueChange={onSalaryAmountChange}
+              invalidMessage={t("money.amountInvalid", language)}
             />
           </Field>
 
@@ -66,12 +67,12 @@ export function PlanSettingsSheet({
             label={t("money.savingsTarget", language)}
             className="sm:col-span-2"
           >
-            <input
+            <MoneyInput
               value={savingsTarget}
-              inputMode="decimal"
+              allowZero
               placeholder="300,00"
-              onChange={(event) => onSavingsTargetChange(event.target.value)}
-              className="input-control"
+              onValueChange={onSavingsTargetChange}
+              invalidMessage={t("money.amountInvalid", language)}
             />
           </Field>
         </div>

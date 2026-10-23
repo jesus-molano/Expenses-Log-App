@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { getMonthlySalarySettings } from "@/domain/finance";
 import type { AppLanguage, FinanceStore } from "@/domain/types";
-import { formatMoneyInput, parseMoneyInput } from "../lib/money-input";
+import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 
 type MonthlySalaryInput = {
   monthId: string;
@@ -47,9 +47,11 @@ export function useMonthlySalaryEditor({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const salaryAmount = parseMoneyInput(amount);
+    if (salaryAmount === null) return;
     onSave({
       monthId,
-      salaryAmount: parseMoneyInput(amount),
+      salaryAmount,
       salaryDay,
     });
     closeEditor();

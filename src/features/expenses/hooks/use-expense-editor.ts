@@ -11,11 +11,9 @@ import type {
 import {
   findOrCreateCategory,
 } from "@/features/expenses/lib/expense-actions";
-import {
-  formatEuroInput,
-  parseEuroInput,
-} from "@/features/expenses/components/ExpenseFormControls";
 import { t } from "@/shared/i18n";
+import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
+import { updateExpenseTemplateInStore } from "@/stores/app/store-commands";
 import type { useExpenseStore } from "@/stores/app/use-expense-store";
 
 type UseExpenseEditorOptions = {
@@ -33,7 +31,7 @@ export function useExpenseEditor({
   const { store, persist, deleteExpense } = expenseStore;
   const category = store.categories.find((item) => item.id === template.categoryId);
   const [amountText, setAmountText] = useState(() =>
-    formatEuroInput(template.amount, language),
+    formatMoneyInput(template.amount, language),
   );
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [form, setForm] = useState<DraftExpense>(() => ({
@@ -48,35 +46,31 @@ export function useExpenseEditor({
     reminder: template.reminder,
   }));
 
-  const previewAmount = Math.max(parseEuroInput(amountText), 0);
+  const previewAmount = parseMoneyInput(amountText) ?? 0;
 
   function saveExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const amount = parseMoneyInput(amountText);
+    // El campo valida antes de enviar; esto solo protege de un importe vacío.
+    if (amount === null || amount <= 0) return;
     const categoryResult = findOrCreateCategory(store, form.categoryName);
-    const amount = Math.max(parseEuroInput(amountText), 0.01);
 
-    persist({
-      ...categoryResult.store,
-      templates: categoryResult.store.templates.map((item) =>
-        item.id === template.id
-          ? {
-              ...item,
-              name: form.name.trim() || t("expenses.newExpense", language),
-              description: form.description.trim(),
-              amount,
-              categoryId: categoryResult.categoryId,
-              startDate: form.startDate || item.startDate,
-              dueDay: Math.min(Math.max(Number(form.dueDay), 1), 31),
-              endDate: form.endDate || undefined,
-              recurrence: form.recurrence,
-              reminder: form.reminder,
-              updatedAt: new Date().toISOString(),
-            }
-          : item,
-      ),
-    });
-    router.push("/");
+    persist(
+      updateExpenseTemplateInStore(categoryResult.store, template.id, {
+        name: form.name.trim() || t("expenses.newExpense", language),
+        description: form.description.trim(),
+        amount,
+        categoryId: categoryResult.categoryId,
+        startDate: form.startDate || template.startDate,
+        dueDay: Math.min(Math.max(Number(form.dueDay), 1), 31),
+        endDate: form.endDate || undefined,
+        recurrence: form.recurrence,
+        reminder: form.reminder,
+      }),
+    );
+    // replace: volver atrás desde el listado no debe reabrir el editor.
+    router.replace("/");
   }
 
   async function removeExpense() {

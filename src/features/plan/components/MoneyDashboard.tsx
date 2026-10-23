@@ -4,6 +4,7 @@ import { type FormEvent, useMemo, useState } from "react";
 import { format, startOfMonth, subMonths } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import { Button } from "@/components/ui/Button";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Sheet } from "@/components/ui/Sheet";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
 import {
@@ -24,7 +25,7 @@ import { useCompactChart } from "../hooks/use-compact-chart";
 import { useOneOffIncomeForm } from "../hooks/use-one-off-income-form";
 import { usePlanSettingsForm } from "../hooks/use-plan-settings-form";
 import { useSkipOccurrenceConfirmation } from "../hooks/use-skip-occurrence-confirmation";
-import { formatMoneyInput, parseMoneyInput } from "../lib/money-input";
+import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 import {
   buildSeriesItem,
   getAvailableYears,
@@ -216,10 +217,10 @@ export function MoneyDashboard() {
   function saveSavings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!savingsMonthId) return;
-    updateMonthlySavingsContribution({
-      monthId: savingsMonthId,
-      amount: parseMoneyInput(savingsActualText),
-    });
+    const amount = parseMoneyInput(savingsActualText);
+    // Solo un 0 escrito borra la aportación; un texto ilegible no guarda nada.
+    if (amount === null) return;
+    updateMonthlySavingsContribution({ monthId: savingsMonthId, amount });
     setSavingsMonthId(null);
   }
 
@@ -351,11 +352,11 @@ export function MoneyDashboard() {
             </p>
             <label className="mt-4 grid gap-1.5 text-sm font-semibold text-[var(--app-text-muted)]">
               {copy.actualTransfer}
-              <input
+              <MoneyInput
                 value={savingsActualText}
-                onChange={(event) => setSavingsActualText(event.target.value)}
-                inputMode="decimal"
-                className="input-control"
+                allowZero
+                onValueChange={setSavingsActualText}
+                invalidMessage={t("money.amountInvalid", language)}
               />
             </label>
             {activeSavingsContribution?.source === "legacy" && !activeSavingsContribution.transferredAt ? (
