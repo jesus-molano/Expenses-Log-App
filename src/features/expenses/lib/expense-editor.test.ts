@@ -41,6 +41,13 @@ describe("expenseEditorValues", () => {
     });
     expect(expenseEditorValues(template, undefined, "es").form.categoryName).toBe("General");
   });
+
+  it("edits the amount that applies now when the series has price changes", () => {
+    const priced = expenseEditorValues(template, "Suscripciones", "es", 13.99);
+
+    expect(priced.amountText).toBe("13,99");
+    expect(priced.form.amount).toBe(13.99);
+  });
 });
 
 describe("normalizeEditorDraft", () => {

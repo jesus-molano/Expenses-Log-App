@@ -116,6 +116,14 @@ Estado:
   - Festivos bancarios en `estimateChargeDate` (nacionales, Jueves y Viernes Santo y cierres de TARGET2).
   - Diferido: "te quedan ~X € hasta el cobro (≈ €/día)" a partir del saldo, que necesita el "Hasta el cobro" de F1a-3.
   - Integrado sobre F1a-3: el ciclo anclado al cobro también decide los días del cierre con restos (restos y "Mover" al primer día del mes siguiente), de "Hasta el cobro" y del mes que Plan sigue desde Gastos, que sigue mostrando solo los días de su mes. Las previsiones miran desde el mes activo aunque se mire otro.
+- **F3 de dinero (puntos 2, 3, 5 y 8): hecho.**
+  - **Recibos variables (2):** previsto frente a pagado por cobro (`amountPaid`) en Gastos, Plan y el detalle. Al pagar otro importe (hoja de acciones del cobro, "Últimos cobros" del detalle o "Pagado" aparte de "Previsto" en el editor de Plan) se sugiere la media de los 3 últimos pagos (`suggestedPaidAmount`). Tras pagar otro importe se pregunta "¿Actualizar el importe desde ahora?", que aplica `setSeriesAmountInStore` (la regla de `keepAmountBeforeSeriesChange`, traída de `feat/amount-scope`): nunca reescribe lo pagado ni los meses cerrados.
+  - **Finalizar o pausar (3):** en el detalle, "Finalizar" elige el último cobro (`endDate`, nunca antes de uno pagado) y se puede reactivar; las pausas son rangos `pauses[]` en la plantilla que `generateTemplateDates` salta, con "Reanudar" (la pausa termina ayer) y "Quitar pausa".
+  - **Cambios de precio (5):** `amountChanges[]` (precio desde una fecha) que `generateOccurrences` aplica por fecha de cobro (`templateAmountOn`); "Programar cambio de precio" desde un mes posterior al activo, lista de programados con "Quitar" e historial de tramos en el detalle (`buildPriceHistory`).
+  - **Pagas extra y "¿Has cobrado?" (8):** `finance.salaryExtraPays` (meses y, opcional, importe; vigente desde su mes) en los ajustes del plan; "¿Has cobrado la nómina?" el día de cobro en Gastos y en Plan (`finance.salaryReceipts`: lo cobrado pasa a ser el sueldo del mes; "Aún no" la esconde hasta mañana en ese dispositivo). **M16:** "Editar ingreso fijo" pregunta "Solo este mes" (`onlyThisMonth`) o "Desde este mes".
+  - Tests de generación con pausas que cruzan meses, fin a mitad de mes, cambios de precio y registros de meses cerrados (`src/domain/series-changes.test.ts`), e2e en `tests/e2e/bills-and-salary.spec.ts`.
+  - Junto a F1a-3 y F3-1: las pausas, el fin y los cambios de precio también valen para los cobros de un gasto nuevo (`passedChargeThisMonth`, `previousMonthsChargeDates`), lo que arrastra el mes anterior y el cierre con restos. Lo cobrado en "¿Has cobrado?" es el sueldo del mes en Plan y en el resumen del cierre; la pregunta sale al mirar el mes natural o el activo, encima de "Hasta el cobro". El CSV lleva las columnas `pauses` y `price_changes`, y sustituir datos deshace las respuestas a "¿Has cobrado?" que no trae el archivo y reescribe las pagas extra que no trae con las que el archivo tiene vigentes ese mes, para que una fusión posterior no las devuelva.
+  - Integrado sobre F3 (4, 6, 12, 13 y 14) y F2b: "¿Has cobrado?", "Hasta el cobro" y el aviso push del día de cobro usan una sola regla de día de cobro (`salaryPaydayOf`, con `configuredPayday` y el ciclo del presupuesto). Con el ciclo anclado al cobro, la nómina que abre un mes es el sueldo de ese mes (la del 28 de octubre es la de "noviembre"), y lo cobrado cuenta en Plan, en el resumen del mes y en "Coste por categoría" (`getMonthSalary`). Los avisos se generan con las mismas ocurrencias que la app: un gasto en pausa o finalizado no avisa y el importe del push es el del propio cobro.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
@@ -475,16 +483,16 @@ Estado:
 
 ### F3 — Backlog de valor (por impacto × esfuerzo)
 1. **Exportar e importar JSON/CSV**, snapshots locales y `storage.persist()`. Reutiliza `normalizeImportedExpenseStore` y `mergeExpenseStores`. **Hecho.**
-2. **Recibos variables:** previsto frente a real, sugerencia con la media de los 3 últimos y "¿Actualizar el importe desde ahora?".
-3. **Finalizar o pausar una suscripción:** `endDate`; las pausas como rangos.
+2. **Recibos variables:** previsto frente a real, sugerencia con la media de los 3 últimos y "¿Actualizar el importe desde ahora?". **Hecho.**
+3. **Finalizar o pausar una suscripción:** `endDate`; las pausas como rangos. **Hecho.**
 4. **Provisión mensual para anuales** y "próximos recibos grandes (90 días)". **Hecho.**
    - `features/plan/lib/bill-forecast.ts`: la provisión es el coste de los próximos 12 meses de lo que se repite con menos frecuencia que mensual, repartido en 12, y por recibo lo que hay que apartar al mes hasta su próximo cobro.
    - Recibos grandes: no mensuales y pagos únicos de al menos 50 €, sin pagar, que vencen en los próximos 90 días, por día de cargo.
-5. **Cambios de precio programados** e historial de precio.
+5. **Cambios de precio programados** e historial de precio. **Hecho.**
 6. **Coste por categoría y anualizado.** **Hecho.**
    - `features/plan/lib/recurring-costs.ts`: los próximos 12 meses de presupuesto desde el mes activo, sin pagos únicos ni lo quitado del mes; lo pagado cuenta por lo pagado. Media al mes, parte del sueldo y desglose por gasto.
 7. **Onboarding:** chips de alta rápida y checklist.
-8. **Pagas extra y "¿Has cobrado?"**; ámbito "solo este mes" al editar el sueldo (M16).
+8. **Pagas extra y "¿Has cobrado?"**; ámbito "solo este mes" al editar el sueldo (M16). **Hecho** (el aviso push del día de cobro, tipo `payday`, es de F2b y usa el mismo día de cobro).
 9. **Catálogo "Todos"** con búsqueda y filtros.
 10. **Campos nuevos:** notas, URL de baja, permanencia, categorías propias y método de pago.
 11. **Comandos por voz o IA** ("marca la luz pagada 71,20").

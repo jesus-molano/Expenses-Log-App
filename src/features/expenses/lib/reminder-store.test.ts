@@ -227,6 +227,47 @@ describe("toReminderStore", () => {
     expect(planUserReminders(full, today)?.candidates).toHaveLength(1);
   });
 
+  it("respects pauses, finished series and price changes, and drops broken ones", () => {
+    const remindedIds = (value: unknown) =>
+      planUserReminders(toReminderStore(value, today)!, today)?.candidates.map((candidate) =>
+        "reminder" in candidate ? candidate.reminder.occurrence.template.id : candidate.kind,
+      );
+    const paused = store([
+      template({ id: "spotify", pauses: [{ from: "2026-06-01", to: "2026-06-30" }] }),
+    ]);
+    const finished = store([
+      template({ id: "spotify", startDate: "2026-05-12", endDate: "2026-06-01" }),
+    ]);
+    const priced = toReminderStore(
+      store([template({ id: "spotify", amountChanges: [{ from: "2026-06-01", amount: 12.5 }] })]),
+      today,
+    );
+    const broken = toReminderStore(
+      {
+        ...store([template({ id: "spotify" })]),
+        templates: [
+          { ...template({ id: "spotify" }), pauses: "soon", amountChanges: { from: "2026-06-01" } },
+        ],
+      },
+      today,
+    );
+
+    // En pausa o ya finalizado, el cobro no existe: no hay nada que avisar.
+    expect(remindedIds(paused)).toEqual([]);
+    expect(remindedIds(finished)).toEqual([]);
+    // El aviso lleva el precio del propio cobro, con su cambio de precio.
+    const [pricedCandidate] = planUserReminders(priced!, today)?.candidates ?? [];
+    expect(
+      pricedCandidate && "reminder" in pricedCandidate
+        ? pricedCandidate.reminder.occurrence.template.amount
+        : null,
+    ).toBe(12.5);
+    // Una pausa o un cambio de precio ilegible se descarta en lugar de lanzar.
+    expect(broken?.templates[0].pauses).toBeUndefined();
+    expect(broken?.templates[0].amountChanges).toBeUndefined();
+    expect(planUserReminders(broken!, today)?.candidates).toHaveLength(1);
+  });
+
   it("keeps a paid override with a broken moved date from reminding again", () => {
     const reminderStore = toReminderStore(
       {

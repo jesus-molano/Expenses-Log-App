@@ -1,4 +1,9 @@
-import { emptyFinanceStore, materializeClosedOccurrenceRecords, salaryClearedTombstone } from "@/domain/finance";
+import {
+  emptyFinanceStore,
+  getSalaryExtraPaySettings,
+  materializeClosedOccurrenceRecords,
+  salaryClearedTombstone,
+} from "@/domain/finance";
 import { occurrenceKeyOf, overrideIdFor } from "@/domain/overrides";
 import type {
   BalanceCheckin,
@@ -7,9 +12,14 @@ import type {
   ExpenseStore,
   FinanceStore,
   MonthClosure,
+  SalaryExtraPaySettings,
+  SalaryReceipt,
 } from "@/domain/types";
 import { mergeExpenseStores } from "@/data/persistence/local-store";
-import { normalizeExpenseStore } from "@/data/persistence/store-normalization";
+import {
+  normalizeExpenseStore,
+  withNonEmpty,
+} from "@/data/persistence/store-normalization";
 
 export type ImportMode = "merge" | "replace";
 // "all": el archivo trae el store entero (JSON, copias). "expenses": solo
@@ -45,8 +55,9 @@ export function importStoreInStore(
 // - Lo que solo estaba en los datos actuales se borra con tombstone si su id
 //   es aleatorio (gastos, categorías, ingresos, aportaciones, histórico de
 //   gastos que desaparecen) o se deja en estado neutro si es determinista
-//   (cobros, cierres de mes, sueldos), porque un tombstone de un id
-//   determinista bloquearía para siempre volver a usarlo.
+//   (cobros, cierres de mes, respuestas a "¿Has cobrado?", sueldos, pagas
+//   extra), porque un tombstone de un id determinista bloquearía para siempre
+//   volver a usarlo.
 // - Los objetivos de ahorro no tienen tombstone: un mes que solo estaba en los
 //   datos actuales podría volver en esa fusión.
 // Las preferencias (tema e idioma) son del dispositivo y no se tocan.
@@ -214,6 +225,40 @@ function replaceFinance(
     : current.budgetCycle
       ? { anchor: "calendar", updatedAt: stamp }
       : undefined;
+  const receipts: Record<string, SalaryReceipt> = {
+    // Igual con "¿Has cobrado?": una respuesta que solo estaba en los datos
+    // actuales se deshace en lugar de borrarse.
+    ...Object.fromEntries(
+      Object.entries(current.salaryReceipts ?? {})
+        .filter(([monthId]) => !imported.salaryReceipts?.[monthId])
+        .map(([monthId, receipt]) => [
+          monthId,
+          { ...receipt, undone: true, updatedAt: stamp },
+        ]),
+    ),
+    ...restamp(imported.salaryReceipts),
+  };
+  const extraPays: Record<string, SalaryExtraPaySettings> = {
+    // Una paga extra que solo estaba en los datos actuales se reescribe con la
+    // que el archivo tiene vigente ese mes (o sin pagas): los meses quedan como
+    // en el archivo y una fusión con la versión anterior no la devuelve.
+    ...Object.fromEntries(
+      Object.keys(current.salaryExtraPays ?? {})
+        .filter((monthId) => !imported.salaryExtraPays?.[monthId])
+        .map((monthId): [string, SalaryExtraPaySettings] => {
+          const inForce = getSalaryExtraPaySettings(imported, monthId);
+          return [
+            monthId,
+            {
+              months: [...(inForce?.months ?? [])],
+              ...(inForce?.amount !== undefined ? { amount: inForce.amount } : {}),
+              updatedAt: stamp,
+            },
+          ];
+        }),
+    ),
+    ...restamp(imported.salaryExtraPays),
+  };
 
   return {
     ...imported,
@@ -228,9 +273,11 @@ function replaceFinance(
       ]),
     ),
     monthlySavingsContributions: restamp(imported.monthlySavingsContributions),
-    ...(Object.keys(closures).length ? { monthClosures: closures } : {}),
-    ...(Object.keys(balanceCheckins).length ? { balanceCheckins } : {}),
+    ...withNonEmpty("monthClosures", closures),
+    ...withNonEmpty("balanceCheckins", balanceCheckins),
     ...(budgetCycle ? { budgetCycle } : {}),
+    ...withNonEmpty("salaryExtraPays", extraPays),
+    ...withNonEmpty("salaryReceipts", receipts),
   };
 }
 

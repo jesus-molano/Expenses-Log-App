@@ -252,6 +252,60 @@ describe("csvToStore", () => {
     expect(reminderOf("gas")).toEqual({ enabled: true, daysBeforeCharge: 5 });
   });
 
+  it("round-trips pauses and price changes without freezing priced charges", () => {
+    const priced = normalizeExpenseStore(
+      {
+        ...emptyStore,
+        categories: [
+          { id: "cat-subs", userId: "demo", name: "Suscripciones", icon: "Sparkles", tone: "violet" },
+        ],
+        templates: [
+          template("gym", "Gimnasio", 30, "cat-subs", "2026-08-15", {
+            amountChanges: [
+              { from: "2026-10-01", amount: 35 },
+              { from: "2027-01-01", amount: 39.5 },
+            ],
+            pauses: [{ from: "2026-12-01", to: "2026-12-31" }, { from: "2027-06-01" }],
+          }),
+        ],
+        overrides: [paid("gym", "2026-10-15", 35)],
+      },
+      today,
+    );
+    const csv = storeToCsv(priced, { today, language: "es" });
+
+    expect(rowsOf(csv).find((row) => row.type === "expense")).toMatchObject({
+      pauses: "2026-12-01/2026-12-31 2027-06-01/",
+      price_changes: "2026-10-01=35.00 2027-01-01=39.50",
+    });
+
+    const { store: imported } = csvToStore(csv, { now: today });
+    expect(imported.templates[0]).toMatchObject({
+      amount: 30,
+      amountChanges: priced.templates[0].amountChanges,
+      pauses: priced.templates[0].pauses,
+    });
+    // El cobro de octubre ya cuesta 35 por el cambio de precio: no necesita
+    // un importe propio.
+    expect(imported.overrides).toEqual([
+      expect.objectContaining({ templateId: "gym", occurrenceDate: "2026-10-15", status: "paid" }),
+    ]);
+    expect(imported.overrides[0].amount).toBeUndefined();
+  });
+
+  it("skips unreadable pause and price entries", () => {
+    const csv = [
+      "name,amount,start_date,pauses,price_changes",
+      "Luz,60,2026-01-10,2026-03-01/nunca 2026-05-01/ x,2026-04-01=abc 2026-06-01=65",
+    ].join("\n");
+    const { store: imported } = csvToStore(csv, { now: today });
+
+    expect(imported.templates[0]).toMatchObject({
+      pauses: [{ from: "2026-05-01" }],
+      amountChanges: [{ from: "2026-06-01", amount: 65 }],
+    });
+  });
+
   it("reuses the categories that already exist with the same name", () => {
     const { store: imported } = csvToStore(storeToCsv(store, { today, language: "en" }), {
       now: today,

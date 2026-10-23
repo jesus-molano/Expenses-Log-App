@@ -39,7 +39,13 @@ export function RecurringOverviewCard({
               {category ? ` · ${categoryLabel(category.name, language)}` : ""}
             </p>
             <p className="app-money ml-auto whitespace-nowrap text-sm font-semibold text-[var(--app-text)]">
-              {formatCurrency(item.template.amount)}
+              {/* El importe del cobro que toca, con sus cambios de precio. */}
+              {formatCurrency(
+                (item.overdueOccurrence ??
+                  item.currentOccurrence ??
+                  item.nextOccurrence ??
+                  item.lastPaidOccurrence)?.template.amount ?? item.template.amount,
+              )}
             </p>
           </div>
         </div>

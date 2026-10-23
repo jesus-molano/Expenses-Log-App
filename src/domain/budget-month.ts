@@ -6,11 +6,18 @@ import {
   cyclePayday,
   periodIdOf,
   periodRange,
+  periodStart,
   resolveBudgetCycle,
   type BudgetCycle,
 } from "./budget-cycle";
 import { buildDateWithDay, daysBetween, toDateOnly } from "./calendar";
-import { buildMonthlyMoneyPlan, occurrencesDueBetween } from "./finance";
+import {
+  buildMonthlyMoneyPlan,
+  getExpectedSalary,
+  getSalaryExtraPay,
+  getSalaryReceipt,
+  occurrencesDueBetween,
+} from "./finance";
 import { isOccurrenceOverdue, monthPendingSummary } from "./pending";
 import type {
   AppLanguage,
@@ -105,6 +112,30 @@ function isPaydayReached(today: string, payday: number | null) {
   return payday !== null && today >= paydayDate(today.slice(0, 7), payday);
 }
 
+// Día en que llega el sueldo de un mes de presupuesto, o null sin sueldo
+// configurado. En el mes natural es su día de cobro (el último día si el mes
+// es más corto); con el ciclo anclado al cobro, el día que abre ese mes. Es la
+// única regla del día de cobro: la usan "Hasta el cobro", "¿Has cobrado?" y el
+// aviso push del día de cobro.
+export function salaryPaydayOf(
+  finance: FinanceStore,
+  monthId: string,
+  cycle: BudgetCycle = resolveBudgetCycle(finance),
+): string | null {
+  const payday = configuredPayday(finance, monthId);
+  if (payday === null) return null;
+  return cycle.anchor === "payday"
+    ? periodStart(monthId, cycle)
+    : paydayDate(monthId, payday);
+}
+
+// Mes de presupuesto cuyo sueldo llega hoy, o null si hoy no es día de cobro.
+export function paydayMonthOn(finance: FinanceStore, today: string): string | null {
+  const cycle = resolveBudgetCycle(finance);
+  const monthId = periodIdOf(today, cycle);
+  return salaryPaydayOf(finance, monthId, cycle) === today ? monthId : null;
+}
+
 // Con el ciclo anclado al cobro, el cobro abre el mes siguiente: no adelanta
 // el cambio de un mes que ya termina el día antes del cobro.
 function paydayCountsForMonth(
@@ -114,6 +145,51 @@ function paydayCountsForMonth(
   payday: number | null,
 ) {
   return cyclePayday(cycle, monthId) === null && isPaydayReached(today, payday);
+}
+
+export type SalaryPrompt = {
+  monthId: string;
+  payday: number;
+  // Sueldo previsto, con la paga extra si toca (que también va aparte).
+  expectedAmount: number;
+  extraPayAmount: number;
+};
+
+// "¿Has cobrado?": desde el día de cobro del mes en que cae hoy hasta que se
+// responda, y solo con el sueldo configurado. El mes es el de presupuesto: el
+// natural o, con el ciclo anclado al cobro, el que abre ese cobro (la nómina
+// del 28 de octubre es el sueldo de "noviembre"), para que lo cobrado cuente
+// en el mismo mes que lo lee Plan.
+export function salaryPromptFor(
+  finance: FinanceStore,
+  today: string,
+): SalaryPrompt | null {
+  const cycle = resolveBudgetCycle(finance);
+  const monthId = periodIdOf(today, cycle);
+  const payday = configuredPayday(finance, monthId);
+  const paydayOn = salaryPaydayOf(finance, monthId, cycle);
+  if (payday === null || paydayOn === null || today < paydayOn) return null;
+  if (getSalaryReceipt(finance, monthId)) return null;
+  return {
+    monthId,
+    payday,
+    expectedAmount: getExpectedSalary(finance, monthId),
+    extraPayAmount: getSalaryExtraPay(finance, monthId),
+  };
+}
+
+// "¿Has cobrado?" es del mes en que cae hoy: se ve al mirar ese mes o el
+// activo (tras pasar al siguiente, la nómina de ese mes puede seguir sin
+// confirmar), no al mirar otros meses.
+export function isSalaryPromptVisible(
+  prompt: SalaryPrompt | null,
+  viewMonthId: string,
+  activeMonthId: string,
+): prompt is SalaryPrompt {
+  return (
+    prompt !== null &&
+    (viewMonthId === activeMonthId || viewMonthId === prompt.monthId)
+  );
 }
 
 // Se ofrece pasar de mes cuando el mes natural tiene recibos, ninguno
@@ -166,18 +242,16 @@ export function shouldSuggestCloseWithLeftovers({
   );
 }
 
-// Próximo cobro después de hoy, con el sueldo configurado del mes en que cae.
+// Próximo cobro después de hoy, con el sueldo configurado del mes en que cae
+// (el del mes en curso si aún no llegó; si no, el del siguiente).
 export function getNextPayday(finance: FinanceStore, today: string): string | null {
-  const monthId = today.slice(0, 7);
-  const day = configuredPayday(finance, monthId);
-  if (day !== null) {
-    const thisMonth = paydayDate(monthId, day);
-    if (thisMonth > today) return thisMonth;
+  const cycle = resolveBudgetCycle(finance);
+  const monthId = periodIdOf(today, cycle);
+  for (const candidate of [monthId, addMonthId(monthId, 1)]) {
+    const payday = salaryPaydayOf(finance, candidate, cycle);
+    if (payday !== null && payday > today) return payday;
   }
-
-  const nextMonthId = addMonthId(monthId, 1);
-  const nextDay = configuredPayday(finance, nextMonthId);
-  return nextDay === null ? null : paydayDate(nextMonthId, nextDay);
+  return null;
 }
 
 export type PaydayOutlook = {

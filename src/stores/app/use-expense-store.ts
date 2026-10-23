@@ -14,7 +14,9 @@ import type {
   BudgetCycleAnchor,
   CreateExpenseOptions,
   DraftExpense,
+  ExpenseAmountChange,
   ExpenseOccurrence,
+  ExpensePause,
   ExpenseReminderSettings,
   ExpenseStore,
 } from "@/domain/types";
@@ -35,18 +37,28 @@ import {
   deleteExpenseFromStore,
   deleteIncomeEventFromStore,
   dismissLastChanceReminderInStore,
+  endSeriesInStore,
   importStoreInStore,
   markOccurrencesPaidInStore,
   moveOccurrenceInStore,
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
+  pauseSeriesInStore,
+  reactivateSeriesInStore,
   recordBalanceInStore,
+  recordSalaryReceiptInStore,
+  removeAmountChangeInStore,
+  removePauseInStore,
   reopenMonthInStore,
   restoreOccurrenceInStore,
+  resumeSeriesInStore,
+  scheduleAmountChangeInStore,
+  setSeriesAmountInStore,
   setTemplateReminderInStore,
   skipOccurrenceInStore,
   payOccurrenceInStore,
   togglePaidInStore,
+  undoSalaryReceiptInStore,
   updateBudgetCycleInStore,
   updateIncomeEventInStore,
   updateLanguageInStore,
@@ -56,8 +68,10 @@ import {
   updateMonthlySavingsContributionInStore,
   updateMonthlySavingsTargetInStore,
   updateReminderPreferencesInStore,
+  updateSalaryExtraPayInStore,
   updateThemeInStore,
   type ReminderPreferencesInput,
+  type SeriesAmountScope,
 } from "./store-commands";
 import type { ImportMode, ImportScope } from "./backup-commands";
 import type {
@@ -67,6 +81,8 @@ import type {
   MonthlySalaryInput,
   MonthlySavingsContributionInput,
   MonthlySavingsTargetInput,
+  SalaryExtraPayInput,
+  SalaryReceiptInput,
 } from "./store-types";
 import { preserveClosedOccurrenceRecords } from "./store-history";
 import { useStorePersistence } from "./use-store-persistence";
@@ -277,6 +293,54 @@ function useExpenseStoreValue() {
     persist(updateReminderPreferencesInStore(current(), changes));
   }
 
+  function setSeriesAmount(
+    templateId: string,
+    amount: number,
+    scope: SeriesAmountScope = "current",
+  ) {
+    persist(setSeriesAmountInStore(current(), templateId, amount, { scope }));
+  }
+
+  function scheduleAmountChange(templateId: string, change: ExpenseAmountChange) {
+    persist(scheduleAmountChangeInStore(current(), templateId, change));
+  }
+
+  function removeAmountChange(templateId: string, from: string) {
+    persist(removeAmountChangeInStore(current(), templateId, from));
+  }
+
+  function endSeries(templateId: string, lastChargeDate: string) {
+    persist(endSeriesInStore(current(), templateId, lastChargeDate));
+  }
+
+  function reactivateSeries(templateId: string) {
+    persist(reactivateSeriesInStore(current(), templateId));
+  }
+
+  function pauseSeries(templateId: string, pause: ExpensePause) {
+    persist(pauseSeriesInStore(current(), templateId, pause));
+  }
+
+  function resumeSeries(templateId: string) {
+    persist(resumeSeriesInStore(current(), templateId));
+  }
+
+  function removePause(templateId: string, from: string) {
+    persist(removePauseInStore(current(), templateId, from));
+  }
+
+  function updateSalaryExtraPay(input: SalaryExtraPayInput) {
+    persist(updateSalaryExtraPayInStore(current(), input));
+  }
+
+  function recordSalaryReceipt(input: SalaryReceiptInput) {
+    persist(recordSalaryReceiptInStore(current(), input));
+  }
+
+  function undoSalaryReceipt(monthId: string) {
+    persist(undoSalaryReceiptInStore(current(), monthId));
+  }
+
   function closeMonth(monthId: string) {
     persist(closeMonthInStore(current(), monthId));
   }
@@ -364,6 +428,17 @@ function useExpenseStoreValue() {
     updateMonthlyExpenseOccurrence,
     setTemplateReminder,
     updateReminderPreferences,
+    setSeriesAmount,
+    scheduleAmountChange,
+    removeAmountChange,
+    endSeries,
+    reactivateSeries,
+    pauseSeries,
+    resumeSeries,
+    removePause,
+    updateSalaryExtraPay,
+    recordSalaryReceipt,
+    undoSalaryReceipt,
     closeMonth,
     reopenMonth,
     importStore,

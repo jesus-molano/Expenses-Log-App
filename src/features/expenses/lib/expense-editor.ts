@@ -15,17 +15,20 @@ export type ExpenseEditorValues = {
   amountText: string;
 };
 
+// `amount` es el importe que se edita: el que rige ahora, con sus cambios de
+// precio (por defecto, el de la plantilla).
 export function expenseEditorValues(
   template: ExpenseTemplate,
   categoryName: string | undefined,
   language: AppLanguage,
+  amount: number = template.amount,
 ): ExpenseEditorValues {
   return {
-    amountText: formatMoneyInput(template.amount, language),
+    amountText: formatMoneyInput(amount, language),
     form: {
       name: template.name,
       description: template.description,
-      amount: template.amount,
+      amount,
       categoryName: resolvePresetCategory(categoryName ?? "General").name,
       startDate: template.startDate,
       dueDay: template.dueDay,

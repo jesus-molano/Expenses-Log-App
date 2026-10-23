@@ -533,6 +533,11 @@ test("tapping a charge opens its actions: pay a different amount", async ({ page
   await sheet.getByRole("button", { name: "Pagado con otro importe" }).click();
   await sheet.getByLabel("Importe cobrado").fill("61,50");
   await sheet.getByRole("button", { name: "Guardar pago" }).click();
+  // Pagado con otro importe: se pregunta si la serie pasa a costar eso.
+  await expect(
+    sheet.getByRole("heading", { name: "¿Actualizar el importe desde ahora?" }),
+  ).toBeVisible();
+  await sheet.getByRole("button", { name: "Solo este cobro" }).click();
 
   await expect(sheet).toBeHidden();
   const row = page.locator('[data-expense-row="true"]').filter({ hasText: "Movistar" }).first();

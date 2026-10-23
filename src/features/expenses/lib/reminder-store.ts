@@ -104,7 +104,11 @@ function isReminderRecord(value: unknown): value is ExpenseOccurrenceRecord {
 // build antiguo o estar corrupto. Se queda con los gastos, overrides y
 // registros con la forma que los avisos necesitan, en lugar de dejar que una
 // pieza rota lance al generar las ocurrencias, y normaliza el resto como la
-// app (ajustes de avisos, idioma, finanzas). Devuelve null si no parece un
+// app (ajustes de avisos, idioma, finanzas). Las pausas y los cambios de
+// precio deciden qué cobros hay y cuánto cuestan: la normalización de la app
+// los sanea (`normalizePauses`, `normalizeAmountChanges`) y descarta uno roto
+// en lugar de lanzar, así que un gasto en pausa o finalizado no avisa y el
+// importe del aviso es el del propio cobro. Devuelve null si no parece un
 // store.
 export function toReminderStore(
   value: unknown,

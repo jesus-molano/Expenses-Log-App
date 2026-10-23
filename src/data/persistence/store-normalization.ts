@@ -3,6 +3,7 @@ import {
   toMonthId,
 } from "@/domain/finance";
 import { dedupeOverrides } from "@/domain/overrides";
+import { normalizeAmountChanges, normalizePauses } from "@/domain/recurrence";
 import {
   sanitizeReminderPreferences,
   sanitizeTemplateReminder,
@@ -22,8 +23,11 @@ import type {
   ExpenseTemplate,
   FinanceStore,
   MonthClosure,
+  MonthlySalarySettings,
   MonthlySavingsContribution,
   MonthlySavingsTarget,
+  SalaryExtraPaySettings,
+  SalaryReceipt,
 } from "@/domain/types";
 import { normalizeAppLanguage } from "@/shared/i18n";
 import { normalizeAppTheme } from "@/shared/theme";
@@ -47,6 +51,8 @@ export const FINANCE_KEYS = [
   "monthClosures",
   "budgetCycle",
   "balanceCheckins",
+  "salaryExtraPays",
+  "salaryReceipts",
 ] as const;
 
 export const DELETED_KEYS = [
@@ -155,8 +161,21 @@ function normalizeFinanceStore(
     monthlySavingsContributions,
     ...withMonthClosures(normalizeMonthClosures(finance.monthClosures)),
     ...withBudgetCycle(normalizeBudgetCycle(finance.budgetCycle)),
-    ...withBalanceCheckins(normalizeBalanceCheckins(finance.balanceCheckins)),
+    ...withNonEmpty("balanceCheckins", normalizeBalanceCheckins(finance.balanceCheckins)),
+    ...withNonEmpty("salaryExtraPays", normalizeSalaryExtraPays(finance.salaryExtraPays)),
+    ...withNonEmpty("salaryReceipts", normalizeSalaryReceipts(finance.salaryReceipts)),
   };
+}
+
+// Las claves nuevas solo se escriben cuando tienen algo, para no añadirlas a
+// todos los stores.
+export function withNonEmpty<K extends string, T>(
+  key: K,
+  record: Record<string, T>,
+): Partial<Record<K, Record<string, T>>> {
+  return Object.keys(record).length > 0
+    ? ({ [key]: record } as Record<K, Record<string, T>>)
+    : {};
 }
 
 // Un saldo por fecha YYYY-MM-DD con importe y hora de cambio; lo ilegible se
@@ -183,11 +202,6 @@ function normalizeBalanceCheckins(value: unknown): Record<string, BalanceCheckin
   );
 }
 
-// Solo se escribe cuando hay algún saldo anotado.
-export function withBalanceCheckins(checkins: Record<string, BalanceCheckin>) {
-  return Object.keys(checkins).length > 0 ? { balanceCheckins: checkins } : {};
-}
-
 // Un ciclo ilegible vuelve al mes natural, que es el valor por defecto.
 function normalizeBudgetCycle(value: unknown): BudgetCycleSetting | undefined {
   if (
@@ -203,6 +217,52 @@ function normalizeBudgetCycle(value: unknown): BudgetCycleSetting | undefined {
 // Solo se escribe cuando alguien lo ha elegido en Ajustes.
 export function withBudgetCycle(setting: BudgetCycleSetting | undefined) {
   return setting ? { budgetCycle: setting } : {};
+}
+
+function normalizeSalaryExtraPays(
+  value: unknown,
+): Record<string, SalaryExtraPaySettings> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
+      if (!/^\d{4}-\d{2}$/.test(monthId) || !isRecord(entry)) return [];
+      const months = Array.isArray(entry.months)
+        ? Array.from(
+            new Set(
+              entry.months
+                .map(Number)
+                .filter((month) => Number.isInteger(month) && month >= 1 && month <= 12),
+            ),
+          ).sort((a, b) => a - b)
+        : [];
+      const amount = Number(entry.amount);
+      const settings: SalaryExtraPaySettings = {
+        months,
+        updatedAt: isTimestamp(entry.updatedAt) ? entry.updatedAt : monthTimestamp(monthId),
+      };
+      if (entry.amount !== undefined && Number.isFinite(amount) && amount > 0) {
+        settings.amount = amount;
+      }
+      return [[monthId, settings]];
+    }),
+  );
+}
+
+function normalizeSalaryReceipts(value: unknown): Record<string, SalaryReceipt> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
+      if (!/^\d{4}-\d{2}$/.test(monthId) || !isRecord(entry)) return [];
+      const amount = Number(entry.amount);
+      const receivedOn = normalizeDateOnly(entry.receivedOn);
+      if (!Number.isFinite(amount) || amount < 0 || !receivedOn) return [];
+      const receipt: SalaryReceipt = {
+        amount,
+        receivedOn,
+        updatedAt: isTimestamp(entry.updatedAt) ? entry.updatedAt : monthTimestamp(monthId),
+      };
+      if (entry.undone === true) receipt.undone = true;
+      return [[monthId, receipt]];
+    }),
+  );
 }
 
 function normalizeMonthClosures(value: unknown): Record<string, MonthClosure> {
@@ -235,7 +295,7 @@ export function withReminderPreferences(value: unknown) {
 // Solo se escribe cuando hay algún cierre, para no añadir la clave a todos los
 // stores.
 export function withMonthClosures(closures: Record<string, MonthClosure>) {
-  return Object.keys(closures).length > 0 ? { monthClosures: closures } : {};
+  return withNonEmpty("monthClosures", closures);
 }
 
 function isTimestamp(value: unknown): value is string {
@@ -248,22 +308,19 @@ function normalizeMonthlySalary(
   return Object.fromEntries(
     Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
       if (!/^\d{4}-\d{2}$/.test(monthId) || !isRecord(entry)) return [];
-      return [
-        [
-          monthId,
-          {
-            amount: Math.max(Number(entry.amount ?? 0), 0),
-            dayOfMonth: Math.min(
-              Math.max(Number(entry.dayOfMonth ?? 28), 1),
-              31,
-            ),
-            updatedAt:
-              typeof entry.updatedAt === "string"
-                ? entry.updatedAt
-                : monthTimestamp(monthId),
-          },
-        ],
-      ];
+      const salary: MonthlySalarySettings = {
+        amount: Math.max(Number(entry.amount ?? 0), 0),
+        dayOfMonth: Math.min(
+          Math.max(Number(entry.dayOfMonth ?? 28), 1),
+          31,
+        ),
+        updatedAt:
+          typeof entry.updatedAt === "string"
+            ? entry.updatedAt
+            : monthTimestamp(monthId),
+      };
+      if (entry.onlyThisMonth === true) salary.onlyThisMonth = true;
+      return [[monthId, salary]];
     }),
   );
 }
@@ -443,18 +500,27 @@ function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
       : Number(startDate.slice(8, 10));
     // Un aviso ilegible se descarta: el gasto pasa a seguir el de Ajustes.
     const reminder = sanitizeTemplateReminder(template.reminder);
+    const amountChanges = normalizeAmountChanges(template.amountChanges);
+    const pauses = normalizePauses(template.pauses);
 
     if (
       startDate === template.startDate &&
       endDate === template.endDate &&
       dueDay === template.dueDay &&
-      sameReminder(reminder, template.reminder)
+      sameReminder(reminder, template.reminder) &&
+      sameJson(amountChanges, template.amountChanges) &&
+      sameJson(pauses, template.pauses)
     ) {
       return template;
     }
 
-    const repaired = { ...template, startDate, endDate, dueDay, reminder };
-    if (!reminder) delete repaired.reminder;
+    const repaired: ExpenseTemplate = { ...template, startDate, endDate, dueDay };
+    delete repaired.reminder;
+    delete repaired.amountChanges;
+    delete repaired.pauses;
+    if (reminder) repaired.reminder = reminder;
+    if (amountChanges) repaired.amountChanges = amountChanges;
+    if (pauses) repaired.pauses = pauses;
     return repaired;
   });
 }
@@ -471,6 +537,10 @@ function sameReminder(
     raw.enabled === sanitized.enabled &&
     raw.daysBeforeCharge === sanitized.daysBeforeCharge
   );
+}
+
+function sameJson(a: unknown, b: unknown) {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function normalizeOccurrenceRecords(

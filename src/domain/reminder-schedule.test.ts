@@ -290,7 +290,6 @@ describe("account notices", () => {
       monthId: "2026-10",
       nextMonthId: "2026-11",
       paidCount: 2,
-      nextMonthPaidCount: 0,
     });
     // Aún falta mucho para fin de mes y no hay cobro configurado.
     expect(buildMonthCloseNotice(store, "2026-10-13")).toBeNull();
@@ -347,6 +346,25 @@ describe("account notices", () => {
 
     expect(buildPaydayNotice(store, "2026-11-30")).toMatchObject({ monthId: "2026-11" });
     expect(buildPaydayNotice(store, "2026-11-29")).toBeNull();
+  });
+
+  it("announces the payday that opens a payday-anchored month", () => {
+    const store: ExpenseStore = {
+      ...storeWith([template("rent", 1), template("gym", 12)]),
+      finance: {
+        ...emptyStore.finance,
+        monthlySalary: { "2026-09": { amount: 2000, dayOfMonth: 28 } },
+        budgetCycle: { anchor: "payday", updatedAt: "2026-10-01T00:00:00.000Z" },
+      },
+    };
+
+    expect(buildPaydayNotice(store, "2026-10-27")).toBeNull();
+    // "Noviembre" va del 28 de octubre al 27 de noviembre: alquiler y gimnasio.
+    expect(buildPaydayNotice(store, "2026-10-28")).toEqual({
+      monthId: "2026-11",
+      pendingCount: 2,
+      pendingTotal: 20,
+    });
   });
 
   it("skips payday without a configured salary", () => {

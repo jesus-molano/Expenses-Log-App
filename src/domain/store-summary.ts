@@ -39,6 +39,8 @@ export function hasUserData(store: ExpenseStore) {
     (store.occurrenceRecords?.length ?? 0) > 0 ||
     store.finance.incomeEvents.length > 0 ||
     Object.keys(store.finance.monthlySalary).length > 0 ||
-    Object.keys(store.finance.monthlySavingsTargets).length > 0
+    Object.keys(store.finance.monthlySavingsTargets).length > 0 ||
+    Object.keys(store.finance.salaryExtraPays ?? {}).length > 0 ||
+    Object.keys(store.finance.salaryReceipts ?? {}).length > 0
   );
 }

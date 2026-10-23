@@ -1,14 +1,14 @@
-import { addDays, parseISO, subDays } from "date-fns";
+import { addDays, subDays } from "date-fns";
+import { periodRange, resolveBudgetCycle } from "./budget-cycle";
 import {
   addMonthId,
   buildMonthContext,
-  configuredPayday,
   monthRange,
+  paydayMonthOn,
   shouldSuggestAdvance,
 } from "./budget-month";
 import {
   APP_TIME_ZONE,
-  buildDateWithDay,
   daysBetween,
   isValidTimeZone,
   toDateOnly,
@@ -256,7 +256,6 @@ export type MonthCloseNotice = {
   monthId: string;
   nextMonthId: string;
   paidCount: number;
-  nextMonthPaidCount: number;
 };
 
 // El mismo criterio que la tarjeta "Octubre al día" de Gastos.
@@ -272,6 +271,7 @@ export function buildMonthCloseNotice(
       status: context.closeStatus,
       today,
       payday: context.payday,
+      cycle: context.cycle,
     })
   ) {
     return null;
@@ -281,7 +281,6 @@ export function buildMonthCloseNotice(
     monthId: context.calendarMonthId,
     nextMonthId: context.nextMonthId,
     paidCount: context.closeStatus.paidCount,
-    nextMonthPaidCount: context.closeStatus.nextMonthPaidCount,
   };
 }
 
@@ -291,22 +290,22 @@ export type PaydayNotice = {
   pendingTotal: number;
 };
 
-// El día de cobro configurado (el último del mes si el mes es más corto),
-// con lo que queda por pagar del mes.
+// El día de cobro (el mismo que "¿Has cobrado?": el último del mes si el mes
+// es más corto o, con el ciclo anclado al cobro, el que abre el mes), con lo
+// que queda por pagar del mes de presupuesto de ese sueldo.
 export function buildPaydayNotice(
   store: ExpenseStore,
   today: string,
   language: AppLanguage = "es",
 ): PaydayNotice | null {
-  const monthId = today.slice(0, 7);
-  const payday = configuredPayday(store.finance, monthId);
-  if (payday === null) return null;
-  if (toDateOnly(buildDateWithDay(parseISO(today), payday)) !== today) return null;
+  const monthId = paydayMonthOn(store.finance, today);
+  if (monthId === null) return null;
 
-  const { start, end } = monthRange(monthId);
+  const range = periodRange(monthId, resolveBudgetCycle(store.finance));
   const pending = monthPendingSummary(
-    occurrencesDueBetween(store, start, end, language),
+    occurrencesDueBetween(store, range.start, range.end, language),
     monthId,
+    range,
   );
   return { monthId, pendingCount: pending.count, pendingTotal: pending.total };
 }

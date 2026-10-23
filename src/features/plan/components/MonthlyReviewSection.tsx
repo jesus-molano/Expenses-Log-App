@@ -1,5 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import type { PaidAmountAverage } from "@/domain/amount-history";
 import { formatCurrency } from "@/domain/calendar";
 import type {
   AppLanguage,
@@ -42,6 +43,7 @@ export function MonthlyReviewSection({
   onSkipOccurrence,
   onTogglePaid,
   onUpdateMonthlyExpense,
+  suggestPaidAmount,
 }: {
   language: AppLanguage;
   reviewYear: number;
@@ -68,6 +70,7 @@ export function MonthlyReviewSection({
   onSkipOccurrence: (occurrence: ExpenseOccurrence) => void;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
   onUpdateMonthlyExpense: (input: MonthlyExpenseOverrideInput) => void;
+  suggestPaidAmount?: (occurrence: ExpenseOccurrence) => PaidAmountAverage | null;
 }) {
   // M17: en un mes registrado el libre solo resta el ahorro real; si había
   // objetivo y no se apuntó nada, se avisa y se ofrece registrarlo.
@@ -203,6 +206,7 @@ export function MonthlyReviewSection({
           onSkipOccurrence={onSkipOccurrence}
           onTogglePaid={onTogglePaid}
           onUpdateMonthlyExpense={onUpdateMonthlyExpense}
+          suggestPaidAmount={suggestPaidAmount}
         />
       </div>
     </section>

@@ -36,8 +36,15 @@ Los comandos se dividen por responsabilidad:
   restaura, mueve o borra gastos. Las operaciones en bloque
   (`markOccurrencesPaidInStore`, `skipOccurrencesInStore`) pliegan
   `upsertOccurrenceOverride` y se guardan con un solo persist.
-- `finance-commands`: modifica salario mensual, objetivos, aportaciones reales
-  e ingresos.
+- `finance-commands`: modifica salario mensual (con ambito "solo este mes" o
+  "desde este mes"), pagas extra, la respuesta a "¿Has cobrado?", objetivos,
+  aportaciones reales, ingresos, el ciclo del presupuesto y el registro de
+  saldo.
+- `series-commands`: cambiar el importe de la serie desde ahora, programar o
+  quitar un precio, finalizar, pausar, reanudar y quitar una pausa. Ninguno
+  reescribe un cobro pagado ni un mes cerrado. Pagar con otro importe
+  (`payOccurrenceInStore`, en `expense-commands`) apunta lo pagado sin tocar
+  lo previsto y, si el cobro ya estaba pagado, conserva su fecha de pago.
 - `preference-commands`: actualiza tema, idioma y ajustes de avisos en el
   store.
 - `backup-commands`: combina o sustituye el store con uno importado o con una
@@ -184,6 +191,12 @@ La mezcla actual usa ids:
   `updatedAt` mas reciente. Borrar guarda `deletedAt` en vez de quitar la
   entrada, asi que un borrado gana a una copia vieja y volver a anotar ese dia
   gana al borrado.
+- Pagas extra (`finance.salaryExtraPays`) y respuestas a "¿Has cobrado?"
+  (`finance.salaryReceipts`): por mes, la version con el `updatedAt` mas
+  reciente. Deshacer un cobro marca `undone` con una version nueva en vez de
+  borrar la entrada.
+- Cambios de precio (`amountChanges`) y pausas (`pauses`) viven dentro de la
+  plantilla y viajan con ella: gana la plantilla editada mas tarde.
 
 La politica de hidratacion (`resolveHydratedStore`) protege los cambios hechos
 mientras llegaba el cloud store y los que quedaron sin subir en una sesion
@@ -242,6 +255,19 @@ Reglas para campos nuevos:
 - Los stores anteriores a estos campos cargan igual: sin `budgetCycle` el mes
   es natural y sin `balanceCheckins` el registro de saldo esta vacio. Un valor
   ilegible se descarta en la normalizacion sin tocar el resto.
+- Excepcion: los campos de F3 de dinero tambien se escriben ya, porque cada uno
+  degrada a un comportamiento anterior y no a perder datos:
+  - `templates[].amountChanges` y `templates[].pauses`: los builds con
+    passthrough conservan la plantilla tal cual, pero no los aplican; hasta
+    actualizar, una suscripcion en pausa vuelve a pedir sus cobros y un precio
+    programado no se aplica. La normalizacion descarta entradas ilegibles y una
+    pausa con un fin imposible (mejor volver a ver los cobros que esconderlos).
+  - `monthlySalary[mes].onlyThisMonth`: un build anterior lo descarta al
+    normalizar y el sueldo de "solo este mes" se arrastra a los siguientes
+    (el comportamiento de antes de M16).
+  - `finance.salaryExtraPays` y `finance.salaryReceipts`: claves nuevas de
+    `finance`, que los builds con passthrough conservan y fusionan por mes; un
+    build anterior no cuenta la paga extra ni lo cobrado.
 
 ## Vista del mes
 
@@ -252,6 +278,9 @@ No se sincroniza:
   la otra lo sigue. Sin valor se ve el mes activo.
 - El "Ahora no" a pasar o cerrar el mes se guarda por dispositivo y por mes en
   `localStorage['plan-close-dismissed:YYYY-MM']`.
+- El "Aun no" a "¿Has cobrado?" se guarda por dispositivo y por mes, con el
+  dia, en `localStorage['salary-prompt-dismissed:YYYY-MM']`: vuelve a preguntar
+  al dia siguiente.
 
 ## Cola de guardado
 
@@ -295,9 +324,11 @@ Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/Ba
   (para que Excel lea las tildes), coma como separador e importes con punto y
   dos decimales (`2200.00`). La columna `type` distingue:
   - `expense`: una fila por gasto (frecuencia, intervalo, mes anual, rrule,
-    inicio, fin, dia de cobro, aviso, descripcion). `reminder_days` lleva los
-    dias de antelacion del aviso propio, `off` si el aviso propio esta apagado
-    o nada si el gasto sigue el aviso por defecto de Ajustes.
+    inicio, fin, pausas, cambios de precio, dia de cobro, aviso, descripcion).
+    `reminder_days` lleva los dias de antelacion del aviso propio, `off` si el
+    aviso propio esta apagado o nada si el gasto sigue el aviso por defecto de
+    Ajustes. Las pausas van como `inicio/fin` (`inicio/` si sigue abierta) y
+    los cambios de precio como `fecha=importe`, separados por espacios.
   - `occurrence`: el historico hasta el final del mes actual (los meses
     cerrados tambien de gastos borrados) y, de despues, solo los cobros con
     cambios (por ejemplo, pagados por adelantado).
@@ -330,9 +361,11 @@ Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/Ba
      actuales recibe tombstone si su id es aleatorio (gastos, categorias,
      ingresos, aportaciones, historico de gastos que desaparecen) o queda en
      estado neutro si es determinista (cobros `ovr:*` en estado pendiente,
-     cierres de mes reabiertos, sueldos con tombstone por mes, saldos con
-     `deletedAt` y el ciclo del presupuesto de vuelta al mes natural), porque
-     un tombstone de un id determinista impediria volver a usarlo. Un id que el
+     cierres de mes reabiertos, respuestas a "¿Has cobrado?" deshechas,
+     sueldos con tombstone por mes, pagas extra reescritas con las que el
+     archivo tiene vigentes ese mes, saldos con `deletedAt` y el ciclo del
+     presupuesto de vuelta al mes natural), porque un tombstone de un id
+     determinista impediria volver a usarlo. Un id que el
      archivo trae se quita de los tombstones. Limite conocido: los objetivos de
      ahorro no tienen tombstone, asi que un mes que solo estaba en los datos
      actuales puede volver en esa fusion.

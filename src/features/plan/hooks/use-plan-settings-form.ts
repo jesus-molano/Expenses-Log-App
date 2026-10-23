@@ -5,9 +5,11 @@ import { useState } from "react";
 import {
   getMonthlySalarySettings,
   getMonthlySavingsTarget,
+  getSalaryExtraPaySettings,
 } from "@/domain/finance";
 import type { AppLanguage, FinanceStore } from "@/domain/types";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
+import type { SalaryExtraPayInput } from "@/stores/app/store-types";
 
 export type PlanSettingsInput = {
   salaryAmount: number;
@@ -21,11 +23,14 @@ export function usePlanSettingsForm({
   language,
   savingsMonthId,
   onSave,
+  onSaveExtraPay,
 }: {
   finance: FinanceStore;
   language: AppLanguage;
   savingsMonthId: string;
   onSave: (input: PlanSettingsInput) => void;
+  // Pagas extra, vigentes desde el mismo mes que el resto de ajustes.
+  onSaveExtraPay?: (input: SalaryExtraPayInput) => void;
 }) {
   const salary = getMonthlySalarySettings(finance, savingsMonthId);
   const [salaryAmount, setSalaryAmount] = useState(
@@ -37,15 +42,30 @@ export function usePlanSettingsForm({
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const [extraPayMonths, setExtraPayMonths] = useState<number[]>([]);
+  const [extraPayAmount, setExtraPayAmount] = useState("");
 
   function resetFromFinance() {
     const currentSalary = getMonthlySalarySettings(finance, savingsMonthId);
+    const extraPay = getSalaryExtraPaySettings(finance, savingsMonthId);
     setSalaryAmount(formatMoneyInput(currentSalary.amount, language));
     setSalaryDay(currentSalary.dayOfMonth);
     setSavingsTarget(
       formatMoneyInput(getMonthlySavingsTarget(finance, savingsMonthId), language),
     );
+    setExtraPayMonths(extraPay?.months ?? []);
+    setExtraPayAmount(
+      extraPay?.amount !== undefined ? formatMoneyInput(extraPay.amount, language) : "",
+    );
     setDayPickerOpen(false);
+  }
+
+  function toggleExtraPayMonth(month: number) {
+    setExtraPayMonths((months) =>
+      months.includes(month)
+        ? months.filter((item) => item !== month)
+        : [...months, month].sort((a, b) => a - b),
+    );
   }
 
   function openSettings() {
@@ -62,12 +82,19 @@ export function usePlanSettingsForm({
     event.preventDefault();
     const salary = parseMoneyInput(salaryAmount);
     const target = parseMoneyInput(savingsTarget);
-    if (salary === null || target === null) return;
+    // El importe de la paga extra es opcional: vacío es un sueldo más.
+    const extraAmount = extraPayAmount.trim() ? parseMoneyInput(extraPayAmount) : undefined;
+    if (salary === null || target === null || extraAmount === null) return;
     onSave({
       salaryAmount: salary,
       salaryDay,
       savingsMonthId,
       savingsTarget: target,
+    });
+    onSaveExtraPay?.({
+      monthId: savingsMonthId,
+      months: extraPayMonths,
+      amount: extraAmount && extraAmount > 0 ? extraAmount : undefined,
     });
     closeSettings();
   }
@@ -78,6 +105,10 @@ export function usePlanSettingsForm({
     savingsTarget,
     settingsOpen,
     dayPickerOpen,
+    extraPayMonths,
+    extraPayAmount,
+    toggleExtraPayMonth,
+    setExtraPayAmount,
     setSalaryAmount,
     setSalaryDay,
     setSavingsTarget,

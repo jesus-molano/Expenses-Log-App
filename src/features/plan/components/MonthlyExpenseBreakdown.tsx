@@ -1,4 +1,5 @@
 ﻿import { TrendingDown } from "lucide-react";
+import type { PaidAmountAverage } from "@/domain/amount-history";
 import type {
   AppLanguage,
   ExpenseCategory,
@@ -28,7 +29,9 @@ type MonthlyExpenseBreakdownProps = {
     categoryId?: string;
     categoryName?: string;
     status: ExpenseOccurrence["status"];
+    amountPaid?: number;
   }) => void;
+  suggestPaidAmount?: (occurrence: ExpenseOccurrence) => PaidAmountAverage | null;
 };
 
 export function MonthlyExpenseBreakdown({
@@ -42,6 +45,7 @@ export function MonthlyExpenseBreakdown({
   onSkipOccurrence,
   onTogglePaid,
   onUpdateMonthlyExpense,
+  suggestPaidAmount,
 }: MonthlyExpenseBreakdownProps) {
   return (
     <PlanSectionList
@@ -72,6 +76,7 @@ export function MonthlyExpenseBreakdown({
                     : undefined
                 }
                 onUpdate={onUpdateMonthlyExpense}
+                suggestPaidAmount={suggestPaidAmount}
               />
             ))
           ) : (

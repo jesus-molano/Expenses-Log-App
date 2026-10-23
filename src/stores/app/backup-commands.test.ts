@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mergeExpenseStores } from "@/data/persistence/local-store";
 import { normalizeExpenseStore } from "@/data/persistence/store-normalization";
+import { getSalaryExtraPay } from "@/domain/finance";
 import { emptyStore } from "@/domain/seed";
 import type {
   ExpenseOccurrenceOverride,
@@ -236,6 +237,95 @@ describe("replaceStoreContents", () => {
     expect(csvReplace.finance.monthlySalary["2026-10"].amount).toBe(2200);
     expect(csvReplace.finance.monthClosures?.["2026-09"]?.reopenedAt).toBeUndefined();
     expect(csvReplace.deleted?.incomeEvents ?? []).not.toContain("evt-a");
+  });
+
+  it("keeps the money data of the file and undoes salary answers it does not bring", () => {
+    const withMoney = normalizeExpenseStore(
+      {
+        ...current,
+        templates: [
+          { ...template("gym", 30, "2026-08-01T00:00:00.000Z"), pauses: [{ from: "2026-11-01" }] },
+        ],
+        finance: {
+          ...current.finance,
+          salaryReceipts: {
+            "2026-09": { amount: 2000, receivedOn: "2026-09-28", updatedAt: "2026-09-28T10:00:00.000Z" },
+          },
+          salaryExtraPays: {
+            "2026-01": { months: [6, 12], updatedAt: "2026-01-01T00:00:00.000Z" },
+            "2026-06": { months: [12], amount: 900, updatedAt: "2026-06-01T00:00:00.000Z" },
+          },
+        },
+      },
+      now,
+    );
+    const file = normalizeExpenseStore(
+      {
+        ...imported,
+        templates: [
+          {
+            ...template("rent", 650, "2026-09-01T00:00:00.000Z"),
+            amountChanges: [{ from: "2026-12-01", amount: 680 }],
+            pauses: [{ from: "2027-02-01", to: "2027-03-31" }],
+          },
+        ],
+        finance: {
+          ...imported.finance,
+          monthlySalary: {
+            "2026-08": {
+              amount: 1900,
+              dayOfMonth: 25,
+              updatedAt: "2026-08-01T00:00:00.000Z",
+              onlyThisMonth: true,
+            },
+          },
+          salaryReceipts: {
+            "2026-08": { amount: 1950, receivedOn: "2026-08-25", updatedAt: "2026-08-25T10:00:00.000Z" },
+          },
+          salaryExtraPays: {
+            "2026-03": { months: [7], amount: 500, updatedAt: "2026-03-01T00:00:00.000Z" },
+          },
+        },
+      },
+      now,
+    );
+    const result = replaceStoreContents(withMoney, file, { scope: "all", now });
+
+    expect(byId(result.templates, "rent")).toMatchObject({
+      amountChanges: [{ from: "2026-12-01", amount: 680 }],
+      pauses: [{ from: "2027-02-01", to: "2027-03-31" }],
+    });
+    expect(result.finance.monthlySalary["2026-08"]).toMatchObject({
+      onlyThisMonth: true,
+      updatedAt: stamp,
+    });
+    // Las pagas extra que el archivo no trae pasan a valer lo que el archivo
+    // tiene vigente ese mes: nada en enero, la de marzo en junio.
+    expect(result.finance.salaryExtraPays).toEqual({
+      "2026-01": { months: [], updatedAt: stamp },
+      "2026-03": { months: [7], amount: 500, updatedAt: stamp },
+      "2026-06": { months: [7], amount: 500, updatedAt: stamp },
+    });
+    expect(result.finance.salaryReceipts?.["2026-08"]).toMatchObject({
+      amount: 1950,
+      updatedAt: stamp,
+    });
+    expect(result.finance.salaryReceipts?.["2026-09"]).toMatchObject({
+      undone: true,
+      updatedAt: stamp,
+    });
+    for (const merged of [
+      mergeExpenseStores(result, withMoney),
+      mergeExpenseStores(withMoney, result),
+    ]) {
+      expect(merged.finance.salaryReceipts?.["2026-09"]?.undone).toBe(true);
+      expect(merged.finance.salaryReceipts?.["2026-08"]?.amount).toBe(1950);
+      expect(merged.finance.salaryExtraPays?.["2026-03"]?.amount).toBe(500);
+      // Las pagas extra que solo había en este dispositivo no vuelven.
+      expect(getSalaryExtraPay(merged.finance, "2026-06")).toBe(0);
+      expect(getSalaryExtraPay(merged.finance, "2026-07")).toBe(500);
+      expect(getSalaryExtraPay(merged.finance, "2026-12")).toBe(0);
+    }
   });
 
   it("is what the replace mode of importStoreInStore does", () => {

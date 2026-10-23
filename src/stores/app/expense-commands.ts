@@ -9,6 +9,7 @@ import {
   generateOccurrences,
   passedChargeThisMonth,
   previousMonthsChargeDates,
+  templateAmountOn,
 } from "@/domain/recurrence";
 import type {
   CreateExpenseOptions,
@@ -58,7 +59,7 @@ export function addExpenseToStore(
             occurrenceDate,
             status: "paid" as const,
             paidAt: now,
-            amountPaid: template.amount,
+            amountPaid: templateAmountOn(template, occurrenceDate),
             updatedAt: now,
             statusUpdatedAt: now,
           },
@@ -202,19 +203,34 @@ export function clearExpensesFromStore(store: ExpenseStore): ExpenseStore {
 }
 
 // Pagado con otro importe: se apunta lo pagado; lo previsto del cobro y de la
-// serie no cambia, y "Marcar como pendiente" lo deshace del todo.
+// serie no cambia, y "Marcar como pendiente" lo deshace del todo. Si ya estaba
+// pagado, solo corrige el importe y conserva la fecha de pago.
 export function payOccurrenceInStore(
   store: ExpenseStore,
   occurrence: ExpenseOccurrence,
   amountPaid: number,
+  now: Date = new Date(),
 ): ExpenseStore {
   if (!Number.isFinite(amountPaid) || amountPaid <= 0) return store;
-  const now = new Date().toISOString();
+  const key = keyOf(occurrence);
+  const existing = store.overrides.find(
+    (override) => occurrenceKeyOf(override) === occurrenceKeyOf(key),
+  );
+  const previousPaidAt =
+    existing?.status === "paid"
+      ? existing.paidAt
+      : !existing && occurrence.record?.status === "paid"
+        ? occurrence.record.paidAt
+        : undefined;
   return upsertOccurrenceOverride(
     store,
-    keyOf(occurrence),
-    { status: "paid", paidAt: now, amountPaid: Math.round(amountPaid * 100) / 100 },
-    { now },
+    key,
+    {
+      status: "paid",
+      paidAt: previousPaidAt ?? now.toISOString(),
+      amountPaid: Math.round(amountPaid * 100) / 100,
+    },
+    { now: now.toISOString() },
   );
 }
 
@@ -368,8 +384,6 @@ export function moveOccurrenceSeriesInStore(
     : moved;
 }
 
-// Cambia la serie y recoloca los overrides de los meses abiertos si cambia su
-// calendario, para que el pago o el movimiento de este mes no se pierda.
 // Desde cuándo vale un importe nuevo de la serie.
 export type SeriesAmountScope = "current" | "next";
 
@@ -378,6 +392,8 @@ export type SeriesAmountScope = "current" | "next";
 // registros, y aquí se fijan con un override los cobros de un mes cerrado con
 // "Pasar al mes siguiente", los ya pagados (también los adelantados del mes
 // que viene) y, si el cambio vale desde el mes que viene, los del mes activo.
+// Cada cobro conserva el importe que tenía (con sus cambios de precio
+// programados) y solo se fija si el nuevo lo cambiaría.
 export function keepAmountBeforeSeriesChange(
   store: ExpenseStore,
   templateId: string,
@@ -385,7 +401,7 @@ export function keepAmountBeforeSeriesChange(
   { scope = "current", today = new Date() }: { scope?: SeriesAmountScope; today?: Date } = {},
 ): ExpenseStore {
   const template = store.templates.find((item) => item.id === templateId);
-  if (!template || template.amount === nextAmount) return store;
+  if (!template) return store;
 
   const todayId = toDateOnly(today);
   const activeMonthId = resolveActiveMonth(todayId, store.finance?.monthClosures);
@@ -398,7 +414,8 @@ export function keepAmountBeforeSeriesChange(
       (occurrence) =>
         occurrence.template.id === templateId &&
         !occurrence.record &&
-        occurrence.override?.amount === undefined,
+        occurrence.override?.amount === undefined &&
+        occurrence.template.amount !== nextAmount,
     )
     .filter((occurrence) => {
       const monthId = occurrence.dueDate.slice(0, 7);
@@ -413,13 +430,15 @@ export function keepAmountBeforeSeriesChange(
         upsertOccurrenceOverride(
           current,
           keyOf(occurrence),
-          { amount: template.amount },
+          { amount: occurrence.template.amount },
           { defaults: { status: occurrence.status }, now },
         ),
       store,
     );
 }
 
+// Cambia la serie y recoloca los overrides de los meses abiertos si cambia su
+// calendario, para que el pago o el movimiento de este mes no se pierda.
 export function updateExpenseTemplateInStore(
   store: ExpenseStore,
   templateId: string,
@@ -473,6 +492,11 @@ export function updateMonthlyExpenseOccurrenceInStore(
   const now = new Date().toISOString();
   const amount = Number(input.amount);
   if (!Number.isFinite(amount) || amount <= 0) return store;
+  // Lo pagado puede diferir de lo previsto; sin dato, se pagó lo previsto.
+  const amountPaid =
+    input.amountPaid !== undefined && Number.isFinite(input.amountPaid) && input.amountPaid > 0
+      ? input.amountPaid
+      : amount;
 
   return upsertOccurrenceOverride(
     categoryResult.store,
@@ -484,7 +508,7 @@ export function updateMonthlyExpenseOccurrenceInStore(
       amount,
       categoryId: categoryResult.categoryId,
       paidAt: input.status === "paid" ? existing?.paidAt ?? now : undefined,
-      amountPaid: input.status === "paid" ? amount : undefined,
+      amountPaid: input.status === "paid" ? amountPaid : undefined,
     },
     { now },
   );

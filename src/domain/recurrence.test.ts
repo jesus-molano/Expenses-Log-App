@@ -369,4 +369,16 @@ describe("charges before this month of a new expense (M18)", () => {
       "2026-12-05",
     ]);
   });
+
+  it("skips the charges of a saved series that fall in a pause", () => {
+    const paused = {
+      ...draft,
+      startDate: "2026-07-05",
+      pauses: [{ from: "2026-08-01", to: "2026-08-31" }, { from: "2026-10-01" }],
+    };
+
+    expect(previousMonthsChargeDates(paused, "2026-10-23")).toEqual(["2026-07-05", "2026-09-05"]);
+    expect(passedChargeThisMonth(paused, "2026-10-23")).toBeNull();
+    expect(firstChargeAlreadyPassed(paused, "2026-10-23")).toBe(false);
+  });
 });

@@ -12,6 +12,8 @@ import type {
   MonthlyMoneyPlan,
   MonthlySavingsContribution,
   MonthlySalarySettings,
+  SalaryExtraPaySettings,
+  SalaryReceipt,
 } from "./types";
 
 const DEFAULT_PAYDAY = 28;
@@ -76,8 +78,74 @@ export function getMonthlySalarySettings(
     amount: 0,
     dayOfMonth: DEFAULT_PAYDAY,
   };
+  // Un sueldo de "solo este mes" no se arrastra a los meses siguientes.
+  const candidates = Object.entries(finance.monthlySalary ?? {})
+    .filter(
+      ([key, salary]) =>
+        /^\d{4}-\d{2}$/.test(key) &&
+        (key === monthId || (key < monthId && !salary.onlyThisMonth)),
+    )
+    .sort(([a], [b]) => b.localeCompare(a));
 
-  return latestRecordValue(finance.monthlySalary, monthId, fallback);
+  return candidates[0]?.[1] ?? fallback;
+}
+
+// Configuración de pagas extra vigente en el mes (la última desde ese mes).
+export function getSalaryExtraPaySettings(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): SalaryExtraPaySettings | null {
+  return latestRecordValue<SalaryExtraPaySettings | null>(
+    finance.salaryExtraPays,
+    toMonthId(monthDate),
+    null,
+  );
+}
+
+// Paga extra que llega ese mes (0 si no toca): la configuración vigente en el
+// mes dice en qué meses hay paga y, si no fija importe, es un sueldo más.
+export function getSalaryExtraPay(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): number {
+  const monthId = toMonthId(monthDate);
+  const settings = getSalaryExtraPaySettings(finance, monthId);
+  if (!settings?.months.includes(Number(monthId.slice(5, 7)))) return 0;
+  return Math.max(
+    settings.amount ?? getMonthlySalarySettings(finance, monthId).amount,
+    0,
+  );
+}
+
+// Sueldo previsto del mes: el fijo más la paga extra si toca.
+export function getExpectedSalary(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): number {
+  return (
+    Math.max(Number(getMonthlySalarySettings(finance, monthDate).amount), 0) +
+    getSalaryExtraPay(finance, monthDate)
+  );
+}
+
+// Cobro confirmado en "¿Has cobrado?" (uno deshecho no cuenta).
+export function getSalaryReceipt(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): SalaryReceipt | null {
+  const receipt = finance.salaryReceipts?.[toMonthId(monthDate)];
+  return receipt && !receipt.undone ? receipt : null;
+}
+
+// Sueldo del mes: lo cobrado de verdad en cuanto se confirma en "¿Has
+// cobrado?" y, hasta entonces, lo previsto (el fijo más la paga extra si
+// toca). Es el que leen Plan, el resumen del mes y las previsiones.
+export function getMonthSalary(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): number {
+  const receipt = getSalaryReceipt(finance, monthDate);
+  return receipt ? Math.max(receipt.amount, 0) : getExpectedSalary(finance, monthDate);
 }
 
 // Tombstones de sueldo: "<mes>@<hora>" o "*@<hora>" (todos los meses). Al
@@ -166,8 +234,9 @@ export function buildMonthlyMoneyPlan({
   const monthStart = range?.start ?? toDateOnly(startOfMonth(monthDate));
   const monthEnd = range?.end ?? toDateOnly(endOfMonth(monthDate));
   const phase = planPhaseFor(month, activeMonthId);
-  const salarySettings = getMonthlySalarySettings(finance, month);
-  const salaryIncomeTotal = Math.max(Number(salarySettings.amount), 0);
+  const salaryExtraPayTotal = getSalaryExtraPay(finance, month);
+  const salaryReceipt = getSalaryReceipt(finance, month);
+  const salaryIncomeTotal = getMonthSalary(finance, month);
   const monthlySavingsTarget = getMonthlySavingsTarget(finance, month);
   const extraIncomeTotal = includeExtraIncome
     ? finance.incomeEvents
@@ -242,6 +311,8 @@ export function buildMonthlyMoneyPlan({
     incomeTotal,
     fixedIncomeTotal: salaryIncomeTotal,
     salaryIncomeTotal,
+    salaryExtraPayTotal,
+    ...(salaryReceipt ? { salaryReceipt } : {}),
     extraIncomeTotal,
     plannedExpensesTotal,
     paidExpensesTotal,

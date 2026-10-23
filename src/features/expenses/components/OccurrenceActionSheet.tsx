@@ -18,10 +18,14 @@ import { Field } from "@/components/ui/Field";
 import { IconButton } from "@/components/ui/IconButton";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Sheet } from "@/components/ui/Sheet";
+import type { PaidAmountAverage } from "@/domain/amount-history";
 import { formatCurrency } from "@/domain/calendar";
+import type { SeriesAmountPrompt } from "@/domain/series-lifecycle";
 import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
+import { PaidAmountSuggestion } from "./PaidAmountSuggestion";
+import { SeriesAmountQuestion } from "./SeriesAmountQuestion";
 
 type OccurrenceActionSheetProps = {
   occurrence: ExpenseOccurrence;
@@ -38,9 +42,14 @@ type OccurrenceActionSheetProps = {
   onMove: (occurrence: ExpenseOccurrence, dueDate: string) => void;
   onSkip: (occurrence: ExpenseOccurrence) => void;
   onEditSeries: (occurrence: ExpenseOccurrence) => void;
+  // Recibos variables: la media de los últimos pagos como sugerencia y, tras
+  // pagar otro importe, "¿Actualizar el importe desde ahora?".
+  suggestion?: PaidAmountAverage | null;
+  seriesPromptFor?: (occurrence: ExpenseOccurrence, amount: number) => SeriesAmountPrompt | null;
+  onApplySeries?: (prompt: SeriesAmountPrompt) => void;
 };
 
-type Mode = "actions" | "amount" | "move";
+type Mode = "actions" | "amount" | "move" | "series";
 
 // Acciones de un cobro al tocarlo: en móvil las filas solo tenían el gesto de
 // deslizar, sin botones ni acceso para lectores de pantalla.
@@ -56,8 +65,12 @@ export function OccurrenceActionSheet({
   onMove,
   onSkip,
   onEditSeries,
+  suggestion = null,
+  seriesPromptFor,
+  onApplySeries,
 }: OccurrenceActionSheetProps) {
   const [mode, setMode] = useState<Mode>("actions");
+  const [seriesPrompt, setSeriesPrompt] = useState<SeriesAmountPrompt | null>(null);
   const [amountText, setAmountText] = useState(() =>
     formatMoneyInput(occurrence.template.amount, language),
   );
@@ -70,7 +83,8 @@ export function OccurrenceActionSheet({
   // Al cambiar de modo, el foco pasa al primer control del nuevo contenido
   // en lugar de perderse en el documento.
   useEffect(() => {
-    if (mode === "actions") return;
+    // La pregunta de la serie enfoca su propio título.
+    if (mode === "actions" || mode === "series") return;
     bodyRef.current
       ?.querySelector<HTMLElement>("input, button:not([disabled])")
       ?.focus({ preventScroll: true });
@@ -160,7 +174,17 @@ export function OccurrenceActionSheet({
                 event.preventDefault();
                 const amount = parseMoneyInput(amountText);
                 if (amount === null || amount <= 0) return;
-                run(() => onPayAmount(occurrence, amount));
+                onPayAmount(occurrence, amount);
+                const prompt =
+                  amount !== occurrence.template.amount
+                    ? (seriesPromptFor?.(occurrence, amount) ?? null)
+                    : null;
+                if (!prompt) {
+                  onClose();
+                  return;
+                }
+                setSeriesPrompt(prompt);
+                setMode("series");
               }}
             >
               <Field label={t("expenses.occurrencePaidAmount", language)}>
@@ -171,6 +195,13 @@ export function OccurrenceActionSheet({
                   autoFocus
                 />
               </Field>
+              {suggestion ? (
+                <PaidAmountSuggestion
+                  suggestion={suggestion}
+                  language={language}
+                  onUse={setAmountText}
+                />
+              ) : null}
               <Button type="submit" variant="primary" size="lg">
                 {t("expenses.occurrenceSavePayment", language)}
               </Button>
@@ -178,6 +209,15 @@ export function OccurrenceActionSheet({
                 {t("expenses.occurrenceBack", language)}
               </Button>
             </form>
+          ) : null}
+
+          {mode === "series" && seriesPrompt ? (
+            <SeriesAmountQuestion
+              prompt={seriesPrompt}
+              language={language}
+              onApply={() => run(() => onApplySeries?.(seriesPrompt))}
+              onKeep={onClose}
+            />
           ) : null}
 
           {mode === "move" ? (

@@ -8,15 +8,22 @@ import {
   toMonthId,
 } from "@/domain/finance";
 import { overrideIdFor } from "@/domain/overrides";
+import {
+  normalizeAmountChanges,
+  normalizePauses,
+  templateAmountOn,
+} from "@/domain/recurrence";
 import { DEFAULT_REMINDER_PREFERENCES } from "@/domain/reminder-schedule";
 import { emptyStore } from "@/domain/seed";
 import { foldText } from "@/domain/text";
 import type {
   AppLanguage,
+  ExpenseAmountChange,
   ExpenseCategory,
   ExpenseOccurrence,
   ExpenseOccurrenceOverride,
   ExpenseOccurrenceRecord,
+  ExpensePause,
   ExpenseReminderSettings,
   ExpenseStore,
   ExpenseTemplate,
@@ -54,6 +61,8 @@ export const CSV_COLUMNS = [
   "rrule",
   "start_date",
   "end_date",
+  "pauses",
+  "price_changes",
   "due_day",
   "active",
   "reminder_days",
@@ -96,6 +105,8 @@ export function storeToCsv(
       ...recurrenceCells(template.recurrence),
       start_date: template.startDate,
       end_date: template.endDate ?? "",
+      pauses: pausesCell(template.pauses),
+      price_changes: priceChangesCell(template.amountChanges),
       due_day: String(template.dueDay),
       active: template.active ? "true" : "false",
       reminder_days: reminderCell(template.reminder),
@@ -157,6 +168,44 @@ function recurrenceCells(rule: RecurrenceRule): CsvRow {
     annual_month: rule.frequency === "yearly" && rule.annualMonth ? String(rule.annualMonth) : "",
     rrule: rule.frequency === "rrule" ? (rule.rrule ?? "") : "",
   };
+}
+
+// Pausas y cambios de precio de la serie, una celda cada uno: entradas
+// separadas por espacios, "inicio/fin" (sin fin, la pausa sigue abierta) y
+// "fecha=importe".
+function pausesCell(pauses: ExpensePause[] | undefined) {
+  return (pauses ?? []).map((pause) => `${pause.from}/${pause.to ?? ""}`).join(" ");
+}
+
+function priceChangesCell(changes: ExpenseAmountChange[] | undefined) {
+  return (changes ?? [])
+    .map((change) => `${change.from}=${formatAmount(change.amount)}`)
+    .join(" ");
+}
+
+function cellEntries(value: string | undefined) {
+  return (value ?? "").split(/[\s;]+/).filter(Boolean);
+}
+
+// Las entradas ilegibles se descartan con las mismas reglas que al cargar el
+// store (una pausa con un fin ilegible no se convierte en una sin fin).
+function pausesFromCell(value: string | undefined) {
+  return normalizePauses(
+    cellEntries(value).map((entry) => {
+      const [from, to = ""] = entry.split("/");
+      return { from, to: to || undefined };
+    }),
+  );
+}
+
+// El importe admite coma decimal, como el resto de importes del CSV.
+function priceChangesFromCell(value: string | undefined) {
+  return normalizeAmountChanges(
+    cellEntries(value).map((entry) => {
+      const [from, amount = ""] = entry.split("=");
+      return { from, amount: parseMoneyInput(amount) };
+    }),
+  );
 }
 
 function toCells(row: CsvRow): string[] {
@@ -273,6 +322,8 @@ function templateFromRow(row: CsvRow, context: RowContext): ExpenseTemplate | nu
   const endDate = normalizeDateOnly(row.end_date);
   const updatedAt = readTimestamp(row.updated_at) ?? context.nowIso;
   const reminder = reminderFromCell(row.reminder_days);
+  const pauses = pausesFromCell(row.pauses);
+  const amountChanges = priceChangesFromCell(row.price_changes);
 
   return {
     id: row.expense_id || `exp-${crypto.randomUUID()}`,
@@ -287,6 +338,8 @@ function templateFromRow(row: CsvRow, context: RowContext): ExpenseTemplate | nu
     dueDay: readInteger(row.due_day, 1, 31) ?? Number(startDate.slice(8, 10)),
     recurrence: recurrenceFromRow(row, startDate),
     ...(reminder ? { reminder } : {}),
+    ...(amountChanges ? { amountChanges } : {}),
+    ...(pauses ? { pauses } : {}),
     active: !/^(false|0|no|n)$/i.test(row.active ?? ""),
     createdAt: updatedAt,
     updatedAt,
@@ -351,7 +404,8 @@ function occurrenceFromRow(
   if (closed) {
     const template = templates.get(templateId);
     const recordName = name || template?.name;
-    const recordAmount = plannedAmount ?? template?.amount ?? amountPaid;
+    const recordAmount =
+      plannedAmount ?? (template ? templateAmountOn(template, occurrenceDate) : amountPaid);
     if (!recordName || !recordAmount || recordAmount <= 0) return null;
     const recordCategory =
       categoryName ?? context.categories.nameOf(template?.categoryId) ?? "General";
@@ -386,7 +440,10 @@ function occurrenceFromRow(
   const categoryId = categoryName ? context.categories.idFor(categoryName) : null;
   const patch: Partial<ExpenseOccurrenceOverride> = {
     ...(dueDate !== occurrenceDate ? { dueDate } : {}),
-    ...(plannedAmount !== null && plannedAmount > 0 && plannedAmount !== template.amount
+    // Lo previsto de ese cobro ya cuenta los cambios de precio de la serie.
+    ...(plannedAmount !== null &&
+    plannedAmount > 0 &&
+    plannedAmount !== templateAmountOn(template, occurrenceDate)
       ? { amount: plannedAmount }
       : {}),
     ...(name && name !== template.name ? { name } : {}),

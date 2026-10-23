@@ -3,8 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ActionToast } from "@/components/ui/ActionToast";
-import { addMonthId } from "@/domain/budget-month";
+import { suggestedPaidAmount } from "@/domain/amount-history";
+import { addMonthId, isSalaryPromptVisible } from "@/domain/budget-month";
 import { periodRange } from "@/domain/budget-cycle";
+import { formatCurrency, toDateOnly } from "@/domain/calendar";
+import { seriesAmountPromptFor } from "@/domain/series-lifecycle";
 import type { ExpenseOccurrence } from "@/domain/types";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
 import { ExpenseFormSheet } from "@/features/expenses/components/ExpenseFormSheet";
@@ -46,7 +49,9 @@ import {
   readNewExpenseIntent,
 } from "@/features/expenses/lib/new-expense-intent";
 import { MonthSummarySheet } from "@/features/plan/components/MonthSummarySheet";
+import { SalaryPromptCard } from "@/features/plan/components/SalaryPromptCard";
 import { useMonthSummary } from "@/features/plan/hooks/use-month-summary";
+import { useSalaryPrompt } from "@/features/plan/hooks/use-salary-prompt";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
 
@@ -74,6 +79,9 @@ export function ExpenseDashboard({
     setTemplateReminder,
     closeMonth,
     reopenMonth,
+    setSeriesAmount,
+    recordSalaryReceipt,
+    undoSalaryReceipt,
   } = useExpenseStore();
   const language = store.preferences?.language ?? "es";
   const now = useCurrentDate();
@@ -163,6 +171,45 @@ export function ExpenseDashboard({
   const runViewTransition = useViewTransitionAction();
   const router = useRouter();
   const [recurringOpen, setRecurringOpen] = useState(false);
+  // Recibos variables: al pagar otro importe desde las acciones del cobro se
+  // sugiere la media de los últimos pagos.
+  const paidSuggestion = useMemo(
+    () =>
+      selectedOccurrence
+        ? suggestedPaidAmount(
+            store,
+            selectedOccurrence.template.id,
+            selectedOccurrence.occurrenceDate,
+            language,
+          )
+        : null,
+    [language, selectedOccurrence, store],
+  );
+  const salaryPrompt = useSalaryPrompt({
+    finance: store.finance,
+    now,
+    language,
+    recordSalaryReceipt,
+    onRecorded: (input) =>
+      actionToast.show({
+        message: capitalize(
+          t("salary.received", language).replace(
+            "{month}",
+            formatMonthName(input.monthId, language),
+          ),
+        ),
+        actionLabel: t("common.undo", language),
+        onAction: () => {
+          undoSalaryReceipt(input.monthId);
+          actionToast.dismiss();
+        },
+      }),
+  });
+  const showSalaryPrompt = isSalaryPromptVisible(
+    salaryPrompt.prompt,
+    month.viewMonthId,
+    month.activeMonthId,
+  );
   const [hiddenReminderId, setHiddenReminderId] = useState<string | null>(null);
   const lastChanceReminder = buildLastChanceReminders(store, now).find(
     (reminder) => reminder.occurrence.id !== hiddenReminderId,
@@ -278,6 +325,23 @@ export function ExpenseDashboard({
           }}
           headingRef={monthHeadingRef}
         />
+        {showSalaryPrompt && salaryPrompt.prompt ? (
+          <SalaryPromptCard
+            prompt={salaryPrompt.prompt}
+            editing={salaryPrompt.editing}
+            amountText={salaryPrompt.amountText}
+            language={language}
+            onConfirm={salaryPrompt.confirm}
+            onStartOther={salaryPrompt.startOther}
+            onCancelOther={salaryPrompt.cancelOther}
+            onAmountTextChange={salaryPrompt.setAmountText}
+            onSaveOther={salaryPrompt.saveOther}
+            onDismiss={() => {
+              salaryPrompt.dismiss();
+              focusMonthHeading();
+            }}
+          />
+        ) : null}
         {showCloseCard ? (
           <MonthCloseCard
             status={month.closeStatus}
@@ -396,6 +460,20 @@ export function ExpenseDashboard({
             runViewTransition(() => moveOccurrence(occurrence, dueDate))
           }
           onSkip={skipWithUndo}
+          suggestion={paidSuggestion}
+          seriesPromptFor={(occurrence, amount) =>
+            seriesAmountPromptFor(store, occurrence.template.id, amount, toDateOnly(now))
+          }
+          onApplySeries={(prompt) => {
+            setSeriesAmount(prompt.templateId, prompt.to);
+            // Sin pisar otro aviso (p. ej. "Octubre al día · Pasar a noviembre").
+            if (actionToast.toast) return;
+            actionToast.show({
+              message: t("bills.seriesUpdated", language)
+                .replace("{name}", prompt.name)
+                .replace("{amount}", formatCurrency(prompt.to)),
+            });
+          }}
           // replace: la entrada de la hoja en el historial pasa a ser la del
           // detalle, y Atrás desde el detalle vuelve al listado.
           onEditSeries={(occurrence) => router.replace(`/expenses/${occurrence.template.id}`)}

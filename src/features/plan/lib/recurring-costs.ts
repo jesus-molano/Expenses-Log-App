@@ -6,7 +6,7 @@ import {
   type DateRange,
 } from "@/domain/budget-cycle";
 import {
-  getMonthlySalarySettings,
+  getMonthSalary,
   occurrenceAmount,
   occurrencesDueBetween,
 } from "@/domain/finance";
@@ -172,7 +172,8 @@ export function buildRecurringCostInsights(
     })
     .sort((a, b) => b.annual - a.annual || (a.category?.name ?? "").localeCompare(b.category?.name ?? ""));
   const monthlyAverage = roundCents(annualTotal / COST_WINDOW_MONTHS);
-  const salary = getMonthlySalarySettings(store.finance, monthId).amount;
+  // El sueldo del mes activo: lo cobrado si ya se confirmó.
+  const salary = getMonthSalary(store.finance, monthId);
 
   return {
     range,
