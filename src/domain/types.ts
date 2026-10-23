@@ -24,6 +24,9 @@ export type ExpenseCategory = {
   name: string;
   icon: string;
   tone: CategoryTone;
+  // Para fusionar por entidad como el resto. Las categorías antiguas no lo
+  // tienen: entonces gana la copia local.
+  updatedAt?: string;
 };
 
 export type RecurrenceRule = {
@@ -129,8 +132,14 @@ export type DraftExpense = {
 };
 
 export type CreateExpenseOptions = {
+  // Estado del cobro de este mes que ya pasó.
   initialStatus?: Extract<OccurrenceStatus, "due" | "paid">;
+  // Qué hacer con los cobros de meses anteriores cuando el gasto empezó antes
+  // de este mes. Sin valor quedan pendientes.
+  previousCharges?: PreviousChargesResolution;
 };
+
+export type PreviousChargesResolution = Extract<OccurrenceStatus, "paid" | "skipped">;
 
 export type IncomeEvent = {
   id: string;
@@ -247,12 +256,6 @@ export type MonthlyMoneyPlan = {
     amount: number;
     overdue: boolean;
   };
-  // Compatibilidad temporal con los consumidores del reparto existente.
-  expensesContribution: number;
-  savingsContribution: number;
-  remainingContribution: number;
-  investmentContribution: number;
-  shortfall: number;
 };
 
 export type ExpenseStore = {

@@ -91,14 +91,51 @@ export function rekeyOverridesForTemplateChange(
   today: Date = new Date(),
 ): ExpenseStore {
   if (!scheduleChanged(previous, next)) return store;
+  return rekeyOpenOverrides(store, next, today);
+}
 
-  const openFrom = toDateOnly(startOfMonth(today));
+// El rekey de un cambio de día solo corre en el dispositivo que edita: un pago
+// hecho en otro con la fecha antigua queda, al fusionar, en una clave que la
+// plantilla ya no genera. Repite el rekey de los meses abiertos contra las
+// plantillas actuales. Devuelve el mismo store si no había nada que mover.
+export function reconcileOrphanOverrides(
+  store: ExpenseStore,
+  today: Date = new Date(),
+): ExpenseStore {
+  const openFrom = openMonthsFrom(today);
+  const candidates = new Set(
+    store.overrides
+      .filter(
+        (override) =>
+          override.occurrenceDate >= openFrom && !isNeutralOverride(override),
+      )
+      .map((override) => override.templateId),
+  );
+  if (!candidates.size) return store;
+
+  return store.templates
+    .filter((template) => candidates.has(template.id))
+    .reduce((result, template) => rekeyOpenOverrides(result, template, today), store);
+}
+
+function openMonthsFrom(today: Date) {
+  return toDateOnly(startOfMonth(today));
+}
+
+// Lleva cada override de un mes abierto de la serie a la única fecha que la
+// plantilla genera en ese mes; si choca, gana el estado más definitivo.
+function rekeyOpenOverrides(
+  store: ExpenseStore,
+  template: ExpenseTemplate,
+  today: Date,
+): ExpenseStore {
+  const openFrom = openMonthsFrom(today);
   const now = new Date().toISOString();
   let result = store;
 
   for (const override of store.overrides) {
     if (
-      override.templateId !== next.id ||
+      override.templateId !== template.id ||
       override.occurrenceDate < openFrom ||
       isNeutralOverride(override)
     ) {
@@ -106,7 +143,7 @@ export function rekeyOverridesForTemplateChange(
     }
     const month = parseISO(override.occurrenceDate);
     const [target, ...others] = generateTemplateDates(
-      next,
+      template,
       toDateOnly(startOfMonth(month)),
       toDateOnly(endOfMonth(month)),
     );
@@ -114,7 +151,7 @@ export function rekeyOverridesForTemplateChange(
 
     const targetExisting = result.overrides.find(
       (candidate) =>
-        candidate.templateId === next.id && candidate.occurrenceDate === target,
+        candidate.templateId === template.id && candidate.occurrenceDate === target,
     );
     // Un placeholder neutro en el destino no protege nada: el contenido de la
     // clave antigua pasa a la nueva salvo que el destino tenga un estado más
@@ -127,7 +164,7 @@ export function rekeyOverridesForTemplateChange(
       const { dueDate, ...fields } = override;
       result = upsertOccurrenceOverride(
         result,
-        { templateId: next.id, occurrenceDate: target },
+        { templateId: template.id, occurrenceDate: target },
         { ...fields, dueDate: dueDate === target ? undefined : dueDate },
         { now },
       );

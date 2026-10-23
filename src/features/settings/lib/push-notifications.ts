@@ -100,6 +100,22 @@ export async function createPushSubscription(
   });
 }
 
+// Sustituye la suscripción del navegador por otra nueva, con otro endpoint.
+// Sirve cuando el endpoint actual quedó registrado a nombre de otra cuenta
+// que cerró sesión sin borrarlo (antes de que el cierre de sesión lo hiciera).
+export async function renewPushSubscription(
+  registration: ServiceWorkerRegistration,
+  publicKey: string,
+) {
+  const existing = await registration.pushManager.getSubscription();
+  await existing?.unsubscribe();
+
+  return registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey),
+  });
+}
+
 export async function savePushSubscription(
   subscription: PushSubscription,
   { previousEndpoint }: { previousEndpoint?: string } = {},
@@ -122,11 +138,13 @@ export async function savePushSubscription(
 
 export async function deletePushSubscription(
   subscription: PushSubscription,
+  { signal }: { signal?: AbortSignal } = {},
 ): Promise<PushSubscribeResult> {
   const response = await fetch("/api/push/subscribe", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ endpoint: subscription.endpoint }),
+    signal,
   });
   const payload = await readPushResponse(response);
 
@@ -178,4 +196,40 @@ export async function getCurrentPushSubscription() {
   if (!registration) return null;
 
   return registration.pushManager.getSubscription();
+}
+
+// Plazo del borrado remoto al cerrar sesión: sin red no debe bloquear la
+// salida.
+export const RELEASE_PUSH_TIMEOUT_MS = 4_000;
+
+export type PushReleaseResult = "none" | "released" | "incomplete";
+
+// Al cerrar sesión, los avisos de este navegador dejan de ser de esa cuenta.
+// Primero se borra el registro remoto (necesita la sesión, por eso va antes
+// del signOut) y después se anula la suscripción del navegador. Anularla
+// invalida el endpoint aunque el borrado remoto falle: el cron poda esa fila
+// cuando el servicio push responda 404/410. Nunca lanza.
+export async function releasePushSubscription({
+  timeoutMs = RELEASE_PUSH_TIMEOUT_MS,
+}: { timeoutMs?: number } = {}): Promise<PushReleaseResult> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+    return "none";
+  }
+
+  const subscription = await getCurrentPushSubscription().catch(() => null);
+  if (!subscription) return "none";
+
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  let remoteFailed = false;
+  try {
+    await deletePushSubscription(subscription, { signal: controller.signal });
+  } catch {
+    remoteFailed = true;
+  } finally {
+    window.clearTimeout(timer);
+  }
+
+  const unsubscribed = await subscription.unsubscribe().catch(() => false);
+  return remoteFailed || !unsubscribed ? "incomplete" : "released";
 }

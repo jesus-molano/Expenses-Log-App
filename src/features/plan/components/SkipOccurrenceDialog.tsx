@@ -23,7 +23,7 @@ export function SkipOccurrenceDialog({
       icon={<Trash2 size={18} />}
       title={t("money.skipMonthExpense", language)}
       body={`${t("money.skipMonthExpenseConfirm", language)} ${occurrence.template.name}`}
-      cancelLabel={t("common.back", language)}
+      cancelLabel={t("common.cancel", language)}
       confirmLabel={t("money.skipMonthExpenseAction", language)}
       onCancel={onCancel}
       onConfirm={onConfirm}

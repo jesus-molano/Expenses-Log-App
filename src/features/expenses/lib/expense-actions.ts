@@ -10,7 +10,7 @@ import type {
   ExpenseStore,
   ExpenseTemplate,
 } from "@/domain/types";
-import { t } from "@/shared/i18n";
+import { formatMessage, t } from "@/shared/i18n";
 
 export function createId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
@@ -34,6 +34,7 @@ export function findOrCreateCategory(
     name: normalizedName,
     icon: presetCategory.icon,
     tone: presetCategory.tone,
+    updatedAt: new Date().toISOString(),
   };
 
   return {
@@ -91,20 +92,27 @@ export function statusLabel(
 
   const delta = daysBetween(today, occurrence.dueDate);
   if (delta === 0) return t("expenses.statusDueToday", language);
-  if (delta < 0) {
-    const days = Math.abs(delta);
-    return language === "en"
-      ? `${days} ${days === 1 ? t("expenses.day", language) : t("expenses.days", language)} ago`
-      : `${t("expenses.daysAgo", language)} ${days} ${days === 1 ? t("expenses.day", language) : t("expenses.days", language)}`;
-  }
+  if (delta < 0) return dayCountLabel("expenses.daysAgoLabel", -delta, language);
   if (occurrence.estimatedChargeDate !== occurrence.dueDate) {
     const locale = language === "en" ? enUS : es;
+    // Un cargo que se va al mes siguiente lleva el mes: "estimado lunes 2 nov".
+    const otherMonth =
+      occurrence.estimatedChargeDate.slice(0, 7) !== occurrence.dueDate.slice(0, 7);
     return `${t("expenses.estimated", language).toLowerCase()} ${format(
       parseISO(occurrence.estimatedChargeDate),
-      "EEEE d",
+      otherMonth ? "EEEE d MMM" : "EEEE d",
       { locale },
     )}`;
   }
-  return `${t("expenses.daysAhead", language)} ${delta} ${delta === 1 ? t("expenses.day", language) : t("expenses.days", language)}`;
+  return dayCountLabel("expenses.daysAheadLabel", delta, language);
+}
+
+function dayCountLabel(
+  key: "expenses.daysAgoLabel" | "expenses.daysAheadLabel",
+  count: number,
+  language: AppLanguage,
+) {
+  const unit = t(count === 1 ? "expenses.day" : "expenses.days", language);
+  return formatMessage(key, { count, unit }, language);
 }
 

@@ -1,5 +1,6 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { normalizeExpenseStore } from "@/data/persistence/store-normalization";
+import { groupDeliverablePushSubscriptions } from "@/data/push/push-endpoints";
 import {
   recordPushFailure,
   recordPushSuccess,
@@ -16,15 +17,17 @@ import {
   configureWebPush,
   isExpiredPushSubscription,
   sendWebPush,
-} from "@/data/push/web-push-client";
+} from "@/data/push/web-push-sender";
 import { createSupabaseServiceClient } from "@/data/supabase/admin-client";
 import type { AppSupabaseClient, UUID } from "@/data/supabase/database.types";
+import type { ExpenseStore } from "@/domain/types";
 import {
   buildReminderNotifications,
   planUserReminders,
   type ReminderCandidate,
   type ReminderNotification,
 } from "@/features/expenses/lib/reminder-notifications";
+import { toReminderStore } from "@/features/expenses/lib/reminder-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,23 +39,45 @@ type DeliverySummary = {
   notificationsFailed: number;
   duplicateDeliveriesSkipped: number;
   invalidSubscriptionsRemoved: number;
-  // Usuarios cuyo cálculo o envío falló; el resto sigue adelante.
+  // Stores que no tienen forma de store (no se puede avisar a ese usuario).
+  invalidStoresSkipped: number;
+  // Filas con un endpoint fuera de la lista de servicios push.
+  blockedEndpointsSkipped: number;
+  // Usuarios cuyo envío falló por un error inesperado (RPC, base de datos o
+  // datos rotos). El resto de usuarios se procesa igual.
   errors: number;
 };
 
 type Claim = {
   candidate: ReminderCandidate;
   claimToken: UUID;
-  settled: boolean;
+  // "open": aún sin cerrar; "settled": marcado o liberado; "failed": no se
+  // pudo cerrar y caduca solo a los 15 minutos.
+  state: "open" | "settled" | "failed";
 };
 
+// Comparación en tiempo constante: `===` deja medir cuántos caracteres del
+// secreto coinciden.
 function authorizeCron(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return "missing_secret";
 
-  return request.headers.get("authorization") === `Bearer ${secret}`
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const received = Buffer.from(request.headers.get("authorization") ?? "");
+  return received.length === expected.length &&
+    timingSafeEqual(received, expected)
     ? "authorized"
     : "unauthorized";
+}
+
+// Para el log: sin datos del store ni del usuario más allá de su id.
+function describeError(error: unknown) {
+  if (error instanceof Error) return { name: error.name, message: error.message };
+  if (error && typeof error === "object") {
+    const { code, message } = error as { code?: unknown; message?: unknown };
+    return { code, message };
+  }
+  return { message: String(error) };
 }
 
 // El cron puede correr cada hora: cada usuario recibe lo del día a partir de la
@@ -110,12 +135,10 @@ async function handleDailyReminders(request: Request) {
     );
   }
 
-  const subscriptionsByUser = new Map<string, PushSubscriptionRow[]>();
-  for (const subscription of subscriptions ?? []) {
-    const current = subscriptionsByUser.get(subscription.user_id) ?? [];
-    current.push(subscription);
-    subscriptionsByUser.set(subscription.user_id, current);
-  }
+  // Solo hosts de servicios push y, como mucho, los 10 dispositivos
+  // actualizados más recientemente de cada usuario.
+  const { byUser: subscriptionsByUser, blocked } =
+    groupDeliverablePushSubscriptions<PushSubscriptionRow>(subscriptions ?? []);
 
   const summary: DeliverySummary = {
     usersChecked: stores?.length ?? 0,
@@ -124,59 +147,77 @@ async function handleDailyReminders(request: Request) {
     notificationsFailed: 0,
     duplicateDeliveriesSkipped: 0,
     invalidSubscriptionsRemoved: 0,
+    invalidStoresSkipped: 0,
+    blockedEndpointsSkipped: blocked,
     errors: 0,
   };
   const now = new Date();
 
+  // Un usuario con datos rotos o un fallo puntual de la base de datos no
+  // corta la ejecución para los demás.
   for (const storeRow of stores ?? []) {
-    const userSubscriptions = subscriptionsByUser.get(storeRow.user_id) ?? [];
-    if (!userSubscriptions.length) continue;
+    const userSubscriptions = subscriptionsByUser.get(storeRow.user_id);
+    if (!userSubscriptions?.length) continue;
 
-    await deliverUserReminders({
-      admin,
-      userId: storeRow.user_id,
-      rawStore: storeRow.store,
-      subscriptions: userSubscriptions,
-      now,
-      summary,
-    });
+    try {
+      const store = toReminderStore(storeRow.store, now);
+      if (!store) {
+        summary.invalidStoresSkipped += 1;
+        continue;
+      }
+      await deliverUserReminders({
+        admin,
+        userId: storeRow.user_id,
+        store,
+        subscriptions: userSubscriptions,
+        now,
+        summary,
+      });
+    } catch (error) {
+      summary.errors += 1;
+      console.error("Could not deliver push reminders for a user", {
+        userId: storeRow.user_id,
+        error: describeError(error),
+      });
+    }
   }
 
   return NextResponse.json({ ok: true, ...summary });
 }
 
-// Un store ilegible o un error de la base de datos con un usuario no corta el
-// envío al resto: se cuenta, se registra y se liberan sus reclamaciones.
+// Reclama cada aviso con su tipo, envía una notificación por tipo y cierra lo
+// reclamado siempre, también si falla una reclamación a medias o un envío:
+// marcado si llegó a algún dispositivo, liberado si no.
 async function deliverUserReminders({
   admin,
   userId,
-  rawStore,
+  store,
   subscriptions,
   now,
   summary,
 }: {
   admin: AppSupabaseClient;
   userId: UUID;
-  rawStore: unknown;
+  store: ExpenseStore;
   subscriptions: PushSubscriptionRow[];
   now: Date;
   summary: DeliverySummary;
 }) {
+  const plan = planUserReminders(store, now);
+  if (!plan?.candidates.length) return;
+
   const claims: Claim[] = [];
   const devices = [...subscriptions];
+  let failure: { error: unknown } | null = null;
 
   try {
-    if (!rawStore || typeof rawStore !== "object") return;
-    const plan = planUserReminders(normalizeExpenseStore(rawStore, now), now);
-    if (!plan?.candidates.length) return;
-
     for (const candidate of plan.candidates) {
       const claimToken = await claimReminderDelivery(admin, deliveryRef(userId, candidate));
       if (!claimToken) {
         summary.duplicateDeliveriesSkipped += 1;
         continue;
       }
-      claims.push({ candidate, claimToken, settled: false });
+      claims.push({ candidate, claimToken, state: "open" });
     }
     if (!claims.length) return;
     summary.usersWithReminders += 1;
@@ -187,31 +228,30 @@ async function deliverUserReminders({
     );
     for (const notification of notifications) {
       const accepted = await sendToDevices(admin, devices, notification, now, summary);
-      for (const claim of claims) {
-        if (!notification.candidates.includes(claim.candidate)) continue;
-        // Entregado si al menos un dispositivo lo aceptó; si no, se libera
-        // para que la siguiente ejecución lo intente.
-        if (accepted > 0) {
-          await markReminderDelivered(admin, deliveryRef(userId, claim.candidate), claim.claimToken);
-        } else {
-          await releaseReminderDelivery(admin, deliveryRef(userId, claim.candidate), claim.claimToken);
-        }
-        claim.settled = true;
-      }
+      // Entregado si al menos un dispositivo lo aceptó; si no, se libera para
+      // que la siguiente ejecución lo intente.
+      await settleClaims(
+        admin,
+        userId,
+        claims.filter((claim) => notification.candidates.includes(claim.candidate)),
+        accepted > 0,
+      );
     }
   } catch (error) {
-    summary.errors += 1;
-    console.error("Push reminders failed for a user", {
-      code: (error as { code?: string } | null)?.code ?? "unknown",
-    });
-  } finally {
-    await Promise.allSettled(
-      claims
-        .filter((claim) => !claim.settled)
-        .map((claim) =>
-          releaseReminderDelivery(admin, deliveryRef(userId, claim.candidate), claim.claimToken),
-        ),
-    );
+    failure = { error };
+  }
+
+  // Lo que quedó sin enviar (reclamación a medias, fallo a mitad o un tipo
+  // sin notificación) se libera.
+  await settleClaims(
+    admin,
+    userId,
+    claims.filter((claim) => claim.state === "open"),
+    false,
+  );
+  if (failure) throw failure.error;
+  if (claims.some((claim) => claim.state !== "settled")) {
+    throw new Error("Push reminder leases were not settled.");
   }
 }
 
@@ -219,9 +259,46 @@ function deliveryRef(userId: UUID, candidate: ReminderCandidate) {
   return { userId, reminderKey: candidate.key, kind: candidate.kind };
 }
 
-// Envía a todos los dispositivos a la vez. Una suscripción caducada se borra;
-// otros fallos se cuentan y, repetidos, también la borran. Devuelve cuántos
-// dispositivos aceptaron el aviso.
+// Cierra cada lease por separado, para que un fallo no deje los demás
+// abiertos. El que no se pudo cerrar queda como "failed": caduca a los 15
+// minutos y otra ejecución puede volver a reclamarlo.
+async function settleClaims(
+  admin: AppSupabaseClient,
+  userId: UUID,
+  claims: Claim[],
+  delivered: boolean,
+) {
+  if (!claims.length) return;
+
+  const settle = delivered ? markReminderDelivered : releaseReminderDelivery;
+  const results = await Promise.allSettled(
+    claims.map((claim) =>
+      settle(admin, deliveryRef(userId, claim.candidate), claim.claimToken),
+    ),
+  );
+  const failed: unknown[] = [];
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      claims[index].state = "settled";
+      return;
+    }
+    claims[index].state = "failed";
+    failed.push(result.reason);
+  });
+  if (!failed.length) return;
+
+  console.error("Could not settle push reminder leases", {
+    userId,
+    delivered,
+    failed: failed.length,
+    error: describeError(failed[0]),
+  });
+}
+
+// Envía a todos los dispositivos a la vez: uno lento (5 s como mucho) no
+// retrasa a los demás. Una suscripción caducada (404/410) se borra; otros
+// fallos se cuentan y, repetidos (MAX_PUSH_FAILURES), también la borran.
+// Devuelve cuántos dispositivos aceptaron el aviso.
 async function sendToDevices(
   admin: AppSupabaseClient,
   devices: PushSubscriptionRow[],

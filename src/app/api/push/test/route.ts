@@ -1,21 +1,26 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { toDatabaseUuid } from "@/data/supabase/database.types";
+import {
+  isAllowedPushEndpoint,
+  MAX_PUSH_ENDPOINT_LENGTH,
+} from "@/data/push/push-endpoints";
 import {
   configureWebPush,
   isExpiredPushSubscription,
   sendWebPush,
-} from "@/data/push/web-push-client";
-import { toDatabaseUuid } from "@/data/supabase/database.types";
+  TEST_PUSH_TTL_SECONDS,
+} from "@/data/push/web-push-sender";
 import { t } from "@/shared/i18n";
 import { createClient } from "@/utils/supabase/server";
 
 const subscriptionSchema = z.object({
-  endpoint: z.string().url(),
+  endpoint: z
+    .string()
+    .max(MAX_PUSH_ENDPOINT_LENGTH)
+    .refine(isAllowedPushEndpoint),
   language: z.enum(["es", "en"]).optional(),
 });
-
-// Una prueba que no llega en 5 minutos ya no sirve.
-const TEST_PUSH_TTL_SECONDS = 5 * 60;
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);

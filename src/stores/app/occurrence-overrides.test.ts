@@ -19,7 +19,10 @@ import {
   updateExpenseTemplateInStore,
   updateMonthlyExpenseOccurrenceInStore,
 } from "./expense-commands";
-import { upsertOccurrenceOverride } from "./occurrence-overrides";
+import {
+  reconcileOrphanOverrides,
+  upsertOccurrenceOverride,
+} from "./occurrence-overrides";
 
 const TEMPLATE: ExpenseTemplate = {
   id: "luz",
@@ -318,6 +321,147 @@ describe("occurrence overrides", () => {
         { ...unpaid, schemaVersion: 3 },
       );
       expect(occurrenceOn(merged, "2026-11-05").status).toBe("due");
+    });
+  });
+
+  describe("reconcileOrphanOverrides", () => {
+    const today = new Date(2026, 10, 2, 12);
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function at(iso: string) {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(iso));
+    }
+
+    // El portátil cambia el día de cobro a 10 y el móvil, sin enterarse, paga
+    // el recibo del día 5.
+    function staleDevicePayment() {
+      at("2026-11-02T10:00:00.000Z");
+      const base = storeWith();
+      vi.setSystemTime(new Date("2026-11-02T10:01:00.000Z"));
+      const laptop = updateExpenseTemplateInStore(base, "luz", { dueDay: 10 }, today);
+      vi.setSystemTime(new Date("2026-11-02T10:02:00.000Z"));
+      const phone = togglePaidInStore(base, occurrenceOn(base, "2026-11-05"));
+      return mergeExpenseStores(
+        { ...laptop, schemaVersion: 3 },
+        { ...phone, schemaVersion: 3 },
+      );
+    }
+
+    it("moves a payment made with the old due day to the date the series generates now", () => {
+      const merged = staleDevicePayment();
+      // Sin reconciliar, el pago se pierde y el recibo vuelve a pedirse.
+      expect(occurrenceOn(merged, "2026-11-10").status).toBe("due");
+
+      const reconciled = reconcileOrphanOverrides(merged, today);
+
+      expect(occurrenceOn(reconciled, "2026-11-10")).toMatchObject({
+        status: "paid",
+        override: expect.objectContaining({
+          id: "ovr:luz:2026-11-10",
+          amountPaid: 60,
+        }),
+      });
+      const oldKey = reconciled.overrides.find(
+        (override) => override.occurrenceDate === "2026-11-05",
+      );
+      expect(oldKey?.status).toBe("due");
+      expect(oldKey?.paidAt).toBeUndefined();
+    });
+
+    it("is idempotent and keeps the same store when there is nothing to move", () => {
+      const reconciled = reconcileOrphanOverrides(staleDevicePayment(), today);
+
+      expect(reconcileOrphanOverrides(reconciled, today)).toBe(reconciled);
+      const paid = togglePaidInStore(storeWith(), occurrenceOn(storeWith(), "2026-11-05"));
+      expect(reconcileOrphanOverrides(paid, today)).toBe(paid);
+    });
+
+    it("converges when both devices reconcile the same merge", () => {
+      const merged = staleDevicePayment();
+      vi.setSystemTime(new Date("2026-11-02T10:05:00.000Z"));
+      const onLaptop = reconcileOrphanOverrides(merged, today);
+      vi.setSystemTime(new Date("2026-11-02T10:06:00.000Z"));
+      const onPhone = reconcileOrphanOverrides(merged, today);
+
+      const converged = reconcileOrphanOverrides(
+        mergeExpenseStores(
+          { ...onPhone, schemaVersion: 3 },
+          { ...onLaptop, schemaVersion: 3 },
+        ),
+        today,
+      );
+      expect(occurrenceOn(converged, "2026-11-10").status).toBe("paid");
+      expect(converged.overrides).toHaveLength(2);
+    });
+
+    it("leaves closed months alone", () => {
+      const october: ExpenseOccurrenceOverride = {
+        id: "ovr:luz:2026-10-05",
+        userId: "demo",
+        templateId: "luz",
+        occurrenceDate: "2026-10-05",
+        status: "paid",
+        paidAt: "2026-10-05T09:00:00.000Z",
+        amountPaid: 60,
+        updatedAt: "2026-10-05T09:00:00.000Z",
+      };
+      const store = {
+        ...storeWith([october]),
+        templates: [{ ...TEMPLATE, startDate: "2026-09-10", dueDay: 10 }],
+      };
+
+      expect(reconcileOrphanOverrides(store, today)).toBe(store);
+    });
+
+    it("keeps the more definitive state when the new date already has one", () => {
+      at("2026-11-02T10:00:00.000Z");
+      const base = { ...storeWith(), templates: [{ ...TEMPLATE, dueDay: 10 }] };
+      const paidOnTenth = togglePaidInStore(base, occurrenceOn(base, "2026-11-10"));
+      vi.setSystemTime(new Date("2026-11-02T10:01:00.000Z"));
+      const store = upsertOccurrenceOverride(
+        paidOnTenth,
+        { templateId: "luz", occurrenceDate: "2026-11-05" },
+        { status: "skipped" },
+      );
+
+      const reconciled = reconcileOrphanOverrides(store, today);
+
+      expect(occurrenceOn(reconciled, "2026-11-10").status).toBe("paid");
+      expect(
+        reconciled.overrides.find((override) => override.occurrenceDate === "2026-11-05")
+          ?.status,
+      ).toBe("due");
+    });
+
+    it("does not guess for series with several charges a month", () => {
+      const weekly: ExpenseTemplate = {
+        ...TEMPLATE,
+        id: "bus",
+        startDate: "2026-11-02",
+        dueDay: 2,
+        recurrence: { frequency: "custom", interval: 1, unit: "week" },
+      };
+      const store: ExpenseStore = {
+        ...emptyStore,
+        templates: [weekly],
+        overrides: [
+          {
+            id: "ovr:bus:2026-11-04",
+            userId: "demo",
+            templateId: "bus",
+            occurrenceDate: "2026-11-04",
+            status: "paid",
+            paidAt: "2026-11-04T09:00:00.000Z",
+            updatedAt: "2026-11-04T09:00:00.000Z",
+          },
+        ],
+      };
+
+      expect(reconcileOrphanOverrides(store, today)).toBe(store);
     });
   });
 });

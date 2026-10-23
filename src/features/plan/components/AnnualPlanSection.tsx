@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
-import { planCopy } from "../lib/plan-dashboard";
 import type { MoneySeriesItem } from "../types";
 
 const MonthlyTrendChart = dynamic(() =>
@@ -13,7 +12,6 @@ const MonthlyTrendChart = dynamic(() =>
 
 export function AnnualPlanSection({
   language,
-  copy,
   year,
   availableYears,
   moneySeries,
@@ -25,7 +23,6 @@ export function AnnualPlanSection({
   onYearChange,
 }: {
   language: AppLanguage;
-  copy: ReturnType<typeof planCopy>;
   year: number;
   availableYears: number[];
   moneySeries: MoneySeriesItem[];
@@ -44,10 +41,10 @@ export function AnnualPlanSection({
             id="annual-plan-title"
             className="app-plan-section-title text-[var(--app-text)]"
           >
-            {copy.annualPlan}
+            {t("plan.annualPlan", language)}
           </h2>
           <p className="mt-1 text-sm text-[var(--app-text-muted)]">
-            {copy.annualSubtitle}
+            {t("plan.annualSubtitle", language)}
           </p>
         </div>
         <select
@@ -71,13 +68,13 @@ export function AnnualPlanSection({
         />
       </div>
       <dl className="app-plan-metric-grid mt-4 grid grid-cols-2 gap-x-5 rounded-[var(--app-radius-lg)] px-3 py-3 sm:grid-cols-4">
-        <AnnualMetric label={copy.annualRecurring} value={annualExpenses} />
-        <AnnualMetric label={copy.annualPaid} value={annualPaid} />
+        <AnnualMetric label={t("plan.annualRecurring", language)} value={annualExpenses} />
+        <AnnualMetric label={t("plan.annualPaid", language)} value={annualPaid} />
         <AnnualMetric
-          label={copy.savedThisYear}
+          label={t("plan.savedThisYear", language)}
           value={annualSavingsActual}
         />
-        <AnnualMetric label={copy.annualCapacity} value={annualCapacity} />
+        <AnnualMetric label={t("plan.annualCapacity", language)} value={annualCapacity} />
       </dl>
     </section>
   );

@@ -218,6 +218,45 @@
   color: var(--app-text);
 }
 
+/* Opción de una elección con radio nativo (por ejemplo, combinar o sustituir). */
+.app-choice-card {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  background: color-mix(in srgb, var(--app-panel-soft-alpha) 58%, var(--app-surface));
+  color: var(--app-text);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.app-choice-card:hover {
+  background: color-mix(in srgb, var(--app-control-hover) 42%, var(--app-surface));
+}
+
+.app-choice-card:has(input:focus-visible) {
+  box-shadow: var(--app-focus);
+}
+
+.app-choice-card[data-selected="true"] {
+  border-color: color-mix(in srgb, var(--app-accent) 46%, transparent);
+  background: color-mix(in srgb, var(--app-accent) 10%, var(--app-surface));
+}
+
+.app-choice-card[data-tone="danger"][data-selected="true"] {
+  border-color: color-mix(in srgb, var(--app-danger) 46%, transparent);
+  background: color-mix(in srgb, var(--app-danger) 10%, var(--app-surface));
+}
+
+.app-choice-card input {
+  accent-color: var(--app-accent);
+}
+
+.app-choice-card[data-tone="danger"] input {
+  accent-color: var(--app-danger);
+}
+
 .app-one-off-income-icon {
   display: grid;
   width: 1.35rem;
@@ -1013,6 +1052,18 @@
   padding: 1rem;
 }
 
+/* Diálogo centrado también en móvil (confirmaciones), dentro de las zonas
+   seguras. */
+.app-dialog-backdrop {
+  align-items: center;
+  justify-content: center;
+  padding:
+    max(1rem, env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+}
+
 .app-dialog {
   width: 100%;
   max-width: 24rem;
@@ -1021,6 +1072,23 @@
   background: var(--app-surface-raised);
   color: var(--app-text);
   box-shadow: var(--app-shadow-overlay);
+}
+
+.app-confirm-dialog {
+  --app-confirm-tone: var(--app-accent);
+  max-height: 100%;
+  overflow-y: auto;
+  border-color: color-mix(in srgb, var(--app-confirm-tone) 28%, transparent);
+}
+
+.app-confirm-dialog[data-tone="danger"] {
+  --app-confirm-tone: var(--app-danger);
+}
+
+.app-confirm-icon {
+  background: color-mix(in srgb, var(--app-confirm-tone) 16%, transparent);
+  color: var(--app-confirm-tone);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-confirm-tone) 26%, transparent);
 }
 
 .app-empty-line {

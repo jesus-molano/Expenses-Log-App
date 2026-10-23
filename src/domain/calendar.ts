@@ -9,6 +9,7 @@ import {
 import { enUS, es } from "date-fns/locale";
 import type { AppLanguage } from "./types";
 
+// Zona por defecto de los avisos push (ajustable en Ajustes > Recordatorios).
 export const APP_TIME_ZONE = "Atlantic/Canary";
 export const DEFAULT_CURRENCY = "EUR";
 
@@ -80,10 +81,6 @@ export function formatCurrency(amount: number): string {
     style: "currency",
     currency: DEFAULT_CURRENCY,
   }).format(amount);
-}
-
-export function formatShortDate(date: string): string {
-  return format(parseISO(date), "d MMM", { locale: es });
 }
 
 export function daysBetween(from: string, to: string): number {

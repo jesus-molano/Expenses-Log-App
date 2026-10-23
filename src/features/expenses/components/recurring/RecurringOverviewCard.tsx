@@ -4,10 +4,8 @@ import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage, ExpenseCategory } from "@/domain/types";
 import { categoryLabel } from "@/shared/category-labels";
 import { t } from "@/shared/i18n";
-import {
-  formatRecurringDate,
-  recurringFrequencyLabel,
-} from "@/features/expenses/lib/recurring-overview-format";
+import { formatRecurringDate } from "@/features/expenses/lib/recurring-overview-format";
+import { localizedRecurrenceLabel } from "@/features/expenses/lib/recurrence-label";
 import type { RecurringOverviewItem } from "@/features/expenses/lib/recurring-overview";
 import { RecurringStatusIcon } from "./RecurringStatusIcon";
 
@@ -37,7 +35,7 @@ export function RecurringOverviewCard({
           </h3>
           <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-3">
             <p className="min-w-0 break-words text-xs font-medium text-[var(--app-text-muted)]">
-              {recurringFrequencyLabel(item.template.recurrence, language)}
+              {localizedRecurrenceLabel(item.template.recurrence, language)}
               {category ? ` · ${categoryLabel(category.name, language)}` : ""}
             </p>
             <p className="app-money ml-auto whitespace-nowrap text-sm font-semibold text-[var(--app-text)]">

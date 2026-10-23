@@ -78,8 +78,9 @@ const runtimeCaching: RuntimeCaching[] = [
       sameOrigin && url.pathname.startsWith("/api/"),
     handler: new NetworkOnly(),
   },
-  // El callback de OAuth lleva un código de un solo uso: sin caché, sin corte
-  // por tiempo y sin el fallback a "/".
+  // El callback de OAuth lleva un código de un solo uso: sin caché ni corte por
+  // tiempo. Como toda regla de runtime, si la red falla en la navegación
+  // responde el fallback "/" (la app abre sin iniciar sesión).
   {
     matcher: ({ sameOrigin, url }) =>
       sameOrigin && url.pathname.startsWith("/auth/"),

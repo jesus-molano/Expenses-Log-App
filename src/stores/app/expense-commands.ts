@@ -3,7 +3,13 @@ import { addMonthId, resolveActiveMonth } from "@/domain/budget-month";
 import { normalizeDateOnly, toDateOnly } from "@/domain/calendar";
 import { generateStoreOccurrences } from "@/domain/finance";
 import { occurrenceKeyOf, overrideIdFor } from "@/domain/overrides";
-import { firstChargeAlreadyPassed, firstOccurrenceDate } from "@/domain/recurrence";
+import {
+  firstChargeAlreadyPassed,
+  firstOccurrenceDate,
+  generateOccurrences,
+  passedChargeThisMonth,
+  previousMonthsChargeDates,
+} from "@/domain/recurrence";
 import type {
   CreateExpenseOptions,
   DraftExpense,
@@ -11,6 +17,7 @@ import type {
   ExpenseReminderSettings,
   ExpenseStore,
   ExpenseTemplate,
+  PreviousChargesResolution,
 } from "@/domain/types";
 import {
   buildTemplateFromDraft,
@@ -35,8 +42,11 @@ export function addExpenseToStore(
     categoryResult.categoryId,
     startDate,
   );
-  // El pago inicial va al primer cobro real (en un anual, su mes).
-  const occurrenceDate = firstOccurrenceDate(template) ?? startDate;
+  const today = toDateOnly(new Date());
+  // El pago inicial va al cobro de este mes que ya pasó o, si no hay, al
+  // primer cobro real (en un anual, su mes).
+  const occurrenceDate =
+    passedChargeThisMonth(template, today) ?? firstOccurrenceDate(template) ?? startDate;
   const now = new Date().toISOString();
   const initialOverrides =
     options.initialStatus === "paid"
@@ -55,11 +65,41 @@ export function addExpenseToStore(
         ]
       : [];
 
-  return {
+  const created: ExpenseStore = {
     ...categoryResult.store,
     templates: [...categoryResult.store.templates, template],
     overrides: [...categoryResult.store.overrides, ...initialOverrides],
   };
+
+  return options.previousCharges
+    ? resolvePreviousCharges(created, template, options.previousCharges, today)
+    : created;
+}
+
+// Cobros de meses anteriores de un gasto recién creado con inicio pasado
+// (M18): pagados, fechados el día de su cargo, o saltados. Sin esto quedarían
+// como impagados en cada mes ya cerrado.
+function resolvePreviousCharges(
+  store: ExpenseStore,
+  template: ExpenseTemplate,
+  resolution: PreviousChargesResolution,
+  today: string,
+): ExpenseStore {
+  const dates = previousMonthsChargeDates(template, today);
+  if (!dates.length) return store;
+  const occurrences = generateOccurrences(
+    [template],
+    store.overrides,
+    dates[0],
+    dates[dates.length - 1],
+    store.preferences?.language,
+  );
+
+  return resolution === "paid"
+    ? markOccurrencesPaidInStore(store, occurrences, {
+        paidAt: (occurrence) => `${occurrence.estimatedChargeDate}T12:00:00.000Z`,
+      })
+    : skipOccurrencesInStore(store, occurrences);
 }
 
 function normalizeDraftStartDate(draft: DraftExpense, startDate: string): DraftExpense {
@@ -93,6 +133,7 @@ export function addExpensesToStore(
             options.initialStatus === "paid" && firstChargeAlreadyPassed(draft, today)
               ? "paid"
               : "due",
+          previousCharges: options.previousCharges,
         }),
       store,
     );
@@ -208,6 +249,46 @@ function mergeDeletedIds(
   next: string[],
 ): string[] {
   return Array.from(new Set([...(current ?? []), ...next]));
+}
+
+// Marca pagados varios cobros en un solo cambio del store; los que ya lo
+// estaban no se tocan. `paidAt` permite fechar pagos atrasados.
+export function markOccurrencesPaidInStore(
+  store: ExpenseStore,
+  occurrences: ExpenseOccurrence[],
+  { paidAt }: { paidAt?: (occurrence: ExpenseOccurrence) => string } = {},
+): ExpenseStore {
+  const now = new Date().toISOString();
+  return occurrences
+    .filter((occurrence) => occurrence.status !== "paid")
+    .reduce(
+      (current, occurrence) =>
+        upsertOccurrenceOverride(
+          current,
+          keyOf(occurrence),
+          {
+            status: "paid",
+            paidAt: paidAt?.(occurrence) ?? now,
+            amountPaid: occurrence.template.amount,
+          },
+          { now },
+        ),
+      store,
+    );
+}
+
+export function skipOccurrencesInStore(
+  store: ExpenseStore,
+  occurrences: ExpenseOccurrence[],
+): ExpenseStore {
+  const now = new Date().toISOString();
+  return occurrences
+    .filter((occurrence) => occurrence.status !== "skipped")
+    .reduce(
+      (current, occurrence) =>
+        upsertOccurrenceOverride(current, keyOf(occurrence), { status: "skipped" }, { now }),
+      store,
+    );
 }
 
 export function skipOccurrenceInStore(

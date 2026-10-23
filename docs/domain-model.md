@@ -71,6 +71,13 @@ resuelve el design system mediante tokens de categoria.
 Cuando se crea un gasto desde texto o formulario, la app reutiliza una categoria
 existente o crea una nueva segun el nombre normalizado.
 
+Los nombres guardados son los de las categorias preset y no llevan tildes
+(`Alimentacion`, `Vehiculo`, `Educacion/Trabajo`). No se renombran para no romper
+los stores existentes: `resolvePresetCategory` compara sin tildes y
+`categoryLabel` (`src/shared/category-labels.ts`) muestra la etiqueta con tildes
+y traducida. `resolveCategoryName` hace el camino inverso (de la etiqueta, en
+cualquiera de los dos idiomas, al nombre guardado) para la importacion CSV.
+
 ## Finanzas
 
 `FinanceStore` contiene:
@@ -92,6 +99,17 @@ Semantica de producto:
   incluye los gastos pequeños del dia a dia.
 - La capacidad maxima es ingreso previsto menos gasto recurrente previsto; no
   presupone que todo ese importe vaya a ahorrarse.
+- Cada cobro cuenta en el mes de su `dueDate`. La fase de un mes se mide contra
+  el mes activo (el natural, o el siguiente si el natural esta cerrado en
+  `monthClosures`): el activo es `current`, lo anterior `registered` y lo
+  posterior `projected`.
+- En un mes `registered` el ahorro reservado es solo la aportacion real: un
+  objetivo que no se cumplio no resta del libre (M17).
+- El dia de cobro solo cuenta con un sueldo configurado y se acota al ultimo
+  dia del mes. "Hasta el cobro" (`buildPaydayOutlook`) suma lo pendiente que se
+  carga antes del proximo cobro, atrasos incluidos.
+- Un gasto creado con inicio en un mes pasado puede marcar sus cobros
+  anteriores como pagados o saltados (`previousMonthsChargeDates`, M18).
 
 La normalizacion v3 acepta stores antiguos. Antes de descartar datos bancarios
 legacy convierte conciliaciones explícitas en overrides pagados. Si ya existe
