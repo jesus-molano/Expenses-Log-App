@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ActionToast } from "@/components/ui/ActionToast";
-import { addMonthId, monthRange } from "@/domain/budget-month";
+import { addMonthId } from "@/domain/budget-month";
+import { periodRange } from "@/domain/budget-cycle";
 import type { ExpenseOccurrence } from "@/domain/types";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
 import { ExpenseFormSheet } from "@/features/expenses/components/ExpenseFormSheet";
@@ -32,11 +33,17 @@ import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
 import { useViewTransitionAction } from "@/features/expenses/hooks/use-view-transition-action";
 import { buildLastChanceReminders } from "@/features/expenses/lib/last-chance-reminders";
 import { canMoveOccurrence } from "@/features/expenses/lib/dnd-move-policy";
-import { capitalize, formatMonthName } from "@/features/expenses/lib/month-view";
+import {
+  capitalize,
+  formatMonthName,
+  periodRangeLabel,
+} from "@/features/expenses/lib/month-view";
 import {
   markNewExpenseIntentHandled,
   readNewExpenseIntent,
 } from "@/features/expenses/lib/new-expense-intent";
+import { MonthSummarySheet } from "@/features/plan/components/MonthSummarySheet";
+import { useMonthSummary } from "@/features/plan/hooks/use-month-summary";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
 
@@ -69,6 +76,11 @@ export function ExpenseDashboard({
   const month = useActiveMonth({ store, language, now, closeMonth, reopenMonth });
   const filters = useExpenseFilters(store, language, now, month.viewMonthId);
   const actionToast = useActionToast();
+  const monthSummary = useMonthSummary({
+    store,
+    today: filters.today,
+    language,
+  });
   const monthHeadingRef = useRef<HTMLHeadingElement>(null);
   const closeCardVariant = month.suggestAdvance
     ? "settled"
@@ -197,12 +209,17 @@ export function ExpenseDashboard({
     });
   }
 
-  // No se mueve a un mes ya cerrado.
+  // No se mueve a un mes ya cerrado. Con el ciclo anclado al cobro el mes
+  // abierto empieza el día de cobro, pero nunca antes del mes natural en curso
+  // (los anteriores ya son historial).
   const openMonthId =
     month.activeMonthId > month.calendarMonthId ? month.activeMonthId : month.calendarMonthId;
-  const openMonthStart = `${openMonthId}-01`;
+  const openMonthStart = [
+    periodRange(openMonthId, month.cycle).start,
+    `${filters.today.slice(0, 7)}-01`,
+  ].sort()[1];
   // Hasta el final del mes que se puede ver después del abierto.
-  const lastMoveDate = monthRange(addMonthId(openMonthId, 1)).end;
+  const lastMoveDate = periodRange(addMonthId(openMonthId, 1), month.cycle).end;
 
   return (
     <DashboardShell
@@ -221,6 +238,7 @@ export function ExpenseDashboard({
       <div className="mb-5 grid gap-3">
         <MonthBar
           monthId={month.viewMonthId}
+          rangeLabel={periodRangeLabel(month.viewMonthId, month.cycle, language)}
           activeMonthId={month.activeMonthId}
           calendarMonthId={month.calendarMonthId}
           language={language}
@@ -250,6 +268,7 @@ export function ExpenseDashboard({
               month.dismiss();
               focusMonthHeading();
             }}
+            onOpenSummary={() => monthSummary.open(month.calendarMonthId)}
           />
         ) : null}
       </div>
@@ -259,7 +278,8 @@ export function ExpenseDashboard({
         categories={store.categories}
         today={filters.today}
         monthId={month.viewMonthId}
-        openMonthId={month.calendarMonthId}
+        openMonthId={filters.today.slice(0, 7)}
+        dropFloorDate={month.dropFloorDate}
         autoScroll={!showCloseCard}
         language={language}
         onTogglePaid={togglePaidWithMonthCheck}
@@ -376,6 +396,15 @@ export function ExpenseDashboard({
           onUndo={closeSheet.undo}
           onPayAll={closeSheet.payAll}
           onStart={closeSheet.start}
+        />
+      ) : null}
+
+      {monthSummary.summary ? (
+        <MonthSummarySheet
+          summary={monthSummary.summary}
+          language={language}
+          periodLabel={periodRangeLabel(monthSummary.summary.monthId, month.cycle, language)}
+          onClose={monthSummary.close}
         />
       ) : null}
 

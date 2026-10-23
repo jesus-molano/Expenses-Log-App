@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { addMonthId, buildMonthPlan, monthRange } from "@/domain/budget-month";
+import { addMonthId, buildMonthPlan } from "@/domain/budget-month";
+import { periodRange, resolveBudgetCycle } from "@/domain/budget-cycle";
 import {
   getMonthlySavingsContribution,
   getMonthlySavingsTarget,
@@ -58,6 +59,8 @@ export function useMonthCloseSheet({
   const [savingsText, setSavingsText] = useState("");
   const isOpen = session !== null;
   const sessionMonthId = session?.monthId ?? monthId;
+  // Mes natural o ciclo desde el día de cobro, según Ajustes.
+  const cycle = useMemo(() => resolveBudgetCycle(store.finance), [store.finance]);
 
   // Los movidos al mes siguiente se siguen buscando para poder deshacerlos.
   const occurrences = useMemo(
@@ -65,16 +68,16 @@ export function useMonthCloseSheet({
       isOpen
         ? occurrencesDueBetween(
             store,
-            monthRange(sessionMonthId).start,
-            monthRange(addMonthId(sessionMonthId, 1)).end,
+            periodRange(sessionMonthId, cycle).start,
+            periodRange(addMonthId(sessionMonthId, 1), cycle).end,
             language,
           )
         : [],
-    [isOpen, language, sessionMonthId, store],
+    [cycle, isOpen, language, sessionMonthId, store],
   );
   const rows = useMemo(
-    () => buildLeftoverRows(session?.snapshot ?? [], occurrences, sessionMonthId),
-    [occurrences, session, sessionMonthId],
+    () => buildLeftoverRows(session?.snapshot ?? [], occurrences, sessionMonthId, cycle),
+    [cycle, occurrences, session, sessionMonthId],
   );
   const plan = useMemo(
     () => (isOpen ? buildMonthPlan(store, sessionMonthId, { today, language }) : null),
@@ -126,7 +129,7 @@ export function useMonthCloseSheet({
     pay: (row: LeftoverRow) => commands.togglePaid(row.occurrence),
     skip: (row: LeftoverRow) => commands.skipOccurrence(row.occurrence),
     move: (row: LeftoverRow) =>
-      commands.moveOccurrence(row.occurrence, leftoverMoveDate(sessionMonthId)),
+      commands.moveOccurrence(row.occurrence, leftoverMoveDate(sessionMonthId, cycle)),
     payAll: () =>
       commands.markOccurrencesPaid(
         rows.filter((row) => row.resolution === "pending").map((row) => row.occurrence),

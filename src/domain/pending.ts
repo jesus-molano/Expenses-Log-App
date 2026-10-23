@@ -18,14 +18,18 @@ export function isOccurrenceOverdue(
 }
 
 // Regla única de "Por pagar" del mes: lo pendiente cuyo dueDate cae en el mes.
-// La usan la cabecera de Gastos y el plan del mes.
+// La usan la cabecera de Gastos y el plan del mes. `range` son los días del
+// mes de presupuesto cuando no es el natural (ciclo anclado al cobro).
 export function monthPendingSummary(
   occurrences: ExpenseOccurrence[],
   monthId: string,
+  range: { start: string; end: string } = calendarMonthRange(monthId),
 ): MonthPendingSummary {
   const items = occurrences.filter(
     (occurrence) =>
-      occurrence.status === "due" && occurrence.dueDate.slice(0, 7) === monthId,
+      occurrence.status === "due" &&
+      occurrence.dueDate >= range.start &&
+      occurrence.dueDate <= range.end,
   );
 
   return {
@@ -33,11 +37,14 @@ export function monthPendingSummary(
     count: items.length,
     items,
     spillToNextMonthTotal: sumPlannedAmounts(
-      items.filter(
-        (occurrence) => occurrence.estimatedChargeDate.slice(0, 7) > monthId,
-      ),
+      items.filter((occurrence) => occurrence.estimatedChargeDate > range.end),
     ),
   };
+}
+
+// Cualquier fecha real del mes queda entre el 01 y el 31 al comparar textos.
+function calendarMonthRange(monthId: string) {
+  return { start: `${monthId}-01`, end: `${monthId}-31` };
 }
 
 function sumPlannedAmounts(occurrences: ExpenseOccurrence[]) {

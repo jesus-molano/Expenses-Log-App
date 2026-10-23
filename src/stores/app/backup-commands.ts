@@ -1,6 +1,8 @@
 import { emptyFinanceStore, materializeClosedOccurrenceRecords, salaryClearedTombstone } from "@/domain/finance";
 import { occurrenceKeyOf, overrideIdFor } from "@/domain/overrides";
 import type {
+  BalanceCheckin,
+  BudgetCycleSetting,
   ExpenseOccurrenceOverride,
   ExpenseStore,
   FinanceStore,
@@ -192,6 +194,26 @@ function replaceFinance(
     ),
     ...restamp(imported.monthClosures),
   };
+  const balanceCheckins: Record<string, BalanceCheckin> = {
+    // Un saldo que solo estaba en los datos actuales se marca como borrado:
+    // el merge por fecha se quedaría con él.
+    ...Object.fromEntries(
+      Object.entries(current.balanceCheckins ?? {})
+        .filter(([date]) => !imported.balanceCheckins?.[date])
+        .map(([date, checkin]) => [
+          date,
+          { ...checkin, deletedAt: stamp, updatedAt: stamp },
+        ]),
+    ),
+    ...restamp(imported.balanceCheckins),
+  };
+  // Sin ciclo en el archivo se vuelve al mes natural, también con hora: si no,
+  // el ciclo de los datos actuales volvería al fusionar.
+  const budgetCycle: BudgetCycleSetting | undefined = imported.budgetCycle
+    ? { ...imported.budgetCycle, updatedAt: stamp }
+    : current.budgetCycle
+      ? { anchor: "calendar", updatedAt: stamp }
+      : undefined;
 
   return {
     ...imported,
@@ -207,6 +229,8 @@ function replaceFinance(
     ),
     monthlySavingsContributions: restamp(imported.monthlySavingsContributions),
     ...(Object.keys(closures).length ? { monthClosures: closures } : {}),
+    ...(Object.keys(balanceCheckins).length ? { balanceCheckins } : {}),
+    ...(budgetCycle ? { budgetCycle } : {}),
   };
 }
 

@@ -159,12 +159,32 @@ export type MonthClosure = {
   reopenedAt?: string;
 };
 
+// Cómo se reparte el año en meses de presupuesto: el mes natural (por
+// defecto) o el ciclo que empieza el día de cobro.
+export type BudgetCycleAnchor = "calendar" | "payday";
+
+export type BudgetCycleSetting = {
+  anchor: BudgetCycleAnchor;
+  updatedAt: string;
+};
+
+// Saldo de la cuenta anotado un día. Borrarlo guarda `deletedAt` en lugar de
+// quitar la entrada, para que el merge no lo resucite.
+export type BalanceCheckin = {
+  amount: number;
+  updatedAt: string;
+  deletedAt?: string;
+};
+
 export type FinanceStore = {
   incomeEvents: IncomeEvent[];
   monthlySalary: Record<string, MonthlySalarySettings>;
   monthlySavingsTargets: Record<string, number | MonthlySavingsTarget>;
   monthlySavingsContributions?: Record<string, MonthlySavingsContribution>;
   monthClosures?: Record<string, MonthClosure>;
+  budgetCycle?: BudgetCycleSetting;
+  // Por fecha YYYY-MM-DD: un saldo por día.
+  balanceCheckins?: Record<string, BalanceCheckin>;
 };
 
 export type ExpenseOccurrenceRecordSource = "native" | "legacy-derived";

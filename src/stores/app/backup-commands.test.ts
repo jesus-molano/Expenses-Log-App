@@ -244,3 +244,50 @@ describe("replaceStoreContents", () => {
     );
   });
 });
+
+describe("replaceStoreContents — budget cycle and balance log", () => {
+  const withInsights = normalizeExpenseStore(
+    {
+      ...current,
+      finance: {
+        ...current.finance,
+        budgetCycle: { anchor: "payday", updatedAt: "2026-10-05T00:00:00.000Z" },
+        balanceCheckins: {
+          "2026-10-01": { amount: 1200, updatedAt: "2026-10-01T09:00:00.000Z" },
+          "2026-10-15": { amount: 900, updatedAt: "2026-10-15T09:00:00.000Z" },
+        },
+      },
+    },
+    now,
+  );
+  const file = normalizeExpenseStore(
+    {
+      ...imported,
+      finance: {
+        ...imported.finance,
+        balanceCheckins: {
+          "2026-10-01": { amount: 1100, updatedAt: "2026-09-30T09:00:00.000Z" },
+        },
+      },
+    },
+    now,
+  );
+  const replaced = replaceStoreContents(withInsights, file, { scope: "all", now });
+
+  it("keeps the file's balances and cycle, also after a later merge", () => {
+    for (const store of [
+      replaced,
+      mergeExpenseStores(replaced, withInsights),
+      mergeExpenseStores(withInsights, replaced),
+    ]) {
+      // El archivo no trae ciclo: vuelve al mes natural.
+      expect(store.finance.budgetCycle).toEqual({ anchor: "calendar", updatedAt: stamp });
+      expect(store.finance.balanceCheckins?.["2026-10-01"]).toEqual({
+        amount: 1100,
+        updatedAt: stamp,
+      });
+      // El saldo que solo estaba en los datos actuales queda borrado.
+      expect(store.finance.balanceCheckins?.["2026-10-15"]?.deletedAt).toBe(stamp);
+    }
+  });
+});

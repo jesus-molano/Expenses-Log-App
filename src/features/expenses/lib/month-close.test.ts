@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { BudgetCycle } from "@/domain/budget-cycle";
 import { occurrencesDueBetween } from "@/domain/finance";
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore, ExpenseTemplate } from "@/domain/types";
@@ -60,6 +61,26 @@ describe("month close leftovers", () => {
       ["power:2026-10-25", "pending"],
     ]);
     expect(rows[1].snapshot.dueDate).toBe("2026-10-25");
+  });
+
+  it("follows the payday cycle: moves to the next payday and counts its days", () => {
+    // Cobro el 5: "octubre" va del 5 de octubre al 4 de noviembre.
+    const cycle: BudgetCycle = {
+      anchor: "payday",
+      monthlySalary: {
+        "2026-01": { amount: 2000, dayOfMonth: 5, updatedAt: "2026-01-01T00:00:00.000Z" },
+      },
+    };
+    const [internet] = october();
+
+    expect(leftoverMoveDate("2026-10", cycle)).toBe("2026-11-05");
+    // El 2 de noviembre sigue siendo "octubre": no cuenta como movido.
+    expect(
+      leftoverResolution({ ...internet, dueDate: "2026-11-02" }, "2026-10", cycle),
+    ).toBe("pending");
+    expect(
+      leftoverResolution({ ...internet, dueDate: "2026-11-05" }, "2026-10", cycle),
+    ).toBe("moved");
   });
 });
 

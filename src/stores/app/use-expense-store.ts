@@ -11,6 +11,7 @@ import {
 import type {
   AppLanguage,
   AppTheme,
+  BudgetCycleAnchor,
   CreateExpenseOptions,
   DraftExpense,
   ExpenseOccurrence,
@@ -29,6 +30,7 @@ import {
   clearExpensesFromStore,
   clearIncomeFromStore,
   closeMonthInStore,
+  deleteBalanceCheckinInStore,
   deleteExpenseFromStore,
   deleteIncomeEventFromStore,
   dismissLastChanceReminderInStore,
@@ -37,11 +39,13 @@ import {
   moveOccurrenceInStore,
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
+  recordBalanceInStore,
   reopenMonthInStore,
   restoreOccurrenceInStore,
   skipOccurrenceInStore,
   payOccurrenceInStore,
   togglePaidInStore,
+  updateBudgetCycleInStore,
   updateIncomeEventInStore,
   updateLanguageInStore,
   updateMoneySettingsInStore,
@@ -296,6 +300,18 @@ function useExpenseStoreValue() {
     return captureSnapshot(current(), reason);
   }
 
+  function updateBudgetCycle(anchor: BudgetCycleAnchor) {
+    persist(updateBudgetCycleInStore(current(), anchor));
+  }
+
+  function recordBalance(input: { date: string; amount: number }) {
+    persist(recordBalanceInStore(current(), input));
+  }
+
+  function deleteBalanceCheckin(date: string) {
+    persist(deleteBalanceCheckinInStore(current(), date));
+  }
+
   function updateTheme(theme: AppTheme) {
     applyAppTheme(theme);
     persist(updateThemeInStore(current(), theme));
@@ -336,6 +352,9 @@ function useExpenseStoreValue() {
     importStore,
     restoreSnapshot,
     takeSnapshot,
+    updateBudgetCycle,
+    recordBalance,
+    deleteBalanceCheckin,
     updateTheme,
     updateLanguage,
     syncStatus: persistence.syncStatus,

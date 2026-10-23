@@ -2,7 +2,11 @@ import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildMonthlyMoneyPlan } from "@/domain/finance";
 import { emptyStore } from "@/domain/seed";
-import { occurrencesForMonth } from "@/features/plan/lib/plan-dashboard";
+import { resolveBudgetCycle } from "@/domain/budget-cycle";
+import {
+  buildPlanForMonth,
+  occurrencesForMonth,
+} from "@/features/plan/lib/plan-dashboard";
 import type {
   ExpenseOccurrenceOverride,
   ExpenseStore,
@@ -250,6 +254,56 @@ describe("viewed month", () => {
     expect(
       result.current.visibleOccurrences.some((item) => item.dueDate >= "2026-11-01"),
     ).toBe(false);
+  });
+});
+
+describe("payday-anchored month", () => {
+  it("shows the cycle's bills and matches the Plan total", () => {
+    // Cobro el 28: el 29 de octubre ya es "noviembre" (28 oct - 27 nov).
+    const store: ExpenseStore = {
+      ...emptyStore,
+      finance: {
+        ...emptyStore.finance,
+        monthlySalary: {
+          "2026-09": { amount: 2000, dayOfMonth: 28, updatedAt: "2026-09-01T00:00:00.000Z" },
+        },
+        budgetCycle: { anchor: "payday", updatedAt: "2026-10-01T00:00:00.000Z" },
+      },
+      templates: [
+        monthlyTemplate("rent", "2026-09-01", 1),
+        monthlyTemplate("internet", "2026-09-29", 29),
+        monthlyTemplate("power", "2026-09-27", 27),
+      ],
+      overrides: [
+        paidOverride("rent", "2026-10-01"),
+        paidOverride("internet", "2026-09-29"),
+      ],
+    };
+
+    const { result } = renderHook(() =>
+      useExpenseFilters(store, "es", new Date(2026, 9, 29, 10), "2026-11"),
+    );
+    const plan = buildPlanForMonth({
+      store,
+      monthDate: new Date(2026, 10, 1),
+      today: new Date(2026, 9, 29, 10),
+      language: "es",
+      cycle: resolveBudgetCycle(store.finance),
+    });
+
+    // Internet del 29-oct, alquiler del 1-nov y luz del 27-nov.
+    expect(result.current.pendingTotal).toBe(300);
+    expect(plan.pendingExpensesTotal).toBe(300);
+    expect(plan.month).toBe("2026-11");
+    expect(plan.phase).toBe("current");
+    // La luz del 27-oct quedó sin pagar en el ciclo de octubre.
+    expect(result.current.timelineSections[0]).toMatchObject({
+      id: "carry-over-2026-10",
+      total: 100,
+    });
+    expect(
+      result.current.timelineSections.some((section) => section.id === "today"),
+    ).toBe(true);
   });
 });
 

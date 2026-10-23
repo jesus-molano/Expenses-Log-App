@@ -8,6 +8,7 @@ import {
   monthRange,
   selectCarryOverOccurrences,
 } from "@/domain/budget-month";
+import { periodRange, resolveBudgetCycle } from "@/domain/budget-cycle";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
 import { occurrencesDueBetween } from "@/domain/finance";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
@@ -39,11 +40,13 @@ function buildExpenseFilters(
   monthId: string,
 ) {
   const today = toDateOnly(todayDate);
+  // Mes natural o ciclo desde el día de cobro, según Ajustes.
+  const cycle = resolveBudgetCycle(store.finance);
   // Cada mes muestra solo sus cobros (más lo pendiente que arrastre): lo del
   // mes siguiente se ve avanzando o mirando ese mes.
-  const { start: windowStart, end: windowEnd } = monthRange(monthId);
+  const viewRange = periodRange(monthId, cycle);
   const nextMonthId = addMonthId(monthId, 1);
-  const nextMonthStart = monthRange(nextMonthId).start;
+  const nextMonthStart = periodRange(nextMonthId, cycle).start;
   const previewEnd = toDateOnly(
     addDays(parseISO(nextMonthStart), NEXT_MONTH_PREVIEW_DAYS - 1),
   );
@@ -60,8 +63,8 @@ function buildExpenseFilters(
   });
 
   const visibleOccurrences = [
-    ...selectCarryOverOccurrences(store, todayDate, language, monthId),
-    ...occurrencesDueBetween(store, windowStart, windowEnd, language),
+    ...selectCarryOverOccurrences(store, todayDate, language, monthId, cycle),
+    ...occurrencesDueBetween(store, viewRange.start, viewRange.end, language),
   ].filter((occurrence) => occurrence.status !== "skipped");
   const upcoming = occurrencesDueBetween(store, nextMonthStart, previewEnd, language).filter(
     (occurrence) => occurrence.status === "due",
@@ -74,12 +77,17 @@ function buildExpenseFilters(
       }
     : null;
 
-  const pendingTotal = monthPendingSummary(visibleOccurrences, monthId).total;
+  const pendingTotal = monthPendingSummary(
+    visibleOccurrences,
+    monthId,
+    viewRange,
+  ).total;
   const timelineSections = buildTimelineSections(
     visibleOccurrences,
     today,
     language,
     monthId,
+    cycle,
   );
   const nextOccurrence =
     visibleOccurrences.find(

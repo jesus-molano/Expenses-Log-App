@@ -12,6 +12,8 @@ import {
   STORE_KEYS,
   normalizeExpenseStore,
   unknownEntries,
+  withBalanceCheckins,
+  withBudgetCycle,
   withMonthClosures,
 } from "./store-normalization";
 import { SYNC_META_KEY } from "./sync-meta-store";
@@ -167,6 +169,22 @@ export function mergeExpenseStores(
         mergeMonthlyRecord(
           normalizedCloudStore.finance.monthClosures,
           normalizedLocalStore.finance.monthClosures,
+        ),
+      ),
+      // La elección más reciente, sea de este dispositivo o de otro.
+      ...withBudgetCycle(
+        normalizedLocalStore.finance.budgetCycle
+          ? latestUpdated(
+              normalizedCloudStore.finance.budgetCycle,
+              normalizedLocalStore.finance.budgetCycle,
+            )
+          : normalizedCloudStore.finance.budgetCycle,
+      ),
+      // Por día, el cambio más reciente (borrar también es un cambio).
+      ...withBalanceCheckins(
+        mergeMonthlyRecord(
+          normalizedCloudStore.finance.balanceCheckins,
+          normalizedLocalStore.finance.balanceCheckins,
         ),
       ),
     },

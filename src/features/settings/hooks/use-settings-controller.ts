@@ -1,15 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { toDateOnly } from "@/domain/calendar";
 import type { AppLanguage } from "@/domain/types";
 import { clearExpenseLocalData } from "@/data/persistence/local-store";
 import { readSyncMeta } from "@/data/persistence/sync-meta-store";
+import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
 import { DEFAULT_THEME } from "@/shared/theme";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { createClient } from "@/utils/supabase/client";
 import { useNotificationSettings } from "./use-notification-settings";
 import { useSettingsAuth, type SignOutOptions } from "./use-settings-auth";
+import { describeBudgetCycle } from "../lib/budget-cycle-options";
 import { releasePushSubscription } from "../lib/push-notifications";
 import { SETTINGS_LANGUAGES, SETTINGS_THEMES } from "../lib/settings-options";
 
@@ -25,12 +28,14 @@ export function useSettingsController({
     syncMessage,
     updateTheme,
     updateLanguage,
+    updateBudgetCycle,
     clearExpenses,
     clearIncome,
   } = expenseStore;
   const [message, setMessage] = useState("");
   const [themeOpen, setThemeOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [budgetCycleOpen, setBudgetCycleOpen] = useState(false);
   const [clearExpensesOpen, setClearExpensesOpen] = useState(false);
   const [isClearingExpenses, setIsClearingExpenses] = useState(false);
   const [clearIncomeOpen, setClearIncomeOpen] = useState(false);
@@ -64,6 +69,11 @@ export function useSettingsController({
   const languageLabel =
     SETTINGS_LANGUAGES.find((language) => language.id === currentLanguage)
       ?.label ?? SETTINGS_LANGUAGES[0].label;
+  const todayDateOnly = toDateOnly(useCurrentDate());
+  const budgetCycle = useMemo(
+    () => describeBudgetCycle(store.finance, todayDateOnly, currentLanguage),
+    [currentLanguage, store.finance, todayDateOnly],
+  );
   const backTab = from === "money" ? "money" : "expenses";
   const backHref = backTab === "money" ? "/money" : "/";
   const backLabel =
@@ -157,6 +167,8 @@ export function useSettingsController({
     message,
     themeOpen,
     languageOpen,
+    budgetCycleOpen,
+    budgetCycle,
     clearExpensesOpen,
     isClearingExpenses,
     clearIncomeOpen,
@@ -180,11 +192,13 @@ export function useSettingsController({
     lastTestSentAt,
     setThemeOpen,
     setLanguageOpen,
+    setBudgetCycleOpen,
     setClearExpensesOpen,
     setClearIncomeOpen,
     setDeleteAccountOpen,
     updateTheme,
     updateLanguage,
+    updateBudgetCycle,
     enableNotifications,
     disableNotifications,
     sendTestNotification,

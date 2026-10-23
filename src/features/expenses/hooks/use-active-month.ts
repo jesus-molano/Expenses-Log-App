@@ -16,7 +16,11 @@ import {
 } from "@/domain/budget-month";
 import { toDateOnly } from "@/domain/calendar";
 import type { AppLanguage, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
-import { clampViewMonth, viewMonthBounds } from "../lib/month-view";
+import {
+  clampViewMonth,
+  cycleDropFloorDate,
+  viewMonthBounds,
+} from "../lib/month-view";
 
 type UseActiveMonthOptions = {
   store: ExpenseStore;
@@ -59,9 +63,19 @@ export function useActiveMonth({
     writeViewMonth(next);
   }
 
+  const paydayCycle = context.cycle.anchor === "payday";
+
   return {
     ...context,
     viewMonthId,
+    dropFloorDate: paydayCycle
+      ? cycleDropFloorDate({
+          viewMonthId,
+          calendarMonthId,
+          today: context.today,
+          cycle: context.cycle,
+        })
+      : undefined,
     canBrowseBack: viewMonthId > bounds.min,
     canBrowseForward: viewMonthId < bounds.max,
     suggestAdvance:
@@ -70,6 +84,7 @@ export function useActiveMonth({
         status: context.closeStatus,
         today: context.today,
         payday: context.payday,
+        cycle: context.cycle,
       }),
     suggestCloseWithLeftovers:
       canSuggest &&
@@ -77,6 +92,7 @@ export function useActiveMonth({
         status: context.closeStatus,
         today: context.today,
         payday: context.payday,
+        cycle: context.cycle,
       }),
     settlesMonth: (occurrence: ExpenseOccurrence) =>
       canSuggest && paymentSettlesMonth(context, occurrence),

@@ -169,6 +169,13 @@ La mezcla actual usa ids:
 - Categorias: llevan `updatedAt` desde F0c-2 y se fusionan por entidad como
   plantillas, ingresos o registros. Las antiguas no lo tienen y gana la local;
   los builds anteriores conservan el campo porque no reescriben las entidades.
+- `finance.budgetCycle` (mes natural o desde el dia de cobro): gana el de
+  `updatedAt` mas reciente; si solo uno de los dos stores lo tiene, se
+  conserva.
+- `finance.balanceCheckins` (saldo por fecha): por dia, la version con el
+  `updatedAt` mas reciente. Borrar guarda `deletedAt` en vez de quitar la
+  entrada, asi que un borrado gana a una copia vieja y volver a anotar ese dia
+  gana al borrado.
 
 La politica de hidratacion (`resolveHydratedStore`) protege los cambios hechos
 mientras llegaba el cloud store y los que quedaron sin subir en una sesion
@@ -204,10 +211,23 @@ Reglas para campos nuevos:
   natural. Se fusiona por mes con el `updatedAt` mas reciente; reabrir guarda
   `reopenedAt` en vez de borrar la entrada.
 - El cierre con restos (F1a-3) no añade campos: cada resto se resuelve con
-  overrides (pagado, saltado o movido al dia 1 del mes siguiente), el ahorro
-  con `monthlySavingsContributions` y el paso de mes con `monthClosures`. Los
+  overrides (pagado, saltado o movido al primer dia del mes siguiente: el 1
+  o, con el ciclo anclado al cobro, el dia de cobro), el ahorro con
+  `monthlySavingsContributions` y el paso de mes con `monthClosures`. Los
   cobros anteriores de un gasto nuevo (M18) tambien son overrides; los pagos se
   fechan el dia de su cargo.
+- Excepcion: `finance.budgetCycle` tambien. Si un build antiguo lo descarta,
+  Gastos y Plan vuelven al mes natural, que es el valor por defecto. Un build
+  con passthrough lo conserva; al fusionar dos copias gana la local, porque no
+  conoce su `updatedAt`.
+- `finance.balanceCheckins` se escribe en cuanto se anota un saldo. Los builds
+  con passthrough (desde PR 0) lo conservan y lo fusionan por fecha con el
+  `updatedAt` mas reciente, igual que este build. Solo un build anterior a PR 0
+  lo descartaria: antes de anotar saldos hay que abrir la app actualizada en
+  todos los dispositivos.
+- Los stores anteriores a estos campos cargan igual: sin `budgetCycle` el mes
+  es natural y sin `balanceCheckins` el registro de saldo esta vacio. Un valor
+  ilegible se descarta en la normalizacion sin tocar el resto.
 
 ## Vista del mes
 
@@ -294,8 +314,9 @@ Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/Ba
      actuales recibe tombstone si su id es aleatorio (gastos, categorias,
      ingresos, aportaciones, historico de gastos que desaparecen) o queda en
      estado neutro si es determinista (cobros `ovr:*` en estado pendiente,
-     cierres de mes reabiertos, sueldos con tombstone por mes), porque un
-     tombstone de un id determinista impediria volver a usarlo. Un id que el
+     cierres de mes reabiertos, sueldos con tombstone por mes, saldos con
+     `deletedAt` y el ciclo del presupuesto de vuelta al mes natural), porque
+     un tombstone de un id determinista impediria volver a usarlo. Un id que el
      archivo trae se quita de los tombstones. Limite conocido: los objetivos de
      ahorro no tienen tombstone, asi que un mes que solo estaba en los datos
      actuales puede volver en esa fusion.

@@ -68,7 +68,7 @@ export function toMonthId(monthDate: Date | string | null | undefined): string {
 }
 
 export function getMonthlySalarySettings(
-  finance: FinanceStore,
+  finance: Pick<FinanceStore, "monthlySalary">,
   monthDate: Date | string,
 ): MonthlySalarySettings {
   const monthId = toMonthId(monthDate);
@@ -142,6 +142,8 @@ export function planPhaseFor(
   return monthId < activeMonthId ? "registered" : "projected";
 }
 
+// `range` son los días del mes de presupuesto cuando no es el natural (ciclo
+// anclado al cobro); `activeMonthId`, el mes activo según ese mismo ciclo.
 export function buildMonthlyMoneyPlan({
   monthDate,
   finance,
@@ -149,6 +151,7 @@ export function buildMonthlyMoneyPlan({
   today = new Date(),
   activeMonthId = toMonthId(today),
   includeExtraIncome = true,
+  range,
 }: {
   monthDate: Date;
   finance: FinanceStore;
@@ -157,10 +160,11 @@ export function buildMonthlyMoneyPlan({
   // Mes activo; por defecto, el natural de `today`.
   activeMonthId?: string;
   includeExtraIncome?: boolean;
+  range?: { start: string; end: string };
 }): MonthlyMoneyPlan {
-  const monthStart = toDateOnly(startOfMonth(monthDate));
-  const monthEnd = toDateOnly(endOfMonth(monthDate));
-  const month = monthStart.slice(0, 7);
+  const month = toMonthId(monthDate);
+  const monthStart = range?.start ?? toDateOnly(startOfMonth(monthDate));
+  const monthEnd = range?.end ?? toDateOnly(endOfMonth(monthDate));
   const phase = planPhaseFor(month, activeMonthId);
   const salarySettings = getMonthlySalarySettings(finance, month);
   const salaryIncomeTotal = Math.max(Number(salarySettings.amount), 0);
@@ -184,7 +188,10 @@ export function buildMonthlyMoneyPlan({
   const paidOccurrences = relevantOccurrences.filter(
     (occurrence) => occurrence.status === "paid",
   );
-  const pendingSummary = monthPendingSummary(relevantOccurrences, month);
+  const pendingSummary = monthPendingSummary(relevantOccurrences, month, {
+    start: monthStart,
+    end: monthEnd,
+  });
   const pendingOccurrences = pendingSummary.items;
   const plannedExpensesTotal = relevantOccurrences.reduce(
     (sum, occurrence) => sum + occurrence.template.amount,
@@ -258,6 +265,11 @@ export function buildMonthlyMoneyPlan({
 // Lo que se pagó de un cobro (puede diferir de lo previsto).
 export function paidAmount(occurrence: ExpenseOccurrence) {
   return occurrence.override?.amountPaid ?? occurrence.record?.amountPaid ?? occurrence.template.amount;
+}
+
+// Lo que cuesta un cobro: lo pagado si ya se pagó y, si no, lo previsto.
+export function occurrenceAmount(occurrence: ExpenseOccurrence) {
+  return occurrence.status === "paid" ? paidAmount(occurrence) : occurrence.template.amount;
 }
 
 export function generateStoreOccurrences(

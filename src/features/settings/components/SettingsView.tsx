@@ -11,6 +11,7 @@ import { SettingsDialogs } from "./SettingsDialogs";
 import {
   AccountRow,
   BackupRows,
+  BudgetCycleRow,
   DangerRows,
   LanguageRow,
   NotificationsRow,
@@ -50,6 +51,7 @@ export function SettingsView() {
             <AccountRow settings={settings} />
             <NotificationsRow settings={settings} />
             <OfflineRow language={settings.currentLanguage} />
+            <BudgetCycleRow settings={settings} />
             <ThemeRow settings={settings} />
             <LanguageRow settings={settings} />
             <BackupRows language={settings.currentLanguage} />

@@ -1,4 +1,5 @@
 ﻿import type { ComponentType, ReactNode } from "react";
+import { Surface } from "@/components/ui/Surface";
 
 export function PlanSectionList({
   title,
@@ -31,6 +32,15 @@ export function PlanSectionList({
       </h3>
       <div className="mt-3 grid gap-3">{children}</div>
     </section>
+  );
+}
+
+// Línea de "no hay nada" de las secciones de previsiones del Plan.
+export function PlanEmptyLine({ children }: { children: ReactNode }) {
+  return (
+    <Surface variant="empty" className="px-3 py-2 text-sm font-medium">
+      {children}
+    </Surface>
   );
 }
 

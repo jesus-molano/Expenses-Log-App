@@ -6,7 +6,12 @@ import {
   toMonthId,
   updateIncomeEvent,
 } from "@/domain/finance";
-import type { ExpenseStore, MonthClosure } from "@/domain/types";
+import { isValidDateOnly } from "@/domain/calendar";
+import type {
+  BudgetCycleAnchor,
+  ExpenseStore,
+  MonthClosure,
+} from "@/domain/types";
 import type {
   IncomeEventInput,
   MoneySettingsInput,
@@ -311,4 +316,80 @@ function withMonthClosure(
       monthClosures: { ...store.finance.monthClosures, [monthId]: closure },
     },
   };
+}
+
+// Mes natural o ciclo desde el día de cobro. Se guarda con hora para que gane
+// la elección más reciente al fusionar dispositivos.
+export function updateBudgetCycleInStore(
+  store: ExpenseStore,
+  anchor: BudgetCycleAnchor,
+  now: Date = new Date(),
+): ExpenseStore {
+  const current = store.finance.budgetCycle;
+  if ((current?.anchor ?? "calendar") === anchor) return store;
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      budgetCycle: { anchor, updatedAt: timestampAfter(current?.updatedAt, now) },
+    },
+  };
+}
+
+// Anota el saldo de la cuenta un día. Un segundo saldo el mismo día sustituye
+// al primero; anotar un día borrado lo recupera.
+export function recordBalanceInStore(
+  store: ExpenseStore,
+  input: { date: string; amount: number },
+  now: Date = new Date(),
+): ExpenseStore {
+  if (!isValidDateOnly(input.date) || !Number.isFinite(input.amount)) return store;
+  const existing = store.finance.balanceCheckins?.[input.date];
+  return withBalanceCheckin(store, input.date, {
+    amount: Math.round(input.amount * 100) / 100,
+    updatedAt: timestampAfter(existing?.updatedAt, now),
+  });
+}
+
+// Borrar guarda `deletedAt` en vez de quitar la entrada: si no, el merge con
+// otro dispositivo la devolvería.
+export function deleteBalanceCheckinInStore(
+  store: ExpenseStore,
+  date: string,
+  now: Date = new Date(),
+): ExpenseStore {
+  const existing = store.finance.balanceCheckins?.[date];
+  if (!existing || existing.deletedAt) return store;
+  const timestamp = timestampAfter(existing.updatedAt, now);
+  return withBalanceCheckin(store, date, {
+    ...existing,
+    deletedAt: timestamp,
+    updatedAt: timestamp,
+  });
+}
+
+function withBalanceCheckin(
+  store: ExpenseStore,
+  date: string,
+  checkin: NonNullable<ExpenseStore["finance"]["balanceCheckins"]>[string],
+): ExpenseStore {
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      balanceCheckins: { ...store.finance.balanceCheckins, [date]: checkin },
+    },
+  };
+}
+
+// La hora de un cambio queda siempre después de la del anterior aunque el
+// reloj de este dispositivo vaya atrasado: si no, el merge se quedaría con la
+// versión vieja.
+export function timestampAfter(previous: string | undefined, now: Date) {
+  const previousTime = previous ? Date.parse(previous) : Number.NaN;
+  return new Date(
+    Number.isNaN(previousTime)
+      ? now.getTime()
+      : Math.max(now.getTime(), previousTime + 1),
+  ).toISOString();
 }

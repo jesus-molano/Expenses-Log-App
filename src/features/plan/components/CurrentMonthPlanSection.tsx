@@ -24,6 +24,7 @@ import { PaydayOutlookCard } from "./PaydayOutlookCard";
 export function CurrentMonthPlanSection({
   language,
   monthLabel,
+  periodLabel = null,
   phaseLabel = null,
   savingsLabel,
   paydayOutlook = null,
@@ -41,6 +42,8 @@ export function CurrentMonthPlanSection({
 }: {
   language: AppLanguage;
   monthLabel: string;
+  // "28 oct – 27 nov" cuando el mes empieza el día de cobro.
+  periodLabel?: string | null;
   // Fase del mes que se mira cuando no es el activo ("Registrado", "Proyectado").
   phaseLabel?: string | null;
   savingsLabel: string;
@@ -68,6 +71,11 @@ export function CurrentMonthPlanSection({
           >
             {formatMessage("plan.planFor", { month: monthLabel }, language)}
           </h1>
+          {periodLabel ? (
+            <p className="mt-1 text-xs font-medium text-[var(--app-text-muted)]">
+              {periodLabel}
+            </p>
+          ) : null}
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--app-text-muted)]">
             {phaseLabel ? (
               <span className="rounded-full bg-[var(--app-panel-soft-alpha)] px-2.5 py-0.5 text-xs font-semibold">
