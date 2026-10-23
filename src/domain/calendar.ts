@@ -1,12 +1,10 @@
 import {
-  addDays,
   differenceInCalendarDays,
   format,
-  isSaturday,
-  isSunday,
   parseISO,
 } from "date-fns";
 import { enUS, es } from "date-fns/locale";
+import { nextBankBusinessDay } from "./holidays";
 import type { AppLanguage } from "./types";
 
 export const APP_TIME_ZONE = "Atlantic/Canary";
@@ -44,34 +42,27 @@ export function buildDateWithDay(baseDate: Date, dueDay: number): Date {
   return new Date(year, month, Math.min(Math.max(dueDay, 1), lastDay));
 }
 
+// Día en que el banco carga el recibo: el propio vencimiento o, si cae en fin
+// de semana o festivo bancario (`holidays.ts`), el siguiente día hábil.
 export function estimateChargeDate(dueDate: string, language: AppLanguage = "es"): {
   date: string;
   label: string;
 } {
-  const date = parseISO(dueDate);
   const locale = language === "en" ? enUS : es;
-  const estimatedPrefix = language === "en" ? "estimated" : "estimado";
+  const chargeDate = nextBankBusinessDay(dueDate);
+
+  if (chargeDate !== dueDate) {
+    const estimatedPrefix = language === "en" ? "estimated" : "estimado";
+    return {
+      date: chargeDate,
+      label: `${estimatedPrefix} ${format(parseISO(chargeDate), "EEEE d", { locale })}`,
+    };
+  }
+
   const chargePrefix = language === "en" ? "charges" : "cobro";
-
-  if (isSaturday(date)) {
-    const estimated = addDays(date, 2);
-    return {
-      date: toDateOnly(estimated),
-      label: `${estimatedPrefix} ${format(estimated, "EEEE d", { locale })}`,
-    };
-  }
-
-  if (isSunday(date)) {
-    const estimated = addDays(date, 1);
-    return {
-      date: toDateOnly(estimated),
-      label: `${estimatedPrefix} ${format(estimated, "EEEE d", { locale })}`,
-    };
-  }
-
   return {
     date: dueDate,
-    label: `${chargePrefix} ${format(date, "EEEE d", { locale })}`,
+    label: `${chargePrefix} ${format(parseISO(dueDate), "EEEE d", { locale })}`,
   };
 }
 
