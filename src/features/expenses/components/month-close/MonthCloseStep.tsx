@@ -26,7 +26,7 @@ export function MonthCloseStep({ number, title, action, children }: MonthCloseSt
           >
             {number}
           </span>
-          <span className="truncate first-letter:uppercase">{title}</span>
+          <span className="min-w-0 break-words first-letter:uppercase">{title}</span>
         </h3>
         {action}
       </header>

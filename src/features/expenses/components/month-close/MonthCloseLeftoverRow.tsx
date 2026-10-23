@@ -73,7 +73,7 @@ export function MonthCloseLeftoverRow({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p
-            className={`truncate text-sm font-semibold ${
+            className={`break-words text-sm font-semibold ${
               resolution === "pending"
                 ? "text-[var(--app-text)]"
                 : "text-[var(--app-text-subtle)] line-through"
@@ -81,7 +81,7 @@ export function MonthCloseLeftoverRow({
           >
             {name}
           </p>
-          <p className="mt-0.5 truncate text-xs text-[var(--app-text-muted)]">
+          <p className="mt-0.5 break-words text-xs text-[var(--app-text-muted)]">
             {[
               format(parseISO(occurrence.dueDate), "d MMM", {
                 locale: language === "en" ? enUS : es,

@@ -82,7 +82,7 @@ export function MonthCloseSheet({
               <h2 id={titleId} className="text-lg font-semibold text-[var(--app-text)]">
                 {capitalize(t("monthClose.closeMonth", language).replace("{month}", month))}
               </h2>
-              <p className="truncate text-sm text-[var(--app-text-muted)]">
+              <p className="break-words text-sm text-[var(--app-text-muted)]">
                 {t("monthClose.sheetSubtitle", language)
                   .replace("{month}", month)
                   .replace("{next}", nextMonth)}

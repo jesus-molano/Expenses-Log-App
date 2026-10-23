@@ -12,6 +12,8 @@ describe("formatShortDate", () => {
 
   it("keeps a malformed date as written instead of throwing", () => {
     expect(formatShortDate("15/10/2026", "es")).toBe("15/10/2026");
+  });
+});
 
 describe("plan dashboard", () => {
   it("offers next year from December and the years of the given months", () => {
