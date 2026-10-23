@@ -97,6 +97,29 @@ export async function POST(request: Request) {
     );
   }
 
+  // El navegador renovó la suscripción: la anterior ya no recibe nada y no
+  // cuenta para el límite de dispositivos. Se borra antes de guardar la nueva
+  // porque `claim_push_subscription` hace sitio dentro de la base de datos:
+  // con la antigua aún guardada, una renovación con 10 dispositivos borraría
+  // otro dispositivo en lugar de ella.
+  const previousEndpoint =
+    parsed.data.previousEndpoint &&
+    parsed.data.previousEndpoint !== parsed.data.endpoint
+      ? parsed.data.previousEndpoint
+      : null;
+
+  if (previousEndpoint) {
+    const { error: cleanupError } = await supabase
+      .from("push_subscriptions")
+      .delete()
+      .eq("user_id", userId)
+      .eq("endpoint", previousEndpoint);
+    // Si falla, la antigua acabará podada por el cron (404/410).
+    if (cleanupError) {
+      console.error("Could not remove replaced push subscription", cleanupError);
+    }
+  }
+
   try {
     // También es el latido del dispositivo: renueva updated_at y pone a cero
     // los fallos. RPC que reclama el endpoint (con la migración de F0c-2) o,
@@ -116,14 +139,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // El navegador renovó la suscripción: la anterior se borra aparte y no
-  // cuenta para el límite de dispositivos.
-  const previousEndpoint =
-    parsed.data.previousEndpoint &&
-    parsed.data.previousEndpoint !== parsed.data.endpoint
-      ? parsed.data.previousEndpoint
-      : null;
-
   // Límite de dispositivos: el nuevo sustituye a los que llevan más tiempo
   // sin actualizarse. Se borra después de guardar, para no perder ninguno si
   // el guardado falla. Si el borrado falla o dos altas coinciden, el usuario
@@ -142,18 +157,6 @@ export async function POST(request: Request) {
 
     if (evictError) {
       console.error("Could not evict old push subscriptions", evictError);
-    }
-  }
-
-  if (previousEndpoint) {
-    const { error: cleanupError } = await supabase
-      .from("push_subscriptions")
-      .delete()
-      .eq("user_id", userId)
-      .eq("endpoint", previousEndpoint);
-    // La nueva ya está guardada; la antigua acabará podada por el cron.
-    if (cleanupError) {
-      console.error("Could not remove replaced push subscription", cleanupError);
     }
   }
 

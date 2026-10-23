@@ -275,7 +275,9 @@ Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/Ba
   (para que Excel lea las tildes), coma como separador e importes con punto y
   dos decimales (`2200.00`). La columna `type` distingue:
   - `expense`: una fila por gasto (frecuencia, intervalo, mes anual, rrule,
-    inicio, fin, dia de cobro, aviso, descripcion).
+    inicio, fin, dia de cobro, aviso, descripcion). `reminder_days` lleva los
+    dias de antelacion del aviso propio, `off` si el aviso propio esta apagado
+    o nada si el gasto sigue el aviso por defecto de Ajustes.
   - `occurrence`: el historico hasta el final del mes actual (los meses
     cerrados tambien de gastos borrados) y, de despues, solo los cobros con
     cambios (por ejemplo, pagados por adelantado).

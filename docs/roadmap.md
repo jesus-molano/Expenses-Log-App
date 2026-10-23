@@ -275,7 +275,7 @@ Estado:
   - Hecho en `src/shared/safe-redirect.ts`: también cae al fallback una ruta que se normaliza a `//host` (`/.//evil.com`). Tests de `%09`/`%0A`/`%0D`, `//`, `/\`, URLs absolutas y segmentos `.`/`..`.
 - **M11.** try/catch por usuario en el cron, liberando los leases.
   - Hecho: cada lease se cierra por separado (marcado o liberado) aunque falle una reclamación a medias o el envío, y la respuesta lleva `errors`, `invalidStoresSkipped` y `blockedEndpointsSkipped`.
-  - `toReminderStore` sustituye a `isExpenseStore`: solo gastos activos con aviso y bien formados, y overrides legibles.
+  - `toReminderStore` sustituye a `isExpenseStore`: solo gastos activos con aviso y bien formados, y overrides legibles. Con F2b vive en `src/features/expenses/lib/reminder-store.ts` y conserva todos los gastos bien formados (con o sin aviso propio), porque el aviso por defecto, el mes al día y el día de cobro los necesitan.
   - El `CRON_SECRET` se compara en tiempo constante.
 - **M15.** En el sign-out, quitar la suscripción push y no fusionar los datos de otro owner.
   - Hecho: `DELETE` + `unsubscribe()` antes del `signOut` (plazo de 4 s) y hoja "Salir y conservar los datos aquí" / "Salir y borrar los datos de este dispositivo", con aviso si hay cambios sin subir. Borrar la cuenta también anula la suscripción del navegador.
@@ -284,7 +284,7 @@ Estado:
   - **Diferido a F0c-2:** el RPC `claim_push_subscription`, que necesita migración.
 - **M13** (parte de la app): lista de hosts push permitidos, `{timeout:5000, TTL}` y `Promise.allSettled`.
   - Hecho: FCM, autopush de Mozilla, `*.push.apple.com` y `*.notify.windows.com`, con forma estricta (`https`, sin usuario, puerto ni `\`) para que web-push, que usa `url.parse`, vea el mismo host. Se comprueba en `subscribe`, en `test` y en el envío, y el cron se salta las filas de otros hosts.
-  - TTL de 24 h para el recordatorio y de 5 minutos para la prueba.
+  - TTL de 24 h para el recordatorio y de 5 minutos para la prueba. Con F2b, cada tipo de aviso lleva su propio TTL (`REMINDER_TTL_SECONDS`); la prueba sigue en 5 minutos.
   - Máximo 10 suscripciones por usuario en la API (se borran las actualizadas hace más tiempo) y en el envío del cron.
   - **Diferido a F0c-2:** el límite en la base de datos y revocar el INSERT directo del rol `authenticated` en `push_subscriptions` (ambos son migración).
 - Siguen diferidos, como bajos del informe: el error ignorado de `exchangeCodeForSession`, el sujeto VAPID por defecto y la paginación y `maxDuration` del cron.

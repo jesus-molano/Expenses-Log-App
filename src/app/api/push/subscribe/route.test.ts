@@ -171,6 +171,25 @@ describe("/api/push/subscribe", () => {
     expect(deleteQuery.eq).toHaveBeenCalledWith("endpoint", stored[0].endpoint);
   });
 
+  it("removes the replaced endpoint before the claim RPC makes room", async () => {
+    const stored = storedSubscriptions(10);
+    const { deleteQuery, rpc } = mockSupabase({ stored, rpcError: null });
+    const previousEndpoint = stored[9].endpoint;
+    const response = await POST(request("POST", { endpoint, keys, previousEndpoint }));
+
+    expect(response.status).toBe(200);
+    // El RPC borra en la base de datos lo que pase de 10: la antigua tiene que
+    // haberse ido ya para que no se lleve otro dispositivo.
+    const removal = deleteQuery.eq.mock.calls.findIndex(
+      ([column, value]) => column === "endpoint" && value === previousEndpoint,
+    );
+    expect(removal).toBeGreaterThanOrEqual(0);
+    expect(deleteQuery.eq.mock.invocationCallOrder[removal]).toBeLessThan(
+      rpc.mock.invocationCallOrder[0],
+    );
+    expect(deleteQuery.in).not.toHaveBeenCalled();
+  });
+
   it("replaces the least recently updated device beyond ten", async () => {
     const { upsert, deleteQuery } = mockSupabase({ stored: storedSubscriptions(10) });
     const response = await POST(request("POST", { endpoint, keys }));

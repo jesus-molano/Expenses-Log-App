@@ -61,17 +61,19 @@ function sameRecurrence(left: RecurrenceRule, right: RecurrenceRule) {
   );
 }
 
-// Sin aviso da igual con cuántos días se avisaría.
+// Sin aviso propio el gasto sigue el aviso por defecto de Ajustes, que puede
+// estar encendido: pasar de ese a uno propio (también apagado), o volver, sí
+// cambia algo. Con el aviso propio apagado da igual con cuántos días se
+// avisaría.
 function sameReminder(
   left: ExpenseReminderSettings | undefined,
   right: ExpenseReminderSettings | undefined,
 ) {
-  const leftEnabled = left?.enabled ?? false;
-  const rightEnabled = right?.enabled ?? false;
-  if (!leftEnabled && !rightEnabled) return true;
+  if (!left || !right) return !left && !right;
+  if (!left.enabled && !right.enabled) return true;
   return (
-    leftEnabled === rightEnabled &&
-    left?.daysBeforeCharge === right?.daysBeforeCharge
+    left.enabled === right.enabled &&
+    left.daysBeforeCharge === right.daysBeforeCharge
   );
 }
 

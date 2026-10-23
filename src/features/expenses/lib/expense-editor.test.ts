@@ -101,13 +101,43 @@ describe("hasUnsavedExpenseChanges", () => {
     expect(
       edit((values) => ({ ...values, form: { ...values.form, recurrence: { frequency: "monthly" } } })),
     ).toBe(false);
-    // Un aviso apagado con otros días no cambia nada.
+    // Un aviso propio apagado con otros días no cambia nada.
+    const ownOff = expenseEditorValues(
+      { ...template, reminder: { enabled: false, daysBeforeCharge: 3 } },
+      "Suscripciones",
+      "es",
+    );
+    expect(
+      hasUnsavedExpenseChanges(
+        ownOff,
+        { ...ownOff, form: { ...ownOff.form, reminder: { enabled: false, daysBeforeCharge: 5 } } },
+        template.startDate,
+      ),
+    ).toBe(false);
+  });
+
+  it("treats leaving or going back to the default reminder as a change", () => {
+    // Sin aviso propio el gasto sigue el de Ajustes (que puede avisar):
+    // apagarlo aquí deja de seguirlo.
     expect(
       edit((values) => ({
         ...values,
-        form: { ...values.form, reminder: { enabled: false, daysBeforeCharge: 5 } },
+        form: { ...values.form, reminder: { enabled: false, daysBeforeCharge: 3 } },
       })),
-    ).toBe(false);
+    ).toBe(true);
+    // "Usar el ajuste general" quita el aviso propio.
+    const ownOff = expenseEditorValues(
+      { ...template, reminder: { enabled: false, daysBeforeCharge: 3 } },
+      "Suscripciones",
+      "es",
+    );
+    expect(
+      hasUnsavedExpenseChanges(
+        ownOff,
+        { ...ownOff, form: { ...ownOff.form, reminder: undefined } },
+        template.startDate,
+      ),
+    ).toBe(true);
   });
 
   it("is clean again after undoing an edit", () => {
