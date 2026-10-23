@@ -45,7 +45,9 @@ export function OneOffIncomePanel({
           <span className="app-one-off-income-icon">
             <Plus size={14} />
           </span>
-          <span className="truncate">{t("money.oneOffIncome", language)}</span>
+          <span className="min-w-0 break-words">
+            {t("money.oneOffIncome", language)}
+          </span>
         </h2>
         <p className="app-money shrink-0 text-right text-sm font-semibold text-[var(--app-success)]">
           {formatCurrency(extraIncomeTotal)}

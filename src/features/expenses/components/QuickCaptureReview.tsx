@@ -57,12 +57,12 @@ export function QuickCaptureReview({
       <section>
         <div className="app-sheet-header sticky top-0 z-10 px-5 pb-3 pt-3">
           <div className="app-sheet-handle mx-auto mb-3 sm:hidden" />
-          <header className="flex items-center justify-between gap-4">
+          <header className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="text-lg font-semibold text-[var(--app-text)]">
                 {t("expenses.captureReviewTitle", language)}
               </h2>
-              <p className="truncate text-sm text-[var(--app-text-muted)]">
+              <p className="break-words text-sm text-[var(--app-text-muted)]">
                 {t("expenses.captureReviewSubtitle", language)}
               </p>
             </div>
@@ -91,7 +91,11 @@ export function QuickCaptureReview({
             const toReview = inferredFieldsLabel(item.inferredFields, language);
             return (
               <li key={item.id} className="app-section-card grid gap-2 p-3">
-                <div className="flex items-start gap-3">
+                {/* Nombre y detalles solo comparten fila con el lapiz. El importe
+                    va siempre en su propia linea, con su borde derecho alineado
+                    con el del lapiz, para que este en el mismo sitio en todas
+                    las tarjetas. */}
+                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1">
                   <input
                     id={checkboxId}
                     type="checkbox"
@@ -101,16 +105,11 @@ export function QuickCaptureReview({
                     onChange={() => onToggle(item.id)}
                     aria-label={t("expenses.captureInclude", language).replace("{name}", draft.name)}
                   />
-                  <label htmlFor={checkboxId} className="grid min-w-0 flex-1 gap-0.5">
-                    <span className="flex items-baseline justify-between gap-2">
-                      <span className="truncate text-sm font-semibold text-[var(--app-text)]">
-                        {draft.name}
-                      </span>
-                      <span className="app-money shrink-0 text-sm font-semibold text-[var(--app-text)]">
-                        {canSelect ? formatCurrency(draft.amount) : "—"}
-                      </span>
+                  <label htmlFor={checkboxId} className="grid min-w-0 gap-0.5">
+                    <span className="text-sm font-semibold leading-snug text-[var(--app-text)] [overflow-wrap:anywhere]">
+                      {draft.name}
                     </span>
-                    <span className="text-xs text-[var(--app-text-muted)]">
+                    <span className="text-xs text-[var(--app-text-muted)] [overflow-wrap:anywhere]">
                       {[
                         localizedRecurrenceLabel(draft.recurrence, language),
                         t("expenses.captureDay", language).replace("{day}", String(draft.dueDay)),
@@ -127,6 +126,12 @@ export function QuickCaptureReview({
                   >
                     <Pencil size={15} />
                   </IconButton>
+                  <label
+                    htmlFor={checkboxId}
+                    className="app-money col-[2/4] justify-self-end whitespace-nowrap text-sm font-semibold text-[var(--app-text)]"
+                  >
+                    {canSelect ? formatCurrency(draft.amount) : "—"}
+                  </label>
                 </div>
                 <div className="flex flex-wrap gap-1.5 pl-8 text-xs">
                   {!canSelect ? (
@@ -162,8 +167,6 @@ export function QuickCaptureReview({
                   type="button"
                   onClick={() => onInitialStatusChange("due")}
                   variant={initialStatus === "due" ? "primary" : "secondary"}
-                  size="sm"
-                  className="h-10"
                   aria-pressed={initialStatus === "due"}
                 >
                   {t("common.pending", language)}
@@ -172,8 +175,6 @@ export function QuickCaptureReview({
                   type="button"
                   onClick={() => onInitialStatusChange("paid")}
                   variant={initialStatus === "paid" ? "primary" : "secondary"}
-                  size="sm"
-                  className="h-10"
                   aria-pressed={initialStatus === "paid"}
                 >
                   {t("common.paid", language)}

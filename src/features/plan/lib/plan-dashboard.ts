@@ -65,11 +65,15 @@ export function getAvailableYears(store: ExpenseStore, today: Date) {
   return Array.from(years).filter(Number.isFinite).sort((a, b) => b - a);
 }
 
+// "15 oct". Una fecha que no es YYYY-MM-DD se muestra tal cual en vez de
+// romper la pantalla.
 export function formatShortDate(date: string, language: AppLanguage) {
+  const value = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(value.getTime())) return date;
   return new Intl.DateTimeFormat(language === "en" ? "en-US" : "es-ES", {
     day: "numeric",
     month: "short",
-  }).format(new Date(`${date}T12:00:00`));
+  }).format(value);
 }
 
 export function phaseLabel(

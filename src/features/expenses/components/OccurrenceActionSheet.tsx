@@ -70,13 +70,13 @@ export function OccurrenceActionSheet({
       <section>
         <div className="app-sheet-header sticky top-0 z-10 px-5 pb-3 pt-3">
           <div className="app-sheet-handle mx-auto mb-3 sm:hidden" />
-          <header className="flex items-center justify-between gap-4">
+          <header className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold text-[var(--app-text)]">
+              <h2 className="text-lg font-semibold leading-snug text-[var(--app-text)] [overflow-wrap:anywhere]">
                 {name}
               </h2>
-              <p className="truncate text-sm text-[var(--app-text-muted)]">
-                <span className="app-money">{formatCurrency(occurrence.template.amount)}</span>
+              <p className="break-words text-sm text-[var(--app-text-muted)]">
+                <span className="app-money whitespace-nowrap">{formatCurrency(occurrence.template.amount)}</span>
                 {" · "}
                 {format(parseISO(occurrence.dueDate), "EEEE d MMM", { locale })}
                 {" · "}

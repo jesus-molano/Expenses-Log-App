@@ -12,23 +12,28 @@ export function DangerRows({ settings }: { settings: SettingsController }) {
       </p>
 
       <div className="grid gap-2">
+        {/* Si la etiqueta no cabe en una linea, salta a dos y el boton crece. */}
         <div className="grid grid-cols-2 gap-2">
           <Button
             variant="danger"
-            className="min-w-0 px-3"
+            className="min-w-0 px-3 py-2"
             onClick={() => settings.setClearExpensesOpen(true)}
-            leadingIcon={<ReceiptText size={17} />}
+            leadingIcon={<ReceiptText size={17} className="shrink-0" />}
           >
-            <span className="truncate">{t("settings.clearExpenses")}</span>
+            <span className="min-w-0 break-words text-center leading-tight">
+              {t("settings.clearExpenses")}
+            </span>
           </Button>
 
           <Button
             variant="danger"
-            className="min-w-0 px-3"
+            className="min-w-0 px-3 py-2"
             onClick={() => settings.setClearIncomeOpen(true)}
-            leadingIcon={<BadgeEuro size={17} />}
+            leadingIcon={<BadgeEuro size={17} className="shrink-0" />}
           >
-            <span className="truncate">{t("settings.clearIncome")}</span>
+            <span className="min-w-0 break-words text-center leading-tight">
+              {t("settings.clearIncome")}
+            </span>
           </Button>
         </div>
 

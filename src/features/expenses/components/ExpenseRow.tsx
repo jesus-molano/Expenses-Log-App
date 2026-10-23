@@ -127,7 +127,7 @@ export function ExpenseRow({
           viewTransitionName: `expense-${occurrence.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`,
         }}
         aria-label={`${occurrence.template.name} ${statusLabelForA11y(paid, language)}`}
-        className={`app-expense-row-card grid min-h-[4.25rem] touch-pan-y select-none grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-[var(--app-radius-md)] border px-3.5 py-3 transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out will-change-transform sm:grid-cols-[minmax(0,1fr)_auto_auto] ${
+        className={`app-expense-row-card grid min-h-[4.25rem] touch-pan-y select-none grid-cols-[minmax(0,1fr)] items-center gap-2 rounded-[var(--app-radius-md)] border px-3.5 py-3 transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out will-change-transform sm:grid-cols-[minmax(0,1fr)_auto] ${
           dragActive
             ? "invisible app-surface-raised border-[var(--app-border-strong)]"
             : swipe.direction

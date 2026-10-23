@@ -24,27 +24,3 @@ export function categoryLabel(name: string, language: AppLanguage): string {
   const translationKey = categoryKeyByName[key];
   return translationKey ? t(translationKey, language) : name;
 }
-
-const compactCategoryLabelByLanguage: Record<
-  AppLanguage,
-  Partial<Record<keyof typeof categoryKeyByName, string>>
-> = {
-  es: {
-    alimentacion: "Comida",
-    suscripciones: "Subs.",
-    "educacion/trabajo": "Edu./trab.",
-  },
-  en: {
-    alimentacion: "Food",
-    suscripciones: "Subs.",
-    "educacion/trabajo": "Edu./work",
-  },
-};
-
-export function compactCategoryLabel(
-  name: string,
-  language: AppLanguage,
-): string {
-  const key = name.trim().toLowerCase() as keyof typeof categoryKeyByName;
-  return compactCategoryLabelByLanguage[language][key] ?? categoryLabel(name, language);
-}

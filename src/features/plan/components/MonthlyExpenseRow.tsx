@@ -137,7 +137,7 @@ export function MonthlyExpenseRow({
                 type="button"
                 onClick={() => editor.setStatus(status)}
                 aria-pressed={selected}
-                className="app-monthly-status-option h-9 text-sm font-semibold"
+                className="app-monthly-status-option min-h-9 px-2 text-sm font-semibold"
                 data-status={status}
                 data-selected={selected ? "true" : "false"}
               >
@@ -160,14 +160,19 @@ export function MonthlyExpenseRow({
       ? t("expenses.overdue", language)
       : t("common.pending", language);
 
+  // En movil, dos filas: nombre | importe arriba y detalle | acciones debajo.
+  // Son tres columnas (texto, hueco, importe): el nombre ocupa las dos
+  // primeras y las acciones las dos ultimas, asi el nombre solo cede el ancho
+  // del importe y el detalle el de los botones. Desde sm vuelven a ser las
+  // columnas de la tabla.
   return (
     <div
-      className="app-list-item app-monthly-table-row app-monthly-expense-row grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-2"
+      className="app-list-item app-monthly-table-row app-monthly-expense-row grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-2 gap-y-1 px-3 py-2 sm:items-center"
       data-has-pay-action={onTogglePaid ? "true" : undefined}
     >
-      <div className="min-w-0">
+      <div className="contents sm:block sm:min-w-0">
         <p
-          className={`truncate text-sm font-semibold ${
+          className={`col-[1/3] row-start-1 min-w-0 break-words text-sm font-semibold ${
             isPaid
               ? "text-[var(--app-text-subtle)] line-through"
               : "text-[var(--app-text)]"
@@ -175,7 +180,7 @@ export function MonthlyExpenseRow({
         >
           {occurrence.template.name}
         </p>
-        <p className="mt-0.5 truncate text-xs font-medium text-[var(--app-text-muted)]">
+        <p className="col-start-1 row-start-2 min-w-0 break-words text-xs font-medium text-[var(--app-text-muted)] sm:mt-0.5">
           {format(new Date(`${occurrence.dueDate}T00:00:00`), "d MMM", {
             locale,
           })}{" "}
@@ -183,7 +188,7 @@ export function MonthlyExpenseRow({
         </p>
       </div>
       <p
-        className={`app-money text-sm font-semibold ${
+        className={`app-money col-start-3 row-start-1 justify-self-end whitespace-nowrap text-sm font-semibold sm:col-auto sm:row-auto sm:justify-self-auto ${
           isPaid
             ? "text-[var(--app-text-subtle)] line-through"
             : "text-[var(--app-text)]"
@@ -191,7 +196,7 @@ export function MonthlyExpenseRow({
       >
         {formatCurrency(occurrence.template.amount)}
       </p>
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="col-[2/4] row-start-2 flex shrink-0 items-center gap-1 justify-self-end sm:col-auto sm:row-auto sm:justify-self-auto">
         {onTogglePaid ? (
           <IconButton
             type="button"

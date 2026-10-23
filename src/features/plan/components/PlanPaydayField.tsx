@@ -122,7 +122,7 @@ export function PlanPaydayField({
         aria-expanded={open}
         aria-label={`${t("money.changePaydayLabel", language)}, ${salaryDay}`}
       >
-        <span className="min-w-0 truncate">
+        <span className="min-w-0 break-words leading-tight">
           {label} {salaryDay}
         </span>
         <CalendarDays size={18} className="shrink-0 text-[var(--app-accent)]" />

@@ -188,7 +188,8 @@ export function DatePickerField({
           >
             <ChevronLeft size={18} />
           </IconButton>
-          <div className="relative z-10 grid min-w-0 flex-1 grid-cols-[minmax(0,8.5rem)_5.75rem] justify-center gap-2">
+          {/* El año nunca se estrecha por debajo de su contenido; el mes usa el resto. */}
+          <div className="relative z-10 grid min-w-0 flex-1 grid-cols-[minmax(0,8.5rem)_minmax(5.75rem,auto)] justify-center gap-2">
             <div className="relative min-w-0">
               <button
                 type="button"
@@ -201,7 +202,7 @@ export function DatePickerField({
                 className="input-control flex h-10 min-w-0 items-center justify-between gap-2 pr-3 text-left"
                 aria-label={t("datePicker.month", language)}
               >
-                <span className="truncate">
+                <span className="min-w-0 break-words leading-tight">
                   {months[visibleMonth.getMonth()]}
                 </span>
                 <ChevronDown
@@ -244,7 +245,9 @@ export function DatePickerField({
                 className="input-control flex h-10 min-w-0 items-center justify-between gap-2 pr-3 text-left"
                 aria-label={t("datePicker.year", language)}
               >
-                <span className="truncate">{visibleMonth.getFullYear()}</span>
+                <span className="whitespace-nowrap">
+                  {visibleMonth.getFullYear()}
+                </span>
                 <ChevronDown
                   size={17}
                   className="shrink-0 text-[var(--app-accent)]"
@@ -356,14 +359,17 @@ export function DatePickerField({
         type="button"
         onClick={openPicker}
         className={cn(
-          "input-control flex w-full items-center justify-between gap-3 text-left",
+          "input-control flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left",
           className,
         )}
+        // .input-control fija la altura; se libera para que un texto largo
+        // salte de linea y el campo crezca en vez de cortarse.
+        style={{ height: "auto" }}
         aria-label={label}
       >
         <span
           className={cn(
-            "min-w-0 truncate",
+            "min-w-0 break-words leading-snug",
             selectedDate ? "text-[var(--app-text)]" : "text-[var(--app-text-subtle)]",
           )}
         >

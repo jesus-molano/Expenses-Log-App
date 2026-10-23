@@ -218,16 +218,16 @@ function useMeasuredChartContainer() {
 
 function ChartLegendItem({ color, label }: { color: string; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-1">
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-1">
       <span
         aria-hidden="true"
-        className="size-2.5 rounded-full"
+        className="size-2.5 shrink-0 rounded-full"
         style={{
           background: color,
           boxShadow: `0 0 0 3px color-mix(in srgb, ${color} 12%, transparent)`,
         }}
       />
-      {label}
+      <span className="min-w-0 break-words">{label}</span>
     </span>
   );
 }
@@ -259,10 +259,10 @@ function ChartTooltip({ active, label, payload }: ChartTooltipProps) {
             <span className="inline-flex min-w-0 items-center gap-2">
               <span
                 aria-hidden="true"
-                className="size-2 rounded-full"
+                className="size-2 shrink-0 rounded-full"
                 style={{ backgroundColor: getTooltipSeriesColor(entry) }}
               />
-              <span className="min-w-0 truncate">{entry.name}</span>
+              <span className="min-w-0 break-words">{entry.name}</span>
             </span>
             <span className="app-money font-semibold text-[var(--app-text)]">
               {formatCurrency(Number(entry.value ?? 0))}

@@ -19,9 +19,9 @@ export function ExpenseField({
     <Field
       label={
         <span className="flex min-w-0 items-center justify-between gap-2">
-          <span className="truncate">{label}</span>
+          <span className="min-w-0 break-words">{label}</span>
           {optional ? (
-            <span className="shrink-0 rounded-[var(--app-radius-pill)] border border-[var(--app-border)] px-2 py-0.5 text-[0.65rem] font-bold uppercase leading-none text-[var(--app-text-subtle)]">
+            <span className="shrink-0 whitespace-nowrap rounded-[var(--app-radius-pill)] border border-[var(--app-border)] px-2 py-0.5 text-[0.65rem] font-bold uppercase leading-none text-[var(--app-text-subtle)]">
               {t("common.optional", language)}
             </span>
           ) : null}
