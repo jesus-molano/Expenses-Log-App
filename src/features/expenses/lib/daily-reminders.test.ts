@@ -4,6 +4,7 @@ import {
   buildDailyReminder,
   dailyReminderBody,
   dailyReminderTitle,
+  toReminderStore,
 } from "./daily-reminders";
 
 function template(overrides: Partial<ExpenseTemplate>): ExpenseTemplate {
@@ -116,5 +117,98 @@ describe("daily reminders", () => {
     );
 
     expect(reminder).toBeNull();
+  });
+});
+
+describe("toReminderStore", () => {
+  it("rejects values that are not a store", () => {
+    expect(toReminderStore(null)).toBeNull();
+    expect(toReminderStore("store")).toBeNull();
+    expect(toReminderStore([])).toBeNull();
+    expect(toReminderStore({ templates: [] })).toBeNull();
+    expect(toReminderStore({ templates: "x", overrides: [] })).toBeNull();
+  });
+
+  it("keeps only active, well-formed templates with the reminder on", () => {
+    const valid = template({ id: "valid" });
+    const result = toReminderStore({
+      templates: [
+        valid,
+        template({ id: "off", reminder: { enabled: false, daysBeforeCharge: 2 } }),
+        template({ id: "inactive", active: false }),
+        { ...template({ id: "no-recurrence" }), recurrence: null },
+        { ...template({ id: "bad-frequency" }), recurrence: { frequency: "daily" } },
+        { ...template({ id: "bad-start" }), startDate: "2026-13-01" },
+        { ...template({ id: "bad-end" }), endDate: "soon" },
+        { ...template({ id: "bad-day" }), dueDay: "12" },
+        { ...template({ id: "bad-reminder" }), reminder: { enabled: true } },
+        { ...template({ id: 7 as unknown as string }) },
+        "template",
+        null,
+      ],
+      overrides: [],
+    });
+
+    expect(result?.templates.map((item) => item.id)).toEqual(["valid"]);
+  });
+
+  it("drops unusable overrides and strips unreadable moved dates", () => {
+    const result = toReminderStore({
+      templates: [template({ id: "spotify" })],
+      overrides: [
+        {
+          id: "ovr:spotify:2026-06-12",
+          templateId: "spotify",
+          occurrenceDate: "2026-06-12",
+          status: "paid",
+          dueDate: "never",
+          name: 42,
+        },
+        { templateId: "spotify", occurrenceDate: "12/06/2026", status: "due" },
+        { templateId: "spotify", occurrenceDate: "2026-07-12", status: "done" },
+        { occurrenceDate: "2026-07-12", status: "due" },
+        "override",
+      ],
+      preferences: { language: "en" },
+    });
+
+    expect(result?.overrides).toEqual([
+      {
+        id: "ovr:spotify:2026-06-12",
+        templateId: "spotify",
+        occurrenceDate: "2026-06-12",
+        status: "paid",
+      },
+    ]);
+    expect(result?.preferences?.language).toBe("en");
+  });
+
+  it("builds the same reminder as the full store for valid data", () => {
+    const full = store([template({ id: "spotify", name: "Spotify", dueDay: 12 })]);
+    const today = new Date("2026-06-11T08:00:00");
+
+    expect(buildDailyReminder(toReminderStore(full)!, today)).toEqual(
+      buildDailyReminder(full, today),
+    );
+  });
+
+  it("keeps a paid override with a broken moved date from reminding again", () => {
+    const reminderStore = toReminderStore({
+      ...store([template({ id: "spotify", name: "Spotify", dueDay: 12 })]),
+      overrides: [
+        {
+          id: "override-1",
+          userId: "user-1",
+          templateId: "spotify",
+          occurrenceDate: "2026-06-12",
+          status: "paid",
+          dueDate: "2026-06-99",
+        },
+      ],
+    });
+
+    expect(
+      buildDailyReminder(reminderStore!, new Date("2026-06-11T08:00:00")),
+    ).toBeNull();
   });
 });

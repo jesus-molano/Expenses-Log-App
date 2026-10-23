@@ -24,7 +24,8 @@ export function AccountRow({ settings }: { settings: SettingsController }) {
         settings.user ? (
           <Button
             variant="secondary"
-            onClick={settings.signOut}
+            onClick={settings.openSignOutDialog}
+            disabled={settings.isSigningOut}
             size="sm"
             leadingIcon={<LogOut size={16} />}
           >

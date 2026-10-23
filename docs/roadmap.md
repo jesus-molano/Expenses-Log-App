@@ -55,6 +55,12 @@ Estado:
   - Atajos del manifest "Añadir gasto" y "Añadir por voz" (`/expenses/new?mode=voice`).
   - Atrás cierra la hoja abierta (`src/components/ui/sheet-history.ts`).
   - Pendiente de F2a: `OccurrenceActionSheet`, `ConfirmActionDialog` con `useDialogA11y` y M22.
+- **F0c-1 (seguridad sin migración): hecho.**
+  - `/auth/callback` solo redirige a rutas de la app: rechaza controles, DEL y `\`, y comprueba el origen con `new URL` (M14).
+  - El cron procesa cada usuario en su propio `try/catch`, cierra siempre sus leases y cuenta `errors`; el store pasa por `toReminderStore` (M11).
+  - Lista de servicios push en `subscribe`, `test` y el propio envío, `{timeout: 5000, TTL}`, `Promise.allSettled` y máximo 10 suscripciones por usuario en la API (M13).
+  - Salir libera la suscripción push antes del `signOut` y ofrece borrar los datos del dispositivo; los datos sin metadatos de sync se atribuyen por su `userId` (M15).
+  - Diferido a F0c-2 (necesita migración): `claim_push_subscription`, el límite de 10 en la base de datos y quitar el INSERT directo en `push_subscriptions`.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
@@ -216,17 +222,31 @@ Estado:
 - Tombstones de sueldo: sin ellos el merge resucita datos. Implementados como lista de versiones borradas (`deleted.monthlySalary: string[]` con `<mes>@<updatedAt>`), que los builds con passthrough fusionan por unión.
 - Revertir es seguro: los builds anteriores ignoran los metadatos.
 
-### F0c-1 — Seguridad (sin migración)
+### F0c-1 — Seguridad (sin migración) — hecho
 - **M14.** Open redirect en `/auth/callback`: rechazar `[\u0000-\u001F\u007F\\]` y comprobar el origen con `new URL`.
+  - Hecho en `src/shared/safe-redirect.ts`: también cae al fallback una ruta que se normaliza a `//host` (`/.//evil.com`). Tests de `%09`/`%0A`/`%0D`, `//`, `/\`, URLs absolutas y segmentos `.`/`..`.
 - **M11.** try/catch por usuario en el cron, liberando los leases.
+  - Hecho: cada lease se cierra por separado (marcado o liberado) aunque falle una reclamación a medias o el envío, y la respuesta lleva `errors`, `invalidStoresSkipped` y `blockedEndpointsSkipped`.
+  - `toReminderStore` sustituye a `isExpenseStore`: solo gastos activos con aviso y bien formados, y overrides legibles.
+  - El `CRON_SECRET` se compara en tiempo constante.
 - **M15.** En el sign-out, quitar la suscripción push y no fusionar los datos de otro owner.
+  - Hecho: `DELETE` + `unsubscribe()` antes del `signOut` (plazo de 4 s) y hoja "Salir y conservar los datos aquí" / "Salir y borrar los datos de este dispositivo", con aviso si hay cambios sin subir. Borrar la cuenta también anula la suscripción del navegador.
+  - Revisado el reparto de F0b-3 (`ownerId` y `localChangesFor`): faltaba el caso de los dispositivos sin metadatos de sync, que ahora se atribuyen por el `userId` de los datos (`inferStoreOwnerId`). Borrar los datos locales también borra los metadatos.
+  - Un endpoint registrado a nombre de otra cuenta devuelve 409 `PUSH_SUBSCRIPTION_IN_USE`; Activar pide una suscripción nueva y la guarda.
+  - **Diferido a F0c-2:** el RPC `claim_push_subscription`, que necesita migración.
 - **M13** (parte de la app): lista de hosts push permitidos, `{timeout:5000, TTL}` y `Promise.allSettled`.
+  - Hecho: FCM, autopush de Mozilla, `*.push.apple.com` y `*.notify.windows.com`, con forma estricta (`https`, sin usuario, puerto ni `\`) para que web-push, que usa `url.parse`, vea el mismo host. Se comprueba en `subscribe`, en `test` y en el envío, y el cron se salta las filas de otros hosts.
+  - TTL de 24 h para el recordatorio y de 5 minutos para la prueba.
+  - Máximo 10 suscripciones por usuario en la API (se borran las actualizadas hace más tiempo) y en el envío del cron.
+  - **Diferido a F0c-2:** el límite en la base de datos y revocar el INSERT directo del rol `authenticated` en `push_subscriptions` (ambos son migración).
+- Siguen diferidos, como bajos del informe: el error ignorado de `exchangeCodeForSession`, el sujeto VAPID por defecto y la paginación y `maxDuration` del cron.
 
 ### F0c-2 — Sync multi-dispositivo (A2, migración expand/contract)
 1. **Migración aditiva:**
    - `revision bigint default 0` y un trigger `BEFORE UPDATE` que incrementa `revision`, para que los upserts ciegos de clientes viejos invaliden el CAS.
    - RPC `save_app_store(p_store, p_expected_revision)`.
-   - Máximo 10 suscripciones push por usuario.
+   - Máximo 10 suscripciones push por usuario (la API ya lo aplica desde F0c-1).
+   - RPC `claim_push_subscription` para traspasar un endpoint que sigue a nombre de otra cuenta (M15), y revocar el INSERT/UPDATE directo del rol `authenticated` en `push_subscriptions` (M13). Viene de F0c-1.
    - Opcional: `ai_usage` con `consume_ai_quota` (ver F1b).
 2. **Cliente:**
    - CAS; ante conflicto, merge, hidratar y reintentar.

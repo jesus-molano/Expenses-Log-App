@@ -23,13 +23,15 @@ vi.mock("@/data/persistence/cloud-store", () => ({
   saveCloudStore: vi.fn(),
 }));
 
-function storeWithTemplate(id: string): ExpenseStore {
+// Por defecto, datos creados sin sesión ("demo"): son de la primera cuenta que
+// entra.
+function storeWithTemplate(id: string, userId = "demo"): ExpenseStore {
   return {
     ...emptyStore,
     templates: [
       {
         id,
-        userId: "user",
+        userId,
         name: id,
         description: "",
         amount: 1,
@@ -298,6 +300,24 @@ describe("useStorePersistence", () => {
     await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
     expect(saveCloudStore).not.toHaveBeenCalled();
     expect(templateIds(onHydrate.mock.lastCall?.[0])).toEqual(["cloud"]);
+    expect(readSyncMeta()).toMatchObject({ ownerId: user.id, dirty: false });
+  });
+
+  it("does not upload data another account synced before the sync metadata existed", async () => {
+    const user = { id: "00000000-0000-4000-8000-000000000010" } as User;
+    // Sin `expense-log-sync-v1`: el dueño sale de los ids de los propios datos.
+    saveExpenseStore(
+      storeWithTemplate("previous-account", "00000000-0000-4000-8000-000000000097"),
+    );
+    vi.mocked(createClient).mockReturnValue(signedInClient(user));
+    vi.mocked(loadCloudStore).mockResolvedValue({ store: null, mode: "table" });
+    const onHydrate = vi.fn();
+
+    const { result } = renderHook(() => useStorePersistence({ onHydrate }));
+
+    await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+    expect(saveCloudStore).not.toHaveBeenCalled();
+    expect(templateIds(onHydrate.mock.lastCall?.[0])).toEqual([]);
     expect(readSyncMeta()).toMatchObject({ ownerId: user.id, dirty: false });
   });
 

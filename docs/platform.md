@@ -138,13 +138,49 @@ y chunks. El script:
 
 Esto evita meter Supabase Auth en cada request API.
 
-`/auth/callback` intercambia el codigo por sesion y sanitiza `next`:
+`/auth/callback` intercambia el codigo por sesion y valida `next` con
+`resolveSafeRedirectPath` (`src/shared/safe-redirect.ts`):
 
-- Acepta solo rutas internas relativas que empiezan por `/`.
-- Rechaza URLs absolutas externas.
-- Rechaza valores tipo `//evil.com`.
-- Rechaza backslashes y caracteres nulos.
+- Rechaza cualquier caracter de control (tab, saltos de linea, NUL...), DEL y
+  la barra invertida. El parser de URL quita los controles sin avisar y trata
+  `\` como `/`: antes `/%09/evil.com`, `/%0A/evil.com` o `/\evil.com`
+  pasaban el filtro y acababan en `//evil.com`, otro host.
+- Solo acepta valores que empiezan por `/`. Los resuelve con `new URL` contra
+  el origen de la peticion, exige el mismo origen y devuelve la ruta
+  normalizada, que nunca empieza por `//` (`/.//evil.com` tambien cae al
+  fallback).
+- `next` llega decodificado una vez por `URLSearchParams` y no se vuelve a
+  decodificar.
 - Usa `/settings` como fallback.
+
+### Cerrar sesion y datos de otra cuenta
+
+Ajustes › Salir abre una hoja con dos opciones: salir y conservar los datos en
+el dispositivo, o salir y borrarlos (un equipo compartido). Si quedan cambios
+sin subir, la hoja avisa de que borrar los datos los perderia.
+
+- Antes del `signOut`, siempre: `DELETE /api/push/subscribe` del endpoint del
+  navegador (necesita la sesion; plazo de 4 s) y `unsubscribe()`. Anular la
+  suscripcion invalida el endpoint aunque falle el borrado remoto, y el cron
+  poda esa fila con el 404/410. Asi la siguiente cuenta no hereda los avisos
+  ni choca con la fila de la anterior.
+- Borrar los datos quita `expense-log-store-v1`, sus copias `.corrupt` y los
+  metadatos `expense-log-sync-v1`, y recarga para descartar el store en
+  memoria. Borrar la cuenta hace lo mismo y tambien anula la suscripcion del
+  navegador.
+- Sin red, `signOut` quita igualmente la sesion local; solo se da por fallido
+  si la sesion sigue ahi.
+- Los datos locales de una cuenta nunca se fusionan ni se suben a otra: el
+  dueño es `expense-log-sync-v1.ownerId` y, en dispositivos sin esos metadatos
+  (sincronizados antes de F0b-3), el `userId` que llevan los propios datos
+  (`inferStoreOwnerId`; `demo` es lo creado sin sesion). Lo creado sin sesion
+  despues de salir sigue siendo de la cuenta anterior. La cuenta que entra
+  carga su nube, o empieza vacia si no tiene.
+- Si un navegador quedo registrado a nombre de otra cuenta (salio antes de
+  este cambio), guardar la suscripcion devuelve 409
+  `PUSH_SUBSCRIPTION_IN_USE`. Al pulsar Activar, la app pide una suscripcion
+  nueva (otro endpoint) y la guarda. El traspaso en el servidor
+  (`claim_push_subscription`) necesita una migracion y queda para F0c-2.
 
 ## Voz y atajos
 
@@ -188,8 +224,10 @@ Endpoints principales:
   local. Solo llama a Gemini cuando el usuario esta autenticado.
 - `/api/auth/clear-sync-metadata`: POST autenticado para limpiar metadata legacy
   sobredimensionada de Supabase Auth. GET responde 405.
-- `/api/push/subscribe`: guarda suscripciones push.
-- `/api/push/test`: prueba notificaciones.
+- `/api/push/subscribe`: guarda suscripciones push (solo de los servicios
+  permitidos, como mucho 10 por usuario) y las borra con `DELETE`.
+- `/api/push/test`: envia una notificacion de prueba a una suscripcion
+  guardada del propio usuario (TTL de 5 minutos).
 - `/api/push/status`: verifica que el endpoint actual sigue registrado y muestra
   el ultimo envio programado completado.
 - `/api/push/daily-reminders`: endpoint llamado por cron para recordatorios.
@@ -257,10 +295,41 @@ esta disponible.
 
 Las notificaciones usan Web Push con VAPID. `vercel.json` programa
 `/api/push/daily-reminders` cada dia a las `08:00 UTC`. El endpoint usa
-credenciales server-side y debe protegerse con `CRON_SECRET`.
+credenciales server-side y debe protegerse con `CRON_SECRET` (comparado en
+tiempo constante).
 
 Las suscripciones push se guardan en Supabase y el cron consulta stores de
 usuario para enviar recordatorios de cobro.
+
+Endpoints permitidos (`src/data/push/push-endpoints.ts`). El servidor hace
+peticiones a la URL que manda el cliente, asi que solo acepta la forma
+`https://<host>/...` (sin usuario, puerto, espacios, controles ni `\`) de estos
+servicios:
+
+- `fcm.googleapis.com`: Chrome, Edge en Android, Samsung Internet, Opera y
+  Brave.
+- `updates.push.services.mozilla.com`: Firefox.
+- Cualquier subdominio de `push.apple.com` (hoy `web.push.apple.com`): Safari
+  en macOS e iOS/iPadOS. Es lo que pide Apple.
+- Cualquier subdominio de `notify.windows.com`: Edge en Windows (WNS).
+
+`/api/push/subscribe` y `/api/push/test` rechazan el resto con 400 (`subscribe`
+con `PUSH_ENDPOINT_NOT_ALLOWED`, que Ajustes explica). El envio
+(`src/data/push/web-push-sender.ts`) vuelve a comprobarlo, y el cron se salta
+las filas de otros hosts (`blockedEndpointsSkipped`): el rol `authenticated`
+puede insertar en `push_subscriptions` sin pasar por la API. `DELETE` acepta
+cualquier URL para poder limpiar filas antiguas.
+
+Cada usuario tiene como mucho 10 suscripciones. Tras guardar una nueva por
+encima del limite, `/api/push/subscribe` borra las actualizadas hace mas
+tiempo (Ajustes actualiza la fecha cada vez que se abre en ese dispositivo); si
+el guardado falla no se borra ninguna. El cron solo envia a las 10 mas
+recientes. Dos altas simultaneas pueden pasarse por una: la restriccion en la
+base de datos llega con la migracion de F0c-2.
+
+Cada envio lleva `timeout` de 5 s (de socket) y `TTL`: 24 h para el
+recordatorio diario, que se repite al dia siguiente, y 5 minutos para la
+prueba. Antes era el de web-push, 4 semanas.
 
 Ajustes diferencia permiso local, suscripcion del navegador y registro remoto.
 Puede resincronizar el dispositivo y enviar una notificacion de prueba. La
@@ -273,7 +342,28 @@ El cron envia recordatorios pendientes cuando:
 - Faltan entre 0 y `daysBeforeCharge` dias para `estimatedChargeDate`; esta
   ventana permite recuperar una ejecucion diaria perdida.
 - El usuario no descarto el aviso para esa `estimatedChargeDate`.
-- Hay al menos una suscripcion push guardada para el usuario.
+- Hay al menos una suscripcion push guardada para el usuario, de un servicio
+  permitido.
+
+El cron no confia en el jsonb de cada store: `toReminderStore`
+(`features/expenses/lib/daily-reminders.ts`) se queda solo con los gastos
+activos con aviso y bien formados (fechas, recurrencia, dia, aviso) y con los
+overrides legibles; a uno con la fecha movida ilegible se le quita esa fecha
+en lugar de descartarlo, para no avisar de un recibo pagado. Un valor que no
+parece un store se cuenta en `invalidStoresSkipped`.
+
+Cada usuario va en su propio `try/catch`: un store roto o un error del RPC o
+de la base de datos se cuenta en `errors` y la ejecucion sigue con el
+siguiente. Lo ya reclamado de ese usuario se cierra siempre (marcado si el
+push llego a algun dispositivo, liberado si no), cada lease por separado; uno
+que no se pudo cerrar caduca a los 15 minutos. Los dispositivos de un usuario
+reciben el push a la vez (`Promise.allSettled`) y los que responden 404/410
+se borran juntos.
+
+La respuesta resume la ejecucion: `usersChecked`, `usersWithReminders`,
+`notificationsSent`, `notificationsFailed`, `duplicateDeliveriesSkipped`,
+`invalidSubscriptionsRemoved`, `invalidStoresSkipped`,
+`blockedEndpointsSkipped` y `errors`.
 
 El endpoint reclama cada ocurrencia en `push_reminder_deliveries` con una clave
 por usuario, template y fechas. La reclamacion es un lease atomico de 15 minutos:
@@ -312,6 +402,10 @@ No documentar valores reales de `.env.local`. Mantener ejemplos en
 ## Seguridad a preservar
 
 - No permitir open redirects en auth callback.
+- Enviar push solo a endpoints de la lista (`isAllowedPushEndpoint`), tambien
+  desde el cron.
+- Liberar la suscripcion push del navegador antes de cerrar sesion.
+- No fusionar ni subir los datos locales de una cuenta a otra.
 - No aceptar GET para acciones que mutan estado server-side.
 - No llamar AI externa para usuarios anonimos.
 - Mantener `/api` fuera del proxy matcher salvo razon explicita.

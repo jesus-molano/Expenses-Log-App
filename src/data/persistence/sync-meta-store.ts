@@ -50,8 +50,16 @@ export function writeSyncMeta(
 // - `dirty`: tienen cambios sin subir que hay que fusionar. Los cambios sin
 //   cuenta (uso sin sesión, o sin red antes de resolverla) son de la primera
 //   que entra.
-export function localChangesFor(meta: SyncMeta, userId: string) {
-  const foreign = meta.ownerId !== null && meta.ownerId !== userId;
+// `storeOwnerId` es el dueño que dicen los propios datos
+// (`inferStoreOwnerId`): cubre los dispositivos que sincronizaron antes de
+// existir estos metadatos y no tienen `ownerId`.
+export function localChangesFor(
+  meta: SyncMeta,
+  userId: string,
+  storeOwnerId: string | null = null,
+) {
+  const ownerId = meta.ownerId ?? storeOwnerId;
+  const foreign = ownerId !== null && ownerId !== userId;
   return { foreign, dirty: meta.dirty && !foreign };
 }
 
