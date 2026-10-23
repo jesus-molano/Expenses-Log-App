@@ -375,4 +375,65 @@ describe("normalizeExpenseStore", () => {
     });
     expect(store.finance.monthlySavingsContributions).toEqual({});
   });
+  it("keeps fields written by newer builds in v3 stores", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 4,
+      categories: [],
+      templates: [],
+      overrides: [],
+      futureFeature: { enabled: true },
+      bankMovements: [{ id: "retired-movement" }],
+      finance: {
+        incomeEvents: [],
+        monthlySalary: {},
+        monthlySavingsTargets: {},
+        monthClosures: {
+          "2026-10": {
+            closedAt: "2026-10-30T10:00:00.000Z",
+            updatedAt: "2026-10-30T10:00:00.000Z",
+          },
+        },
+        accounts: [{ id: "retired-account" }],
+      },
+      deleted: {
+        templates: ["tpl-old"],
+        monthlySalary: { "2026-09": "2026-10-01T00:00:00.000Z" },
+      },
+      preferences: {
+        theme: "nord",
+        language: "es",
+        defaultReminderDays: 3,
+      },
+    });
+
+    expect(store).toMatchObject({
+      futureFeature: { enabled: true },
+      finance: {
+        monthClosures: {
+          "2026-10": { closedAt: "2026-10-30T10:00:00.000Z" },
+        },
+      },
+      deleted: {
+        templates: ["tpl-old"],
+        monthlySalary: { "2026-09": "2026-10-01T00:00:00.000Z" },
+      },
+      preferences: { theme: "nord", defaultReminderDays: 3 },
+    });
+    expect("bankMovements" in store).toBe(false);
+    expect("accounts" in store.finance).toBe(false);
+  });
+
+  it("drops unknown fields from legacy stores before v3", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 2,
+      categories: [],
+      templates: [],
+      overrides: [],
+      legacyOnly: true,
+      finance: { legacyFinance: true },
+    });
+
+    expect("legacyOnly" in store).toBe(false);
+    expect("legacyFinance" in store.finance).toBe(false);
+  });
 });

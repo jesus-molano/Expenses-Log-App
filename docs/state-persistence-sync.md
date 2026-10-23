@@ -87,6 +87,29 @@ La politica de hidratacion protege cambios hechos por el usuario mientras
 llegaba el cloud store: si la revision local cambio, se usa el store local mas
 reciente y no se pisa el estado React con datos antiguos.
 
+## Compatibilidad hacia delante
+
+Un build antiguo puede convivir con datos escritos por uno nuevo: otro
+dispositivo sin actualizar, una PWA con la version anterior en cache o un
+rollback de Vercel. Para que no borre lo que no conoce:
+
+- En stores con `schemaVersion >= 3`, la normalizacion conserva las claves
+  desconocidas de la raiz, `finance`, `deleted` y `preferences`.
+- El merge las combina sin interpretarlas. Los registros se fusionan por entrada
+  con el `updatedAt` mas reciente, las listas de ids por union y en el resto de
+  casos gana el valor local.
+- Las claves retiradas (`bankMovements`, `bankMerchantAliases`, `accounts`,
+  `allocation`, `incomeSources`, `purposes`) se siguen descartando, igual que
+  todo lo desconocido de stores anteriores a la v3.
+
+Reglas para campos nuevos:
+
+- Han de ser aditivos y opcionales, sin subir `schemaVersion`.
+- No se escriben hasta que el build con passthrough lleve al menos una semana
+  desplegado y abierto en todos los dispositivos.
+- Revertir un despliegue que añade campos solo es seguro hacia un build que ya
+  tenga passthrough.
+
 ## Cola de guardado
 
 Los cambios normales se guardan localmente y se encolan para cloud. Operaciones

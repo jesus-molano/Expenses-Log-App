@@ -14,7 +14,7 @@ import type {
 import { normalizeAppLanguage } from "@/shared/i18n";
 import { normalizeAppTheme } from "@/shared/theme";
 
-const STORE_KEYS = [
+export const STORE_KEYS = [
   "categories",
   "schemaVersion",
   "templates",
@@ -24,6 +24,38 @@ const STORE_KEYS = [
   "deleted",
   "preferences",
 ] as const;
+
+export const FINANCE_KEYS = [
+  "incomeEvents",
+  "monthlySalary",
+  "monthlySavingsTargets",
+  "monthlySavingsContributions",
+] as const;
+
+export const DELETED_KEYS = [
+  "categories",
+  "templates",
+  "overrides",
+  "incomeEvents",
+  "occurrenceRecords",
+  "savingsContributions",
+] as const;
+
+export const PREFERENCE_KEYS = ["theme", "language"] as const;
+
+// Datos de versiones antiguas que la normalización v3 descarta a propósito.
+const RETIRED_KEYS = [
+  "bankMovements",
+  "bankMerchantAliases",
+  "accounts",
+  "allocation",
+  "incomeSources",
+  "purposes",
+] as const;
+
+// Primera versión cuyas claves desconocidas se conservan: las escribe un build
+// más nuevo y un build anterior no debe borrarlas al guardar o sincronizar.
+const PASSTHROUGH_SCHEMA_VERSION = 3;
 
 type LegacyBankMovement = {
   id: string;
@@ -44,10 +76,26 @@ function recordOrEmpty<T>(value: unknown): Record<string, T> {
   return isRecord(value) ? (value as Record<string, T>) : {};
 }
 
+export function unknownEntries(
+  value: unknown,
+  knownKeys: readonly string[],
+): Record<string, unknown> {
+  if (!isRecord(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([key]) =>
+        !knownKeys.includes(key) &&
+        !(RETIRED_KEYS as readonly string[]).includes(key),
+    ),
+  );
+}
+
 function normalizeFinanceStore(
   value: unknown,
   needsLegacySavingsMigration: boolean,
   today: Date,
+  keepUnknownKeys: boolean,
 ): FinanceStore {
   const finance = isRecord(value) ? value : {};
 
@@ -80,6 +128,7 @@ function normalizeFinanceStore(
   }
 
   return {
+    ...(keepUnknownKeys ? unknownEntries(finance, FINANCE_KEYS) : {}),
     incomeEvents: Array.isArray(finance.incomeEvents)
       ? (finance.incomeEvents as FinanceStore["incomeEvents"])
       : [],
@@ -177,10 +226,14 @@ function monthTimestamp(monthId: string) {
   return `${monthId}-01T00:00:00.000Z`;
 }
 
-function normalizeDeletedIds(value: unknown): NonNullable<ExpenseStore["deleted"]> {
+function normalizeDeletedIds(
+  value: unknown,
+  keepUnknownKeys: boolean,
+): NonNullable<ExpenseStore["deleted"]> {
   const deleted = isRecord(value) ? value : {};
 
   return {
+    ...(keepUnknownKeys ? unknownEntries(deleted, DELETED_KEYS) : {}),
     categories: stringArray(deleted.categories),
     templates: stringArray(deleted.templates),
     overrides: stringArray(deleted.overrides),
@@ -205,12 +258,14 @@ export function normalizeExpenseStore(
   const schemaVersion = Number(store.schemaVersion ?? 1);
   const needsLegacySavingsMigration = schemaVersion < 2;
   const needsBankMigration = schemaVersion < 3;
+  const keepUnknownKeys = schemaVersion >= PASSTHROUGH_SCHEMA_VERSION;
   const legacyBankMovements =
     needsBankMigration && Array.isArray(store.bankMovements)
       ? (store.bankMovements as LegacyBankMovement[])
       : [];
 
   const base: ExpenseStore = {
+    ...(keepUnknownKeys ? unknownEntries(store, STORE_KEYS) : {}),
     schemaVersion: 3,
     categories: Array.isArray(store.categories)
       ? (store.categories as ExpenseStore["categories"])
@@ -226,9 +281,11 @@ export function normalizeExpenseStore(
       store.finance,
       needsLegacySavingsMigration,
       today,
+      keepUnknownKeys,
     ),
-    deleted: normalizeDeletedIds(store.deleted),
+    deleted: normalizeDeletedIds(store.deleted, keepUnknownKeys),
     preferences: {
+      ...(keepUnknownKeys ? unknownEntries(preferences, PREFERENCE_KEYS) : {}),
       theme: normalizeAppTheme(preferences.theme),
       language: normalizeAppLanguage(preferences.language),
     },

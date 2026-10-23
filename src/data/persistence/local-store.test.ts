@@ -133,6 +133,61 @@ describe("mergeExpenseStores", () => {
     expect(readded.finance.monthlySavingsContributions?.["2026-06"])
       .toMatchObject({ id: replacement.id, amount: 450 });
   });
+
+  it("keeps fields it does not know from both stores", () => {
+    const local = {
+      ...emptyStore,
+      schemaVersion: 3,
+      localOnly: "local",
+      finance: {
+        ...emptyStore.finance,
+        monthClosures: {
+          "2026-10": {
+            closedAt: "2026-10-30T10:00:00.000Z",
+            updatedAt: "2026-10-30T10:00:00.000Z",
+          },
+          "2026-09": {
+            closedAt: "2026-09-29T10:00:00.000Z",
+            updatedAt: "2026-09-29T10:00:00.000Z",
+          },
+        },
+      },
+      deleted: { ...emptyStore.deleted, futureIds: ["a"] },
+    } as ExpenseStore;
+    const cloud = {
+      ...emptyStore,
+      schemaVersion: 3,
+      cloudOnly: "cloud",
+      finance: {
+        ...emptyStore.finance,
+        monthClosures: {
+          "2026-10": {
+            closedAt: "2026-10-30T10:00:00.000Z",
+            reopenedAt: "2026-10-31T09:00:00.000Z",
+            updatedAt: "2026-10-31T09:00:00.000Z",
+          },
+        },
+      },
+      deleted: { ...emptyStore.deleted, futureIds: ["b"] },
+    } as ExpenseStore;
+
+    const merged = mergeExpenseStores(
+      JSON.parse(JSON.stringify(local)),
+      JSON.parse(JSON.stringify(cloud)),
+    ) as ExpenseStore & Record<string, unknown>;
+
+    expect(merged.localOnly).toBe("local");
+    expect(merged.cloudOnly).toBe("cloud");
+    expect(merged.finance).toMatchObject({
+      monthClosures: {
+        "2026-10": { reopenedAt: "2026-10-31T09:00:00.000Z" },
+        "2026-09": { closedAt: "2026-09-29T10:00:00.000Z" },
+      },
+    });
+    expect(
+      (merged.deleted as Record<string, unknown>).futureIds,
+    ).toEqual(["b", "a"]);
+  });
 });
 
 function occurrenceRecord(

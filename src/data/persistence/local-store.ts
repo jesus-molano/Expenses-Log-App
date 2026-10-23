@@ -3,7 +3,14 @@
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore } from "@/domain/types";
 import { latestUpdated, mergeLatestById } from "./merge-by-id";
-import { normalizeExpenseStore } from "./store-normalization";
+import {
+  DELETED_KEYS,
+  FINANCE_KEYS,
+  PREFERENCE_KEYS,
+  STORE_KEYS,
+  normalizeExpenseStore,
+  unknownEntries,
+} from "./store-normalization";
 
 const STORAGE_KEY = "expense-log-store-v1";
 
@@ -53,6 +60,7 @@ export function mergeExpenseStores(
   );
 
   return {
+    ...mergeUnknownEntries(normalizedCloudStore, normalizedLocalStore, STORE_KEYS),
     schemaVersion: 3,
     categories: mergeLatestById(
       normalizedCloudStore.categories,
@@ -75,6 +83,11 @@ export function mergeExpenseStores(
       deleted.occurrenceRecords,
     ),
     finance: {
+      ...mergeUnknownEntries(
+        normalizedCloudStore.finance,
+        normalizedLocalStore.finance,
+        FINANCE_KEYS,
+      ),
       incomeEvents: mergeLatestById(
         normalizedCloudStore.finance.incomeEvents,
         normalizedLocalStore.finance.incomeEvents,
@@ -95,6 +108,11 @@ export function mergeExpenseStores(
       ),
     },
     preferences: {
+      ...mergeUnknownEntries(
+        normalizedCloudStore.preferences,
+        normalizedLocalStore.preferences,
+        PREFERENCE_KEYS,
+      ),
       theme:
         normalizedLocalStore.preferences?.theme ??
         normalizedCloudStore.preferences?.theme ??
@@ -113,6 +131,7 @@ function mergeDeletedIds(
   incoming: ExpenseStore["deleted"],
 ): NonNullable<ExpenseStore["deleted"]> {
   return {
+    ...mergeUnknownEntries(base, incoming, DELETED_KEYS),
     categories: mergeIdLists(base?.categories, incoming?.categories),
     templates: mergeIdLists(base?.templates, incoming?.templates),
     overrides: mergeIdLists(base?.overrides, incoming?.overrides),
@@ -126,6 +145,38 @@ function mergeDeletedIds(
       incoming?.savingsContributions,
     ),
   };
+}
+
+// Fusiona claves que este build no conoce sin interpretarlas: registros por
+// entrada con el updatedAt más reciente, listas de ids por unión y, en otro
+// caso, gana el valor local.
+function mergeUnknownEntries(
+  cloud: unknown,
+  local: unknown,
+  knownKeys: readonly string[],
+): Record<string, unknown> {
+  const result = unknownEntries(cloud, knownKeys);
+
+  for (const [key, value] of Object.entries(unknownEntries(local, knownKeys))) {
+    const existing = result[key];
+    if (isPlainRecord(existing) && isPlainRecord(value)) {
+      result[key] = mergeMonthlyRecord(existing, value);
+    } else if (isStringList(existing) && isStringList(value)) {
+      result[key] = mergeIdLists(existing, value);
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
 function mergeIdLists(
