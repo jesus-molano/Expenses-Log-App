@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/Button";
+import type { PaidAmountAverage } from "@/domain/amount-history";
 import { formatCurrency } from "@/domain/calendar";
 import type {
   AppLanguage,
@@ -40,6 +41,7 @@ export function MonthlyReviewSection({
   onToggleExpanded,
   onSkipOccurrence,
   onUpdateMonthlyExpense,
+  suggestPaidAmount,
 }: {
   language: AppLanguage;
   copy: ReturnType<typeof planCopy>;
@@ -64,6 +66,7 @@ export function MonthlyReviewSection({
   onToggleExpanded: () => void;
   onSkipOccurrence: (occurrence: ExpenseOccurrence) => void;
   onUpdateMonthlyExpense: (input: MonthlyExpenseOverrideInput) => void;
+  suggestPaidAmount?: (occurrence: ExpenseOccurrence) => PaidAmountAverage | null;
 }) {
   return (
     <section className="min-w-0" aria-labelledby="monthly-review-title">
@@ -165,6 +168,7 @@ export function MonthlyReviewSection({
           onToggleExpanded={onToggleExpanded}
           onSkipOccurrence={onSkipOccurrence}
           onUpdateMonthlyExpense={onUpdateMonthlyExpense}
+          suggestPaidAmount={suggestPaidAmount}
         />
       </div>
     </section>

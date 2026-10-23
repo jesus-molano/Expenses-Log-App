@@ -7,6 +7,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
+import type { PaidAmountAverage } from "@/domain/amount-history";
 import { formatCurrency } from "@/domain/calendar";
 import type {
   AppLanguage,
@@ -34,6 +35,8 @@ export function CurrentMonthPlanSection({
   onSkipOccurrence,
   onTogglePaid,
   onUpdateMonthlyExpense,
+  suggestPaidAmount,
+  notice,
 }: {
   language: AppLanguage;
   copy: ReturnType<typeof planCopy>;
@@ -49,7 +52,29 @@ export function CurrentMonthPlanSection({
   onSkipOccurrence: (occurrence: ExpenseOccurrence) => void;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
   onUpdateMonthlyExpense: (input: MonthlyExpenseOverrideInput) => void;
+  suggestPaidAmount?: (occurrence: ExpenseOccurrence) => PaidAmountAverage | null;
+  // Aviso del mes bajo la cabecera ("¿Has cobrado?").
+  notice?: ReactNode;
 }) {
+  // Sueldo del mes: lo cobrado si ya se confirmó; si no, el fijo (con la paga
+  // extra aparte si toca).
+  const salaryDetail = plan.salaryReceipt
+    ? t("salary.receivedDetail", language).replace(
+        "{amount}",
+        formatCurrency(plan.salaryReceipt.amount),
+      )
+    : [
+        `${copy.fixedIncome} ${formatCurrency(plan.fixedIncomeTotal - plan.salaryExtraPayTotal)}`,
+        plan.salaryExtraPayTotal > 0
+          ? t("salary.extraPayDetail", language).replace(
+              "{amount}",
+              formatCurrency(plan.salaryExtraPayTotal),
+            )
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
   return (
     <section className="min-w-0" aria-labelledby="current-month-title">
       <header className="flex items-start justify-between gap-3 px-1">
@@ -92,6 +117,8 @@ export function CurrentMonthPlanSection({
         </div>
       ) : null}
 
+      {notice ? <div className="mt-5">{notice}</div> : null}
+
       <div className="app-plan-next-receipt mt-5 flex min-h-11 items-center gap-3 px-3 py-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--app-panel-soft-alpha)] text-[var(--app-accent)]">
           <CalendarClock size={17} />
@@ -130,7 +157,7 @@ export function CurrentMonthPlanSection({
           <dl className="app-plan-equation mt-5 grid gap-1 p-2 sm:p-3">
             <EquationRow
               label={copy.expectedIncome}
-              detail={`${copy.fixedIncome} ${formatCurrency(plan.fixedIncomeTotal)} · ${copy.extras} ${formatCurrency(plan.extraIncomeTotal)}`}
+              detail={`${salaryDetail} · ${copy.extras} ${formatCurrency(plan.extraIncomeTotal)}`}
               value={plan.plannedIncomeTotal}
             />
             <EquationRow
@@ -233,6 +260,7 @@ export function CurrentMonthPlanSection({
                     onSkip={() => onSkipOccurrence(occurrence)}
                     onTogglePaid={() => onTogglePaid(occurrence)}
                     onUpdate={onUpdateMonthlyExpense}
+                    suggestPaidAmount={suggestPaidAmount}
                   />
                 ))
               ) : (

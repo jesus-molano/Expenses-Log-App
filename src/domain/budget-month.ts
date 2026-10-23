@@ -3,6 +3,7 @@ import { daysBetween, toDateOnly } from "./calendar";
 import {
   getExpectedSalary,
   getMonthlySalarySettings,
+  getSalaryExtraPay,
   getSalaryReceipt,
   occurrencesDueBetween,
 } from "./finance";
@@ -98,7 +99,9 @@ export function configuredPayday(finance: FinanceStore, monthId: string) {
 export type SalaryPrompt = {
   monthId: string;
   payday: number;
+  // Sueldo previsto, con la paga extra si toca (que también va aparte).
   expectedAmount: number;
+  extraPayAmount: number;
 };
 
 // "¿Has cobrado?": desde el día de cobro del mes natural (el último día si el
@@ -116,6 +119,7 @@ export function salaryPromptFor(
     monthId,
     payday,
     expectedAmount: getExpectedSalary(finance, monthId),
+    extraPayAmount: getSalaryExtraPay(finance, monthId),
   };
 }
 

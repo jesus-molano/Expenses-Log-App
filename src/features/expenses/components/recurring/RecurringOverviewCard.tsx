@@ -41,7 +41,13 @@ export function RecurringOverviewCard({
 
         <div className="flex shrink-0 items-center gap-2">
           <p className="app-money text-sm font-semibold text-[var(--app-text)]">
-            {formatCurrency(item.template.amount)}
+            {/* El importe del cobro que toca, con sus cambios de precio. */}
+            {formatCurrency(
+              (item.overdueOccurrence ??
+                item.currentOccurrence ??
+                item.nextOccurrence ??
+                item.lastPaidOccurrence)?.template.amount ?? item.template.amount,
+            )}
           </p>
           <Link
             href={`/expenses/${item.template.id}`}

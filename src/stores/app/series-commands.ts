@@ -1,13 +1,16 @@
-import { addDays, addMonths, endOfMonth, parseISO } from "date-fns";
+import { addDays, parseISO } from "date-fns";
 import { addMonthId, resolveActiveMonth } from "@/domain/budget-month";
 import { isValidDateOnly, toDateOnly } from "@/domain/calendar";
-import { generateStoreOccurrences } from "@/domain/finance";
 import { occurrenceKeyOf } from "@/domain/overrides";
 import {
   resumePausesOn,
   withAmountChange,
   withPause,
 } from "@/domain/recurrence";
+import {
+  latestPaidChargeDate,
+  seriesOccurrencesFrom,
+} from "@/domain/series-lifecycle";
 import type {
   ExpenseAmountChange,
   ExpenseOccurrence,
@@ -21,9 +24,6 @@ import {
   type SeriesAmountScope,
 } from "./expense-commands";
 import { upsertOccurrenceOverride } from "./occurrence-overrides";
-
-// Hasta dónde se buscan cobros pagados por adelantado al cambiar una serie.
-const PREPAID_HORIZON_MONTHS = 13;
 
 // Paga un cobro con lo que costó de verdad. Lo previsto no cambia: así se ve
 // la diferencia en los recibos variables. Si ya estaba pagado, solo corrige
@@ -246,22 +246,6 @@ export function removePauseInStore(
   );
 }
 
-// Fecha del último cobro pagado de la serie en los meses abiertos (también
-// los adelantados): lo que una pausa o un final no deben tapar.
-export function latestPaidChargeDate(
-  store: ExpenseStore,
-  templateId: string,
-  today: Date = new Date(),
-): string | null {
-  return (
-    seriesOccurrencesFrom(store, templateId, `${toDateOnly(today).slice(0, 7)}-01`, today)
-      .filter((occurrence) => occurrence.status === "paid")
-      .map((occurrence) => occurrence.occurrenceDate)
-      .sort()
-      .at(-1) ?? null
-  );
-}
-
 // Fija el importe actual en los cobros ya pagados desde una fecha (incluidos
 // los adelantados), para que un cambio de precio no reescriba lo pagado.
 function keepPaidAmountsFrom(
@@ -288,19 +272,6 @@ function keepPaidAmountsFrom(
         ),
       store,
     );
-}
-
-function seriesOccurrencesFrom(
-  store: ExpenseStore,
-  templateId: string,
-  from: string,
-  today: Date,
-) {
-  const start = parseISO(from) > today ? parseISO(from) : today;
-  const to = toDateOnly(endOfMonth(addMonths(start, PREPAID_HORIZON_MONTHS)));
-  return generateStoreOccurrences(store, from, to).filter(
-    (occurrence) => occurrence.template.id === templateId,
-  );
 }
 
 function findTemplate(

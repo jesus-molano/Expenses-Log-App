@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateStoreOccurrences } from "@/domain/finance";
 import { emptyStore } from "@/domain/seed";
+import { latestPaidChargeDate } from "@/domain/series-lifecycle";
 import type { ExpenseStore, ExpenseTemplate } from "@/domain/types";
 import { closeMonthInStore } from "./finance-commands";
 import {
   endSeriesInStore,
-  latestPaidChargeDate,
   pauseSeriesInStore,
   payOccurrenceWithAmountInStore,
   reactivateSeriesInStore,

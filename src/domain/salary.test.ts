@@ -136,12 +136,16 @@ describe("'¿Has cobrado?' prompt", () => {
       monthId: "2026-10",
       payday: 28,
       expectedAmount: 2000,
+      extraPayAmount: 0,
     });
     expect(salaryPromptFor(configured, "2026-10-31")?.monthId).toBe("2026-10");
   });
 
   it("offers the extra pay in its month", () => {
-    expect(salaryPromptFor(configured, "2026-12-28")?.expectedAmount).toBe(4000);
+    expect(salaryPromptFor(configured, "2026-12-28")).toMatchObject({
+      expectedAmount: 4000,
+      extraPayAmount: 2000,
+    });
   });
 
   it("asks on the last day when payday does not exist in the month", () => {

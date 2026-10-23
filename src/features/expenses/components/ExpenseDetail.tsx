@@ -9,10 +9,12 @@ import type {
   AppLanguage,
   ExpenseTemplate,
 } from "@/domain/types";
+import { SeriesDetailSections } from "@/features/expenses/components/detail/SeriesDetailSections";
 import { useExpenseEditor } from "@/features/expenses/hooks/use-expense-editor";
 import { localizedRecurrenceLabel } from "@/features/expenses/lib/recurrence-label";
 import type { SeriesAmountScope } from "@/stores/app/store-commands";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
+import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
 import { ExpenseForm } from "@/features/expenses/components/ExpenseForm";
 
@@ -107,7 +109,8 @@ function ExpenseDetailForm({
   expenseStore: ReturnType<typeof useExpenseStore>;
   language: AppLanguage;
 }) {
-  const editor = useExpenseEditor({ template, expenseStore, language });
+  const now = useCurrentDate();
+  const editor = useExpenseEditor({ template, expenseStore, language, now });
 
   return (
     <main className="app-page app-page-safe min-h-dvh px-4">
@@ -170,6 +173,13 @@ function ExpenseDetailForm({
             </Button>
           </div>
         </form>
+
+        <SeriesDetailSections
+          template={template}
+          expenseStore={expenseStore}
+          language={language}
+          now={now}
+        />
       </div>
 
       {editor.deleteOpen ? (

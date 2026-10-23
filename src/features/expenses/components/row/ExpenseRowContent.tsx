@@ -1,6 +1,8 @@
 ﻿import { formatCurrency } from "@/domain/calendar";
+import { paidAmountOf } from "@/domain/finance";
 import type { AppLanguage, ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
 import { categoryLabel } from "@/shared/category-labels";
+import { t } from "@/shared/i18n";
 import { categoryToneClass, statusLabel } from "../../lib/expense-actions";
 import { expenseStatusToneClass } from "../../lib/expense-visual-state";
 
@@ -19,6 +21,9 @@ export function ExpenseRowContent({
 }: ExpenseRowContentProps) {
   const paid = occurrence.status === "paid";
   const statusToneClass = expenseStatusToneClass(occurrence, today);
+  // Pagado con otro importe: se ve lo pagado y, debajo del nombre, lo previsto.
+  const amount = paid ? paidAmountOf(occurrence) : occurrence.template.amount;
+  const differsFromPlan = paid && amount !== occurrence.template.amount;
 
   return (
     <>
@@ -41,6 +46,14 @@ export function ExpenseRowContent({
             </span>
           ) : null}
         </div>
+        {differsFromPlan ? (
+          <p className="app-money mt-0.5 truncate text-xs text-[var(--app-text-muted)]">
+            {t("bills.plannedHint", language).replace(
+              "{amount}",
+              formatCurrency(occurrence.template.amount),
+            )}
+          </p>
+        ) : null}
       </div>
 
       <div className="shrink-0 text-right">
@@ -49,7 +62,7 @@ export function ExpenseRowContent({
             paid ? "app-row-paid" : "text-[var(--app-text)]"
           }`}
         >
-          {formatCurrency(occurrence.template.amount)}
+          {formatCurrency(amount)}
         </p>
         <p
           className={`mt-1 inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusToneClass}`}

@@ -1,11 +1,13 @@
 ﻿"use client";
 
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useMemo, useState } from "react";
 import { format, parseISO, subMonths } from "date-fns";
 import { enUS, es } from "date-fns/locale";
+import { ActionToast } from "@/components/ui/ActionToast";
 import { Button } from "@/components/ui/Button";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Sheet } from "@/components/ui/Sheet";
+import { suggestedPaidAmount } from "@/domain/amount-history";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
 import {
   buildMonthlyMoneyPlan,
@@ -15,9 +17,14 @@ import {
   toMonthId,
 } from "@/domain/finance";
 import { resolveActiveMonth } from "@/domain/budget-month";
-import type { AppLanguage } from "@/domain/types";
+import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
+import { SeriesAmountPromptSheet } from "@/features/expenses/components/SeriesAmountQuestion";
+import { useActionToast } from "@/features/expenses/hooks/use-action-toast";
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
+import { useSeriesAmountPrompt } from "@/features/expenses/hooks/use-series-amount-prompt";
+import { capitalize, formatMonthName } from "@/features/expenses/lib/month-view";
+import type { MonthlyExpenseOverrideInput } from "@/stores/app/store-types";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { t } from "@/shared/i18n";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
@@ -25,6 +32,7 @@ import { useMonthlySalaryEditor } from "../hooks/use-monthly-salary-editor";
 import { useCompactChart } from "../hooks/use-compact-chart";
 import { useOneOffIncomeForm } from "../hooks/use-one-off-income-form";
 import { usePlanSettingsForm } from "../hooks/use-plan-settings-form";
+import { useSalaryPrompt } from "../hooks/use-salary-prompt";
 import { useSkipOccurrenceConfirmation } from "../hooks/use-skip-occurrence-confirmation";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 import {
@@ -39,6 +47,7 @@ import { MonthlyReviewSection } from "./MonthlyReviewSection";
 import { MonthlySalaryDialog } from "./MonthlySalaryDialog";
 import { OneOffIncomePanel } from "./OneOffIncomePanel";
 import { PlanSettingsSheet } from "./PlanSettingsSheet";
+import { SalaryPromptCard } from "./SalaryPromptCard";
 import { SkipOccurrenceDialog } from "./SkipOccurrenceDialog";
 
 export function MoneyDashboard() {
@@ -54,6 +63,10 @@ export function MoneyDashboard() {
     updateMonthlyExpenseOccurrence,
     skipOccurrence,
     togglePaid,
+    setSeriesAmount,
+    updateSalaryExtraPay,
+    recordSalaryReceipt,
+    undoSalaryReceipt,
   } = expenseStore;
   const chrome = useScrollChrome();
   const isCompactChart = useCompactChart();
@@ -191,6 +204,46 @@ export function MoneyDashboard() {
     language,
     savingsMonthId: currentMonthId,
     onSave: updateMoneySettings,
+    onSaveExtraPay: updateSalaryExtraPay,
+  });
+  const actionToast = useActionToast();
+  // Recibos variables: tras pagar con otro importe desde Plan se pregunta si
+  // los próximos cobros pasan a costar eso.
+  const seriesPrompt = useSeriesAmountPrompt({ store, setSeriesAmount });
+  const suggestPaidAmount = useCallback(
+    (occurrence: ExpenseOccurrence) =>
+      suggestedPaidAmount(store, occurrence.template.id, occurrence.occurrenceDate, language),
+    [language, store],
+  );
+  function updateMonthlyExpense(input: MonthlyExpenseOverrideInput) {
+    updateMonthlyExpenseOccurrence(input);
+    if (
+      input.status === "paid" &&
+      input.amountPaid !== undefined &&
+      input.amountPaid !== input.amount
+    ) {
+      seriesPrompt.askAfterPayment(input.templateId, input.amountPaid);
+    }
+  }
+  const salaryPrompt = useSalaryPrompt({
+    finance: store.finance,
+    now: today,
+    language,
+    recordSalaryReceipt,
+    onRecorded: (input) =>
+      actionToast.show({
+        message: capitalize(
+          t("salary.received", language).replace(
+            "{month}",
+            formatMonthName(input.monthId, language),
+          ),
+        ),
+        actionLabel: t("common.undo", language),
+        onAction: () => {
+          undoSalaryReceipt(input.monthId);
+          actionToast.dismiss();
+        },
+      }),
   });
   // Un ingreso extra cuenta en el mes que se está viendo: con el mes
   // siguiente ya activo, se fecha el día 1 de ese mes.
@@ -206,6 +259,7 @@ export function MoneyDashboard() {
     language,
     monthId: selectedSummary.id,
     monthLabel: selectedSummary.monthLong,
+    currentMonthId: todayDateOnly.slice(0, 7),
     onSave: updateMonthlySalary,
   });
 
@@ -270,7 +324,24 @@ export function MoneyDashboard() {
           onOpenExtraIncome={() => setExtraSheetOpen(true)}
           onSkipOccurrence={skipDialog.requestSkipOccurrence}
           onTogglePaid={togglePaid}
-          onUpdateMonthlyExpense={updateMonthlyExpenseOccurrence}
+          onUpdateMonthlyExpense={updateMonthlyExpense}
+          suggestPaidAmount={suggestPaidAmount}
+          notice={
+            salaryPrompt.prompt ? (
+              <SalaryPromptCard
+                prompt={salaryPrompt.prompt}
+                editing={salaryPrompt.editing}
+                amountText={salaryPrompt.amountText}
+                language={language}
+                onConfirm={salaryPrompt.confirm}
+                onStartOther={salaryPrompt.startOther}
+                onCancelOther={salaryPrompt.cancelOther}
+                onAmountTextChange={salaryPrompt.setAmountText}
+                onSaveOther={salaryPrompt.saveOther}
+                onDismiss={salaryPrompt.dismiss}
+              />
+            ) : null
+          }
         />
 
         <AnnualPlanSection
@@ -315,7 +386,8 @@ export function MoneyDashboard() {
           onUpdateIncomeEvent={updateIncomeEvent}
           onToggleExpanded={() => setExpandedReview((value) => !value)}
           onSkipOccurrence={skipDialog.requestSkipOccurrence}
-          onUpdateMonthlyExpense={updateMonthlyExpenseOccurrence}
+          onUpdateMonthlyExpense={updateMonthlyExpense}
+          suggestPaidAmount={suggestPaidAmount}
         />
       </div>
 
@@ -326,6 +398,10 @@ export function MoneyDashboard() {
           salaryDay={settingsForm.salaryDay}
           savingsTarget={settingsForm.savingsTarget}
           dayPickerOpen={settingsForm.dayPickerOpen}
+          extraPayMonths={settingsForm.extraPayMonths}
+          extraPayAmount={settingsForm.extraPayAmount}
+          onToggleExtraPayMonth={settingsForm.toggleExtraPayMonth}
+          onExtraPayAmountChange={settingsForm.setExtraPayAmount}
           onSalaryAmountChange={settingsForm.setSalaryAmount}
           onSalaryDayChange={settingsForm.setSalaryDay}
           onSavingsTargetChange={settingsForm.setSavingsTarget}
@@ -396,6 +472,8 @@ export function MoneyDashboard() {
           amount={salaryEditor.amount}
           salaryDay={salaryEditor.salaryDay}
           dayPickerOpen={salaryEditor.dayPickerOpen}
+          scope={salaryEditor.scope}
+          onScopeChange={salaryEditor.setScope}
           onAmountChange={salaryEditor.setAmount}
           onSalaryDayChange={salaryEditor.setSalaryDay}
           onDayPickerOpenChange={salaryEditor.setDayPickerOpen}
@@ -410,6 +488,34 @@ export function MoneyDashboard() {
         onCancel={skipDialog.cancelSkipOccurrence}
         onConfirm={skipDialog.confirmSkipOccurrence}
       />
+
+      {seriesPrompt.prompt ? (
+        <SeriesAmountPromptSheet
+          prompt={seriesPrompt.prompt}
+          language={language}
+          onApply={() => {
+            const applied = seriesPrompt.apply();
+            if (!applied) return;
+            actionToast.show({
+              message: t("bills.seriesUpdated", language)
+                .replace("{name}", applied.name)
+                .replace("{amount}", formatCurrency(applied.to)),
+            });
+          }}
+          onKeep={seriesPrompt.dismiss}
+        />
+      ) : null}
+
+      {actionToast.toast ? (
+        <ActionToast
+          key={actionToast.toast.id}
+          message={actionToast.toast.message}
+          actionLabel={actionToast.toast.actionLabel}
+          onAction={actionToast.toast.onAction}
+          onPause={actionToast.pause}
+          onResume={actionToast.resume}
+        />
+      ) : null}
     </DashboardShell>
   );
 }

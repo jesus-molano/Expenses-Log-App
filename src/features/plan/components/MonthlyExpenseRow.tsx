@@ -2,14 +2,16 @@
 
 import { format } from "date-fns";
 import { enUS, es } from "date-fns/locale";
-import { Check, Pencil, WalletCards, X } from "lucide-react";
-import { useState } from "react";
+import { Check, Pencil, Sparkles, WalletCards, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { DatePickerField } from "@/components/ui/DatePickerField";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { IconButton } from "@/components/ui/IconButton";
 import { SelectMenu } from "@/components/ui/SelectMenu";
+import type { PaidAmountAverage } from "@/domain/amount-history";
 import { formatCurrency } from "@/domain/calendar";
 import { PRESET_EXPENSE_CATEGORIES } from "@/domain/categories";
+import { paidAmountOf } from "@/domain/finance";
 import { isOccurrenceOverdue } from "@/domain/pending";
 import type {
   AppLanguage,
@@ -23,6 +25,7 @@ import {
 } from "@/features/plan/hooks/use-monthly-expense-row-editor";
 import { categoryLabel } from "@/shared/category-labels";
 import { t } from "@/shared/i18n";
+import { formatMoneyInput } from "@/shared/money";
 
 export function MonthlyExpenseRow({
   occurrence,
@@ -33,6 +36,7 @@ export function MonthlyExpenseRow({
   onSkip,
   onTogglePaid,
   onUpdate,
+  suggestPaidAmount,
 }: {
   occurrence: ExpenseOccurrence;
   categories: ExpenseCategory[];
@@ -42,6 +46,8 @@ export function MonthlyExpenseRow({
   onSkip: () => void;
   onTogglePaid?: () => void;
   onUpdate: (input: MonthlyExpenseUpdateInput) => void;
+  // Media de los últimos pagos de la serie, para un recibo variable.
+  suggestPaidAmount?: (occurrence: ExpenseOccurrence) => PaidAmountAverage | null;
 }) {
   const locale = language === "en" ? enUS : es;
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
@@ -51,6 +57,14 @@ export function MonthlyExpenseRow({
     language,
     onUpdate,
   });
+  // La media de los últimos pagos solo se calcula al editar un cobro pagado.
+  const suggestion = useMemo(
+    () =>
+      editor.editing && editor.status === "paid"
+        ? (suggestPaidAmount?.(occurrence) ?? null)
+        : null,
+    [editor.editing, editor.status, occurrence, suggestPaidAmount],
+  );
   const categoryOptions = PRESET_EXPENSE_CATEGORIES.map((category) => {
     const Icon = categoryIconMap[category.icon] ?? WalletCards;
 
@@ -104,7 +118,11 @@ export function MonthlyExpenseRow({
             onValueChange={editor.setAmount}
             invalidMessage={t("expenses.amountInvalid", language)}
             blockSubmit={false}
-            aria-label={t("expenses.amount", language)}
+            aria-label={
+              editor.status === "paid"
+                ? t("bills.plannedField", language)
+                : t("expenses.amount", language)
+            }
             className="h-11 min-w-0"
           />
           <DatePickerField
@@ -148,11 +166,52 @@ export function MonthlyExpenseRow({
             );
           })}
         </div>
+        {editor.status === "paid" ? (
+          <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-end gap-2">
+            <label className="grid gap-1 text-xs font-semibold text-[var(--app-text-muted)]">
+              {t("bills.paidField", language)}
+              <MoneyInput
+                value={editor.paidAmount}
+                onValueChange={editor.setPaidAmount}
+                invalidMessage={t("bills.payInvalid", language)}
+                blockSubmit={false}
+                className="h-11 min-w-0"
+              />
+            </label>
+            {suggestion ? (
+              <button
+                type="button"
+                onClick={() =>
+                  editor.setPaidAmount(formatMoneyInput(suggestion.amount, language))
+                }
+                className="app-chip app-focus-ring inline-flex min-h-11 items-center gap-1.5 justify-self-start px-3 text-left text-xs font-semibold"
+              >
+                <Sparkles size={14} aria-hidden="true" />
+                {(suggestion.count === 1
+                  ? t("bills.payAverageOne", language)
+                  : t("bills.payAverageMany", language).replace(
+                      "{count}",
+                      String(suggestion.count),
+                    )
+                ).replace("{amount}", formatCurrency(suggestion.amount))}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     );
   }
 
   const isPaid = occurrence.status === "paid";
+  // Pagado con otro importe: se ve lo pagado y lo previsto al lado.
+  const shownAmount = isPaid ? paidAmountOf(occurrence) : occurrence.template.amount;
+  const plannedNote =
+    isPaid && shownAmount !== occurrence.template.amount
+      ? ` - ${t("bills.plannedHint", language).replace(
+          "{amount}",
+          formatCurrency(occurrence.template.amount),
+        )}`
+      : "";
   const isOverdue = isOccurrenceOverdue(occurrence, today);
   const status = isPaid
     ? t("common.paid", language)
@@ -180,6 +239,7 @@ export function MonthlyExpenseRow({
             locale,
           })}{" "}
           - {categoryLabel(editor.categoryName, language)} - {status}
+          {plannedNote}
         </p>
       </div>
       <p
@@ -189,7 +249,7 @@ export function MonthlyExpenseRow({
             : "text-[var(--app-text)]"
         }`}
       >
-        {formatCurrency(occurrence.template.amount)}
+        {formatCurrency(shownAmount)}
       </p>
       <div className="flex shrink-0 items-center gap-1">
         {onTogglePaid ? (
