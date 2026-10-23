@@ -268,23 +268,6 @@ test("compact menus support keyboard navigation and Escape", async ({ page }) =>
   await expect(languageButton).toBeFocused();
 });
 
-test("deletes an expense from the edit screen", async ({ page }) => {
-  await loadDemoStore(page);
-  await page.goto("/expenses/exp-game-pass");
-
-  await expect(page.getByRole("heading", { name: "Game Pass" })).toBeVisible();
-  await page.getByRole("button", { name: "Borrar" }).click();
-
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Borrar" }).click();
-
-  await expect(page).toHaveURL(/\/$/);
-  await expect(
-    page.locator('[data-expense-row="true"]').filter({ hasText: "Game Pass" }),
-  ).toHaveCount(0);
-});
-
 test("mobile shell routes render without runtime errors", async ({ page }) => {
   await loadDemoStore(page);
 

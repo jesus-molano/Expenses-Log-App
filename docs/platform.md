@@ -291,6 +291,19 @@ sin subir, la hoja avisa de que borrar los datos los perderia.
   abierta) se salta al llegar a ella o al arrancar la app en ella
   (`OrphanLayerGuard`) y, mientras hay capas, el scroll no se restaura al
   volver.
+- Las confirmaciones (`ConfirmActionDialog`) también son capas: Atrás cancela.
+  Hojas y diálogos comparten `useDialogA11y` (foco, Tab, Escape y bloqueo del
+  scroll); solo la capa de encima atiende el teclado.
+- Para navegar justo después de cerrar capas (salir del detalle tras guardar,
+  borrar o descartar) se usa `afterLayerHistorySettles`: navega cuando las
+  capas cerradas han quitado su entrada del historial, porque esa vuelta atrás
+  pendiente desharía la navegación.
+- Detalle de un gasto (`/expenses/[id]`): mientras hay cambios sin guardar, una
+  capa intercepta Atrás y pregunta si descartarlos; el control "Gastos" también
+  pregunta (`use-leave-guard.ts`). Guardar y borrar sustituyen la entrada por la
+  lista (Atrás no reabre el editor); el control "Gastos" y descartar tras Atrás
+  vuelven a la entrada anterior, o a la lista si se abrió el detalle desde un
+  enlace directo.
 
 ## APIs internas
 
