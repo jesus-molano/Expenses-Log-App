@@ -19,6 +19,7 @@
   --noctalia-blue: #799fec;
   --noctalia-magenta: #e963c7;
   --noctalia-cyan: #89f5e3;
+  --noctalia-on-surface-subtle: color-mix(in srgb, var(--noctalia-on-surface-variant) 87%, var(--noctalia-surface));
 }
 
 :root[data-theme="atlas"] {
@@ -40,6 +41,7 @@
   --noctalia-blue: #83a7c4;
   --noctalia-magenta: #b98eaa;
   --noctalia-cyan: #7fa4c0;
+  --noctalia-on-surface-subtle: color-mix(in srgb, var(--noctalia-on-surface-variant) 75%, var(--noctalia-surface));
 }
 
 :root[data-theme="obsidian-amber"] {
@@ -61,6 +63,7 @@
   --noctalia-blue: #70a5eb;
   --noctalia-magenta: #d49be6;
   --noctalia-cyan: #61c9b8;
+  --noctalia-on-surface-subtle: color-mix(in srgb, var(--noctalia-on-surface-variant) 72%, var(--noctalia-surface));
 }
 
 :root[data-theme="catppuccin"] {
@@ -82,6 +85,7 @@
   --noctalia-blue: #89b4fa;
   --noctalia-magenta: #f5c2e7;
   --noctalia-cyan: #94e2d5;
+  --noctalia-on-surface-subtle: color-mix(in srgb, var(--noctalia-on-surface) 56%, var(--noctalia-on-surface-variant));
 }
 
 :root[data-theme="rose-pine"] {
@@ -103,6 +107,7 @@
   --noctalia-blue: #9ccfd8;
   --noctalia-magenta: #c4a7e7;
   --noctalia-cyan: #ebbcba;
+  --noctalia-on-surface-subtle: color-mix(in srgb, var(--noctalia-on-surface-variant) 95%, var(--noctalia-surface));
 }
 
 :root[data-theme="nord"] {
@@ -124,6 +129,7 @@
   --noctalia-blue: #81a1c1;
   --noctalia-magenta: #b48ead;
   --noctalia-cyan: #88c0d0;
+  --noctalia-on-surface-subtle: color-mix(in srgb, var(--noctalia-on-surface-variant) 83%, var(--noctalia-surface));
 }
 
 :root[data-theme="dracula"] {
@@ -145,6 +151,7 @@
   --noctalia-blue: #bd93f9;
   --noctalia-magenta: #ff79c6;
   --noctalia-cyan: #8be9fd;
+  --noctalia-on-surface-subtle: color-mix(in srgb, var(--noctalia-on-surface) 38%, var(--noctalia-on-surface-variant));
 }
 
 :root[data-theme="tokyo-night"] {
@@ -166,6 +173,7 @@
   --noctalia-blue: #7aa2f7;
   --noctalia-magenta: #bb9af7;
   --noctalia-cyan: #7dcfff;
+  --noctalia-on-surface-subtle: color-mix(in srgb, var(--noctalia-on-surface) 40%, var(--noctalia-on-surface-variant));
 }
 
 :root {
@@ -179,7 +187,10 @@
   --app-border-strong: color-mix(in srgb, var(--noctalia-primary) 42%, var(--noctalia-outline));
   --app-text: var(--noctalia-on-surface);
   --app-text-muted: var(--noctalia-on-surface-variant);
-  --app-text-subtle: color-mix(in srgb, var(--noctalia-on-surface-variant) 72%, var(--noctalia-surface));
+  /* Cada tema ajusta su texto tenue para llegar a 4,5:1 (WCAG AA) sobre el
+     fondo, las superficies y los controles: los temas con margen lo atenúan
+     hacia la superficie y los que no lo tienen lo aclaran hacia el texto. */
+  --app-text-subtle: var(--noctalia-on-surface-subtle);
   --app-accent: var(--noctalia-primary);
   --app-accent-hover: color-mix(in srgb, var(--noctalia-primary) 82%, white);
   --app-accent-contrast: var(--noctalia-on-primary);
