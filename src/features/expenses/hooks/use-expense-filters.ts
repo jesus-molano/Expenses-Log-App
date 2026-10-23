@@ -11,7 +11,6 @@ import {
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
 import { occurrencesDueBetween } from "@/domain/finance";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
-import { buildRecurringOverview } from "../lib/recurring-overview";
 import { buildTimelineSections } from "../lib/timeline";
 
 const NEXT_MONTH_VISIBLE_DAYS = 7;
@@ -46,17 +45,6 @@ function buildExpenseFilters(
     ),
   );
 
-  // La vista de series se mide siempre contra el mes natural: mirar otro mes
-  // no convierte en atrasado lo que vence más adelante en este.
-  const calendarMonth = monthRange(today.slice(0, 7));
-  const recurringOverviewItems = buildRecurringOverview({
-    templates: store.templates,
-    overrides: store.overrides,
-    windowStart: calendarMonth.start,
-    windowEnd: calendarMonth.end,
-    language,
-  });
-
   const visibleOccurrences = [
     ...selectCarryOverOccurrences(store, todayDate, language, monthId),
     ...occurrencesDueBetween(store, windowStart, timelineWindowEnd, language),
@@ -84,6 +72,5 @@ function buildExpenseFilters(
     nextOccurrence,
     visibleOccurrences,
     timelineSections,
-    recurringOverviewItems,
   };
 }

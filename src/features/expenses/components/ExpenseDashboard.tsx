@@ -14,11 +14,12 @@ import {
   QuickCapture,
 } from "@/features/expenses/components/QuickCapture";
 import { QuickCaptureReview } from "@/features/expenses/components/QuickCaptureReview";
-import { RecurringOverviewButton } from "@/features/expenses/components/RecurringOverviewButton";
-import { RecurringOverviewSheet } from "@/features/expenses/components/RecurringOverviewSheet";
+import { CatalogButton } from "@/features/expenses/components/catalog/CatalogButton";
+import { ExpenseCatalogSheet } from "@/features/expenses/components/catalog/ExpenseCatalogSheet";
 import { useActionToast } from "@/features/expenses/hooks/use-action-toast";
 import { useActiveMonth } from "@/features/expenses/hooks/use-active-month";
 import { useExpenseCaptureFlow } from "@/features/expenses/hooks/use-expense-capture-flow";
+import { useExpenseCatalog } from "@/features/expenses/hooks/use-expense-catalog";
 import { useExpenseFilters } from "@/features/expenses/hooks/use-expense-filters";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { useQuickExpenseParser } from "@/features/expenses/hooks/use-quick-expense-parser";
@@ -89,7 +90,8 @@ export function ExpenseDashboard({
   });
   const chrome = useScrollChrome();
   const runViewTransition = useViewTransitionAction();
-  const [recurringOpen, setRecurringOpen] = useState(false);
+  const catalog = useExpenseCatalog(store, filters.today, language);
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const [hiddenReminderId, setHiddenReminderId] = useState<string | null>(null);
   const lastChanceReminder = buildLastChanceReminders(store, now).find(
     (reminder) => reminder.occurrence.id !== hiddenReminderId,
@@ -143,9 +145,10 @@ export function ExpenseDashboard({
       language={language}
       panelChrome={chrome.panelChrome}
       headerAction={
-        <RecurringOverviewButton
+        <CatalogButton
           language={language}
-          onClick={() => setRecurringOpen(true)}
+          attentionCount={catalog.endingCommitments}
+          onClick={() => setCatalogOpen(true)}
         />
       }
     >
@@ -251,13 +254,14 @@ export function ExpenseDashboard({
         onSave={capture.saveForm}
       />
 
-      <RecurringOverviewSheet
-        open={recurringOpen}
-        items={filters.recurringOverviewItems}
-        categories={store.categories}
-        language={language}
-        onClose={() => setRecurringOpen(false)}
-      />
+      {catalogOpen ? (
+        <ExpenseCatalogSheet
+          items={catalog.items}
+          categories={store.categories}
+          language={language}
+          onClose={() => setCatalogOpen(false)}
+        />
+      ) : null}
 
       {actionToast.toast ? (
         <ActionToast

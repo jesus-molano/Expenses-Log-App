@@ -71,13 +71,6 @@ describe("expense timeline window", () => {
       ]),
     );
     expect(result.current.pendingTotal).toBe(0);
-    expect(result.current.recurringOverviewItems).toEqual([
-      expect.objectContaining({
-        template: expect.objectContaining({ id: "quarterly" }),
-        currentOccurrence: null,
-        nextOccurrence: expect.objectContaining({ dueDate: "2026-08-05" }),
-      }),
-    ]);
   });
 
   it("crosses the year boundary and includes January 7 but not January 8", () => {
