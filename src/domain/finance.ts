@@ -271,6 +271,11 @@ export function paidAmount(occurrence: ExpenseOccurrence) {
   return occurrence.override?.amountPaid ?? occurrence.record?.amountPaid ?? occurrence.template.amount;
 }
 
+// Lo que cuesta un cobro: lo pagado si ya se pagó y, si no, lo previsto.
+export function occurrenceAmount(occurrence: ExpenseOccurrence) {
+  return occurrence.status === "paid" ? paidAmount(occurrence) : occurrence.template.amount;
+}
+
 export function generateStoreOccurrences(
   store: ExpenseStore,
   fromDate: string,

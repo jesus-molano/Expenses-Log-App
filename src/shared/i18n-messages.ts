@@ -428,7 +428,8 @@ export const messages = {
         share: "{percent} del total",
         chargesOne: "1 cobro",
         chargesMany: "{count} cobros",
-        showExpenses: "Ver gastos de {category}",
+        monthlyAverage: "Media al mes",
+        windowTotal: "Total en 12 meses",
         empty: "Sin gastos recurrentes en los próximos 12 meses.",
       },
       summary: {
@@ -898,7 +899,8 @@ export const messages = {
         share: "{percent} of total",
         chargesOne: "1 charge",
         chargesMany: "{count} charges",
-        showExpenses: "Show {category} expenses",
+        monthlyAverage: "Monthly average",
+        windowTotal: "12-month total",
         empty: "No recurring expenses in the next 12 months.",
       },
       summary: {

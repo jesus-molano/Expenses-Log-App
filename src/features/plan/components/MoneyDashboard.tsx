@@ -29,6 +29,7 @@ import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { useMonthlySalaryEditor } from "../hooks/use-monthly-salary-editor";
 import { useCompactChart } from "../hooks/use-compact-chart";
 import { useOneOffIncomeForm } from "../hooks/use-one-off-income-form";
+import { usePlanInsights } from "../hooks/use-plan-insights";
 import { usePlanSettingsForm } from "../hooks/use-plan-settings-form";
 import { useSkipOccurrenceConfirmation } from "../hooks/use-skip-occurrence-confirmation";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
@@ -45,7 +46,9 @@ import { MonthlyReviewSection } from "./MonthlyReviewSection";
 import { MonthlySalaryDialog } from "./MonthlySalaryDialog";
 import { OneOffIncomePanel } from "./OneOffIncomePanel";
 import { PlanSettingsSheet } from "./PlanSettingsSheet";
+import { RecurringCostSection } from "./RecurringCostSection";
 import { SkipOccurrenceDialog } from "./SkipOccurrenceDialog";
+import { UpcomingBillsSection } from "./UpcomingBillsSection";
 
 export function MoneyDashboard() {
   const expenseStore = useExpenseStore();
@@ -111,6 +114,13 @@ export function MoneyDashboard() {
   const monthLabel = format(currentMonthDate, "MMMM yyyy", { locale });
   const periodLabel =
     cycle.anchor === "payday" ? formatPeriodRange(activeMonth.range, language) : null;
+  const insights = usePlanInsights({
+    store,
+    monthId: currentMonthId,
+    cycle,
+    today: todayDateOnly,
+    language,
+  });
   const paidProgress = plan.plannedExpenseCount
     ? Math.round((plan.paidExpenseCount / plan.plannedExpenseCount) * 100)
     : 0;
@@ -299,6 +309,13 @@ export function MoneyDashboard() {
           onUpdateMonthlyExpense={updateMonthlyExpenseOccurrence}
         />
 
+        <UpcomingBillsSection
+          language={language}
+          largeBills={insights.largeBills.items}
+          largeBillsTotal={insights.largeBills.total}
+          provision={insights.provision}
+        />
+
         <AnnualPlanSection
           language={language}
           copy={copy}
@@ -312,6 +329,8 @@ export function MoneyDashboard() {
           annualCapacity={annualCapacity}
           onYearChange={selectAnnualYear}
         />
+
+        <RecurringCostSection language={language} insights={insights.costs} />
 
         <MonthlyReviewSection
           language={language}
