@@ -1,6 +1,10 @@
 import { endOfMonth, parseISO } from "date-fns";
-import { daysBetween, toDateOnly } from "./calendar";
-import { getMonthlySalarySettings, occurrencesDueBetween } from "./finance";
+import { buildDateWithDay, daysBetween, toDateOnly } from "./calendar";
+import {
+  buildMonthlyMoneyPlan,
+  getMonthlySalarySettings,
+  occurrencesDueBetween,
+} from "./finance";
 import { isOccurrenceOverdue, monthPendingSummary } from "./pending";
 import type {
   AppLanguage,
@@ -8,6 +12,7 @@ import type {
   ExpenseStore,
   FinanceStore,
   MonthClosure,
+  MonthlyMoneyPlan,
 } from "./types";
 
 export { monthPendingSummary, type MonthPendingSummary } from "./pending";
@@ -15,6 +20,10 @@ export { monthPendingSummary, type MonthPendingSummary } from "./pending";
 // Días antes de fin de mes en los que se ofrece pasar al siguiente aunque no
 // haya llegado el cobro.
 export const ADVANCE_SUGGESTION_DAYS = 10;
+
+// Últimos días del mes en los que, sin haber cobrado, se ofrece cerrarlo
+// aunque queden recibos por resolver.
+export const LEFTOVERS_SUGGESTION_DAYS = 3;
 
 export function addMonthId(monthId: string, delta: number): string {
   const [year, month] = monthId.split("-").map(Number);
@@ -69,6 +78,8 @@ export type MonthCloseStatus = {
   pendingTotal: number;
   // Recibos del mes siguiente que ya están pagados.
   nextMonthPaidCount: number;
+  // Lo que queda pendiente del mes, para resolverlo al cerrarlo.
+  leftovers: ExpenseOccurrence[];
 };
 
 export function monthCloseStatus(
@@ -89,6 +100,7 @@ export function monthCloseStatus(
     pendingCount: pending.count,
     pendingTotal: pending.total,
     nextMonthPaidCount: paidIn(nextMonthId),
+    leftovers: pending.items,
   };
 }
 
@@ -100,6 +112,16 @@ export function configuredPayday(finance: FinanceStore, monthId: string) {
   );
   const salary = getMonthlySalarySettings(finance, monthId);
   return hasSalary && salary.amount > 0 ? salary.dayOfMonth : null;
+}
+
+// Día de cobro de un mes, acotado a su último día (un 31 cae el 30 en
+// noviembre).
+function paydayDate(monthId: string, payday: number) {
+  return toDateOnly(buildDateWithDay(parseISO(`${monthId}-01`), payday));
+}
+
+function isPaydayReached(today: string, payday: number | null) {
+  return payday !== null && today >= paydayDate(today.slice(0, 7), payday);
 }
 
 // Se ofrece pasar de mes cuando el mes natural tiene recibos, ninguno
@@ -117,8 +139,116 @@ export function shouldSuggestAdvance({
   if (status.paidCount === 0 || status.pendingCount > 0) return false;
 
   const daysLeft = daysBetween(today, monthRange(status.monthId).end);
-  const paydayReached = payday !== null && Number(today.slice(8, 10)) >= payday;
-  return daysLeft <= ADVANCE_SUGGESTION_DAYS || paydayReached;
+  return daysLeft <= ADVANCE_SUGGESTION_DAYS || isPaydayReached(today, payday);
+}
+
+// Si tras el cobro quedan recibos del mes, se ofrece cerrarlo resolviendo lo
+// que queda. El cobro solo cuenta en los últimos días del mes (quien cobra a
+// primeros financia ese mes, no el siguiente); sin cobro, se ofrece en los
+// últimos días.
+export function shouldSuggestCloseWithLeftovers({
+  status,
+  today,
+  payday,
+}: {
+  status: MonthCloseStatus;
+  today: string;
+  payday: number | null;
+}) {
+  if (status.monthId !== today.slice(0, 7)) return false;
+  if (status.pendingCount === 0) return false;
+
+  const daysLeft = daysBetween(today, monthRange(status.monthId).end);
+  return (
+    daysLeft < LEFTOVERS_SUGGESTION_DAYS ||
+    (daysLeft <= ADVANCE_SUGGESTION_DAYS && isPaydayReached(today, payday))
+  );
+}
+
+// Próximo cobro después de hoy, con el sueldo configurado del mes en que cae.
+export function getNextPayday(finance: FinanceStore, today: string): string | null {
+  const monthId = today.slice(0, 7);
+  const day = configuredPayday(finance, monthId);
+  if (day !== null) {
+    const thisMonth = paydayDate(monthId, day);
+    if (thisMonth > today) return thisMonth;
+  }
+
+  const nextMonthId = addMonthId(monthId, 1);
+  const nextDay = configuredPayday(finance, nextMonthId);
+  return nextDay === null ? null : paydayDate(nextMonthId, nextDay);
+}
+
+export type PaydayOutlook = {
+  payday: string;
+  daysUntil: number;
+  total: number;
+  items: ExpenseOccurrence[];
+};
+
+// "Hasta el cobro": lo que falta por pagar y se carga antes del próximo
+// sueldo, atrasos incluidos. Lo ya pagado (también lo pagado por adelantado)
+// no cuenta.
+export function buildPaydayOutlook(
+  store: ExpenseStore,
+  today: string,
+  language: AppLanguage = "es",
+): PaydayOutlook | null {
+  const payday = getNextPayday(store.finance, today);
+  if (!payday) return null;
+
+  const seenIds = new Set<string>();
+  const items = [
+    ...selectCarryOverOccurrences(store, parseISO(today), language),
+    ...occurrencesDueBetween(store, monthRange(today.slice(0, 7)).start, payday, language),
+  ].filter((occurrence) => {
+    if (
+      occurrence.status !== "due" ||
+      occurrence.estimatedChargeDate >= payday ||
+      seenIds.has(occurrence.id)
+    ) {
+      return false;
+    }
+    seenIds.add(occurrence.id);
+    return true;
+  });
+
+  return {
+    payday,
+    daysUntil: daysBetween(today, payday),
+    total: items.reduce((sum, occurrence) => sum + occurrence.template.amount, 0),
+    items,
+  };
+}
+
+// Día en que se apunta algo de un mes (un ingreso extra): hoy si es ese mes,
+// el día 1 si aún no ha empezado y el último día si ya terminó.
+export function defaultDateInMonth(monthId: string, today: string) {
+  const { start, end } = monthRange(monthId);
+  if (today < start) return start;
+  if (today > end) return end;
+  return today;
+}
+
+// Plan de un mes con la misma atribución que Gastos (cada cobro en el mes de
+// su dueDate) y la fase respecto al mes activo.
+export function buildMonthPlan(
+  store: ExpenseStore,
+  monthId: string,
+  {
+    today,
+    activeMonthId = resolveActiveMonth(today, store.finance.monthClosures),
+    language = "es",
+  }: { today: string; activeMonthId?: string; language?: AppLanguage },
+): MonthlyMoneyPlan {
+  const { start, end } = monthRange(monthId);
+  return buildMonthlyMoneyPlan({
+    monthDate: parseISO(start),
+    finance: store.finance,
+    occurrences: occurrencesDueBetween(store, start, end, language),
+    today: parseISO(today),
+    activeMonthId,
+  });
 }
 
 // Lo que quedó pendiente el mes anterior al que se mira (por defecto, el de

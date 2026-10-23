@@ -62,4 +62,22 @@ describe("useCategoryManager", () => {
     act(() => result.current.confirmDelete());
     expect(onDelete).toHaveBeenLastCalledWith("general", "Viajes");
   });
+
+  it("asks for confirmation before deleting, right away when nothing uses it", () => {
+    const { result, onDelete } = setup();
+
+    act(() => result.current.startDelete(categories[0], false));
+    expect(result.current.mode).toMatchObject({ kind: "delete", confirming: true });
+    act(() => result.current.cancelDelete());
+    expect(result.current.mode).toEqual({ kind: "list" });
+
+    act(() => result.current.startDelete(categories[0], true));
+    expect(result.current.mode).toMatchObject({ kind: "delete", confirming: false });
+    act(() => result.current.requestDelete());
+    expect(result.current.mode).toMatchObject({ kind: "delete", confirming: true });
+    // Cancelar el diálogo vuelve a elegir a cuál pasan sus gastos.
+    act(() => result.current.cancelDelete());
+    expect(result.current.mode).toMatchObject({ kind: "delete", confirming: false });
+    expect(onDelete).not.toHaveBeenCalled();
+  });
 });

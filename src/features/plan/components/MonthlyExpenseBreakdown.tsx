@@ -17,6 +17,8 @@ type MonthlyExpenseBreakdownProps = {
   expanded: boolean;
   onToggleExpanded: () => void;
   onSkipOccurrence: (occurrence: ExpenseOccurrence) => void;
+  // Pagar desde la revisión sin abrir el editor (solo los pendientes).
+  onTogglePaid?: (occurrence: ExpenseOccurrence) => void;
   onUpdateMonthlyExpense: (input: {
     templateId: string;
     occurrenceDate: string;
@@ -38,6 +40,7 @@ export function MonthlyExpenseBreakdown({
   expanded,
   onToggleExpanded,
   onSkipOccurrence,
+  onTogglePaid,
   onUpdateMonthlyExpense,
 }: MonthlyExpenseBreakdownProps) {
   return (
@@ -63,6 +66,11 @@ export function MonthlyExpenseBreakdown({
                 today={today}
                 skipLabel={t("money.skipMonthExpense", language)}
                 onSkip={() => onSkipOccurrence(occurrence)}
+                onTogglePaid={
+                  onTogglePaid && occurrence.status === "due"
+                    ? () => onTogglePaid(occurrence)
+                    : undefined
+                }
                 onUpdate={onUpdateMonthlyExpense}
               />
             ))

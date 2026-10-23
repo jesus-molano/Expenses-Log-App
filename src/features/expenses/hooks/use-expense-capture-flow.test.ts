@@ -93,8 +93,27 @@ describe("useExpenseCaptureFlow", () => {
     act(() => hook.result.current.setReviewStatus("paid"));
     act(() => hook.result.current.saveReviewed());
 
-    expect(addExpenses).toHaveBeenCalledWith([deezer.draft], { initialStatus: "paid" });
+    // Los cobros de meses anteriores se dan por pagados salvo que se elija otra cosa.
+    expect(addExpenses).toHaveBeenCalledWith([deezer.draft], {
+      initialStatus: "paid",
+      previousCharges: "paid",
+    });
     expect(hook.result.current.reviewItems).toBeNull();
+  });
+
+  it("leaves previous months pending when that is the choice", async () => {
+    const { hook, addExpenses, respond } = setup(captured("Tidal 10,99 y Deezer 9,99"));
+
+    act(() => void hook.result.current.analyze());
+    await respond();
+    act(() => hook.result.current.setReviewPreviousCharges("due"));
+    act(() => hook.result.current.saveReviewed());
+
+    expect(addExpenses).toHaveBeenCalledWith(expect.any(Array), {
+      initialStatus: "due",
+      previousCharges: undefined,
+    });
+    expect(hook.result.current.reviewPreviousCharges).toBe("paid");
   });
 
   it("tells why the local parser was used", async () => {

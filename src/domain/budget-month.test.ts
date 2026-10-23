@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   addMonthId,
   buildMonthContext,
+  buildMonthPlan,
+  buildPaydayOutlook,
   configuredPayday,
+  defaultDateInMonth,
+  getNextPayday,
   isMonthClosed,
   monthCloseStatus,
   monthPendingSummary,
@@ -10,6 +14,7 @@ import {
   resolveActiveMonth,
   selectCarryOverOccurrences,
   shouldSuggestAdvance,
+  shouldSuggestCloseWithLeftovers,
 } from "./budget-month";
 import { estimateChargeDate } from "./calendar";
 import {
@@ -101,7 +106,26 @@ describe("month close suggestion", () => {
       pendingCount: 0,
       pendingTotal: 0,
       nextMonthPaidCount: 1,
+      leftovers: [],
     });
+  });
+
+  it("clamps a payday beyond the end of a short month", () => {
+    const november = monthCloseStatus(
+      [occurrence("rent", 700, "2026-11-01", "paid")],
+      "2026-11",
+    );
+
+    // Día de cobro 31: en noviembre se cobra el 30.
+    expect(shouldSuggestAdvance({ status: november, today: "2026-11-15", payday: 31 }))
+      .toBe(false);
+    expect(
+      shouldSuggestAdvance({
+        status: { ...november, monthId: "2026-11" },
+        today: "2026-11-30",
+        payday: 31,
+      }),
+    ).toBe(true);
   });
 
   it("suggests advancing near month end or once payday has arrived", () => {
@@ -140,6 +164,141 @@ describe("month close suggestion", () => {
     expect(configuredPayday(emptyFinanceStore, "2026-10")).toBeNull();
     expect(configuredPayday(withSalary, "2026-08")).toBeNull();
     expect(configuredPayday(withSalary, "2026-10")).toBe(31);
+  });
+});
+
+describe("closing a month with leftovers", () => {
+  const withLeftovers = monthCloseStatus(
+    [
+      occurrence("rent", 700, "2026-10-01", "paid"),
+      occurrence("internet", 30, "2026-10-20"),
+      occurrence("gym", 45, "2026-10-30"),
+    ],
+    "2026-10",
+  );
+
+  it("lists what is still pending in the month", () => {
+    expect(withLeftovers.leftovers.map((item) => item.id)).toEqual(["internet", "gym"]);
+    expect(withLeftovers.pendingTotal).toBe(75);
+  });
+
+  it("suggests closing once payday arrives near the end of the month", () => {
+    const suggest = (today: string, payday: number | null) =>
+      shouldSuggestCloseWithLeftovers({ status: withLeftovers, today, payday });
+
+    expect(suggest("2026-10-27", 28)).toBe(false);
+    expect(suggest("2026-10-28", 28)).toBe(true);
+    // Quien cobra a primeros financia ese mes: el cobro no cierra el anterior.
+    expect(suggest("2026-10-10", 5)).toBe(false);
+    // Sin cobro, en los últimos días del mes.
+    expect(suggest("2026-10-28", null)).toBe(false);
+    expect(suggest("2026-10-29", null)).toBe(true);
+  });
+
+  it("does not suggest it with nothing pending or for another month", () => {
+    const settledStatus = monthCloseStatus(
+      [occurrence("rent", 700, "2026-10-01", "paid")],
+      "2026-10",
+    );
+
+    expect(
+      shouldSuggestCloseWithLeftovers({ status: settledStatus, today: "2026-10-30", payday: 28 }),
+    ).toBe(false);
+    expect(
+      shouldSuggestCloseWithLeftovers({ status: withLeftovers, today: "2026-11-02", payday: 1 }),
+    ).toBe(false);
+  });
+});
+
+describe("until payday", () => {
+  const salary = (dayOfMonth: number, from = "2026-09") => ({
+    ...emptyFinanceStore,
+    monthlySalary: { [from]: { amount: 2000, dayOfMonth } },
+  });
+
+  it("finds the next payday after today, clamped to the month", () => {
+    expect(getNextPayday(salary(28), "2026-10-23")).toBe("2026-10-28");
+    // El día de cobro ya cuenta como cobrado: el siguiente es el del mes que viene.
+    expect(getNextPayday(salary(28), "2026-10-28")).toBe("2026-11-28");
+    expect(getNextPayday(salary(31), "2026-11-02")).toBe("2026-11-30");
+    expect(getNextPayday(salary(28, "2026-11"), "2026-10-23")).toBe("2026-11-28");
+    expect(getNextPayday(emptyFinanceStore, "2026-10-23")).toBeNull();
+  });
+
+  it("adds what is still unpaid before payday, overdue bills included", () => {
+    const store: ExpenseStore = {
+      ...emptyStore,
+      finance: salary(28),
+      templates: [
+        template("old", "2026-09-15", 15, 20),
+        template("internet", "2026-10-20", 20, 30),
+        template("gym", "2026-10-24", 24, 45),
+        template("weekend", "2026-10-31", 31, 10),
+        template("rent", "2026-11-01", 1, 700),
+      ],
+      overrides: [
+        paidOverride("old", "2026-10-15"),
+        paidOverride("gym", "2026-10-24"),
+        paidOverride("rent", "2026-11-01"),
+      ],
+    };
+
+    const outlook = buildPaydayOutlook(store, "2026-10-23");
+
+    // Septiembre sin pagar, internet atrasado; el gimnasio ya está pagado.
+    expect(outlook).toMatchObject({ payday: "2026-10-28", daysUntil: 5, total: 50 });
+    expect(outlook?.items.map((item) => item.id)).toEqual([
+      "old:2026-09-15",
+      "internet:2026-10-20",
+    ]);
+
+    // Tras el cobro del 28 cuenta hasta el 28 de noviembre. El sábado 31 se
+    // carga el lunes 2 y el alquiler de noviembre ya está pagado.
+    const afterPayday = buildPaydayOutlook(store, "2026-10-28");
+    expect(afterPayday).toMatchObject({ payday: "2026-11-28", daysUntil: 31 });
+    expect(afterPayday?.items.map((item) => item.id)).toEqual([
+      "old:2026-09-15",
+      "internet:2026-10-20",
+      "weekend:2026-10-31",
+      "old:2026-11-15",
+      "internet:2026-11-20",
+      "gym:2026-11-24",
+    ]);
+  });
+
+  it("needs a configured salary", () => {
+    expect(buildPaydayOutlook(emptyStore, "2026-10-23")).toBeNull();
+  });
+});
+
+describe("months as seen from another month", () => {
+  it("dates an entry today, on the 1st of a future month or the last day of a past one", () => {
+    expect(defaultDateInMonth("2026-10", "2026-10-23")).toBe("2026-10-23");
+    expect(defaultDateInMonth("2026-11", "2026-10-23")).toBe("2026-11-01");
+    expect(defaultDateInMonth("2026-09", "2026-10-23")).toBe("2026-09-30");
+  });
+
+  it("builds the plan of a month with its phase against the active month", () => {
+    const store: ExpenseStore = {
+      ...emptyStore,
+      templates: [template("rent", "2026-10-01", 1, 700)],
+      finance: {
+        ...emptyFinanceStore,
+        monthClosures: {
+          "2026-10": {
+            closedAt: "2026-10-28T10:00:00.000Z",
+            updatedAt: "2026-10-28T10:00:00.000Z",
+          },
+        },
+      },
+    };
+
+    expect(buildMonthPlan(store, "2026-11", { today: "2026-10-28" })).toMatchObject({
+      month: "2026-11",
+      phase: "current",
+      plannedExpensesTotal: 700,
+    });
+    expect(buildMonthPlan(store, "2026-10", { today: "2026-10-28" }).phase).toBe("registered");
   });
 });
 

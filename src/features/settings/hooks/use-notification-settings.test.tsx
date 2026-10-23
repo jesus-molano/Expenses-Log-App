@@ -5,6 +5,8 @@ import {
   fetchPushHealth,
   fetchPushSubscribeConfig,
   getCurrentPushSubscription,
+  PushApiError,
+  renewPushSubscription,
   savePushSubscription,
 } from "../lib/push-notifications";
 import { useNotificationSettings } from "./use-notification-settings";
@@ -20,13 +22,17 @@ vi.mock("../lib/push-notifications", async (importOriginal) => {
     fetchPushHealth: vi.fn(),
     fetchPushSubscribeConfig: vi.fn(),
     getCurrentPushSubscription: vi.fn(),
+    renewPushSubscription: vi.fn(),
     savePushSubscription: vi.fn(),
     sendPushTest: vi.fn(),
   };
 });
 
 const subscription = {
-  endpoint: "https://push.example.test/device",
+  endpoint: "https://fcm.googleapis.com/fcm/send/device",
+} as PushSubscription;
+const freshSubscription = {
+  endpoint: "https://fcm.googleapis.com/fcm/send/fresh",
 } as PushSubscription;
 
 beforeEach(() => {
@@ -76,6 +82,47 @@ describe("useNotificationSettings", () => {
     expect(result.current.notificationState).toBe("ready");
     expect(savePushSubscription).toHaveBeenCalledWith(subscription);
     expect(fetchPushHealth).toHaveBeenCalledWith(subscription);
+  });
+
+  it("takes over an endpoint left registered by another account when enabling", async () => {
+    vi.stubGlobal("Notification", {
+      permission: "default",
+      requestPermission: vi.fn().mockResolvedValue("granted"),
+    });
+    vi.mocked(savePushSubscription)
+      .mockRejectedValueOnce(new PushApiError("PUSH_SUBSCRIPTION_IN_USE", 409))
+      .mockResolvedValue({});
+    vi.mocked(renewPushSubscription).mockResolvedValue(freshSubscription);
+    const setMessage = vi.fn();
+    const { result } = renderHook(() => useNotificationSettings(setMessage));
+    // Deja pasar la comprobación inicial (setTimeout 0) antes de activar.
+    await act(() => new Promise((resolve) => window.setTimeout(resolve, 0)));
+
+    await act(async () => {
+      await result.current.enableNotifications();
+    });
+
+    expect(renewPushSubscription).toHaveBeenCalledTimes(1);
+    expect(savePushSubscription).toHaveBeenLastCalledWith(freshSubscription);
+    expect(fetchPushHealth).toHaveBeenCalledWith(freshSubscription);
+    expect(result.current.notificationState).toBe("ready");
+  });
+
+  it("does not renew in the background and explains how to fix it", async () => {
+    vi.stubGlobal("Notification", {
+      permission: "granted",
+      requestPermission: vi.fn(),
+    });
+    vi.mocked(getCurrentPushSubscription).mockResolvedValue(subscription);
+    vi.mocked(savePushSubscription).mockRejectedValue(
+      new PushApiError("PUSH_SUBSCRIPTION_IN_USE", 409),
+    );
+    const setMessage = vi.fn();
+    const { result } = renderHook(() => useNotificationSettings(setMessage));
+
+    await waitFor(() => expect(result.current.notificationState).toBe("error"));
+    expect(renewPushSubscription).not.toHaveBeenCalled();
+    expect(setMessage).not.toHaveBeenCalled();
   });
 
   it("silently repairs an existing granted subscription on mount", async () => {

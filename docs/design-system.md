@@ -35,6 +35,13 @@ El tema activo se aplica con `data-theme` en `<html>`. Los colores funcionales
 deben usar variables como `--app-accent`, `--app-danger`, `--app-success`,
 `--app-warning`, `--app-text`, `--app-surface` y equivalentes.
 
+`--app-text-subtle` (etiquetas pequeñas, placeholders, días fuera de mes) sale
+del rol `--noctalia-on-surface-subtle` de cada tema, ajustado para llegar a
+4,5:1 (WCAG AA) sobre el fondo, las superficies y los controles en reposo o con
+hover. `src/shared/theme-contrast.test.ts` evalúa los tokens de cada tema y
+falla si alguno baja de ese umbral: al añadir un tema o tocar sus colores hay
+que ajustar ese rol.
+
 ## Componentes base
 
 Usar `src/components/ui` antes de crear controles nuevos:
@@ -48,6 +55,9 @@ Usar `src/components/ui` antes de crear controles nuevos:
 - `Field` y `DatePickerField`: campos de formulario.
 - `ConfirmActionDialog`: confirmaciones destructivas.
 - `ListItem`: filas genericas.
+- `OfflineLink`: enlace interno que navega por documento sin conexion.
+- `OfflineStatusChip`: chip "Sin conexion" (`app-chip app-chip-orange`) para
+  las cabeceras; solo aparece offline y no ocupa sitio con conexion.
 
 Los componentes especificos de gastos, dinero o ajustes deben vivir en su
 feature correspondiente.

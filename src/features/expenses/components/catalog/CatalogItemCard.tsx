@@ -8,10 +8,8 @@ import { categoryToneClass } from "../../lib/expense-actions";
 import type { CatalogItem } from "../../lib/expense-catalog";
 import { paymentMethodLabel } from "../../lib/expense-detail-labels";
 import { categoryIconMap } from "../../lib/expense-form-options";
-import {
-  formatRecurringDate,
-  recurringFrequencyLabel,
-} from "../../lib/recurring-overview-format";
+import { localizedRecurrenceLabel } from "../../lib/recurrence-label";
+import { formatRecurringDate } from "../../lib/recurring-overview-format";
 
 type CatalogItemCardProps = {
   item: CatalogItem;
@@ -25,7 +23,7 @@ export function CatalogItemCard({ item, category, language }: CatalogItemCardPro
   const Icon = categoryIconMap[category?.icon ?? ""] ?? WalletCards;
   const payment = paymentMethodLabel(template.paymentMethod, template.paymentMethodDetail, language);
   const subtitle = [
-    recurringFrequencyLabel(template.recurrence, language),
+    localizedRecurrenceLabel(template.recurrence, language),
     category ? categoryLabel(category.name, language) : null,
     payment || null,
   ]

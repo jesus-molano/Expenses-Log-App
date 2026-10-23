@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ActionToast } from "@/components/ui/ActionToast";
-import { canMoveOccurrence, occurrenceMoveRange } from "@/domain/budget-month";
+import { addMonthId, canMoveOccurrence, occurrenceMoveRange } from "@/domain/budget-month";
 import type { ExpenseOccurrence } from "@/domain/types";
 import { CaptureCommandReview } from "@/features/expenses/components/CaptureCommandReview";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
@@ -14,6 +14,7 @@ import { MonthBar } from "@/features/expenses/components/MonthBar";
 import { MonthCloseCard } from "@/features/expenses/components/MonthCloseCard";
 import { NextMonthPreview } from "@/features/expenses/components/NextMonthPreview";
 import { OccurrenceActionSheet } from "@/features/expenses/components/OccurrenceActionSheet";
+import { MonthCloseSheet } from "@/features/expenses/components/month-close/MonthCloseSheet";
 import {
   AddExpenseButton,
   QuickCapture,
@@ -27,6 +28,7 @@ import { useActiveMonth } from "@/features/expenses/hooks/use-active-month";
 import { useExpenseCaptureFlow } from "@/features/expenses/hooks/use-expense-capture-flow";
 import { useExpenseCatalog } from "@/features/expenses/hooks/use-expense-catalog";
 import { useExpenseFilters } from "@/features/expenses/hooks/use-expense-filters";
+import { useMonthCloseSheet } from "@/features/expenses/hooks/use-month-close-sheet";
 import { useOnboarding } from "@/features/expenses/hooks/use-onboarding";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { useQuickExpenseParser } from "@/features/expenses/hooks/use-quick-expense-parser";
@@ -59,7 +61,9 @@ export function ExpenseDashboard({
     skipOccurrence,
     restoreOccurrence,
     payOccurrence,
+    markOccurrencesPaid,
     moveOccurrence,
+    updateMonthlySavingsContribution,
     dismissLastChanceReminder,
     moveOccurrenceOnly,
     moveOccurrenceSeries,
@@ -77,8 +81,31 @@ export function ExpenseDashboard({
   const filters = useExpenseFilters(store, language, now, month.viewMonthId);
   const actionToast = useActionToast();
   const monthHeadingRef = useRef<HTMLHeadingElement>(null);
+  const closeCardVariant = month.suggestAdvance
+    ? "settled"
+    : month.suggestCloseWithLeftovers
+      ? "leftovers"
+      : null;
   const showCloseCard =
-    month.suggestAdvance && month.viewMonthId === month.activeMonthId;
+    closeCardVariant !== null && month.viewMonthId === month.activeMonthId;
+  const closeSheet = useMonthCloseSheet({
+    store,
+    monthId: month.calendarMonthId,
+    today: month.today,
+    language,
+    commands: {
+      togglePaid,
+      skipOccurrence,
+      restoreOccurrence,
+      moveOccurrence,
+      markOccurrencesPaid,
+      updateMonthlySavingsContribution,
+    },
+    // Si mientras estaba abierta empezó otro mes, no se cierra el nuevo.
+    onStart: (closedMonthId) => {
+      if (closedMonthId === month.calendarMonthId) advanceMonth();
+    },
+  });
 
   // La tarjeta, el aviso o el chip que se acaba de usar desaparece: el foco
   // pasa al título del mes para que el teclado y el lector no se pierdan.
@@ -297,7 +324,9 @@ export function ExpenseDashboard({
             nextMonthId={month.nextMonthId}
             hasPayday={month.payday !== null}
             language={language}
+            variant={closeCardVariant ?? "settled"}
             onAdvance={advanceMonth}
+            onReview={() => closeSheet.open(month.closeStatus.leftovers)}
             onDismiss={() => {
               month.dismiss();
               focusMonthHeading();
@@ -377,11 +406,13 @@ export function ExpenseDashboard({
           items={capture.reviewItems}
           excludedIds={capture.excludedIds}
           initialStatus={capture.reviewStatus}
+          previousCharges={capture.reviewPreviousCharges}
           notice={capture.notice}
           existingNames={store.templates.map((template) => template.name)}
           language={language}
           onToggle={capture.toggleReviewItem}
           onInitialStatusChange={capture.setReviewStatus}
+          onPreviousChargesChange={capture.setReviewPreviousCharges}
           onEdit={capture.editReviewItem}
           onSave={capture.saveReviewed}
           onClose={capture.closeReview}
@@ -445,6 +476,29 @@ export function ExpenseDashboard({
           // replace: la entrada de la hoja en el historial pasa a ser la del
           // detalle, y Atrás desde el detalle vuelve al listado.
           onEditSeries={(occurrence) => router.replace(`/expenses/${occurrence.template.id}`)}
+        />
+      ) : null}
+
+      {closeSheet.isOpen && closeSheet.plan ? (
+        <MonthCloseSheet
+          monthId={closeSheet.monthId}
+          nextMonthId={addMonthId(closeSheet.monthId, 1)}
+          plan={closeSheet.plan}
+          rows={closeSheet.rows}
+          categories={store.categories}
+          today={month.today}
+          language={language}
+          savingsText={closeSheet.savingsText}
+          savingsTarget={closeSheet.savingsTarget}
+          savingsInvalid={closeSheet.savingsInvalid}
+          onSavingsChange={closeSheet.setSavingsText}
+          onClose={closeSheet.close}
+          onPay={closeSheet.pay}
+          onSkip={closeSheet.skip}
+          onMove={closeSheet.move}
+          onUndo={closeSheet.undo}
+          onPayAll={closeSheet.payAll}
+          onStart={closeSheet.start}
         />
       ) : null}
 

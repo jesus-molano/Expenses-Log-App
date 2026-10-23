@@ -38,6 +38,9 @@ export const CATEGORY_TONES: CategoryTone[] = [
 export const CUSTOM_CATEGORY_ICON = "Tag";
 export const CATEGORY_NAME_MAX_LENGTH = 30;
 
+// Los nombres guardados no llevan tildes ("Alimentacion"): se comparan sin
+// ellas para que "Alimentación" no acabe en General. La tilde se pone al
+// mostrarlos (`categoryLabel`).
 export function resolvePresetCategory(name: string): PresetExpenseCategory {
   return findPresetCategory(name) ?? PRESET_EXPENSE_CATEGORIES.at(-1)!;
 }
@@ -50,6 +53,21 @@ export function findPresetCategory(name: string): PresetExpenseCategory | undefi
 
 export function isCategoryTone(value: unknown): value is CategoryTone {
   return CATEGORY_TONES.includes(value as CategoryTone);
+}
+
+// Nombre, icono y color de una categoría nueva llamada `name`: los de la
+// preset si lo es (sin tildes ni mayúsculas) o los de una propia, con el color
+// elegido o el neutro. La usan el gestor y la importación del CSV.
+export function newCategoryFields(
+  name: string,
+  tone?: CategoryTone,
+): Pick<ExpenseCategory, "name" | "icon" | "tone"> {
+  const preset = findPresetCategory(name);
+  return {
+    name: preset?.name ?? name.trim().slice(0, CATEGORY_NAME_MAX_LENGTH),
+    icon: preset?.icon ?? CUSTOM_CATEGORY_ICON,
+    tone: tone ?? preset?.tone ?? "slate",
+  };
 }
 
 // Lo que el usuario decide de una categoría propia.

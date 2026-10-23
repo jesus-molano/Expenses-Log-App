@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
+import { t } from "@/shared/i18n";
 
 export default function Error({
   error,
@@ -18,20 +19,20 @@ export default function Error({
     <main className="app-page app-page-safe grid min-h-dvh place-items-center px-6 text-center">
       <div className="app-section-card max-w-sm p-5">
         <p className="text-sm font-semibold text-[var(--app-danger)]">
-          Error de aplicacion
+          {t("boot.viewErrorLabel")}
         </p>
         <h1 className="mt-2 text-xl font-semibold text-[var(--app-text)]">
-          No se pudo cargar esta vista
+          {t("boot.viewErrorTitle")}
         </h1>
         <p className="mt-2 text-sm text-[var(--app-text-muted)]">
-          Inténtalo de nuevo. Tus datos guardados en este dispositivo no se han borrado.
+          {t("boot.errorBody")}
         </p>
         <Button
           type="button"
           onClick={reset}
           className="mt-5"
         >
-          Reintentar
+          {t("boot.retry")}
         </Button>
       </div>
     </main>

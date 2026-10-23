@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchPushHealth,
   PushApiError,
+  releasePushSubscription,
+  renewPushSubscription,
   sendPushTest,
   urlBase64ToUint8Array,
 } from "./push-notifications";
@@ -11,8 +13,29 @@ const subscription = {
 } as PushSubscription;
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
+  Reflect.deleteProperty(navigator, "serviceWorker");
 });
+
+function browserSubscription(endpoint = "https://fcm.googleapis.com/fcm/send/device") {
+  return {
+    endpoint,
+    unsubscribe: vi.fn().mockResolvedValue(true),
+  } as unknown as PushSubscription & { unsubscribe: ReturnType<typeof vi.fn> };
+}
+
+function stubRegistration(current: PushSubscription | null) {
+  const pushManager = {
+    getSubscription: vi.fn().mockResolvedValue(current),
+    subscribe: vi.fn(),
+  };
+  Object.defineProperty(navigator, "serviceWorker", {
+    configurable: true,
+    value: { getRegistration: vi.fn().mockResolvedValue({ pushManager }) },
+  });
+  return pushManager;
+}
 
 describe("urlBase64ToUint8Array", () => {
   it("decodes URL-safe base64 values", () => {
@@ -95,5 +118,101 @@ describe("push API client", () => {
         status: 409,
       }),
     );
+  });
+});
+
+describe("releasePushSubscription", () => {
+  it("does nothing without a browser subscription", async () => {
+    stubRegistration(null);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(releasePushSubscription()).resolves.toBe("none");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("deletes the remote registration before unsubscribing the browser", async () => {
+    const order: string[] = [];
+    const subscription = browserSubscription();
+    subscription.unsubscribe.mockImplementation(async () => {
+      order.push("unsubscribe");
+      return true;
+    });
+    stubRegistration(subscription);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        order.push("delete");
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }),
+    );
+
+    await expect(releasePushSubscription()).resolves.toBe("released");
+    expect(order).toEqual(["delete", "unsubscribe"]);
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/push/subscribe",
+      expect.objectContaining({
+        method: "DELETE",
+        body: JSON.stringify({ endpoint: subscription.endpoint }),
+      }),
+    );
+  });
+
+  it("still unsubscribes the browser when the remote delete fails", async () => {
+    const subscription = browserSubscription();
+    stubRegistration(subscription);
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    await expect(releasePushSubscription()).resolves.toBe("incomplete");
+    expect(subscription.unsubscribe).toHaveBeenCalled();
+  });
+
+  it("does not wait for a server that never answers", async () => {
+    vi.useFakeTimers();
+    const subscription = browserSubscription();
+    stubRegistration(subscription);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () =>
+              reject(new DOMException("Aborted", "AbortError")),
+            );
+          }),
+      ),
+    );
+
+    const released = releasePushSubscription({ timeoutMs: 4000 });
+    await vi.advanceTimersByTimeAsync(4000);
+
+    await expect(released).resolves.toBe("incomplete");
+    expect(subscription.unsubscribe).toHaveBeenCalled();
+  });
+});
+
+describe("renewPushSubscription", () => {
+  it("replaces the browser subscription with a new endpoint", async () => {
+    const atobSpy = vi
+      .spyOn(window, "atob")
+      .mockImplementation((value) => Buffer.from(value, "base64").toString("binary"));
+    const current = browserSubscription();
+    const fresh = browserSubscription("https://fcm.googleapis.com/fcm/send/fresh");
+    const pushManager = {
+      getSubscription: vi.fn().mockResolvedValue(current),
+      subscribe: vi.fn().mockResolvedValue(fresh),
+    };
+
+    await expect(
+      renewPushSubscription(
+        { pushManager } as unknown as ServiceWorkerRegistration,
+        "SGVsbG8",
+      ),
+    ).resolves.toBe(fresh);
+    expect(current.unsubscribe).toHaveBeenCalled();
+    expect(pushManager.subscribe).toHaveBeenCalledWith(
+      expect.objectContaining({ userVisibleOnly: true }),
+    );
+    atobSpy.mockRestore();
   });
 });

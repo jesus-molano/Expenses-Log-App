@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCategoryOptions,
   categoryUsage,
+  newCategoryFields,
   resolvePresetCategory,
   validateCategoryName,
 } from "./categories";
@@ -19,6 +20,17 @@ describe("categories", () => {
     expect(resolvePresetCategory("alimentación").name).toBe("Alimentacion");
     expect(resolvePresetCategory(" OCIO ").name).toBe("Ocio");
     expect(resolvePresetCategory("Viajes").name).toBe("General");
+  });
+
+  it("gives a new category the preset look or a custom one", () => {
+    expect(newCategoryFields("alimentación")).toEqual({
+      name: "Alimentacion",
+      icon: "Utensils",
+      tone: "orange",
+    });
+    expect(newCategoryFields("Ocio", "blue")).toEqual({ name: "Ocio", icon: "Gamepad2", tone: "blue" });
+    expect(newCategoryFields(" Caprichos ")).toEqual({ name: "Caprichos", icon: "Tag", tone: "slate" });
+    expect(newCategoryFields("x".repeat(40), "rose").name).toHaveLength(30);
   });
 
   it("validates names against the user's own categories", () => {

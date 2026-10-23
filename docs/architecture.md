@@ -74,13 +74,23 @@ Dashboard de gastos:
 1. La pantalla lee el store desde `useExpenseStore`.
 2. El dominio genera ocurrencias desde templates, reglas recurrentes y
    overrides.
-3. La UI agrupa por timeline y permite pagar, mover, saltar o editar.
+3. La UI agrupa por timeline y permite pagar, mover, saltar o editar. El
+   timeline es el del mes que se mira (`useActiveMonth`): los dias de otro mes
+   llevan el mes, lo pagado por adelantado del siguiente va al final ("Ya
+   pagado de noviembre") y "Hoy" solo existe en el mes natural.
 4. Los comandos actualizan el store y disparan persistencia.
+5. Cierre de mes: si el mes natural esta al dia, `MonthCloseCard` propone
+   pasar al siguiente; si tras el cobro quedan recibos, abre `MonthCloseSheet`
+   (resumen frente al plan, Pagado/Saltar/Mover por resto, ahorro real y
+   "Empezar noviembre"). La logica vive en `domain/budget-month.ts`,
+   `features/expenses/lib/month-close.ts` y `use-month-close-sheet.ts`.
 
 Pantalla de dinero:
 
 1. `CurrentMonthPlanSection` responde que queda por pagar, que ya esta pagado y
-   cuanto queda libre segun el plan.
+   cuanto queda libre segun el plan del mes que se mira en Gastos (con su
+   mismo selector). La fase "actual" es el mes activo; en el, "Hasta el cobro"
+   suma lo pendiente antes del proximo sueldo.
 2. `AnnualPlanSection` muestra gasto recurrente, pagado, ahorro real y capacidad
    maxima de los doce meses del año seleccionado.
 3. `MonthlyReviewSection` compara un mes con el anterior y permite editar sus

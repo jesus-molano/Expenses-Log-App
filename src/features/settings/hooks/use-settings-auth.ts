@@ -1,17 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
+import { clearExpenseLocalData } from "@/data/persistence/local-store";
 import { t } from "@/shared/i18n";
 import type { createClient } from "@/utils/supabase/client";
+import { releasePushSubscription } from "../lib/push-notifications";
 
 type SupabaseBrowserClient = ReturnType<typeof createClient>;
+
+export type SignOutOptions = {
+  // Borra también los datos de gastos de este dispositivo (equipo compartido).
+  clearLocalData: boolean;
+};
+
+function reloadHome() {
+  window.location.replace("/");
+}
 
 export function useSettingsAuth(
   supabase: SupabaseBrowserClient,
   setMessage: (message: string) => void,
+  // Recarga tras borrar los datos locales; los tests la sustituyen.
+  { reload = reloadHome }: { reload?: () => void } = {},
 ) {
   const [user, setUser] = useState<User | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const signingOutRef = useRef(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -26,16 +41,52 @@ export function useSettingsAuth(
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  async function signOut() {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    setUser(null);
-    setMessage(t("settings.signedOut"));
+  // Devuelve true si la sesión quedó cerrada.
+  async function signOut({ clearLocalData }: SignOutOptions) {
+    if (!supabase || signingOutRef.current) return false;
+    signingOutRef.current = true;
+    setIsSigningOut(true);
+    let reloading = false;
+
+    try {
+      // Antes del signOut: el borrado remoto necesita la sesión.
+      await releasePushSubscription();
+      await supabase.auth.signOut();
+      // Sin red, signOut devuelve un error pero quita la sesión local; solo
+      // falla de verdad si la sesión sigue ahí.
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        setMessage(t("settings.signOutError"));
+        return false;
+      }
+
+      if (clearLocalData) {
+        clearExpenseLocalData();
+        // Recarga para descartar también el store que sigue en memoria.
+        reloading = true;
+        reload();
+        return true;
+      }
+
+      setUser(null);
+      setMessage(t("settings.signedOut"));
+      return true;
+    } catch {
+      setMessage(t("settings.signOutError"));
+      return false;
+    } finally {
+      // Mientras recarga, los botones siguen desactivados.
+      if (!reloading) {
+        signingOutRef.current = false;
+        setIsSigningOut(false);
+      }
+    }
   }
 
   return {
     user,
     setUser,
+    isSigningOut,
     signOut,
   };
 }

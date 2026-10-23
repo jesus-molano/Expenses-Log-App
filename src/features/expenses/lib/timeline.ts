@@ -17,17 +17,48 @@ export type TimelineSection = {
   total: number;
   items: ExpenseOccurrence[];
   anchorDate: string;
+  // Se pinta atenuado: lo pagado de otro mes que ya no pide atención.
+  muted?: boolean;
 };
+
+// Lo pagado por adelantado del mes siguiente va al final, detrás de lo
+// pendiente del mes que se mira.
+const PAID_AHEAD_PRIORITY = 4;
 
 function sectionMeta(
   occurrence: ExpenseOccurrence,
   today: string,
   language: AppLanguage,
-): Pick<TimelineSection, "id" | "title" | "subtitle" | "tone" | "priority"> {
+  monthId: string,
+): Pick<TimelineSection, "id" | "title" | "subtitle" | "tone" | "priority" | "muted"> {
   const dueDate = parseISO(occurrence.dueDate);
   const locale = language === "en" ? enUS : es;
-  const dayLabel = (date: Date) => format(date, "EEEE d", { locale });
+  // Un día de otro mes lleva el mes: "domingo 1 nov" mirando octubre.
+  const dayLabel = (date: Date) =>
+    format(date, format(date, "yyyy-MM") === monthId ? "EEEE d" : "EEEE d MMM", {
+      locale,
+    });
+  const monthName = (id: string) =>
+    format(parseISO(`${id}-01`), "LLLL", { locale });
   const visualState = resolveExpenseVisualState(occurrence, today);
+  const dueMonthId = occurrence.dueDate.slice(0, 7);
+
+  if (visualState === "paid" && dueMonthId > monthId) {
+    return {
+      id: `paid-ahead-${dueMonthId}`,
+      title: t("monthClose.paidAheadTitle", language).replace(
+        "{month}",
+        monthName(dueMonthId),
+      ),
+      subtitle: t("monthClose.paidAheadSubtitle", language).replace(
+        "{month}",
+        monthName(dueMonthId),
+      ),
+      tone: visualState,
+      priority: PAID_AHEAD_PRIORITY,
+      muted: true,
+    };
+  }
 
   if (visualState === "paid") {
     return {
@@ -39,13 +70,12 @@ function sectionMeta(
     };
   }
 
-  const dueMonthId = occurrence.dueDate.slice(0, 7);
-  if (visualState === "overdue" && dueMonthId < today.slice(0, 7)) {
+  if (visualState === "overdue" && dueMonthId < monthId) {
     return {
       id: `carry-over-${dueMonthId}`,
       title: t("expenses.carryOverTitle", language).replace(
         "{month}",
-        format(parseISO(`${dueMonthId}-01`), "LLLL", { locale }),
+        monthName(dueMonthId),
       ),
       subtitle: t("expenses.carryOverSubtitle", language),
       tone: visualState,
@@ -63,7 +93,12 @@ function sectionMeta(
     };
   }
 
-  if (occurrence.dueDate === today || occurrence.estimatedChargeDate === today) {
+  // "Hoy" solo existe en el mes natural: mirando otro mes, lo de hoy es un día
+  // más con su fecha.
+  if (
+    monthId === today.slice(0, 7) &&
+    (occurrence.dueDate === today || occurrence.estimatedChargeDate === today)
+  ) {
     return {
       id: "today",
       title: t("expenses.today", language),
@@ -105,7 +140,7 @@ export function buildTimelineSections(
   const sections = new Map<string, TimelineSection>();
 
   for (const occurrence of occurrences) {
-    const meta = sectionMeta(occurrence, today, language);
+    const meta = sectionMeta(occurrence, today, language, monthId);
     const existing = sections.get(meta.id);
 
     if (existing) {

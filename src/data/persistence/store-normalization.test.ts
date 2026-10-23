@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { emptyStore } from "@/domain/seed";
 import {
   assignExpenseStoreOwner,
+  inferStoreOwnerId,
   normalizeExpenseStore,
   normalizeImportedExpenseStore,
 } from "./store-normalization";
@@ -153,6 +155,77 @@ describe("normalizeExpenseStore", () => {
     );
   });
 
+  it("drops imported entities that would break the app and keeps the rest", () => {
+    const store = normalizeImportedExpenseStore({
+      schemaVersion: 3,
+      categories: [{ id: "cat", name: "Casa" }, { name: "Sin id" }],
+      templates: [
+        {
+          id: "rent",
+          name: "Alquiler",
+          amount: 700,
+          startDate: "2026-10-01",
+          dueDay: 1,
+          recurrence: { frequency: "monthly" },
+        },
+        { id: "no-rule", name: "Sin regla", amount: 10, startDate: "2026-10-01", dueDay: 1 },
+        { id: "bad-amount", name: "Importe", amount: "mucho" },
+        { name: "Sin id", amount: 5 },
+        "texto",
+      ],
+      overrides: [
+        { id: "ok", templateId: "rent", occurrenceDate: "2026-10-01", status: "paid" },
+        { id: "bad-date", templateId: "rent", occurrenceDate: "2026-13-45", status: "paid" },
+        { id: "bad-status", templateId: "rent", occurrenceDate: "2026-10-01", status: "lost" },
+      ],
+      occurrenceRecords: [{ id: "record:x", templateId: "x", occurrenceDate: "nunca" }],
+      finance: {
+        incomeEvents: [
+          { id: "evt", name: "Extra", amount: 40, receivedAt: "2026-10-10" },
+          { id: "evt-bad", name: "Extra", amount: 40, receivedAt: "ayer" },
+        ],
+      },
+    });
+
+    expect(store.categories.map((category) => category.id)).toEqual(["cat"]);
+    expect(store.templates.map((template) => template.id)).toEqual(["rent", "no-rule"]);
+    expect(store.templates[1].recurrence).toEqual({ frequency: "monthly" });
+    expect(store.overrides.map((override) => override.templateId)).toEqual(["rent"]);
+    expect(store.overrides[0].status).toBe("paid");
+    expect(store.occurrenceRecords?.some((record) => record.id === "record:x")).toBe(false);
+    expect(store.finance.incomeEvents.map((event) => event.id)).toEqual(["evt"]);
+  });
+
+  it("loads a valid store the same way through import and normal load", () => {
+    const value = {
+      schemaVersion: 3,
+      categories: [{ id: "cat", userId: "demo", name: "Casa", icon: "Home", tone: "green" }],
+      templates: [
+        {
+          id: "rent",
+          userId: "demo",
+          name: "Alquiler",
+          description: "",
+          amount: 700,
+          currency: "EUR",
+          categoryId: "cat",
+          startDate: "2026-10-01",
+          dueDay: 1,
+          recurrence: { frequency: "monthly" },
+          active: true,
+          createdAt: "2026-10-01T00:00:00.000Z",
+          updatedAt: "2026-10-01T00:00:00.000Z",
+        },
+      ],
+      overrides: [],
+      finance: { incomeEvents: [], monthlySalary: {}, monthlySavingsTargets: {} },
+      futureField: { kept: true },
+    };
+    const today = new Date();
+
+    expect(normalizeImportedExpenseStore(value)).toEqual(normalizeExpenseStore(value, today));
+  });
+
   it("assigns the authenticated user id to nested store entities", () => {
     const store = normalizeExpenseStore({
       categories: [{ id: "cat", userId: "demo" }],
@@ -180,6 +253,29 @@ describe("normalizeExpenseStore", () => {
     expect(ownedStore.finance.incomeEvents[0].userId).toBe(
       "11111111-1111-4111-8111-111111111111",
     );
+  });
+
+  it("infers the account that owns local data from its ids", () => {
+    const ownerId = "11111111-1111-4111-8111-111111111111";
+    const anonymous = normalizeExpenseStore({
+      schemaVersion: 3,
+      templates: [{ id: "tpl", userId: "demo", name: "Luz" }],
+      overrides: [{ id: "ovr", userId: "demo", templateId: "tpl" }],
+    });
+
+    expect(inferStoreOwnerId(emptyStore)).toBeNull();
+    expect(inferStoreOwnerId(anonymous)).toBeNull();
+    expect(inferStoreOwnerId(assignExpenseStoreOwner(anonymous, ownerId))).toBe(
+      ownerId,
+    );
+    // Lo creado sin sesión encima de datos sincronizados sigue siendo de esa
+    // cuenta.
+    expect(
+      inferStoreOwnerId({
+        ...anonymous,
+        overrides: [{ ...anonymous.overrides[0], userId: ownerId }],
+      }),
+    ).toBe(ownerId);
   });
 
   it("repairs imported paid overrides stored on bank booked dates", () => {
@@ -562,6 +658,24 @@ describe("normalizeExpenseStore", () => {
       },
       { id: "ocio", userId: "demo", name: "Ocio", icon: "Gamepad2", tone: "violet" },
       { id: "sin-nombre", userId: "demo", name: "General", icon: "WalletCards", tone: "slate" },
+    ]);
+  });
+
+  it("keeps category timestamps and still loads categories written without them", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      categories: [
+        { id: "new", name: "Casa", icon: "Home", tone: "green", updatedAt: "2026-10-23T10:00:00.000Z" },
+        { id: "old", name: "Ocio", icon: "Gamepad2", tone: "violet" },
+        { id: "broken", name: "Salud", icon: "HeartPulse", tone: "rose", updatedAt: "ayer" },
+        null,
+      ],
+    });
+
+    expect(store.categories).toEqual([
+      { id: "new", userId: "demo", name: "Casa", icon: "Home", tone: "green", updatedAt: "2026-10-23T10:00:00.000Z" },
+      { id: "old", userId: "demo", name: "Ocio", icon: "Gamepad2", tone: "violet" },
+      { id: "broken", userId: "demo", name: "Salud", icon: "HeartPulse", tone: "rose" },
     ]);
   });
 });

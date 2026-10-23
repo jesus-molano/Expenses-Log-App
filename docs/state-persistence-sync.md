@@ -12,11 +12,15 @@ settings y detail comparten una unica instancia del store.
 El hook expone:
 
 - `store`: datos normalizados de la app.
-- Comandos de gastos: add, delete, clear, toggle paid, skip, move occurrence y
-  move series.
-- Comandos financieros: salario, objetivo de ahorro, aportacion real, ingresos
-  y overrides mensuales.
+- Comandos de gastos: add (con los cobros de meses anteriores pagados o
+  saltados si el gasto empezo antes de este mes), delete, clear, toggle paid,
+  skip, restore, pagar varios a la vez (`markOccurrencesPaid`), move occurrence
+  y move series.
+- Comandos financieros: salario, objetivo de ahorro, aportacion real, ingresos,
+  overrides mensuales y cerrar o reabrir un mes.
 - Comandos de preferencias: tema e idioma.
+- Copias: `importStore`, `restoreSnapshot` y `takeSnapshot` (ver "Copias,
+  exportar e importar").
 - Estado de sync: `syncStatus`, `syncMessage`, `isHydrated`.
 
 `useExpenseStore` falla explicitamente si se llama fuera del provider. Eso evita
@@ -27,10 +31,14 @@ pantallas con stores paralelos o rehidrataciones accidentales.
 Los comandos se dividen por responsabilidad:
 
 - `expense-commands`: crea templates, categorias y overrides; paga, salta,
-  mueve o borra gastos.
+  restaura, mueve o borra gastos. Las operaciones en bloque
+  (`markOccurrencesPaidInStore`, `skipOccurrencesInStore`) pliegan
+  `upsertOccurrenceOverride` y se guardan con un solo persist.
 - `finance-commands`: modifica salario mensual, objetivos, aportaciones reales
   e ingresos.
 - `preference-commands`: actualiza tema e idioma en el store.
+- `backup-commands`: combina o sustituye el store con uno importado o con una
+  copia.
 
 Los comandos reciben un `ExpenseStore` y devuelven otro. Esta forma mantiene la
 logica testeable y evita mutaciones ocultas dentro de componentes.
@@ -75,7 +83,7 @@ usuario. Al hidratar con sesion:
    (`AuthRetryableFetchError`) no se trata como cierre de sesion, tampoco la
    sesion inicial vacia que auth-js emite sin red (`INITIAL_SESSION` sin
    sesion se comprueba con `getUser`).
-3. Se carga el store cloud desde `app_stores`.
+3. Se carga el store cloud desde `app_stores`, con su `revision`.
 4. Gana la nube, salvo que haya cambios locales sin subir de esa misma cuenta o
    ediciones hechas mientras cargaba: entonces se fusionan local y cloud.
 5. Se asigna `userId` real a entidades sincronizables.
@@ -88,11 +96,60 @@ cambios sin cuenta (uso sin sesion, o sin red antes de resolverla) se fusionan
 con la primera cuenta que entra.
 
 Solo la tabla inexistente (`PGRST205`, `42P01`) cuenta como "sin nube". Un
-fallo temporal de PostgREST o de permisos es un error a reintentar. Las
-peticiones a `app_stores` se cortan a los 20 s.
+fallo temporal de PostgREST, de permisos o la falta del RPC del CAS
+(`PGRST202`) no. Las peticiones a `app_stores` se cortan a los 20 s.
 
 Si la tabla `app_stores` no existe o no esta disponible, la app degrada a modo
 local sin romper la experiencia.
+
+## Multi-dispositivo (compare-and-swap)
+
+La migracion `20261023120000_app_store_revision_cas.sql` añade
+`app_stores.revision` y un trigger `BEFORE UPDATE` que la incrementa en cada
+escritura, tambien en el upsert ciego de los clientes anteriores. Los guardados
+pasan por el RPC `save_app_store(p_store, p_expected_revision)`:
+
+- Guarda solo si la fila sigue en la revision que leyo el cliente (`null`:
+  "aun no hay fila") y devuelve la nueva. Si otro dispositivo guardo antes,
+  devuelve `conflict` con la revision actual en vez de pisarlo.
+- Ante un conflicto (`saveResolvingConflicts`, `cloud-save-queue.ts`) se
+  vuelve a cargar la nube, se fusiona con lo que muestra la app (no con la
+  copia que fallo), se guarda local, se hidrata y se reintenta sobre la nueva
+  revision, hasta 3 veces. Lo encolado mientras tanto se sustituye por la
+  fusion, que ya lo incluye. Si la nube sigue cambiando, el fallo cuenta como
+  temporal y se reintenta con la resincronizacion normal.
+- Sin la migracion aplicada (`PGRST202`), `saveCloudStore` cae al upsert de
+  siempre, lo registra una vez y no vuelve a probar el RPC en 10 minutos. La
+  carga usa `select("*")` para no pedir una columna que aun no existe. Mergear
+  el cliente antes que la migracion es seguro.
+- La revocacion de la escritura directa en `app_stores` (contract) queda para
+  un PR posterior; entonces el RPC pasara a `security definer`.
+
+Al volver a la app (`visibilitychange` visible u `online`), con la nube lista y
+sin guardado en curso, se trae la nube como mucho cada 30 s
+(`CLOUD_PULL_THROTTLE_MS`). Si la revision no cambio, no se hace nada. Si
+cambio y no hay cambios locales sin subir, gana la nube; si los hay, se fusiona
+y se sube con CAS. Ajustes muestra "Sincronizado · con cambios de otro
+dispositivo" cuando llegan datos de fuera.
+
+Tras cualquier fusion (`mergeStoresForSync`) se recolocan los overrides
+huerfanos (`reconcileOrphanOverrides`): el rekey de un cambio de dia solo corre
+en el dispositivo que edita, asi que un pago hecho en otro con la fecha antigua
+queda en una clave que la plantilla ya no genera. Se repite el rekey de los
+meses abiertos contra las plantillas actuales; si la nube ya traia huerfanos,
+la version corregida tambien se sube.
+
+## Varias pestañas
+
+Cada escritura local lee antes lo que haya en localStorage: si otra pestaña
+guardo despues de la ultima escritura de esta (`readExpenseStoreFromOtherTab`),
+se fusiona antes de escribir, para que dos pestañas no se pisen. Al recibir el
+evento `storage` del store (o al volver a la pestaña), lo de la otra se
+incorpora a lo que se muestra sin volver a escribirlo; la revision local sube
+para que un guardado en curso de esta pestaña no de por subido un estado sin
+esos cambios. Las preferencias vienen de la escritura mas reciente. Los datos
+de otra cuenta escritos por otra pestaña no se mezclan: esta vuelve a
+sincronizar.
 
 ## Merge local/cloud
 
@@ -110,7 +167,13 @@ La mezcla actual usa ids:
   `salaryClearedTombstone`). Al fusionar desaparece cualquier sueldo editado
   hasta esa hora, tambien copias antiguas de otro dispositivo; uno editado
   despues se conserva.
-- Preferencias: local, luego cloud, luego defaults.
+- Preferencias: local, luego cloud, luego defaults. Son de cada dispositivo:
+  las cookies de tema e idioma mandan sobre el store al cargar.
+- Categorias: llevan `updatedAt` desde F0c-2 y se fusionan por entidad como
+  plantillas, ingresos o registros. Las antiguas no lo tienen: pierden frente
+  a una copia con fecha (un cambio de nombre no se deshace) y, entre dos sin
+  fecha, gana la local. Los builds anteriores conservan el campo porque no
+  reescriben las entidades.
 
 La politica de hidratacion (`resolveHydratedStore`) protege los cambios hechos
 mientras llegaba el cloud store y los que quedaron sin subir en una sesion
@@ -154,6 +217,11 @@ Reglas para campos nuevos:
   lo ilegible: un enlace que no es http(s), una fecha imposible, un metodo de
   pago desconocido; una categoria sin id. Un store sin estos campos carga
   igual.
+- El cierre con restos (F1a-3) no añade campos: cada resto se resuelve con
+  overrides (pagado, saltado o movido al dia 1 del mes siguiente), el ahorro
+  con `monthlySavingsContributions` y el paso de mes con `monthClosures`. Los
+  cobros anteriores de un gasto nuevo (M18) tambien son overrides; los pagos se
+  fechan el dia de su cargo.
 
 ## Categorias
 
@@ -165,11 +233,23 @@ equivalente. Renombrar o cambiar el color actualiza `updatedAt`; borrar
 (`deleteCategoryInStore`) pasa las plantillas, overrides y registros que la
 usan a otra categoria y deja su id como tombstone en `deleted.categories`.
 
+Al fusionar gana la copia con el `updatedAt` mas reciente; una con fecha gana
+a otra sin ella y, entre dos sin fecha, gana la local. La copia JSON lleva las
+categorias tal cual. El CSV exporta el nombre visible y el color
+(`category_tone`); al importar, `resolveCategoryName` reconoce primero las
+categorias del dispositivo, despues las preset (en los dos idiomas, sin
+tildes) y sus alias, y un nombre que no es ninguna de ellas vuelve como
+categoria propia con su color.
+
 ## Preferencias de dispositivo
 
 No se sincronizan y viven fuera del store:
 
-- `expense-view-month` (sessionStorage) y `plan-close-dismissed:YYYY-MM`.
+- El mes que se mira vive en `sessionStorage['expense-view-month']`, por
+  pestaña y compartido entre Gastos y Plan: al cambiar de mes en una pestaña,
+  la otra lo sigue. Sin valor se ve el mes activo.
+- El "Ahora no" a pasar o cerrar el mes se guarda por dispositivo y por mes en
+  `localStorage['plan-close-dismissed:YYYY-MM']`.
 - `expense-onboarding-v1` (`src/data/persistence/onboarding-store.ts`):
   `{startedAt, dismissedAt}` de la guia de primeros pasos. La guia se ve con el
   store vacio (salvo mientras carga la nube) y, si el primer gasto se añadio
@@ -186,6 +266,8 @@ La cola:
 
 - Sube siempre la ultima version y nunca dos a la vez, para que una respuesta
   lenta no pise otra mas nueva.
+- Sube con CAS: un conflicto se fusiona y se reintenta dentro del mismo
+  guardado (ver "Multi-dispositivo").
 - Si falla, no repite la misma copia: la nube puede haber cambiado. Marca la
   nube como no lista y vuelve a sincronizar (cargar, fusionar con los cambios
   pendientes y subir) a los 2, 5, 15, 30 y 60 s, y de inmediato al recuperar la
@@ -202,14 +284,97 @@ subir, local o error. "Pendiente" solo se muestra para fallos temporales (sin
 red, cortes, servidor reiniciando) con cambios sin subir; el resto se muestra
 como error. Los mensajes se traducen con `src/shared/i18n`.
 
+## Copias, exportar e importar
+
+Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/BackupRows.tsx`).
+
+### Exportar
+
+- **JSON** (`src/data/persistence/backup-file.ts`): el store completo dentro de
+  un sobre `{kind: "expense-log-backup", version: 1, exportedAt, store}`. El
+  archivo se llama `expense-log-AAAA-MM-DD.json`.
+- **CSV** (`src/data/persistence/store-csv.ts`): un solo archivo UTF-8 con BOM
+  (para que Excel lea las tildes), coma como separador e importes con punto y
+  dos decimales (`2200.00`). La columna `type` distingue:
+  - `expense`: una fila por gasto (frecuencia, intervalo, mes anual, rrule,
+    inicio, fin, dia de cobro, aviso, descripcion y los datos de contrato:
+    `notes`, `cancellation_url`, `commitment_end_date`, `payment_method`,
+    `payment_method_detail`).
+  - `occurrence`: el historico hasta el final del mes actual (los meses
+    cerrados tambien de gastos borrados) y, de despues, solo los cobros con
+    cambios (por ejemplo, pagados por adelantado).
+  - Las cabeceras y los valores de frecuencia y estado no se traducen; la
+    categoria sale como se ve en la app, con su color en `category_tone`, y se
+    reconoce en los dos idiomas al importar (`resolveCategoryName`; las
+    propias, por su nombre). El texto que empieza por `= + - @` lleva
+    un apostrofo delante para que una hoja de calculo no lo ejecute como
+    formula; se quita al importar.
+
+### Importar
+
+1. Se lee el archivo (maximo 5 MB). Si empieza por `{` o acaba en `.json`, se
+   trata como JSON (con sobre o el store a secas) y pasa por
+   `normalizeImportedExpenseStore`, que ademas descarta las entidades a las que
+   les falta lo imprescindible (id, nombre, importe, fechas validas). Si no,
+   como CSV: acepta `;` y coma decimal (Excel en espanol) y un CSV hecho a mano
+   con solo `name` y `amount`. Las filas ilegibles se cuentan y se saltan.
+2. Se ensena una vista previa: lo que trae el archivo y cuantos gastos, pagos
+   e ingresos quedarian al combinar o al sustituir.
+3. Antes de aplicar se guarda una copia "Antes de importar".
+4. Se aplica con `importStoreInStore` (`src/stores/app/backup-commands.ts`) y
+   `persistImmediately`:
+   - **Combinar**: `mergeExpenseStores(actual, importado)`, como con la nube.
+     Por id gana la version mas reciente, los borrados siguen borrados y las
+     preferencias del dispositivo se mantienen.
+   - **Sustituir** (`replaceStoreContents`): deja solo lo importado y lo hace
+     de forma que aguante una fusion posterior con la nube u otro dispositivo
+     (si la subida falla o hay otro dispositivo sin sincronizar). Todo lo
+     importado (tambien las categorias) se marca como editado ahora; lo que solo estaba en los datos
+     actuales recibe tombstone si su id es aleatorio (gastos, categorias,
+     ingresos, aportaciones, historico de gastos que desaparecen) o queda en
+     estado neutro si es determinista (cobros `ovr:*` en estado pendiente,
+     cierres de mes reabiertos, sueldos con tombstone por mes), porque un
+     tombstone de un id determinista impediria volver a usarlo. Un id que el
+     archivo trae se quita de los tombstones. Limite conocido: los objetivos de
+     ahorro no tienen tombstone, asi que un mes que solo estaba en los datos
+     actuales puede volver en esa fusion.
+   - El CSV solo trae gastos, cobros e historico: sustituir no toca Plan,
+     ingresos ni preferencias. Los meses cerrados vuelven como historico
+     (`occurrenceRecords`) y los abiertos como overrides de su gasto.
+
+### Copias automaticas
+
+- Viven en IndexedDB (`expense-log-backups`, `src/data/persistence/snapshot-store.ts`),
+  nunca en localStorage: varias copias llenarian su cupo y entonces fallaria
+  guardar el propio store. Sin IndexedDB no hay copias y la app sigue igual.
+- `useStoreSnapshots` (en el provider) guarda una diaria 4 s despues de
+  hidratar y al volver a la app: una por dia natural y solo si los datos han
+  cambiado desde la ultima copia (huella FNV-1a sin preferencias). Un store
+  vacio no se copia.
+- Tambien se guarda una antes de importar, restaurar o limpiar gastos o
+  ingresos, y otra cuando el usuario pulsa "Guardar copia ahora".
+- Se quedan las 7 diarias y las 5 de otro tipo mas recientes
+  (`snapshot-policy.ts`).
+- Restaurar es sustituir con alcance completo, despues de guardar una copia
+  "Antes de restaurar"; la copia pasa por `normalizeExpenseStore`, asi que una
+  guardada por una version anterior sigue cargando.
+
+### Almacenamiento persistente
+
+La fila "Almacenamiento persistente" ensena `navigator.storage.persisted()` y el
+espacio usado, y ofrece "Proteger" (`navigator.storage.persist()`) si el
+navegador lo permite y aun no lo ha concedido. `PwaRegister` lo sigue pidiendo
+en silencio al registrar el service worker.
+
 ## Reglas actuales y limites
 
 - El modelo cloud sigue siendo JSONB por usuario, no tablas normalizadas por
   entidad.
 - Los tombstones evitan reaparicion de deletes, pero no son un sistema completo
   de resolucion por revision de cada campo.
-- En ediciones concurrentes del mismo elemento, gana el item que entra al final
-  en el merge por id.
+- En ediciones concurrentes del mismo elemento gana el `updatedAt` mas
+  reciente; sin el, la copia local. El CAS garantiza que ninguna escritura
+  pisa a otra sin fusionarla, no que se conserve cada campo de las dos.
 - Los deletes deben seguir registrando tombstones en nuevos comandos.
 - La migracion v3 descarta cuentas y datos bancarios legacy despues de
   materializar conciliaciones pagadas.

@@ -9,7 +9,9 @@ type ManagerMode =
   | { kind: "list" }
   | { kind: "create" }
   | { kind: "edit"; categoryId: string }
-  | { kind: "delete"; categoryId: string };
+  // Borrar: si algo la usa, antes se elige en la fila a cuál pasa; la
+  // confirmación final es el diálogo común (`confirming`).
+  | { kind: "delete"; categoryId: string; inUse: boolean; confirming: boolean };
 
 // Estado del gestor de categorías: qué se está creando, editando o
 // borrando, y la validación del nombre. Los cambios van por los comandos.
@@ -48,14 +50,25 @@ export function useCategoryManager({
     setMode({ kind: "edit", categoryId: category.id });
   }
 
-  function startDelete(category: ExpenseCategory) {
+  // Sin nada que mover se pide confirmación directamente.
+  function startDelete(category: ExpenseCategory, inUse = true) {
     // General salvo que se borre la propia General.
     const fallback = categories.find(
       (candidate) => candidate.id !== category.id && candidate.name === "General",
     );
     setReplacementName(category.name === "General" ? "Casa" : fallback?.name ?? "General");
     setError(null);
-    setMode({ kind: "delete", categoryId: category.id });
+    setMode({ kind: "delete", categoryId: category.id, inUse, confirming: !inUse });
+  }
+
+  function requestDelete() {
+    if (mode.kind === "delete") setMode({ ...mode, confirming: true });
+  }
+
+  // Cancelar el diálogo vuelve a elegir destino, o a la lista si no había.
+  function cancelDelete() {
+    if (mode.kind === "delete" && mode.inUse) setMode({ ...mode, confirming: false });
+    else reset();
   }
 
   function submit() {
@@ -89,6 +102,8 @@ export function useCategoryManager({
     startCreate,
     startEdit,
     startDelete,
+    requestDelete,
+    cancelDelete,
     submit,
     confirmDelete,
     cancel: reset,

@@ -1,3 +1,4 @@
+export * from "./backup-commands";
 export * from "./capture-command-actions";
 export * from "./category-commands";
 export * from "./expense-commands";

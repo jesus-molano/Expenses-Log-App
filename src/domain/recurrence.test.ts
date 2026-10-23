@@ -5,6 +5,8 @@ import {
   firstOccurrenceDate,
   generateOccurrences,
   generateTemplateDates,
+  passedChargeThisMonth,
+  previousMonthsChargeDates,
 } from "./recurrence";
 import type { ExpenseTemplate } from "./types";
 
@@ -288,6 +290,15 @@ describe("first charge of a new expense", () => {
     expect(firstChargeAlreadyPassed({ ...draft, dueDay: 5 }, "2026-10-23")).toBe(true);
   });
 
+  it("asks for this month's charge of an expense that started months ago", () => {
+    const started = { ...draft, dueDay: 5, startDate: "2026-07-05" };
+
+    expect(passedChargeThisMonth(started, "2026-10-23")).toBe("2026-10-05");
+    expect(firstChargeAlreadyPassed(started, "2026-10-23")).toBe(true);
+    // El día 1 no hay nada de este mes que ya haya pasado.
+    expect(passedChargeThisMonth({ ...started, dueDay: 1 }, "2026-10-01")).toBeNull();
+  });
+
   it("does not ask for a yearly expense due in another month", () => {
     expect(
       firstChargeAlreadyPassed(
@@ -295,5 +306,67 @@ describe("first charge of a new expense", () => {
         "2026-10-23",
       ),
     ).toBe(false);
+  });
+});
+
+describe("charges before this month of a new expense (M18)", () => {
+  const draft = {
+    name: "Netflix",
+    description: "",
+    amount: 10,
+    categoryName: "Suscripciones",
+    dueDay: 5,
+    recurrence: { frequency: "monthly" as const },
+  };
+
+  it("lists the charges of the months already closed", () => {
+    expect(previousMonthsChargeDates({ ...draft, startDate: "2026-07-05" }, "2026-10-23")).toEqual([
+      "2026-07-05",
+      "2026-08-05",
+      "2026-09-05",
+    ]);
+  });
+
+  it("does not count a charge before the start date in its first month", () => {
+    expect(
+      previousMonthsChargeDates({ ...draft, dueDay: 2, startDate: "2026-09-10" }, "2026-10-23"),
+    ).toEqual([]);
+    expect(
+      previousMonthsChargeDates({ ...draft, dueDay: 20, startDate: "2026-09-10" }, "2026-10-23"),
+    ).toEqual(["2026-09-20"]);
+  });
+
+  it("asks nothing for an expense starting this month, a future one or a bad date", () => {
+    expect(previousMonthsChargeDates({ ...draft, startDate: "2026-10-01" }, "2026-10-23")).toEqual([]);
+    expect(previousMonthsChargeDates({ ...draft, startDate: "2026-12-01" }, "2026-10-23")).toEqual([]);
+    expect(previousMonthsChargeDates({ ...draft, startDate: "no-date" }, "2026-10-23")).toEqual([]);
+    expect(previousMonthsChargeDates(draft, "2026-10-23")).toEqual([]);
+  });
+
+  it("follows yearly series and stops at the end date", () => {
+    expect(
+      previousMonthsChargeDates(
+        {
+          ...draft,
+          dueDay: 15,
+          startDate: "2025-03-15",
+          recurrence: { frequency: "yearly", annualMonth: 3 },
+        },
+        "2026-10-23",
+      ),
+    ).toEqual(["2025-03-15", "2026-03-15"]);
+    expect(
+      previousMonthsChargeDates(
+        { ...draft, startDate: "2026-07-05", endDate: "2026-08-31" },
+        "2026-10-23",
+      ),
+    ).toEqual(["2026-07-05", "2026-08-05"]);
+  });
+
+  it("crosses the year boundary in January", () => {
+    expect(previousMonthsChargeDates({ ...draft, startDate: "2026-11-05" }, "2027-01-10")).toEqual([
+      "2026-11-05",
+      "2026-12-05",
+    ]);
   });
 });

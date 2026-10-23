@@ -3,6 +3,7 @@
 import { Pencil, Plus, Tags, Trash2, WalletCards, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { IconButton } from "@/components/ui/IconButton";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { Sheet } from "@/components/ui/Sheet";
@@ -13,7 +14,7 @@ import {
 } from "@/domain/categories";
 import type { AppLanguage, ExpenseCategory, ExpenseStore } from "@/domain/types";
 import { categoryLabel } from "@/shared/category-labels";
-import { t } from "@/shared/i18n";
+import { formatMessage, t } from "@/shared/i18n";
 import { useCategoryManager } from "../../hooks/use-category-manager";
 import { categoryToneClass } from "../../lib/expense-actions";
 import { categoryUsageLabel } from "../../lib/expense-detail-labels";
@@ -114,7 +115,45 @@ export function CategoryManagerSheet({
           </p>
         )}
       </section>
+      <DeleteCategoryDialog categories={categories} language={language} manager={manager} />
     </Sheet>
+  );
+}
+
+// Confirmación común (foco en Cancelar, Escape y Atrás) antes de borrar.
+function DeleteCategoryDialog({
+  categories,
+  language,
+  manager,
+}: {
+  categories: ExpenseCategory[];
+  language: AppLanguage;
+  manager: ReturnType<typeof useCategoryManager>;
+}) {
+  const { mode } = manager;
+  if (mode.kind !== "delete" || !mode.confirming) return null;
+  const category = categories.find((candidate) => candidate.id === mode.categoryId);
+  if (!category) return null;
+  const label = categoryLabel(category.name, language);
+
+  return (
+    <ConfirmActionDialog
+      icon={<Trash2 size={18} />}
+      title={formatMessage("categoryManager.deleteConfirmTitle", { name: label }, language)}
+      body={
+        mode.inUse
+          ? formatMessage(
+              "categoryManager.deleteConfirmBody",
+              { target: categoryLabel(manager.replacementName, language) },
+              language,
+            )
+          : t("categoryManager.deleteConfirmBodyUnused", language)
+      }
+      cancelLabel={t("categoryManager.cancel", language)}
+      confirmLabel={t("categoryManager.deleteConfirm", language)}
+      onCancel={manager.cancelDelete}
+      onConfirm={manager.confirmDelete}
+    />
   );
 }
 
@@ -151,7 +190,7 @@ function CategoryManagerRow({
     );
   }
 
-  if (mode.kind === "delete" && mode.categoryId === category.id) {
+  if (mode.kind === "delete" && mode.inUse && mode.categoryId === category.id) {
     const replacements = buildCategoryOptions(store.categories).filter(
       (option) => option.id !== category.id,
     );
@@ -187,7 +226,7 @@ function CategoryManagerRow({
           <Button type="button" variant="ghost" onClick={manager.cancel}>
             {t("categoryManager.cancel", language)}
           </Button>
-          <Button type="button" variant="danger" onClick={manager.confirmDelete}>
+          <Button type="button" variant="danger" onClick={manager.requestDelete}>
             {t("categoryManager.deleteConfirm", language)}
           </Button>
         </div>
@@ -218,7 +257,9 @@ function CategoryManagerRow({
         <IconButton
           type="button"
           variant="danger"
-          onClick={() => manager.startDelete(category)}
+          onClick={() =>
+            manager.startDelete(category, usage.templates > 0 || usage.occurrences > 0)
+          }
           aria-label={t("categoryManager.delete", language).replace("{name}", label)}
         >
           <Trash2 size={16} />

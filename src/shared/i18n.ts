@@ -31,6 +31,18 @@ export function t(key: TranslationKey, language = readActiveLanguage()): string 
   return typeof value === "string" ? value : key;
 }
 
+// Mensaje con huecos ("{month}", "{count}"…). Un hueco sin valor se deja tal
+// cual para que se vea en lugar de desaparecer en silencio.
+export function formatMessage(
+  key: TranslationKey,
+  values: Record<string, string | number>,
+  language = readActiveLanguage(),
+): string {
+  return t(key, language).replace(/\{(\w+)\}/g, (placeholder, name: string) =>
+    name in values ? String(values[name]) : placeholder,
+  );
+}
+
 export function persistLanguagePreference(language: AppLanguage) {
   if (typeof document === "undefined") return;
   document.documentElement.lang = language;

@@ -9,6 +9,7 @@ import type {
   RecurrenceRule,
 } from "./types";
 
+// Se sigue exportando desde aquí para los imports que ya lo usan.
 export { foldText };
 
 // Lo que se acepta analizar de una vez (el campo de texto lo limita igual).
@@ -75,7 +76,6 @@ const CATEGORY_HINTS: Array<[string, string[]]> = [
   ["Educacion/Trabajo", ["curso", "software", "formacion", "academia", "universidad"]],
   ["Deudas", ["prestamo", "tarjeta", "financiacion", "cuota"]],
 ];
-
 
 export function detectCategoryFromText(text: string) {
   const folded = foldText(text);

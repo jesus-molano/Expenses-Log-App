@@ -1,7 +1,6 @@
 import {
   CATEGORY_NAME_MAX_LENGTH,
-  CUSTOM_CATEGORY_ICON,
-  findPresetCategory,
+  newCategoryFields,
   validateCategoryName,
   type CategoryInput,
 } from "@/domain/categories";
@@ -27,13 +26,10 @@ export function createCategoryInStore(
   if (validateCategoryName(store.categories, name)) return { store, categoryId: null };
 
   // Escribir el nombre de una preset ("ocio") crea esa preset con su icono.
-  const preset = findPresetCategory(name);
   const category: ExpenseCategory = {
     id: createId("cat"),
     userId: "demo",
-    name: preset?.name ?? name,
-    icon: preset?.icon ?? CUSTOM_CATEGORY_ICON,
-    tone: input.tone,
+    ...newCategoryFields(name, input.tone),
     updatedAt: now,
   };
 

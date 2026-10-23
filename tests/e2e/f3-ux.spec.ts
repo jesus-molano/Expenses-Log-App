@@ -231,6 +231,10 @@ test("renames and deletes a category moving its expenses", async ({ page }) => {
   await manager.getByRole("button", { name: /^Pasar a/ }).click();
   await page.getByRole("option", { name: "Casa" }).click();
   await manager.getByRole("button", { name: "Borrar", exact: true }).click();
+  // La confirmación común, con el destino elegido.
+  const confirm = page.getByRole("alertdialog", { name: "¿Borrar «Vacaciones»?" });
+  await expect(confirm).toContainText("Lo que la usa pasa a «Casa».");
+  await confirm.getByRole("button", { name: "Borrar", exact: true }).click();
   await expect(manager.getByText("Vacaciones")).toHaveCount(0);
 
   const saved = await savedStore(page);

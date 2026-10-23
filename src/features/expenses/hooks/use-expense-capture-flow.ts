@@ -9,6 +9,7 @@ import type {
   DraftExpense,
 } from "@/domain/types";
 import { createEmptyDraft } from "../lib/dashboard-config";
+import { previousChargesOption, type PreviousChargesChoiceValue } from "../types";
 import type { CaptureReason } from "../lib/capture-labels";
 import { appendDictated } from "../lib/voice-support";
 import type { useQuickExpenseParser } from "./use-quick-expense-parser";
@@ -54,6 +55,8 @@ export function useExpenseCaptureFlow({
   // se edita uno de sus gastos.
   const [excludedIds, setExcludedIds] = useState<Set<string>>(() => new Set());
   const [reviewStatus, setReviewStatus] = useState<InitialStatus>("due");
+  const [reviewPreviousCharges, setReviewPreviousCharges] =
+    useState<PreviousChargesChoiceValue>("paid");
   const [editingId, setEditingId] = useState<string | null>(null);
   // Por qué se usó el análisis local, para avisarlo donde se abra el borrador.
   const [notice, setNotice] = useState<CaptureReason | null>(null);
@@ -80,6 +83,7 @@ export function useExpenseCaptureFlow({
     setReviewItems(null);
     setExcludedIds(new Set());
     setReviewStatus("due");
+    setReviewPreviousCharges("paid");
     setEditingId(null);
   }
 
@@ -180,7 +184,10 @@ export function useExpenseCaptureFlow({
       reviewItems
         .filter((item) => item.draft.amount > 0 && !excludedIds.has(item.id))
         .map((item) => item.draft),
-      { initialStatus: reviewStatus },
+      {
+        initialStatus: reviewStatus,
+        previousCharges: previousChargesOption(reviewPreviousCharges),
+      },
     );
     clearReview();
     setNotice(null);
@@ -197,6 +204,7 @@ export function useExpenseCaptureFlow({
     reviewItems: formOpen ? null : reviewItems,
     excludedIds,
     reviewStatus,
+    reviewPreviousCharges,
     commandReview,
     finishCommands,
     isIdle: !captureOpen && !formOpen && !reviewItems && !commandReview,
@@ -258,6 +266,7 @@ export function useExpenseCaptureFlow({
         return next;
       }),
     setReviewStatus,
+    setReviewPreviousCharges,
     saveReviewed,
     closeReview: () => {
       clearReview();
