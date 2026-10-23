@@ -105,8 +105,14 @@ export type DraftExpense = {
 };
 
 export type CreateExpenseOptions = {
+  // Estado del cobro de este mes que ya pasó.
   initialStatus?: Extract<OccurrenceStatus, "due" | "paid">;
+  // Qué hacer con los cobros de meses anteriores cuando el gasto empezó antes
+  // de este mes. Sin valor quedan pendientes.
+  previousCharges?: PreviousChargesResolution;
 };
+
+export type PreviousChargesResolution = Extract<OccurrenceStatus, "paid" | "skipped">;
 
 export type IncomeEvent = {
   id: string;

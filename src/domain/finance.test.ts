@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildMonthlyMoneyPlan,
+  planPhaseFor,
   defaultFinanceStore,
   emptyFinanceStore,
   generateStoreOccurrences,
@@ -50,6 +51,7 @@ describe("finance", () => {
   it("allocates income to expenses, savings and main account", () => {
     const plan = buildMonthlyMoneyPlan({
       monthDate: new Date("2026-06-10"),
+      today: new Date("2026-06-15T12:00:00"),
       finance: defaultFinanceStore,
       occurrences: [occurrence("Gastos de casa", 660, "2026-06-01")],
     });
@@ -63,6 +65,7 @@ describe("finance", () => {
   it("reports shortfall when income cannot cover fixed expenses", () => {
     const plan = buildMonthlyMoneyPlan({
       monthDate: new Date("2026-06-10"),
+      today: new Date("2026-06-15T12:00:00"),
       finance: {
         ...defaultFinanceStore,
         monthlySalary: {
@@ -84,6 +87,7 @@ describe("finance", () => {
   it("does not count skipped month occurrences as fixed expenses", () => {
     const plan = buildMonthlyMoneyPlan({
       monthDate: new Date("2026-06-10"),
+      today: new Date("2026-06-15T12:00:00"),
       finance: defaultFinanceStore,
       occurrences: [
         occurrence("Parking", 30, "2026-06-01", "skipped"),
@@ -239,4 +243,57 @@ describe("finance", () => {
       .toMatchObject([{ dueDate: "2026-07-02" }]);
   });
 
+});
+
+describe("plan phases and closed months", () => {
+  const finance = {
+    ...defaultFinanceStore,
+    incomeEvents: [],
+    monthlySavingsContributions: {
+      "2026-09": {
+        id: "saving:2026-09",
+        userId: "demo",
+        monthId: "2026-09",
+        amount: 120,
+        source: "manual" as const,
+        createdAt: "2026-09-30T10:00:00.000Z",
+        updatedAt: "2026-09-30T10:00:00.000Z",
+      },
+    },
+  };
+  const planFor = (monthId: string, activeMonthId: string) =>
+    buildMonthlyMoneyPlan({
+      monthDate: new Date(`${monthId}-01T00:00:00`),
+      finance,
+      occurrences: [occurrence("Gastos de casa", 660, `${monthId}-01`)],
+      today: new Date("2026-10-28T10:00:00"),
+      activeMonthId,
+    });
+
+  it("makes the active month the current one, even when it is next month", () => {
+    expect(planPhaseFor("2026-10", "2026-10")).toBe("current");
+    expect(planPhaseFor("2026-09", "2026-10")).toBe("registered");
+    expect(planPhaseFor("2026-11", "2026-10")).toBe("projected");
+    // Octubre cerrado el 28: noviembre es el actual y octubre queda registrado.
+    expect(planFor("2026-11", "2026-11").phase).toBe("current");
+    expect(planFor("2026-10", "2026-11").phase).toBe("registered");
+    expect(planFor("2026-10", "2026-10").phase).toBe("current");
+  });
+
+  it("reserves only the savings actually made in a registered month (M17)", () => {
+    // Septiembre: objetivo 300, transferidos 120.
+    const september = planFor("2026-09", "2026-10");
+    expect(september.savingsReserved).toBe(120);
+    expect(september.freeAccordingToPlan).toBe(2200 - 660 - 120);
+
+    // Octubre, ya cerrado y sin ahorro apuntado: no resta un objetivo que no se cumplió.
+    const closedOctober = planFor("2026-10", "2026-11");
+    expect(closedOctober.savingsReserved).toBe(0);
+    expect(closedOctober.freeAccordingToPlan).toBe(2200 - 660);
+  });
+
+  it("keeps reserving the goal in the current and projected months", () => {
+    expect(planFor("2026-10", "2026-10").savingsReserved).toBe(300);
+    expect(planFor("2026-12", "2026-10").savingsReserved).toBe(300);
+  });
 });
