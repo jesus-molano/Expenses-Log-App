@@ -10,6 +10,12 @@ export type DragMoveAction = "ignore" | "single" | "series";
 // - Lo pagado de un mes cerrado es historial y no se mueve.
 // - Lo pendiente de meses anteriores (o con registro histórico) solo mueve ese
 //   cobro: cambiar la serie desde ahí reescribiría meses cerrados.
+// Lo pagado de un mes cerrado es historial y no se mueve (ni arrastrando ni
+// desde las acciones del cobro).
+export function canMoveOccurrence(occurrence: ExpenseOccurrence, openMonth: string) {
+  return !(occurrence.dueDate.slice(0, 7) < openMonth && occurrence.status !== "due");
+}
+
 export function resolveDragMove({
   occurrence,
   target,
@@ -23,9 +29,7 @@ export function resolveDragMove({
 }): DragMoveAction {
   if (!isDropTargetAllowed(target, currentMonth, openMonth)) return "ignore";
   if (target.date === occurrence.dueDate && !target.rowId) return "ignore";
-  if (occurrence.dueDate.slice(0, 7) < openMonth && occurrence.status !== "due") {
-    return "ignore";
-  }
+  if (!canMoveOccurrence(occurrence, openMonth)) return "ignore";
   if (occurrence.record || occurrence.dueDate.slice(0, 7) < currentMonth) {
     return "single";
   }

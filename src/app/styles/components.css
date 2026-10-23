@@ -299,6 +299,23 @@
   text-align: left;
 }
 
+/* En móvil las filas (MonthlyExpenseRow, IncomeEventRow) ponen el importe en
+   el borde derecho: la cabecera pone "Importe" en ese mismo borde para que se
+   alineen y oculta las columnas vacías de las acciones. */
+@media (max-width: 639px) {
+  .app-monthly-table-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .app-monthly-table-head > :nth-child(2) {
+    text-align: right;
+  }
+
+  .app-monthly-table-head > :nth-child(n + 3) {
+    display: none;
+  }
+}
+
 .app-monthly-table-body {
   display: grid;
   gap: 0.125rem;
@@ -338,14 +355,14 @@
   grid-template-columns: minmax(0, 1fr) minmax(5.75rem, auto) auto;
 }
 
-@media (max-width: 359px) {
+/* En móvil cada fila tiene dos líneas: nombre | importe arriba y detalle |
+   acciones debajo. Tres columnas (texto, hueco, importe): el nombre ocupa las
+   dos primeras y las acciones las dos últimas, así el nombre solo cede el
+   ancho del importe. Desde sm vuelven a ser las columnas de la tabla. */
+@media (max-width: 639px) {
+  .app-monthly-table-body[data-integrated-list="true"] .app-monthly-table-row:not([data-editing="true"]),
   .app-monthly-table-body[data-integrated-list="true"] .app-monthly-expense-row[data-has-pay-action="true"]:not([data-editing="true"]) {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .app-monthly-table-body[data-integrated-list="true"] .app-monthly-expense-row[data-has-pay-action="true"]:not([data-editing="true"]) > :nth-child(3) {
-    grid-column: 1 / -1;
-    justify-self: end;
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
 }
 
@@ -608,8 +625,12 @@
 .app-select-menu-panel {
   box-sizing: border-box;
   width: var(--app-select-menu-width, max-content);
-  max-width: min(24rem, calc(100vw - 2rem));
-  max-height: min(22rem, 58dvh);
+  /* --app-select-menu-available lo calcula CompactMenu: el espacio real hasta
+     el borde de la pantalla, para que el panel no se salga por un lado. */
+  max-width: min(24rem, calc(100vw - 2rem), var(--app-select-menu-available, 100vw));
+  /* --app-select-menu-available-height: alto que queda libre en pantalla en
+     el lado hacia el que abre el panel (solo si no cabe entero). */
+  max-height: min(22rem, 58dvh, var(--app-select-menu-available-height, 100dvh));
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -624,6 +645,12 @@
 
 .app-select-menu-panel::-webkit-scrollbar {
   display: none;
+}
+
+/* Sin sitio debajo del disparador: CompactMenu abre el panel hacia arriba. */
+.app-select-menu-panel[data-placement="top"] {
+  top: auto;
+  bottom: calc(100% + 0.25rem);
 }
 
 .app-select-menu-option {
@@ -952,9 +979,10 @@
   display: none;
 }
 
+/* Opaco: al hacer scroll los campos no se transparentan bajo el titulo. */
 .app-sheet-header,
 .app-sheet-footer {
-  background: color-mix(in srgb, var(--app-surface-strong) 94%, transparent);
+  background: var(--app-surface-strong);
 }
 
 .app-sheet-handle {

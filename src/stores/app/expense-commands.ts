@@ -159,6 +159,23 @@ export function clearExpensesFromStore(store: ExpenseStore): ExpenseStore {
   };
 }
 
+// Pagado con otro importe: se apunta lo pagado; lo previsto del cobro y de la
+// serie no cambia, y "Marcar como pendiente" lo deshace del todo.
+export function payOccurrenceInStore(
+  store: ExpenseStore,
+  occurrence: ExpenseOccurrence,
+  amountPaid: number,
+): ExpenseStore {
+  if (!Number.isFinite(amountPaid) || amountPaid <= 0) return store;
+  const now = new Date().toISOString();
+  return upsertOccurrenceOverride(
+    store,
+    keyOf(occurrence),
+    { status: "paid", paidAt: now, amountPaid: Math.round(amountPaid * 100) / 100 },
+    { now },
+  );
+}
+
 export function togglePaidInStore(
   store: ExpenseStore,
   occurrence: ExpenseOccurrence,
