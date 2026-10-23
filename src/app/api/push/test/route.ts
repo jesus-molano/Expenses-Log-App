@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
-import webpush from "web-push";
 import { z } from "zod";
 import { toDatabaseUuid } from "@/data/supabase/database.types";
+import {
+  isAllowedPushEndpoint,
+  MAX_PUSH_ENDPOINT_LENGTH,
+} from "@/data/push/push-endpoints";
+import {
+  configureWebPush,
+  isExpiredPushSubscription,
+  sendWebPush,
+  TEST_PUSH_TTL_SECONDS,
+} from "@/data/push/web-push-sender";
 import { createClient } from "@/utils/supabase/server";
 
 const subscriptionSchema = z.object({
-  endpoint: z.string().url(),
+  endpoint: z
+    .string()
+    .max(MAX_PUSH_ENDPOINT_LENGTH)
+    .refine(isAllowedPushEndpoint),
 });
-
-function isExpiredPushSubscription(error: unknown) {
-  const statusCode = (error as { statusCode?: number }).statusCode;
-  return statusCode === 404 || statusCode === 410;
-}
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -63,36 +70,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-
-  if (!publicKey || !privateKey) {
+  if (!configureWebPush()) {
     return NextResponse.json(
       { code: "PUSH_NOT_CONFIGURED" },
       { status: 503 },
     );
   }
 
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT ?? "mailto:expense-reminders@example.com",
-    publicKey,
-    privateKey,
-  );
-
   try {
-    await webpush.sendNotification(
-      {
-        endpoint: subscription.endpoint,
-        keys: {
-          p256dh: subscription.p256dh,
-          auth: subscription.auth,
-        },
-      },
+    await sendWebPush(
+      subscription,
       JSON.stringify({
         title: "Expense Reminders",
         body: "Notificación de prueba lista.",
         url: "/",
       }),
+      { ttlSeconds: TEST_PUSH_TTL_SECONDS },
     );
   } catch (error) {
     if (isExpiredPushSubscription(error)) {

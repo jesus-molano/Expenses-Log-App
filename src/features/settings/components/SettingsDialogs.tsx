@@ -2,6 +2,7 @@
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { t } from "@/shared/i18n";
 import type { SettingsController } from "../types";
+import { SignOutSheet } from "./SignOutSheet";
 
 export function SettingsDialogs({
   settings,
@@ -10,6 +11,16 @@ export function SettingsDialogs({
 }) {
   return (
     <>
+      {settings.signOutOpen ? (
+        <SignOutSheet
+          language={settings.currentLanguage}
+          hasPendingChanges={settings.signOutHasPendingChanges}
+          busy={settings.isSigningOut}
+          onClose={settings.closeSignOutDialog}
+          onSignOut={settings.handleSignOut}
+        />
+      ) : null}
+
       {settings.clearExpensesOpen ? (
         <ConfirmActionDialog
           icon={<Trash2 size={18} />}

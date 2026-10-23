@@ -312,10 +312,14 @@ describe("loadExpenseStore", () => {
     window.localStorage.clear();
   });
 
-  it("removes corrupt-store copies together with the local data", () => {
+  it("removes corrupt-store copies and sync metadata together with the local data", () => {
     window.localStorage.setItem("expense-log-store-v1", "{}");
     window.localStorage.setItem("expense-log-store-v1.corrupt", "{a");
     window.localStorage.setItem("expense-log-store-v1.corrupt-1760000000000", "{b");
+    window.localStorage.setItem(
+      "expense-log-sync-v1",
+      JSON.stringify({ ownerId: "user-a", dirty: true, updatedAt: "" }),
+    );
     window.localStorage.setItem("expense-theme", "nord");
 
     clearExpenseLocalData();

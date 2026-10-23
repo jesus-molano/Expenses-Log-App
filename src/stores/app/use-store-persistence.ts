@@ -10,7 +10,10 @@ import {
   loadExpenseStore,
   saveExpenseStore,
 } from "@/data/persistence/local-store";
-import { assignExpenseStoreOwner } from "@/data/persistence/store-normalization";
+import {
+  assignExpenseStoreOwner,
+  inferStoreOwnerId,
+} from "@/data/persistence/store-normalization";
 import {
   localChangesFor,
   readSyncMeta,
@@ -176,7 +179,11 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
 
       const revisionBeforeCloudHydration = localRevisionRef.current;
       const initialLocalStore = applyRuntimePreferences(loadExpenseStore());
-      const localChanges = localChangesFor(readSyncMeta(), user.id);
+      const localChanges = localChangesFor(
+        readSyncMeta(),
+        user.id,
+        inferStoreOwnerId(initialLocalStore),
+      );
       const syncRun = syncRunRef.current + 1;
       syncRunRef.current = syncRun;
       syncingUserIdRef.current = user.id;

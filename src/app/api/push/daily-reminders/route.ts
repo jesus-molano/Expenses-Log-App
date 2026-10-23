@@ -1,23 +1,27 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import webpush from "web-push";
 import type { UUID } from "@/data/supabase/database.types";
 import type { ExpenseOccurrence } from "@/domain/types";
 import { createSupabaseServiceClient } from "@/data/supabase/admin-client";
+import { groupDeliverablePushSubscriptions } from "@/data/push/push-endpoints";
+import {
+  configureWebPush,
+  isExpiredPushSubscription,
+  REMINDER_PUSH_TTL_SECONDS,
+  sendWebPush,
+  type StoredPushSubscriptionKeys,
+} from "@/data/push/web-push-sender";
 import {
   buildDailyReminder,
   dailyReminderBody,
   dailyReminderTitle,
-  isExpenseStore,
+  toReminderStore,
 } from "@/features/expenses/lib/daily-reminders";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type PushSubscriptionRow = {
-  endpoint: string;
-  p256dh: string;
-  auth: string;
-};
+type AdminClient = NonNullable<ReturnType<typeof createSupabaseServiceClient>>;
 
 type DeliverySummary = {
   usersChecked: number;
@@ -26,47 +30,46 @@ type DeliverySummary = {
   notificationsFailed: number;
   duplicateDeliveriesSkipped: number;
   invalidSubscriptionsRemoved: number;
+  // Stores que no tienen forma de store (no se puede avisar a ese usuario).
+  invalidStoresSkipped: number;
+  // Filas con un endpoint fuera de la lista de servicios push.
+  blockedEndpointsSkipped: number;
+  // Usuarios cuyo envío falló por un error inesperado (RPC, base de datos o
+  // datos rotos). El resto de usuarios se procesa igual.
+  errors: number;
+};
+
+type ClaimedReminder = {
+  occurrence: ExpenseOccurrence;
+  reminderKey: string;
+  claimToken: UUID;
 };
 
 const REMINDER_KIND = "last_chance";
 const DELIVERY_LEASE_SECONDS = 15 * 60;
 
+// Comparación en tiempo constante: `===` deja medir cuántos caracteres del
+// secreto coinciden.
 function authorizeCron(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return "missing_secret";
 
-  return request.headers.get("authorization") === `Bearer ${secret}`
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const received = Buffer.from(request.headers.get("authorization") ?? "");
+  return received.length === expected.length &&
+    timingSafeEqual(received, expected)
     ? "authorized"
     : "unauthorized";
 }
 
-function configureWebPush() {
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-
-  if (!publicKey || !privateKey) return false;
-
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT ?? "mailto:expense-reminders@example.com",
-    publicKey,
-    privateKey,
-  );
-  return true;
-}
-
-function toPushSubscription(subscription: PushSubscriptionRow) {
-  return {
-    endpoint: subscription.endpoint,
-    keys: {
-      p256dh: subscription.p256dh,
-      auth: subscription.auth,
-    },
-  };
-}
-
-function isExpiredPushSubscription(error: unknown) {
-  const statusCode = (error as { statusCode?: number }).statusCode;
-  return statusCode === 404 || statusCode === 410;
+// Para el log: sin datos del store ni del usuario más allá de su id.
+function describeError(error: unknown) {
+  if (error instanceof Error) return { name: error.name, message: error.message };
+  if (error && typeof error === "object") {
+    const { code, message } = error as { code?: unknown; message?: unknown };
+    return { code, message };
+  }
+  return { message: String(error) };
 }
 
 async function handleDailyReminders(request: Request) {
@@ -109,7 +112,7 @@ async function handleDailyReminders(request: Request) {
 
   const { data: subscriptions, error: subscriptionsError } = await admin
     .from("push_subscriptions")
-    .select("user_id, endpoint, p256dh, auth");
+    .select("user_id, endpoint, p256dh, auth, updated_at");
   if (subscriptionsError) {
     console.error(
       "Could not load subscriptions for push reminders",
@@ -121,12 +124,8 @@ async function handleDailyReminders(request: Request) {
     );
   }
 
-  const subscriptionsByUser = new Map<string, PushSubscriptionRow[]>();
-  for (const subscription of subscriptions ?? []) {
-    const current = subscriptionsByUser.get(subscription.user_id) ?? [];
-    current.push(subscription);
-    subscriptionsByUser.set(subscription.user_id, current);
-  }
+  const { byUser: subscriptionsByUser, blocked } =
+    groupDeliverablePushSubscriptions(subscriptions ?? []);
 
   const summary: DeliverySummary = {
     usersChecked: stores?.length ?? 0,
@@ -135,89 +134,161 @@ async function handleDailyReminders(request: Request) {
     notificationsFailed: 0,
     duplicateDeliveriesSkipped: 0,
     invalidSubscriptionsRemoved: 0,
+    invalidStoresSkipped: 0,
+    blockedEndpointsSkipped: blocked,
+    errors: 0,
   };
 
+  // Un usuario con datos rotos o un fallo puntual de la base de datos no
+  // corta la ejecución para los demás.
   for (const storeRow of stores ?? []) {
-    if (!isExpenseStore(storeRow.store)) continue;
+    const userSubscriptions = subscriptionsByUser.get(storeRow.user_id);
+    if (!userSubscriptions?.length) continue;
 
-    const userSubscriptions = subscriptionsByUser.get(storeRow.user_id) ?? [];
-    if (!userSubscriptions.length) continue;
-
-    const reminder = buildDailyReminder(storeRow.store);
-    if (!reminder) continue;
-
-    const claimedOccurrences: Array<{
-      occurrence: ExpenseOccurrence;
-      reminderKey: string;
-      claimToken: UUID;
-    }> = [];
-    for (const occurrence of reminder.occurrences) {
-      const reminderKey = buildReminderDeliveryKey(occurrence);
-      const claimToken = await claimReminderDelivery(
+    try {
+      const store = toReminderStore(storeRow.store);
+      if (!store) {
+        summary.invalidStoresSkipped += 1;
+        continue;
+      }
+      await deliverUserReminders(
         admin,
         storeRow.user_id,
-        reminderKey,
+        buildDailyReminder(store),
+        userSubscriptions,
+        summary,
       );
+    } catch (error) {
+      summary.errors += 1;
+      console.error("Could not deliver push reminders for a user", {
+        userId: storeRow.user_id,
+        error: describeError(error),
+      });
+    }
+  }
+
+  return NextResponse.json({ ok: true, ...summary });
+}
+
+async function deliverUserReminders(
+  admin: AdminClient,
+  userId: UUID,
+  reminder: ReturnType<typeof buildDailyReminder>,
+  subscriptions: StoredPushSubscriptionKeys[],
+  summary: DeliverySummary,
+) {
+  if (!reminder) return;
+
+  const claimed: ClaimedReminder[] = [];
+  let delivered = false;
+  let failure: { error: unknown } | null = null;
+
+  // Lo reclamado se cierra siempre, también si falla una reclamación a
+  // medias o el envío: marcado si llegó a algún dispositivo, liberado si no.
+  try {
+    for (const occurrence of reminder.occurrences) {
+      const reminderKey = buildReminderDeliveryKey(occurrence);
+      const claimToken = await claimReminderDelivery(admin, userId, reminderKey);
       if (!claimToken) {
         summary.duplicateDeliveriesSkipped += 1;
         continue;
       }
-      claimedOccurrences.push({ occurrence, reminderKey, claimToken });
+      claimed.push({ occurrence, reminderKey, claimToken });
     }
-    if (!claimedOccurrences.length) continue;
+    if (!claimed.length) return;
 
     summary.usersWithReminders += 1;
     const pendingReminder = {
       ...reminder,
-      occurrences: claimedOccurrences.map(({ occurrence }) => occurrence),
+      occurrences: claimed.map(({ occurrence }) => occurrence),
     };
     const payload = JSON.stringify({
       title: dailyReminderTitle(pendingReminder),
       body: dailyReminderBody(pendingReminder),
       url: "/",
     });
-    let userNotificationsSent = 0;
 
-    for (const subscription of userSubscriptions) {
-      try {
-        await webpush.sendNotification(toPushSubscription(subscription), payload);
+    // Todos los dispositivos a la vez: uno lento (5 s como mucho) no retrasa
+    // a los demás.
+    const results = await Promise.allSettled(
+      subscriptions.map((subscription) =>
+        sendWebPush(subscription, payload, {
+          ttlSeconds: REMINDER_PUSH_TTL_SECONDS,
+        }),
+      ),
+    );
+    const expiredEndpoints: string[] = [];
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
         summary.notificationsSent += 1;
-        userNotificationsSent += 1;
-      } catch (error) {
-        summary.notificationsFailed += 1;
+        delivered = true;
+        return;
+      }
+      summary.notificationsFailed += 1;
+      if (isExpiredPushSubscription(result.reason)) {
+        expiredEndpoints.push(subscriptions[index].endpoint);
+      }
+    });
 
-        if (isExpiredPushSubscription(error)) {
-          const { error: deleteError } = await admin
-            .from("push_subscriptions")
-            .delete()
-            .eq("endpoint", subscription.endpoint);
-          if (!deleteError) summary.invalidSubscriptionsRemoved += 1;
-        }
-      }
+    if (expiredEndpoints.length) {
+      await removeExpiredSubscriptions(admin, userId, expiredEndpoints, summary);
     }
-
-    if (userNotificationsSent > 0) {
-      for (const { reminderKey, claimToken } of claimedOccurrences) {
-        await markReminderDelivered(
-          admin,
-          storeRow.user_id,
-          reminderKey,
-          claimToken,
-        );
-      }
-    } else {
-      for (const { reminderKey, claimToken } of claimedOccurrences) {
-        await releaseReminderDelivery(
-          admin,
-          storeRow.user_id,
-          reminderKey,
-          claimToken,
-        );
-      }
-    }
+  } catch (error) {
+    failure = { error };
   }
 
-  return NextResponse.json({ ok: true, ...summary });
+  const settled = await settleClaims(admin, userId, claimed, delivered);
+  if (failure) throw failure.error;
+  if (!settled) throw new Error("Push reminder leases were not settled.");
+}
+
+async function removeExpiredSubscriptions(
+  admin: AdminClient,
+  userId: UUID,
+  endpoints: string[],
+  summary: DeliverySummary,
+) {
+  const { error } = await admin
+    .from("push_subscriptions")
+    .delete()
+    .eq("user_id", userId)
+    .in("endpoint", endpoints);
+
+  if (error) {
+    // Se volverá a intentar en la siguiente ejecución.
+    console.error("Could not remove expired push subscriptions", describeError(error));
+    return;
+  }
+  summary.invalidSubscriptionsRemoved += endpoints.length;
+}
+
+// Cierra cada lease por separado, para que un fallo no deje los demás
+// abiertos. Devuelve false si alguno no se pudo cerrar: caduca a los 15
+// minutos y otra ejecución puede volver a reclamarlo.
+async function settleClaims(
+  admin: AdminClient,
+  userId: UUID,
+  claimed: ClaimedReminder[],
+  delivered: boolean,
+) {
+  if (!claimed.length) return true;
+
+  const settle = delivered ? markReminderDelivered : releaseReminderDelivery;
+  const results = await Promise.allSettled(
+    claimed.map(({ reminderKey, claimToken }) =>
+      settle(admin, userId, reminderKey, claimToken),
+    ),
+  );
+  const failed = results.filter((result) => result.status === "rejected");
+  if (!failed.length) return true;
+
+  console.error("Could not settle push reminder leases", {
+    userId,
+    delivered,
+    failed: failed.length,
+    error: describeError(failed[0].reason),
+  });
+  return false;
 }
 
 export async function GET(request: Request) {
@@ -233,7 +304,7 @@ export function buildReminderDeliveryKey(occurrence: ExpenseOccurrence) {
 }
 
 async function claimReminderDelivery(
-  admin: NonNullable<ReturnType<typeof createSupabaseServiceClient>>,
+  admin: AdminClient,
   userId: UUID,
   reminderKey: string,
 ) {
@@ -249,7 +320,7 @@ async function claimReminderDelivery(
 }
 
 async function markReminderDelivered(
-  admin: NonNullable<ReturnType<typeof createSupabaseServiceClient>>,
+  admin: AdminClient,
   userId: UUID,
   reminderKey: string,
   claimToken: UUID,
@@ -271,7 +342,7 @@ async function markReminderDelivered(
 }
 
 async function releaseReminderDelivery(
-  admin: NonNullable<ReturnType<typeof createSupabaseServiceClient>>,
+  admin: AdminClient,
   userId: UUID,
   reminderKey: string,
   claimToken: UUID,

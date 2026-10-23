@@ -14,6 +14,7 @@ import {
   unknownEntries,
   withMonthClosures,
 } from "./store-normalization";
+import { SYNC_META_KEY } from "./sync-meta-store";
 
 const STORAGE_KEY = "expense-log-store-v1";
 
@@ -55,10 +56,13 @@ export function saveExpenseStore(store: ExpenseStore): void {
   }
 }
 
+// Borra los datos de gastos de este dispositivo y sus metadatos de sync: sin
+// datos, un dueño o unos cambios pendientes antiguos no significan nada.
 export function clearExpenseLocalData(): void {
   try {
     if (typeof window === "undefined" || !window.localStorage) return;
     window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(SYNC_META_KEY);
     // También las copias con fecha que guardaban builds anteriores.
     const storage = window.localStorage;
     Array.from({ length: storage.length }, (_, index) => storage.key(index))

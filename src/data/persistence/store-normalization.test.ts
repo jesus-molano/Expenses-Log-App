@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { emptyStore } from "@/domain/seed";
 import {
   assignExpenseStoreOwner,
+  inferStoreOwnerId,
   normalizeExpenseStore,
   normalizeImportedExpenseStore,
 } from "./store-normalization";
@@ -180,6 +182,29 @@ describe("normalizeExpenseStore", () => {
     expect(ownedStore.finance.incomeEvents[0].userId).toBe(
       "11111111-1111-4111-8111-111111111111",
     );
+  });
+
+  it("infers the account that owns local data from its ids", () => {
+    const ownerId = "11111111-1111-4111-8111-111111111111";
+    const anonymous = normalizeExpenseStore({
+      schemaVersion: 3,
+      templates: [{ id: "tpl", userId: "demo", name: "Luz" }],
+      overrides: [{ id: "ovr", userId: "demo", templateId: "tpl" }],
+    });
+
+    expect(inferStoreOwnerId(emptyStore)).toBeNull();
+    expect(inferStoreOwnerId(anonymous)).toBeNull();
+    expect(inferStoreOwnerId(assignExpenseStoreOwner(anonymous, ownerId))).toBe(
+      ownerId,
+    );
+    // Lo creado sin sesión encima de datos sincronizados sigue siendo de esa
+    // cuenta.
+    expect(
+      inferStoreOwnerId({
+        ...anonymous,
+        overrides: [{ ...anonymous.overrides[0], userId: ownerId }],
+      }),
+    ).toBe(ownerId);
   });
 
   it("repairs imported paid overrides stored on bank booked dates", () => {

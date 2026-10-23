@@ -395,6 +395,27 @@ export function normalizeImportedExpenseStore(value: unknown): ExpenseStore {
   return normalizeExpenseStore(value);
 }
 
+// Usuario provisional de lo creado sin sesión.
+const ANONYMOUS_USER_ID = "demo";
+
+// Cuenta a la que pertenecen unos datos locales según los ids que les puso
+// `assignExpenseStoreOwner` al sincronizar; null si todo se creó sin sesión.
+export function inferStoreOwnerId(store: ExpenseStore): string | null {
+  const owners = [
+    ...store.templates,
+    ...store.overrides,
+    ...store.categories,
+    ...store.finance.incomeEvents,
+  ].map((entity) => entity.userId);
+
+  return (
+    owners.find(
+      (userId): userId is string =>
+        typeof userId === "string" && userId !== "" && userId !== ANONYMOUS_USER_ID,
+    ) ?? null
+  );
+}
+
 export function assignExpenseStoreOwner(
   store: ExpenseStore,
   userId: string | null | undefined,
