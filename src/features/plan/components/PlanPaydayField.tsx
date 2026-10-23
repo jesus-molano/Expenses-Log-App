@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { IconButton } from "@/components/ui/IconButton";
 import { useBodyScrollLock } from "@/components/ui/use-body-scroll-lock";
+import { useHistoryLayer } from "@/components/ui/use-history-layer";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { cn } from "@/shared/ui";
@@ -26,6 +27,8 @@ export function PlanPaydayField({
   onSalaryDayChange,
 }: PlanPaydayFieldProps) {
   useBodyScrollLock(open, { strategy: "fixed" });
+  // Atrás cierra el selector, no la hoja que lo contiene.
+  useHistoryLayer(open, () => onOpenChange(false));
 
   function selectDay(day: number) {
     onSalaryDayChange(day);

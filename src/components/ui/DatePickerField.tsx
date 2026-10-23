@@ -31,6 +31,7 @@ import { cn } from "@/shared/ui";
 import { Button } from "./Button";
 import { IconButton } from "./IconButton";
 import { useBodyScrollLock } from "./use-body-scroll-lock";
+import { useHistoryLayer } from "./use-history-layer";
 
 type DatePickerFieldProps = {
   value?: string;
@@ -88,6 +89,8 @@ export function DatePickerField({
   const selectedDate = useMemo(() => parseDate(value), [value]);
   const fallbackMonth = useMemo(() => parseDate(min) ?? new Date(), [min]);
   const [open, setOpen] = useState(false);
+  // Atrás cierra el selector, no la hoja que lo contiene.
+  useHistoryLayer(open, () => setOpen(false));
   const [activeSelector, setActiveSelector] = useState<"month" | "year" | null>(
     null,
   );

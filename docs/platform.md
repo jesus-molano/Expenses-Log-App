@@ -152,18 +152,29 @@ Esto evita meter Supabase Auth en cada request API.
   captura, solo en Chromium fuera de iOS (`features/expenses/lib/voice-support.ts`).
   En iOS y Safari falta o se cuelga en apps instaladas: alli se muestra una pista
   para usar el microfono del teclado.
-- El dictado termina al tocar de nuevo, a los 30 s, tras 2 s sin una frase nueva,
-  si no se oye nada o al salir de la app, y lanza un unico analisis. En Android
-  `continuous` no tiene efecto: se reinicia la misma instancia tras cada frase.
+- Lo dictado se suma a lo ya escrito; mientras se dicta, el campo es de solo
+  lectura. El dictado termina al tocar de nuevo, a los 30 s, tras 2 s sin oir
+  nada nuevo (tambien parcial) o al salir de la app: pide al reconocedor lo que
+  aun procesa (`stop`, no `abort`) y lanza un unico analisis. Analizar mientras
+  se dicta lo termina y analiza el texto completo.
+- En Android `continuous` no tiene efecto: se reinicia la misma instancia tras
+  cada frase, conservando lo aun parcial. Los resultados acumulados que repite
+  Chrome en Android no duplican palabras (`sessionTranscript`).
 - El reconocimiento de Chrome envia el audio a Google y necesita conexion; sin
-  ella el microfono avisa. Tras un fallo de servicio sin resultados (por ejemplo
-  en Brave) se oculta durante la sesion.
+  ella el microfono avisa. Un error (red, permiso) deja lo oido en el campo sin
+  analizarlo. Solo un "servicio no permitido" sin resultados (por ejemplo en
+  Brave) oculta el microfono durante la sesion.
 - El manifest tiene atajos "Añadir gasto" (`/expenses/new`) y "Añadir por voz"
   (`/expenses/new?mode=voice`). `mode` se lee en cliente y el precache lo ignora,
-  asi que la pagina sigue siendo estatica. Dictar siempre exige un toque.
-- Atras (boton o gesto de Android) cierra la hoja de encima
-  (`src/components/ui/sheet-history.ts`): cada hoja añade una entrada al
-  historial con la misma URL y la quita al cerrarse desde la propia hoja.
+  asi que la pagina sigue siendo estatica. Dictar siempre exige un toque. El
+  atajo abre el formulario o la captura una sola vez por entrada del historial
+  (`lib/new-expense-intent.ts`): volver a la pantalla con Atras no lo repite.
+- Atras (boton o gesto de Android) cierra la capa de encima: hojas y selectores
+  de fecha o de dia de cobro (`src/components/ui/sheet-history.ts` y
+  `use-history-layer.ts`). Cada capa añade una entrada al historial con la
+  misma URL; las que se cierran a la vez se deshacen con un solo
+  `history.go(-n)`, una entrada sin dueño (tras recargar o navegar con una hoja
+  abierta) se salta y, mientras hay capas, el scroll no se restaura al volver.
 
 ## APIs internas
 

@@ -9,6 +9,7 @@ import type {
 } from "@/domain/types";
 import { createEmptyDraft } from "../lib/dashboard-config";
 import type { CaptureReason } from "../lib/capture-labels";
+import { joinWords } from "../lib/voice-support";
 import type { useQuickExpenseParser } from "./use-quick-expense-parser";
 import { useSpeechDictation } from "./use-speech-dictation";
 
@@ -73,16 +74,34 @@ export function useExpenseCaptureFlow({
     setEditingId(null);
   }
 
-  // Lo dictado se analiza una sola vez al terminar y siempre pasa por
-  // revisión (formulario o lista).
+  // Lo dictado se suma a lo ya escrito, se analiza una sola vez al terminar
+  // y siempre pasa por revisión (formulario o lista).
+  const dictationPrefixRef = useRef("");
+  // Analizar durante el dictado lo termina y analiza el texto completo,
+  // aunque no se haya oído nada.
+  const analyzeAfterDictationRef = useRef(false);
   const dictation = useSpeechDictation({
     language,
-    onTranscript: parser.setQuickText,
+    onTranscript: (text) => parser.setQuickText(joinWords(dictationPrefixRef.current, text)),
     onFinish: (text) => {
-      parser.setQuickText(text);
-      void analyze(text);
+      const requested = analyzeAfterDictationRef.current;
+      analyzeAfterDictationRef.current = false;
+      if (!text && !requested) return;
+      const full = joinWords(dictationPrefixRef.current, text);
+      parser.setQuickText(full);
+      if (full) void analyze(full);
     },
   });
+
+  function toggleDictation() {
+    if (dictation.listening) {
+      dictation.stop();
+      return;
+    }
+    dictationPrefixRef.current = parser.quickText;
+    analyzeAfterDictationRef.current = false;
+    dictation.start();
+  }
 
   async function analyze(textOverride?: string) {
     const request = ++requestRef.current;
@@ -142,24 +161,34 @@ export function useExpenseCaptureFlow({
     excludedIds,
     reviewStatus,
     isIdle: !captureOpen && !formOpen && !reviewItems,
-    dictation,
-    openCapture: () => setCaptureOpen(true),
+    dictation: { ...dictation, toggle: toggleDictation },
+    openCapture: () => {
+      dictation.reset();
+      setCaptureOpen(true);
+    },
     closeCapture: () => {
       dictation.cancel();
+      dictation.reset();
       supersede();
       setCaptureOpen(false);
     },
     cancelAnalysis: supersede,
     openManualForm: () => {
       dictation.cancel();
+      dictation.reset();
       supersede();
       setCaptureOpen(false);
       setNotice(null);
       openForm(createEmptyDraft());
     },
-    // Analizar mientras se dicta termina el dictado, que entrega el texto
-    // completo y lo analiza una sola vez.
-    analyze: () => (dictation.listening ? dictation.stop() : void analyze()),
+    analyze: () => {
+      if (dictation.listening) {
+        analyzeAfterDictationRef.current = true;
+        dictation.stop();
+        return;
+      }
+      void analyze();
+    },
     closeForm: () => {
       setFormOpen(false);
       setEditingId(null);

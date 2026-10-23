@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getDictationSupport, toDictationError } from "./voice-support";
+import {
+  getDictationSupport,
+  joinWords,
+  sessionTranscript,
+  toDictationError,
+} from "./voice-support";
 
 const recognizer = { webkitSpeechRecognition: class {} };
 
@@ -46,5 +51,36 @@ describe("getDictationSupport", () => {
   it("ignores the abort the app causes itself", () => {
     expect(toDictationError("aborted")).toBeNull();
     expect(toDictationError("not-allowed")).toBe("not-allowed");
+  });
+});
+
+describe("sessionTranscript", () => {
+  const result = (transcript: string, isFinal: boolean) => ({ isFinal, 0: { transcript } });
+
+  it("joins final results and the pending partial one", () => {
+    expect(
+      sessionTranscript([result("Gimnasio 35", true), result("y Spotify", false)]),
+    ).toEqual({ final: "Gimnasio 35", interim: "y Spotify" });
+  });
+
+  it("does not repeat cumulative results from Chrome on Android", () => {
+    expect(sessionTranscript([result("café", true), result("café cinco euros", true)])).toEqual({
+      final: "café cinco euros",
+      interim: "",
+    });
+    expect(sessionTranscript([result("Café cinco", true), result("café", true)]).final).toBe(
+      "Café cinco",
+    );
+    expect(sessionTranscript([result("café", true), result("café cinco", false)])).toEqual({
+      final: "café",
+      interim: "cinco",
+    });
+  });
+});
+
+describe("joinWords", () => {
+  it("joins with single spaces and skips empty parts", () => {
+    expect(joinWords(" Seguro del coche ", "", "420 al año")).toBe("Seguro del coche 420 al año");
+    expect(joinWords("", " ")).toBe("");
   });
 });

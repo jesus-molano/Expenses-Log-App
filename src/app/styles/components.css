@@ -1124,6 +1124,12 @@
   animation: app-dictation-pulse 1.4s ease-in-out infinite;
 }
 
+/* El pulso anima box-shadow y taparía el anillo de foco. */
+.app-dictation-active:focus-visible {
+  animation: none;
+  box-shadow: var(--app-focus);
+}
+
 @keyframes app-dictation-pulse {
   0%,
   100% {

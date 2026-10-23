@@ -164,6 +164,9 @@ export function QuickCapture({
                   event.currentTarget.form?.requestSubmit();
                 }
               }}
+              // Mientras se dicta, el texto lo escribe el dictado: lo tecleado
+              // se perdería con el siguiente resultado.
+              readOnly={dictation.listening}
               placeholder={t("expenses.quickPlaceholder", language)}
               className={cn(
                 "input-control h-auto min-h-24 w-full resize-none py-3 leading-relaxed",
@@ -177,7 +180,6 @@ export function QuickCapture({
                 variant={dictation.listening ? "default" : "ghost"}
                 onClick={dictation.toggle}
                 disabled={isParsing}
-                aria-pressed={dictation.listening}
                 aria-label={
                   dictation.listening
                     ? t("expenses.dictationStop", language)
@@ -208,7 +210,8 @@ export function QuickCapture({
               <button
                 key={example}
                 type="button"
-                className="app-chip app-focus-ring min-h-9 px-3 py-1.5 text-left text-xs font-medium"
+                className="app-chip app-focus-ring min-h-9 px-3 py-1.5 text-left text-xs font-medium disabled:opacity-50"
+                disabled={dictation.listening}
                 onClick={() => onValueChange(example)}
               >
                 {example}
@@ -261,7 +264,7 @@ export function QuickCapture({
           </p>
 
           {needsLogin ? (
-            <Link href="/login" className="app-button app-button-secondary">
+            <Link href="/login" replace className="app-button app-button-secondary">
               <LogIn size={16} />
               {t("expenses.captureLogin", language)}
             </Link>

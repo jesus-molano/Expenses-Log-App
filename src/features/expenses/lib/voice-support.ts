@@ -46,3 +46,46 @@ export function toDictationError(code: string): DictationError | null {
       return null;
   }
 }
+
+// Une trozos de texto con un solo espacio, sin huecos de los vacíos.
+export function joinWords(...parts: string[]) {
+  return parts
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+type RecognitionResultLike = { isFinal: boolean; 0: { transcript: string } };
+
+const startsWithFolded = (text: string, prefix: string) =>
+  text.toLocaleLowerCase().startsWith(prefix.toLocaleLowerCase());
+
+// Texto de una sesión de reconocimiento a partir de todos sus resultados.
+// Chrome en Android puede repetir en cada resultado lo ya dicho ("café",
+// "café cinco euros"): un final que empieza por el anterior lo sustituye en
+// lugar de sumarse, y lo parcial no repite lo ya fijado.
+export function sessionTranscript(results: ArrayLike<RecognitionResultLike>) {
+  const finals: string[] = [];
+  let interim = "";
+  for (let index = 0; index < results.length; index += 1) {
+    const result = results[index];
+    const text = result[0].transcript.trim();
+    if (!text) continue;
+    if (!result.isFinal) {
+      interim = joinWords(interim, text);
+      continue;
+    }
+    const last = finals.at(-1);
+    if (last && startsWithFolded(text, last)) {
+      finals[finals.length - 1] = text;
+    } else if (!last || !startsWithFolded(last, text)) {
+      finals.push(text);
+    }
+  }
+  const final = finals.join(" ");
+  const lastFinal = finals.at(-1);
+  if (lastFinal && startsWithFolded(interim, lastFinal)) {
+    interim = interim.slice(lastFinal.length).trim();
+  }
+  return { final, interim };
+}

@@ -488,3 +488,42 @@ test("Back closes the open sheet instead of leaving the screen", async ({ page }
   await page.goBack();
   await expect(page).toHaveURL(/\/money$/);
 });
+
+test("Back closes an open date picker before the form that holds it", async ({ page }) => {
+  await loadDemoStore(page);
+  await page.goto("/money");
+  await page.getByRole("link", { name: "Gastos" }).click();
+  await page.getByRole("button", { name: "Añadir gasto" }).click();
+  await page.getByRole("dialog", { name: "Añadir gasto" }).getByRole("button", { name: "Manual" }).click();
+
+  const form = page.getByRole("dialog", { name: "Nuevo gasto" });
+  await expect(form).toBeVisible();
+  await form.getByRole("button", { name: "Fecha de inicio" }).click();
+  const picker = page.getByRole("dialog", { name: "Fecha de inicio" });
+  await expect(picker).toBeVisible();
+
+  await page.goBack();
+  await expect(picker).toHaveCount(0);
+  await expect(form).toBeVisible();
+
+  await page.goBack();
+  await expect(form).toHaveCount(0);
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test("the add expense shortcut opens the form only once", async ({ page }) => {
+  await loadDemoStore(page);
+  await page.goto("/expenses/new");
+  const form = page.getByRole("dialog", { name: "Nuevo gasto" });
+  await expect(form).toBeVisible();
+  await form.getByRole("button", { name: "Cerrar" }).click();
+  await expect(form).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Plan" }).click();
+  await expect(page).toHaveURL(/\/money$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/expenses\/new$/);
+  await expect(page.getByRole("button", { name: "Añadir gasto" })).toBeVisible();
+  await page.waitForTimeout(300);
+  await expect(form).toHaveCount(0);
+});
