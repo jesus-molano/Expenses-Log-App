@@ -366,8 +366,10 @@ function occurrenceFromRow(
     status === "paid" ? parseMoneyInput(row.amount_paid ?? "") ?? undefined : undefined;
   const plannedAmount = parseMoneyInput(row.amount ?? "");
   const name = readText(row.name);
-  const categoryName = row.category ? context.categories.resolve(readText(row.category)) : null;
   const categoryTone = readTone(row.category_tone);
+  const categoryName = row.category
+    ? context.categories.resolve(readText(row.category), categoryTone)
+    : null;
 
   // Un mes ya cerrado se guarda como histórico, igual que lo hace la app al
   // cerrarlo: así se conserva aunque el gasto ya no exista o haya cambiado.
@@ -449,11 +451,15 @@ function createCategoryRegistry(existing: ExpenseCategory[], nowIso: string) {
   const used = new Map<string, ExpenseCategory>();
 
   // Nombre guardado de una etiqueta del CSV: las del dispositivo y las ya
-  // creadas en esta importación se reconocen antes que las preset.
-  function resolve(label: string) {
+  // creadas en esta importación se reconocen antes que las preset. Una fila
+  // con color (`category_tone`) es de una exportación de la app: su etiqueta
+  // es la de una preset o el nombre de una propia, así que los alias solo
+  // valen para las hojas hechas a mano.
+  function resolve(label: string, tone?: CategoryTone) {
     return resolveCategoryName(
       label,
       Array.from(byName.values(), (category) => category.name),
+      { aliases: tone === undefined },
     );
   }
 
@@ -463,7 +469,7 @@ function createCategoryRegistry(existing: ExpenseCategory[], nowIso: string) {
       return id ? (byId.get(id) ?? used.get(id))?.name : undefined;
     },
     idFor(label: string, tone?: CategoryTone) {
-      const name = resolve(label);
+      const name = resolve(label, tone);
       const key = foldText(name);
       let category = byName.get(key);
       if (!category) {

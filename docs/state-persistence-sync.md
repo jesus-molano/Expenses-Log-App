@@ -239,7 +239,9 @@ categorias tal cual. El CSV exporta el nombre visible y el color
 (`category_tone`); al importar, `resolveCategoryName` reconoce primero las
 categorias del dispositivo, despues las preset (en los dos idiomas, sin
 tildes) y sus alias, y un nombre que no es ninguna de ellas vuelve como
-categoria propia con su color.
+categoria propia con su color. Los alias solo cuentan en filas sin
+`category_tone` (hojas hechas a mano): una propia exportada que se llama como
+un alias ("Streaming", "Hogar") vuelve como propia y no como la preset.
 
 ## Preferencias de dispositivo
 

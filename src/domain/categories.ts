@@ -57,7 +57,8 @@ export function isCategoryTone(value: unknown): value is CategoryTone {
 
 // Nombre, icono y color de una categoría nueva llamada `name`: los de la
 // preset si lo es (sin tildes ni mayúsculas) o los de una propia, con el color
-// elegido o el neutro. La usan el gestor y la importación del CSV.
+// elegido o el neutro. La usan el gestor, la importación del CSV y la
+// normalización del store (para el color o el icono que falten).
 export function newCategoryFields(
   name: string,
   tone?: CategoryTone,

@@ -42,7 +42,14 @@ export function categoryLabel(name: string, language: AppLanguage): string {
 // alias, todo sin tildes ni mayúsculas. Un nombre que no es ninguna de ellas
 // es una categoría propia y se conserva; General solo si viene vacío. Lo usa
 // la importación, que recibe las etiquetas tal como se exportaron.
-export function resolveCategoryName(label: string, categories: string[] = []): string {
+// `aliases: false` cuando la etiqueta sale de una exportación de la app: es la
+// de una preset o el nombre de una propia, y una propia llamada como un alias
+// ("Streaming", "Hogar") no debe acabar en la preset.
+export function resolveCategoryName(
+  label: string,
+  categories: string[] = [],
+  { aliases = true }: { aliases?: boolean } = {},
+): string {
   const folded = foldText(label);
   if (!folded) return "General";
   const own = categories.find((name) => foldText(name) === folded);
@@ -57,7 +64,7 @@ export function resolveCategoryName(label: string, categories: string[] = []): s
 
   return (
     preset?.name ??
-    matchCategoryName(label, []) ??
+    (aliases ? matchCategoryName(label, []) : null) ??
     label.trim().slice(0, CATEGORY_NAME_MAX_LENGTH)
   );
 }

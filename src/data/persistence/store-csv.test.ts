@@ -267,6 +267,33 @@ describe("csvToStore", () => {
     expect(categories.get(netflix?.categoryId ?? "")?.name).toBe("Suscripciones");
   });
 
+  it("brings back a custom category named like an alias as its own, not as the preset", () => {
+    const withStreaming = normalizeExpenseStore(
+      {
+        ...emptyStore,
+        categories: [
+          { id: "cat-streaming", userId: "demo", name: "Streaming", icon: "Tag", tone: "blue" },
+        ],
+        templates: [template("netflix", "Netflix", 12.99, "cat-streaming", "2026-09-05")],
+      },
+      today,
+    );
+
+    const { store: imported } = csvToStore(storeToCsv(withStreaming, { today }), { now: today });
+    const netflix = imported.templates.find((item) => item.id === "netflix");
+    expect(imported.categories.find((category) => category.id === netflix?.categoryId)).toMatchObject({
+      name: "Streaming",
+      tone: "blue",
+      icon: "Tag",
+    });
+
+    // En una hoja hecha a mano (sin color) los alias siguen valiendo.
+    const { store: handMade } = csvToStore(["name,amount,category", "Mercado,60,comida"].join("\n"), {
+      now: today,
+    });
+    expect(handMade.categories[0]?.name).toBe("Alimentacion");
+  });
+
   it("reuses a custom category of this device written with other accents or casing", () => {
     const current = normalizeExpenseStore({
       ...emptyStore,

@@ -37,6 +37,13 @@ describe("category labels", () => {
     expect(categoryLabel("Caprichos", "en")).toBe("Caprichos");
   });
 
+  it("keeps a custom name that is also an alias when aliases are off", () => {
+    expect(resolveCategoryName("Streaming")).toBe("Suscripciones");
+    expect(resolveCategoryName("Streaming", [], { aliases: false })).toBe("Streaming");
+    // Las etiquetas de las preset se siguen reconociendo.
+    expect(resolveCategoryName("Food", [], { aliases: false })).toBe("Alimentacion");
+  });
+
   it("does not send accented preset names to General", () => {
     expect(resolvePresetCategory("Alimentación").name).toBe("Alimentacion");
     expect(resolvePresetCategory(" vehículo ").name).toBe("Vehiculo");

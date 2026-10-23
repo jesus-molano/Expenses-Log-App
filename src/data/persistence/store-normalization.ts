@@ -4,9 +4,8 @@ import {
 } from "@/domain/finance";
 import {
   CATEGORY_NAME_MAX_LENGTH,
-  CUSTOM_CATEGORY_ICON,
-  findPresetCategory,
   isCategoryTone,
+  newCategoryFields,
 } from "@/domain/categories";
 import { EXPENSE_DETAIL_KEYS, sanitizeExpenseDetails } from "@/domain/expense-details";
 import { dedupeOverrides } from "@/domain/overrides";
@@ -388,8 +387,9 @@ function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
 }
 
 // Una categoría sin id no se puede referenciar: se descarta. Sin nombre pasa
-// a General, y un color o icono desconocido vuelve al de su preset o al
-// neutro. Llevan `updatedAt` para fusionarse por entidad; las de stores
+// a General, y un color o icono desconocido vuelve al de una categoría nueva
+// con ese nombre (`newCategoryFields`: el de su preset o el neutro). Llevan
+// `updatedAt` para fusionarse por entidad; las de stores
 // antiguos no lo tienen y cargan igual. Uno ilegible se quita y la categoría
 // queda sin fecha: al fusionar pierde frente a una copia con fecha
 // (`latestUpdated`).
@@ -401,12 +401,13 @@ function normalizeCategories(value: unknown): ExpenseCategory[] {
 
     const rawName = typeof category.name === "string" ? category.name.trim() : "";
     const name = (rawName || "General").slice(0, CATEGORY_NAME_MAX_LENGTH);
-    const preset = findPresetCategory(name);
-    const tone = isCategoryTone(category.tone) ? category.tone : preset?.tone ?? "slate";
+    const defaults = newCategoryFields(
+      name,
+      isCategoryTone(category.tone) ? category.tone : undefined,
+    );
+    const tone = defaults.tone;
     const icon =
-      typeof category.icon === "string" && category.icon
-        ? category.icon
-        : preset?.icon ?? CUSTOM_CATEGORY_ICON;
+      typeof category.icon === "string" && category.icon ? category.icon : defaults.icon;
     const userId = typeof category.userId === "string" ? category.userId : "demo";
     const updatedAt = isTimestamp(category.updatedAt) ? category.updatedAt : undefined;
 
