@@ -4,7 +4,10 @@ import {
   selectCarryOverOccurrences,
 } from "./budget-month";
 import { estimateChargeDate } from "./calendar";
-import { occurrencesDueBetween } from "./finance";
+import {
+  materializeClosedOccurrenceRecords,
+  occurrencesDueBetween,
+} from "./finance";
 import { emptyStore } from "./seed";
 import type {
   ExpenseOccurrence,
@@ -87,6 +90,25 @@ describe("selectCarryOverOccurrences", () => {
       new Date(2026, 10, 1, 9),
     );
     expect(withUnpaid.map((item) => item.dueDate)).toEqual(["2026-10-28"]);
+  });
+
+  it("does not bring back bills whose expense was deleted", () => {
+    const withHistory = materializeClosedOccurrenceRecords(
+      {
+        ...emptyStore,
+        templates: [template("game-pass", "2026-10-12", 12)],
+      },
+      { today: new Date(2026, 10, 1, 9) },
+    );
+    const deleted: ExpenseStore = { ...withHistory, templates: [] };
+
+    expect(withHistory.occurrenceRecords).toHaveLength(1);
+    expect(
+      selectCarryOverOccurrences(withHistory, new Date(2026, 10, 1, 9)),
+    ).toHaveLength(1);
+    expect(
+      selectCarryOverOccurrences(deleted, new Date(2026, 10, 1, 9)),
+    ).toEqual([]);
   });
 });
 

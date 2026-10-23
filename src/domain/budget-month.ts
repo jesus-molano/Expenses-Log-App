@@ -34,19 +34,24 @@ export function monthPendingSummary(
 }
 
 // Lo que quedó pendiente el mes anterior, para que no desaparezca el día 1.
+// Los gastos borrados conservan su historial, pero no vuelven a reclamar pago.
 export function selectCarryOverOccurrences(
   store: ExpenseStore,
   today: Date,
   language: AppLanguage = "es",
 ): ExpenseOccurrence[] {
   const previousMonth = subMonths(startOfMonth(today), 1);
+  const templateIds = new Set(store.templates.map((template) => template.id));
 
   return occurrencesDueBetween(
     store,
     toDateOnly(previousMonth),
     toDateOnly(endOfMonth(previousMonth)),
     language,
-  ).filter((occurrence) => occurrence.status === "due");
+  ).filter(
+    (occurrence) =>
+      occurrence.status === "due" && templateIds.has(occurrence.template.id),
+  );
 }
 
 function sumPlannedAmounts(occurrences: ExpenseOccurrence[]) {

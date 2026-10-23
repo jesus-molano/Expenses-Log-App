@@ -18,7 +18,7 @@ export function TimelineSectionHeader({
     >
       <div className="min-w-0">
         <h2
-          className={`truncate font-semibold capitalize leading-tight text-[var(--app-text)] ${
+          className={`truncate font-semibold leading-tight first-letter:uppercase text-[var(--app-text)] ${
             section.id === "today" ? "text-[19px]" : "text-[16px]"
           }`}
         >
