@@ -57,13 +57,22 @@ export function createSnapshotRepository(
     return snapshot;
   }
 
-  async function saveDaily(store: ExpenseStore, now = new Date()) {
-    if (!hasUserData(store)) return null;
-    const snapshots = await list();
-    if (!shouldTakeDailySnapshot(snapshots, { now, hash: hashStoreContent(store) })) {
-      return null;
-    }
-    return save(store, "daily", now);
+  // Volver a la app y el temporizador del arranque pueden coincidir: la
+  // segunda llamada espera a la primera en lugar de guardar otra diaria.
+  let dailyInFlight: Promise<StoreSnapshot | null> | null = null;
+
+  function saveDaily(store: ExpenseStore, now = new Date()) {
+    dailyInFlight ??= (async () => {
+      if (!hasUserData(store)) return null;
+      const snapshots = await list();
+      if (!shouldTakeDailySnapshot(snapshots, { now, hash: hashStoreContent(store) })) {
+        return null;
+      }
+      return save(store, "daily", now);
+    })().finally(() => {
+      dailyInFlight = null;
+    });
+    return dailyInFlight;
   }
 
   return { list, save, saveDaily };

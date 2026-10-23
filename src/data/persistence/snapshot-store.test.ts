@@ -79,6 +79,19 @@ describe("snapshot repository", () => {
     expect((await repository.list()).map((snapshot) => snapshot.reason)).toEqual(["daily", "daily"]);
   });
 
+  it("does not save two daily copies when two triggers overlap", async () => {
+    const { backend } = memoryBackend();
+    const repository = createSnapshotRepository(backend);
+    const now = new Date("2026-10-23T09:00:00");
+
+    await Promise.all([
+      repository.saveDaily(storeWithIncome(40), now),
+      repository.saveDaily(storeWithIncome(40), now),
+    ]);
+
+    expect(await repository.list()).toHaveLength(1);
+  });
+
   it("prunes old copies and ignores damaged entries", async () => {
     const { backend, items } = memoryBackend([{ id: "broken", createdAt: "x" }]);
     const repository = createSnapshotRepository(backend);
