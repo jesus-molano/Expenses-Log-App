@@ -57,6 +57,8 @@ Estado:
   - Pendiente de F2a: `OccurrenceActionSheet`, `ConfirmActionDialog` con `useDialogA11y` y M22.
 - **Cambios de importe de una serie: hecho.** Al editar el importe, lo ya pasado y lo ya pagado no cambian (meses anteriores como registros; mes cerrado con "Pasar al mes siguiente", cobros pagados y adelantados con override) y el editor pregunta "Desde este mes" o "Desde el mes que viene" (`keepAmountBeforeSeriesChange`). Para un solo mes, se edita el cobro.
   - Tocar un gasto abre sus acciones (`OccurrenceActionSheet`, M19): pagar o deshacer, pagar con otro importe, mover solo este cobro (no a un mes cerrado), saltar este mes con "Deshacer" y editar la serie. Deslizar o arrastrar no cuentan como toque.
+  - Hoja de acciones revisada: "Editar la serie" navega (sustituye la entrada de la hoja en el historial), "Pagado con otro importe" solo apunta lo pagado (la fila pagada muestra lo pagado), mover solo toca el cobro y no se ofrece para lo pagado de un mes cerrado ni más allá del mes siguiente, Intro la abre desde el teclado y los clicks de lector de pantalla cuentan.
+  - Cada mes del listado muestra solo sus cobros (más lo pendiente que arrastra); al final, "Noviembre empieza con N cobros en sus primeros días" con "Ver noviembre".
   - Pendiente de F2a: `ConfirmActionDialog` con `useDialogA11y` y M22.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.

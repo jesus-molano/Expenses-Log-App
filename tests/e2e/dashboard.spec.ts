@@ -528,6 +528,8 @@ test("the add expense shortcut opens the form only once", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Añadir gasto" })).toBeVisible();
   await page.waitForTimeout(300);
   await expect(form).toHaveCount(0);
+});
+
 async function openRowActions(page: Page, name: string) {
   const row = page.locator('[data-expense-row="true"]').filter({ hasText: name }).first();
   await row.scrollIntoViewIfNeeded();
@@ -538,6 +540,7 @@ async function openRowActions(page: Page, name: string) {
 }
 
 test("tapping a charge opens its actions: pay a different amount", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-23T10:00:00"));
   await loadDemoStore(page);
   await page.goto("/");
   await expect(page.getByText("Atrasado")).toBeVisible();
@@ -554,6 +557,7 @@ test("tapping a charge opens its actions: pay a different amount", async ({ page
 });
 
 test("skipping a charge from its actions can be undone", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-23T10:00:00"));
   await loadDemoStore(page);
   await page.goto("/");
   await expect(page.getByText("Atrasado")).toBeVisible();
@@ -569,6 +573,7 @@ test("skipping a charge from its actions can be undone", async ({ page }) => {
 });
 
 test("moving only one charge from its actions", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-23T10:00:00"));
   await loadDemoStore(page);
   await page.goto("/");
   await expect(page.getByText("Atrasado")).toBeVisible();
@@ -605,4 +610,33 @@ test("a new series amount can start next month without touching this one", async
   await expect(page).toHaveURL(/\/$/);
   const october = page.locator('[data-expense-row="true"][data-timeline-date="2026-10-12"]').filter({ hasText: "Game Pass" });
   await expect(october).toContainText("12,00");
+});
+
+test("editing the series from a charge's actions opens its detail", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-23T10:00:00"));
+  await loadDemoStore(page);
+  await page.goto("/");
+  await expect(page.getByText("Atrasado")).toBeVisible();
+
+  const sheet = await openRowActions(page, "Movistar");
+  await sheet.getByRole("button", { name: "Editar la serie" }).click();
+  await expect(page).toHaveURL(/\/expenses\/exp-movistar$/);
+  await expect(page.getByRole("heading", { name: "Movistar" })).toBeVisible();
+
+  // Atrás vuelve al listado, sin la hoja abierta.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("dialog", { name: "Movistar" })).toHaveCount(0);
+});
+
+test("a charge's actions open with the keyboard", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-23T10:00:00"));
+  await loadDemoStore(page);
+  await page.goto("/");
+  await expect(page.getByText("Atrasado")).toBeVisible();
+
+  const row = page.locator('[data-expense-row="true"]').filter({ hasText: "Movistar" }).first();
+  await row.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "Movistar" })).toBeVisible();
 });

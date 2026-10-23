@@ -177,6 +177,13 @@ export function DatePickerField({
         role="dialog"
         aria-modal="true"
         aria-label={label}
+        onKeyDown={(event) => {
+          // Escape cierra solo el selector, no la hoja que lo contiene.
+          if (event.key !== "Escape") return;
+          event.preventDefault();
+          event.stopPropagation();
+          setOpen(false);
+        }}
         className="app-dialog animate-[slide-up-soft_220ms_cubic-bezier(0.22,1,0.36,1)] p-4 sm:max-w-sm"
         style={{ backgroundColor: "var(--app-surface-strong)" }}
       >
@@ -343,6 +350,7 @@ export function DatePickerField({
             <Button
               type="button"
               onClick={() => selectDate(new Date())}
+              disabled={isDisabled(new Date(), min, max)}
               variant="primary"
             >
               {t("common.today", language)}

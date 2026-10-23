@@ -1,4 +1,5 @@
 ﻿import { formatCurrency } from "@/domain/calendar";
+import { paidAmount } from "@/domain/finance";
 import type { AppLanguage, ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
 import { categoryLabel } from "@/shared/category-labels";
 import { categoryToneClass, statusLabel } from "../../lib/expense-actions";
@@ -40,7 +41,7 @@ export function ExpenseRowContent({
             paid ? "app-row-paid" : "text-[var(--app-text)]"
           }`}
         >
-          {formatCurrency(occurrence.template.amount)}
+          {formatCurrency(paid ? paidAmount(occurrence) : occurrence.template.amount)}
         </p>
       </div>
 

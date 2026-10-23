@@ -73,9 +73,20 @@ export function ExpenseRow({
     setDragRef(node);
   }
 
-  function openFromTap() {
+  function openFromTap(event: React.MouseEvent<HTMLDivElement>) {
     // Un deslizamiento o un arrastre acaban con un click que no es un toque.
-    if (dragActive || !swipe.wasTap()) return;
+    // Un click sin puntero (lector de pantalla, teclado) siempre cuenta.
+    const tap = swipe.consumeTap();
+    if (dragActive || (event.detail !== 0 && !tap)) return;
+    onOpenOccurrence?.(occurrence);
+  }
+
+  function openFromKeyboard(event: React.KeyboardEvent<HTMLDivElement>) {
+    listeners?.onKeyDown?.(event);
+    // Espacio arrastra (teclado de dnd-kit); Intro abre las acciones.
+    if (event.key !== "Enter" || event.defaultPrevented || dragActive) return;
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
     onOpenOccurrence?.(occurrence);
   }
 
@@ -105,6 +116,7 @@ export function ExpenseRow({
       data-expense-row="true"
       data-expense-row-id={occurrence.id}
       onClick={openFromTap}
+      onKeyDown={openFromKeyboard}
       className={`relative overflow-visible rounded-2xl ${
         dragActive ? "z-0" : ""
       } ${

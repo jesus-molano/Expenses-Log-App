@@ -102,7 +102,13 @@ export function useSwipeAction({
   return {
     x: state.x,
     phase: state.phase,
-    wasTap: () => !movedRef.current,
+    // Lee y olvida: un desplazamiento que no acabó en click (scroll, gesto
+    // cancelado) no debe anular la próxima activación.
+    consumeTap: () => {
+      const tap = !movedRef.current;
+      movedRef.current = false;
+      return tap;
+    },
     direction: swipeDirection(state.phase),
     swipingLeft: swipeDirection(state.phase) === "left",
     swipingRight: swipeDirection(state.phase) === "right",

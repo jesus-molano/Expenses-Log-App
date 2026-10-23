@@ -51,3 +51,26 @@ describe("adding captured expenses", () => {
     expect(store.overrides[0]).toMatchObject({ occurrenceDate: "2027-03-15" });
   });
 });
+
+describe("paying a different amount", () => {
+  it("records what was paid without changing the planned amount, and unpaying undoes it", async () => {
+    const { payOccurrenceInStore, togglePaidInStore } = await import("./expense-commands");
+    const { generateStoreOccurrences } = await import("@/domain/finance");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-23T10:00:00"));
+    const store = addExpenseToStore(emptyStore, { ...monthly("Luz", 5), amount: 60 });
+    const occurrence = generateStoreOccurrences(store, "2026-10-05", "2026-10-05")[0];
+
+    const paid = payOccurrenceInStore(store, occurrence, 71.2);
+    const paidOccurrence = generateStoreOccurrences(paid, "2026-10-05", "2026-10-05")[0];
+    expect(paidOccurrence).toMatchObject({ status: "paid", template: { amount: 60 } });
+    expect(paidOccurrence.override).toMatchObject({ amountPaid: 71.2 });
+    expect(paidOccurrence.override?.amount).toBeUndefined();
+
+    const unpaid = togglePaidInStore(paid, paidOccurrence);
+    const back = generateStoreOccurrences(unpaid, "2026-10-05", "2026-10-05")[0];
+    expect(back).toMatchObject({ status: "due", template: { amount: 60 } });
+    expect(back.override?.amountPaid).toBeUndefined();
+    vi.useRealTimers();
+  });
+});

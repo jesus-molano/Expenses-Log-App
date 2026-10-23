@@ -71,6 +71,16 @@ export function Sheet({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      // Una capa encima (p. ej. el selector de fecha, en un portal) gestiona
+      // sus propias teclas: Escape la cierra a ella, no a la hoja.
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        !panelRef.current?.contains(target) &&
+        target.closest('[role="dialog"], [role="alertdialog"]')
+      ) {
+        return;
+      }
       if (event.key === "Escape") {
         event.stopPropagation();
         onBackdropClick?.();

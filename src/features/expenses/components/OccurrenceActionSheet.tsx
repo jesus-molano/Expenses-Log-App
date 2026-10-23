@@ -11,7 +11,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { DatePickerField } from "@/components/ui/DatePickerField";
 import { Field } from "@/components/ui/Field";
@@ -25,8 +25,12 @@ import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 
 type OccurrenceActionSheetProps = {
   occurrence: ExpenseOccurrence;
-  // Primer día en que se puede mover (no se mueve a un mes cerrado).
+  // Primer y último día a los que se puede mover: no a un mes cerrado ni más
+  // allá del mes que se puede ver.
   minMoveDate: string;
+  maxMoveDate: string;
+  // Lo pagado de un mes cerrado es historial y no se mueve.
+  canMove: boolean;
   language: AppLanguage;
   onClose: () => void;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
@@ -43,6 +47,8 @@ type Mode = "actions" | "amount" | "move";
 export function OccurrenceActionSheet({
   occurrence,
   minMoveDate,
+  maxMoveDate,
+  canMove,
   language,
   onClose,
   onTogglePaid,
@@ -59,6 +65,16 @@ export function OccurrenceActionSheet({
   const paid = occurrence.status === "paid";
   const locale = language === "en" ? enUS : es;
   const name = occurrence.template.name;
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  // Al cambiar de modo, el foco pasa al primer control del nuevo contenido
+  // en lugar de perderse en el documento.
+  useEffect(() => {
+    if (mode === "actions") return;
+    bodyRef.current
+      ?.querySelector<HTMLElement>("input, button:not([disabled])")
+      ?.focus({ preventScroll: true });
+  }, [mode]);
 
   function run(action: () => void) {
     action();
@@ -94,7 +110,7 @@ export function OccurrenceActionSheet({
           </header>
         </div>
 
-        <div className="grid gap-2 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        <div ref={bodyRef} className="grid gap-2 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
           {mode === "actions" ? (
             <>
               <Button
@@ -112,9 +128,11 @@ export function OccurrenceActionSheet({
                   {t("expenses.occurrencePayOther", language)}
                 </Button>
               ) : null}
-              <Button leadingIcon={<CalendarClock size={17} />} onClick={() => setMode("move")}>
-                {t("expenses.occurrenceMove", language)}
-              </Button>
+              {canMove ? (
+                <Button leadingIcon={<CalendarClock size={17} />} onClick={() => setMode("move")}>
+                  {t("expenses.occurrenceMove", language)}
+                </Button>
+              ) : null}
               {!paid ? (
                 <Button
                   leadingIcon={<SkipForward size={17} />}
@@ -126,7 +144,9 @@ export function OccurrenceActionSheet({
               <Button
                 variant="ghost"
                 leadingIcon={<Pencil size={17} />}
-                onClick={() => run(() => onEditSeries(occurrence))}
+                // Sin cerrar antes: la navegación sustituye la entrada de la hoja en el
+                // historial (cerrarla haría un "atrás" que cancela la navegación).
+                onClick={() => onEditSeries(occurrence)}
               >
                 {t("expenses.occurrenceEditSeries", language)}
               </Button>
@@ -169,12 +189,15 @@ export function OccurrenceActionSheet({
                   label={t("expenses.occurrenceMoveTo", language)}
                   language={language}
                   min={minMoveDate}
+                  max={maxMoveDate}
                 />
               </Field>
               <Button
                 variant="primary"
                 size="lg"
-                disabled={moveDate === occurrence.dueDate || moveDate < minMoveDate}
+                disabled={
+                  moveDate === occurrence.dueDate || moveDate < minMoveDate || moveDate > maxMoveDate
+                }
                 onClick={() => run(() => onMove(occurrence, moveDate))}
               >
                 {t("expenses.occurrenceMoveConfirm", language)}

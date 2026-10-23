@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExpenseOccurrence } from "@/domain/types";
-import { isDropTargetAllowed, resolveDragMove } from "./dnd-move-policy";
+import { canMoveOccurrence, isDropTargetAllowed, resolveDragMove } from "./dnd-move-policy";
 
 function occurrence(dueDate: string, record = false): ExpenseOccurrence {
   return {
@@ -110,5 +110,16 @@ describe("resolveDragMove", () => {
         openMonth: "2026-10",
       }),
     ).toBe("single");
+  });
+});
+
+describe("canMoveOccurrence", () => {
+  const occurrence = (dueDate: string, status: "due" | "paid") =>
+    ({ dueDate, status }) as Parameters<typeof canMoveOccurrence>[0];
+
+  it("keeps paid charges of a closed month as history", () => {
+    expect(canMoveOccurrence(occurrence("2026-09-08", "paid"), "2026-10")).toBe(false);
+    expect(canMoveOccurrence(occurrence("2026-09-08", "due"), "2026-10")).toBe(true);
+    expect(canMoveOccurrence(occurrence("2026-10-08", "paid"), "2026-10")).toBe(true);
   });
 });

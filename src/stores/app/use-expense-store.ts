@@ -36,6 +36,7 @@ import {
   reopenMonthInStore,
   restoreOccurrenceInStore,
   skipOccurrenceInStore,
+  payOccurrenceInStore,
   togglePaidInStore,
   updateIncomeEventInStore,
   updateLanguageInStore,
@@ -170,6 +171,10 @@ function useExpenseStoreValue() {
     persist(togglePaidInStore(current(), occurrence));
   }
 
+  function payOccurrence(occurrence: ExpenseOccurrence, amountPaid: number) {
+    persist(payOccurrenceInStore(current(), occurrence, amountPaid));
+  }
+
   function skipOccurrence(occurrence: ExpenseOccurrence) {
     persist(skipOccurrenceInStore(current(), occurrence));
   }
@@ -263,6 +268,7 @@ function useExpenseStoreValue() {
     clearExpenses,
     clearIncome,
     togglePaid,
+    payOccurrence,
     skipOccurrence,
     restoreOccurrence,
     dismissLastChanceReminder,
