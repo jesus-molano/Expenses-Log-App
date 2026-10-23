@@ -1,5 +1,6 @@
 import {
   addDays,
+  differenceInCalendarDays,
   format,
   isSaturday,
   isSunday,
@@ -65,7 +66,5 @@ export function formatShortDate(date: string): string {
 }
 
 export function daysBetween(from: string, to: string): number {
-  const start = parseISO(from);
-  const end = parseISO(to);
-  return Math.ceil((end.getTime() - start.getTime()) / 86_400_000);
+  return differenceInCalendarDays(parseISO(to), parseISO(from));
 }
