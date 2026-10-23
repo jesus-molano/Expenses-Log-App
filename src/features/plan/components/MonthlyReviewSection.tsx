@@ -11,14 +11,13 @@ import type {
   IncomeEventInput,
   MonthlyExpenseOverrideInput,
 } from "@/stores/app/store-types";
-import { phaseLabel, planCopy } from "../lib/plan-dashboard";
+import { phaseLabel } from "../lib/plan-dashboard";
 import type { MoneySeriesItem } from "../types";
 import { MonthlyExpenseBreakdown } from "./MonthlyExpenseBreakdown";
 import { MonthlyIncomeEventsList } from "./MonthlyIncomeEventsList";
 
 export function MonthlyReviewSection({
   language,
-  copy,
   reviewYear,
   availableYears,
   selectedSummary,
@@ -42,7 +41,6 @@ export function MonthlyReviewSection({
   onUpdateMonthlyExpense,
 }: {
   language: AppLanguage;
-  copy: ReturnType<typeof planCopy>;
   reviewYear: number;
   availableYears: number[];
   selectedSummary: MoneySeriesItem;
@@ -72,10 +70,10 @@ export function MonthlyReviewSection({
           id="monthly-review-title"
           className="app-plan-section-title text-[var(--app-text)]"
         >
-          {copy.monthlyReview}
+          {t("plan.monthlyReview", language)}
         </h2>
         <p className="mt-1 text-sm text-[var(--app-text-muted)]">
-          {copy.comparedWithPrevious}
+          {t("plan.comparedWithPrevious", language)}
         </p>
       </header>
       <div className="mt-4 grid grid-cols-[0.8fr_1.2fr] gap-3">
@@ -107,33 +105,33 @@ export function MonthlyReviewSection({
 
       <div className="mt-4 flex flex-wrap items-center gap-2 px-1 text-xs font-semibold">
         <span className="rounded-full bg-[var(--app-panel-soft-alpha)] px-2.5 py-1 text-[var(--app-text-muted)]">
-          {phaseLabel(selectedSummary.phase, copy)}
+          {phaseLabel(selectedSummary.phase, language)}
         </span>
         {selectedHasLegacyHistory ? (
           <span className="rounded-full bg-[color-mix(in_srgb,var(--app-warning)_12%,transparent)] px-2.5 py-1 text-[var(--app-warning)]">
-            {copy.legacyDerived}
+            {t("plan.legacyDerived", language)}
           </span>
         ) : null}
       </div>
 
       <dl className="app-plan-review-summary mt-5 grid gap-1 rounded-[var(--app-radius-lg)] p-2">
         <ReviewDelta
-          label={copy.recurringExpenses}
+          label={t("plan.recurringExpenses", language)}
           value={selectedSummary.expenses}
           previous={previousSummary.expenses}
         />
         <ReviewDelta
-          label={copy.paid}
+          label={t("plan.paid", language)}
           value={selectedSummary.paid ?? 0}
           previous={previousSummary.paid ?? 0}
         />
         <ReviewDelta
-          label={copy.actualSavings}
+          label={t("plan.actualSavings", language)}
           value={selectedSummary.savings}
           previous={previousSummary.savings}
         />
         <ReviewDelta
-          label={copy.freeAccordingToPlan}
+          label={t("plan.freeAccordingToPlan", language)}
           value={selectedSummary.remaining}
           previous={previousSummary.remaining}
         />
@@ -141,10 +139,10 @@ export function MonthlyReviewSection({
 
       <div className="mt-3 flex justify-end gap-2">
         <Button size="sm" variant="ghost" onClick={onEditSalary}>
-          {copy.editFixedIncome}
+          {t("plan.editFixedIncome", language)}
         </Button>
         <Button size="sm" variant="ghost" onClick={onEditSavings}>
-          {copy.editSavings}
+          {t("plan.editSavings", language)}
         </Button>
       </div>
 

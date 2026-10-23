@@ -76,7 +76,7 @@ export function DashboardShell({
       </div>
 
       <nav
-        aria-label={language === "es" ? "Secciones" : "Sections"}
+        aria-label={t("common.sections", language)}
         className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2"
       >
         <div className="app-bottom-nav mx-auto grid max-w-md grid-cols-2 gap-2 p-1.5 text-sm font-semibold">

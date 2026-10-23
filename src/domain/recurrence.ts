@@ -208,23 +208,3 @@ export function generateOccurrences(
     )
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 }
-
-export function recurrenceLabel(rule: RecurrenceRule): string {
-  if (rule.frequency === "once") return "Pago unico";
-  if (rule.frequency === "monthly") return "Mensual";
-  if (rule.frequency === "quarterly") return "Trimestral";
-  if (rule.frequency === "yearly") return "Anual";
-  if (rule.frequency === "rrule") return "Avanzada";
-
-  const interval = rule.interval ?? 1;
-  const unit = rule.unit ?? "month";
-  const units = {
-    day: "días",
-    week: "semanas",
-    month: "meses",
-    year: "años",
-  };
-
-  return `Cada ${interval} ${units[unit]}`;
-}
-

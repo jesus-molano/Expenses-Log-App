@@ -45,21 +45,17 @@ export function MonthlyTrendChart({
         />
         <ChartLegendItem
           color={chartSeriesColors.savings}
-          label={language === "es" ? "Ahorro real" : "Actual savings"}
+          label={t("plan.actualSavings", language)}
         />
         <ChartLegendItem
           color={chartSeriesColors.capacity}
-          label={language === "es" ? "Capacidad máxima" : "Maximum capacity"}
+          label={t("plan.annualCapacity", language)}
         />
       </div>
       <div
         ref={containerRef}
         role="img"
-        aria-label={
-          language === "es"
-            ? "Comparación mensual de gastos recurrentes, ahorro real y capacidad máxima"
-            : "Monthly comparison of recurring expenses, actual savings and maximum capacity"
-        }
+        aria-label={t("plan.chartLabel", language)}
         className="app-chart-shell mt-4 h-52 min-h-52 min-w-0 overflow-hidden"
       >
         {ready ? (
@@ -165,7 +161,7 @@ export function MonthlyTrendChart({
               />
               <Bar
                 dataKey="savings"
-                name={language === "es" ? "Ahorro real" : "Actual savings"}
+                name={t("plan.actualSavings", language)}
                 fill="url(#chartSavingsGradient)"
                 maxBarSize={18}
                 radius={[7, 7, 2, 2]}
@@ -173,7 +169,7 @@ export function MonthlyTrendChart({
               <Line
                 type="monotone"
                 dataKey="capacity"
-                name={language === "es" ? "Capacidad máxima" : "Maximum capacity"}
+                name={t("plan.annualCapacity", language)}
                 stroke={chartSeriesColors.capacity}
                 strokeWidth={2}
                 strokeDasharray="6 5"
