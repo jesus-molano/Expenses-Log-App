@@ -4,11 +4,17 @@ Mobile-first recurring expense tracker inspired by iPhone Reminders.
 
 ## Features
 
-- Smart lists: Hoy, Proximos, Todos, Realizados.
+- Month timeline (overdue, today, upcoming, paid) and an "All expenses"
+  catalog with search and filters by status, frequency and category.
 - Recurring expenses: mensual, trimestral, anual, custom and RRULE-ready.
 - One-tap paid state with occurrence overrides.
 - Weekend charge estimate for Spain/Canary defaults.
-- Tags/categories, local persistence and Supabase sync.
+- Preset and custom categories (create, rename, recolour, delete moving their
+  expenses), local persistence and Supabase sync.
+- Contract details per expense: notes, cancellation link, commitment end date
+  (with a heads-up 30 days before) and payment method.
+- Getting-started guide on an empty app: quick-add chips for common fixed
+  expenses and a checklist (salary, first expense, reminders, install).
 - Manual-first expense capture; text analysis remains an optional secondary
   shortcut.
 - Plan split into current month, annual projection and monthly review. It keeps
@@ -19,6 +25,9 @@ Mobile-first recurring expense tracker inspired by iPhone Reminders.
 - Per-expense Web Push reminders in the configured pre-charge window, with
   catch-up, device health/test controls and recoverable delivery leases.
 - Optional AI quick entry through Gemini; local parser fallback if no key exists.
+  Both understand orders on existing expenses ("marca la luz pagada 71,20",
+  "salta el gimnasio este mes", "mueve Netflix al 10"), always confirmed
+  before applying.
 - Build-aware offline PWA after the first production visit, including internal
   navigation between Expenses, Plan and Settings.
 - Eight Noctalia-aligned themes with semantic chart and UI colors.

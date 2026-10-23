@@ -1,4 +1,4 @@
-import { resolvePresetCategory } from "@/domain/categories";
+import { EXPENSE_DETAIL_KEYS, sanitizeExpenseDetails } from "@/domain/expense-details";
 import type {
   AppLanguage,
   DraftExpense,
@@ -29,18 +29,25 @@ export function expenseEditorValues(
       name: template.name,
       description: template.description,
       amount,
-      categoryName: resolvePresetCategory(categoryName ?? "General").name,
+      // El nombre tal cual: una categoría propia no debe volver a General.
+      categoryName: categoryName ?? "General",
       startDate: template.startDate,
       dueDay: template.dueDay,
       endDate: template.endDate,
       recurrence: template.recurrence,
       reminder: template.reminder,
+      notes: template.notes,
+      cancellationUrl: template.cancellationUrl,
+      commitmentEndDate: template.commitmentEndDate,
+      paymentMethod: template.paymentMethod,
+      paymentMethodDetail: template.paymentMethodDetail,
     },
   };
 }
 
 // El formulario tal como se guarda (la categoría se resuelve después contra
-// el store y el importe sale de `amountText`).
+// el store y el importe sale de `amountText`). Los datos de contrato van
+// saneados en `details`: lo vacío o inválido no está.
 export function normalizeEditorDraft(form: DraftExpense, fallbackStartDate: string) {
   return {
     name: form.name.trim(),
@@ -51,6 +58,7 @@ export function normalizeEditorDraft(form: DraftExpense, fallbackStartDate: stri
     endDate: form.endDate || undefined,
     recurrence: form.recurrence,
     reminder: form.reminder,
+    details: sanitizeExpenseDetails(form),
   };
 }
 
@@ -104,6 +112,7 @@ export function hasUnsavedExpenseChanges(
     before.dueDay === after.dueDay &&
     before.endDate === after.endDate &&
     sameRecurrence(before.recurrence, after.recurrence) &&
-    sameReminder(before.reminder, after.reminder)
+    sameReminder(before.reminder, after.reminder) &&
+    EXPENSE_DETAIL_KEYS.every((key) => before.details[key] === after.details[key])
   );
 }

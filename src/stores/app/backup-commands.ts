@@ -67,6 +67,9 @@ export function replaceStoreContents(
   { scope, now = new Date() }: { scope: ImportScope; now?: Date },
 ): ExpenseStore {
   const stamp = now.toISOString();
+  // Las categorías también: una copia antigua sin fecha perdería frente a la
+  // versión con fecha de la nube (`latestUpdated`).
+  const categories = imported.categories.map((category) => ({ ...category, updatedAt: stamp }));
   const templates = imported.templates.map((template) => ({ ...template, updatedAt: stamp }));
   const templateIds = new Set(templates.map((template) => template.id));
   const overrides = replaceOverrides(current.overrides, imported.overrides, templateIds, stamp);
@@ -74,7 +77,7 @@ export function replaceStoreContents(
   const base: ExpenseStore = {
     ...(scope === "all" ? imported : current),
     schemaVersion: 3,
-    categories: imported.categories,
+    categories,
     templates,
     overrides,
     occurrenceRecords: imported.occurrenceRecords ?? [],
@@ -92,7 +95,7 @@ export function replaceStoreContents(
   ).map((record) => record.id);
 
   const kept = {
-    categories: ids(imported.categories),
+    categories: ids(categories),
     templates: templateIds,
     overrides: ids(overrides),
     occurrenceRecords: ids(occurrenceRecords),

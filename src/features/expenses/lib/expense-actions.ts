@@ -1,5 +1,7 @@
-﻿import { daysBetween } from "@/domain/calendar";
+import { daysBetween } from "@/domain/calendar";
 import { resolvePresetCategory } from "@/domain/categories";
+import { sanitizeExpenseDetails } from "@/domain/expense-details";
+import { foldText } from "@/domain/text";
 import { format, parseISO } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import type {
@@ -16,22 +18,23 @@ export function createId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+// La categoría del usuario con ese nombre (también las propias, sin tildes ni
+// mayúsculas) o, si no existe, la preset equivalente (General si no hay).
 export function findOrCreateCategory(
   store: ExpenseStore,
   categoryName: string,
 ): { store: ExpenseStore; categoryId: string } {
-  const presetCategory = resolvePresetCategory(categoryName);
-  const normalizedName = presetCategory.name;
-  const existing = store.categories.find(
-    (category) => category.name.toLowerCase() === normalizedName.toLowerCase(),
-  );
+  const sameName = findCategoryByName(store.categories, categoryName);
+  if (sameName) return { store, categoryId: sameName.id };
 
+  const presetCategory = resolvePresetCategory(categoryName);
+  const existing = findCategoryByName(store.categories, presetCategory.name);
   if (existing) return { store, categoryId: existing.id };
 
   const category: ExpenseCategory = {
     id: createId("cat"),
     userId: "demo",
-    name: normalizedName,
+    name: presetCategory.name,
     icon: presetCategory.icon,
     tone: presetCategory.tone,
     updatedAt: new Date().toISOString(),
@@ -44,6 +47,13 @@ export function findOrCreateCategory(
       categories: [...store.categories, category],
     },
   };
+}
+
+export function findCategoryByName(categories: ExpenseCategory[], name: string) {
+  const folded = foldText(name);
+  return folded
+    ? categories.find((category) => foldText(category.name) === folded)
+    : undefined;
 }
 
 export function buildTemplateFromDraft(
@@ -66,6 +76,7 @@ export function buildTemplateFromDraft(
     dueDay: draft.dueDay,
     recurrence: draft.recurrence,
     reminder: draft.reminder,
+    ...sanitizeExpenseDetails(draft),
     active: true,
     createdAt: now,
     updatedAt: now,

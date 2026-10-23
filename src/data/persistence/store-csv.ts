@@ -1,6 +1,7 @@
 import { endOfMonth } from "date-fns";
 import { normalizeDateOnly, toDateOnly } from "@/domain/calendar";
-import { resolvePresetCategory } from "@/domain/categories";
+import { isCategoryTone, newCategoryFields } from "@/domain/categories";
+import { sanitizeExpenseDetails } from "@/domain/expense-details";
 import {
   earliestOccurrenceDate,
   generateStoreOccurrences,
@@ -18,6 +19,7 @@ import { emptyStore } from "@/domain/seed";
 import { foldText } from "@/domain/text";
 import type {
   AppLanguage,
+  CategoryTone,
   ExpenseAmountChange,
   ExpenseCategory,
   ExpenseOccurrence,
@@ -46,7 +48,8 @@ import { normalizeExpenseStore } from "./store-normalization";
 // cobro concreto del histórico o con cambios). Las cabeceras y los valores de
 // frecuencia y estado no se traducen para poder volver a importarlo; los
 // nombres de categoría salen como se ven en la app y se reconocen en los dos
-// idiomas al importar.
+// idiomas al importar (las propias, por su nombre, con su color en
+// `category_tone`). Los datos de contrato van en las filas `expense`.
 export const CSV_COLUMNS = [
   "type",
   "expense_id",
@@ -73,6 +76,12 @@ export const CSV_COLUMNS = [
   "paid_at",
   "amount_paid",
   "updated_at",
+  "category_tone",
+  "notes",
+  "cancellation_url",
+  "commitment_end_date",
+  "payment_method",
+  "payment_method_detail",
 ] as const;
 
 type CsvColumn = (typeof CSV_COLUMNS)[number];
@@ -88,11 +97,10 @@ export function storeToCsv(
   store: ExpenseStore,
   { today = new Date(), language = "es" }: { today?: Date; language?: AppLanguage } = {},
 ): string {
-  const categoryNames = new Map(
-    store.categories.map((category) => [category.id, category.name]),
-  );
+  const categoriesById = new Map(store.categories.map((category) => [category.id, category]));
   const labelFor = (categoryId: string, fallback = "General") =>
-    categoryLabel(categoryNames.get(categoryId) ?? fallback, language);
+    categoryLabel(categoriesById.get(categoryId)?.name ?? fallback, language);
+  const toneFor = (categoryId: string) => categoriesById.get(categoryId)?.tone ?? "";
 
   const expenseRows = store.templates.map((template) =>
     toCells({
@@ -100,6 +108,7 @@ export function storeToCsv(
       expense_id: template.id,
       name: protectSpreadsheetText(template.name),
       category: labelFor(template.categoryId),
+      category_tone: toneFor(template.categoryId),
       amount: formatAmount(template.amount),
       currency: template.currency,
       ...recurrenceCells(template.recurrence),
@@ -112,6 +121,11 @@ export function storeToCsv(
       reminder_days: reminderCell(template.reminder),
       description: protectSpreadsheetText(template.description),
       updated_at: template.updatedAt,
+      notes: protectSpreadsheetText(template.notes ?? ""),
+      cancellation_url: template.cancellationUrl ?? "",
+      commitment_end_date: template.commitmentEndDate ?? "",
+      payment_method: template.paymentMethod ?? "",
+      payment_method_detail: protectSpreadsheetText(template.paymentMethodDetail ?? ""),
     }),
   );
   const occurrenceRows = historyOccurrences(store, today, language).map((occurrence) =>
@@ -120,6 +134,7 @@ export function storeToCsv(
       expense_id: occurrence.template.id,
       name: protectSpreadsheetText(occurrence.template.name),
       category: labelFor(occurrence.template.categoryId, occurrence.record?.categoryName),
+      category_tone: toneFor(occurrence.template.categoryId),
       amount: formatAmount(occurrence.template.amount),
       currency: occurrence.template.currency,
       occurrence_date: occurrence.occurrenceDate,
@@ -255,7 +270,7 @@ export function csvToStore(
     nowIso: now.toISOString(),
     today: toDateOnly(now),
     currentMonthId: toMonthId(now),
-    categories: createCategoryRegistry(current?.categories ?? []),
+    categories: createCategoryRegistry(current?.categories ?? [], now.toISOString()),
   };
   let skippedRows = 0;
 
@@ -332,7 +347,7 @@ function templateFromRow(row: CsvRow, context: RowContext): ExpenseTemplate | nu
     description: readText(row.description),
     amount,
     currency: "EUR",
-    categoryId: context.categories.idFor(resolveCategoryName(readText(row.category))),
+    categoryId: context.categories.idFor(readText(row.category), readTone(row.category_tone)),
     startDate,
     ...(endDate && endDate >= startDate ? { endDate } : {}),
     dueDay: readInteger(row.due_day, 1, 31) ?? Number(startDate.slice(8, 10)),
@@ -341,6 +356,15 @@ function templateFromRow(row: CsvRow, context: RowContext): ExpenseTemplate | nu
     ...(amountChanges ? { amountChanges } : {}),
     ...(pauses ? { pauses } : {}),
     active: !/^(false|0|no|n)$/i.test(row.active ?? ""),
+    // Lo ilegible (un enlace que no es http(s), una fecha imposible) se queda
+    // fuera, como al normalizar el store.
+    ...sanitizeExpenseDetails({
+      notes: readText(row.notes),
+      cancellationUrl: row.cancellation_url,
+      commitmentEndDate: row.commitment_end_date,
+      paymentMethod: foldText(row.payment_method ?? ""),
+      paymentMethodDetail: readText(row.payment_method_detail),
+    }),
     createdAt: updatedAt,
     updatedAt,
   };
@@ -394,7 +418,10 @@ function occurrenceFromRow(
     status === "paid" ? parseMoneyInput(row.amount_paid ?? "") ?? undefined : undefined;
   const plannedAmount = parseMoneyInput(row.amount ?? "");
   const name = readText(row.name);
-  const categoryName = row.category ? resolveCategoryName(readText(row.category)) : null;
+  const categoryTone = readTone(row.category_tone);
+  const categoryName = row.category
+    ? context.categories.resolve(readText(row.category), categoryTone)
+    : null;
 
   // Un mes ya cerrado se guarda como histórico, igual que lo hace la app al
   // cerrarlo: así se conserva aunque el gasto ya no exista o haya cambiado.
@@ -422,7 +449,7 @@ function occurrenceFromRow(
         description: template?.description ?? "",
         plannedAmount: recordAmount,
         currency: "EUR",
-        categoryId: context.categories.idFor(recordCategory),
+        categoryId: context.categories.idFor(recordCategory, categoryTone),
         categoryName: recordCategory,
         status,
         sortOrder: 0,
@@ -437,7 +464,7 @@ function occurrenceFromRow(
 
   const template = templates.get(templateId);
   if (!template) return null;
-  const categoryId = categoryName ? context.categories.idFor(categoryName) : null;
+  const categoryId = categoryName ? context.categories.idFor(categoryName, categoryTone) : null;
   const patch: Partial<ExpenseOccurrenceOverride> = {
     ...(dueDate !== occurrenceDate ? { dueDate } : {}),
     // Lo previsto de ese cobro ya cuenta los cambios de precio de la serie.
@@ -472,27 +499,41 @@ function occurrenceFromRow(
 type CategoryRegistry = ReturnType<typeof createCategoryRegistry>;
 
 // Reutiliza la categoría que ya existe con ese nombre (sin tildes) para no
-// duplicarla al combinar; si no, crea la del preset.
-function createCategoryRegistry(existing: ExpenseCategory[]) {
+// duplicarla al combinar; si no, crea la preset o una propia con el color de
+// la fila (`newCategoryFields`).
+function createCategoryRegistry(existing: ExpenseCategory[], nowIso: string) {
   const byName = new Map(existing.map((category) => [foldText(category.name), category]));
   const byId = new Map(existing.map((category) => [category.id, category]));
   const used = new Map<string, ExpenseCategory>();
 
+  // Nombre guardado de una etiqueta del CSV: las del dispositivo y las ya
+  // creadas en esta importación se reconocen antes que las preset. Una fila
+  // con color (`category_tone`) es de una exportación de la app: su etiqueta
+  // es la de una preset o el nombre de una propia, así que los alias solo
+  // valen para las hojas hechas a mano.
+  function resolve(label: string, tone?: CategoryTone) {
+    return resolveCategoryName(
+      label,
+      Array.from(byName.values(), (category) => category.name),
+      { aliases: tone === undefined },
+    );
+  }
+
   return {
+    resolve,
     nameOf(id: string | undefined) {
       return id ? (byId.get(id) ?? used.get(id))?.name : undefined;
     },
-    idFor(name: string) {
+    idFor(label: string, tone?: CategoryTone) {
+      const name = resolve(label, tone);
       const key = foldText(name);
       let category = byName.get(key);
       if (!category) {
-        const preset = resolvePresetCategory(name);
         category = {
           id: `cat-${crypto.randomUUID()}`,
           userId: "demo",
-          name: preset.name,
-          icon: preset.icon,
-          tone: preset.tone,
+          ...newCategoryFields(name, tone),
+          updatedAt: nowIso,
         };
         byName.set(key, category);
       }
@@ -501,6 +542,11 @@ function createCategoryRegistry(existing: ExpenseCategory[]) {
     },
     used: () => Array.from(used.values()),
   };
+}
+
+function readTone(value: string | undefined): CategoryTone | undefined {
+  const tone = foldText(value ?? "");
+  return isCategoryTone(tone) ? tone : undefined;
 }
 
 function readText(value: string | undefined) {

@@ -1,5 +1,9 @@
+import { canMoveOccurrence } from "@/domain/budget-month";
 import type { ExpenseOccurrence } from "@/domain/types";
 import type { DropTarget } from "./expense-dnd-target";
+
+// Vive en el dominio porque las órdenes de la captura siguen la misma regla.
+export { canMoveOccurrence };
 
 export type DragMoveAction = "ignore" | "single" | "series";
 
@@ -10,12 +14,6 @@ export type DragMoveAction = "ignore" | "single" | "series";
 // - Lo pagado de un mes cerrado es historial y no se mueve.
 // - Lo pendiente de meses anteriores (o con registro histórico) solo mueve ese
 //   cobro: cambiar la serie desde ahí reescribiría meses cerrados.
-// Lo pagado de un mes cerrado es historial y no se mueve (ni arrastrando ni
-// desde las acciones del cobro).
-export function canMoveOccurrence(occurrence: ExpenseOccurrence, openMonth: string) {
-  return !(occurrence.dueDate.slice(0, 7) < openMonth && occurrence.status !== "due");
-}
-
 // Con el ciclo anclado al cobro los meses no empiezan el día 1: `floorDate`
 // es el primer día en que se puede soltar (`cycleDropFloorDate`).
 export function resolveDragMove({

@@ -1,7 +1,9 @@
+import type { CategoryInput } from "@/domain/categories";
 import { DEFAULT_REMINDER_PREFERENCES } from "@/domain/reminder-schedule";
 import type {
   AppLanguage,
   DraftExpense,
+  ExpenseCategory,
   ReminderPreferences,
 } from "@/domain/types";
 import { t } from "@/shared/i18n";
@@ -11,6 +13,7 @@ import {
   ExpenseField,
   ExpenseSchedulePicker,
 } from "./ExpenseFormControls";
+import { ExpenseDetailsFields } from "./form/ExpenseDetailsFields";
 import { ReminderControls } from "./form/ReminderControls";
 
 type ExpenseFormProps = {
@@ -19,6 +22,9 @@ type ExpenseFormProps = {
   language: AppLanguage;
   // Aviso por defecto de Ajustes, para mostrar el de un gasto sin ajuste propio.
   reminderPreferences?: ReminderPreferences;
+  // Categorías guardadas (propias y colores) y alta de una nueva.
+  categories?: ExpenseCategory[];
+  onCreateCategory?: (input: CategoryInput) => string | null;
   onFormChange: (form: DraftExpense) => void;
   onAmountTextChange: (value: string) => void;
 };
@@ -28,6 +34,8 @@ export function ExpenseForm({
   amountText,
   language,
   reminderPreferences = DEFAULT_REMINDER_PREFERENCES,
+  categories,
+  onCreateCategory,
   onFormChange,
   onAmountTextChange,
 }: ExpenseFormProps) {
@@ -81,6 +89,8 @@ export function ExpenseForm({
       <CategoryPicker
         value={form.categoryName}
         language={language}
+        categories={categories}
+        onCreateCategory={onCreateCategory}
         onChange={(categoryName) => onFormChange({ ...form, categoryName })}
       />
 
@@ -96,6 +106,8 @@ export function ExpenseForm({
         language={language}
         onChange={onFormChange}
       />
+
+      <ExpenseDetailsFields value={form} language={language} onChange={onFormChange} />
     </div>
   );
 }

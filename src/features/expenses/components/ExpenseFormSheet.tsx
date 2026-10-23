@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { toDateOnly } from "@/domain/calendar";
+import type { CategoryInput } from "@/domain/categories";
 import type { CapturedDraft } from "@/domain/expense-capture";
 import {
   firstChargeAlreadyPassed,
@@ -13,6 +14,7 @@ import type {
   AppLanguage,
   CreateExpenseOptions,
   DraftExpense,
+  ExpenseCategory,
   OccurrenceStatus,
   ReminderPreferences,
 } from "@/domain/types";
@@ -36,6 +38,8 @@ type ExpenseFormSheetProps = {
   notice?: CaptureReason | null;
   language?: AppLanguage;
   reminderPreferences?: ReminderPreferences;
+  categories?: ExpenseCategory[];
+  onCreateCategory?: (input: CategoryInput) => string | null;
   onClose: () => void;
   onSave: (draft: DraftExpense, options?: CreateExpenseOptions) => void;
 };
@@ -47,6 +51,8 @@ export function ExpenseFormSheet({
   notice = null,
   language = "es",
   reminderPreferences,
+  categories,
+  onCreateCategory,
   onClose,
   onSave,
 }: ExpenseFormSheetProps) {
@@ -136,6 +142,8 @@ export function ExpenseFormSheet({
             amountText={amountText}
             language={language}
             reminderPreferences={reminderPreferences}
+            categories={categories}
+            onCreateCategory={onCreateCategory}
             onFormChange={setForm}
             onAmountTextChange={setAmountText}
           />

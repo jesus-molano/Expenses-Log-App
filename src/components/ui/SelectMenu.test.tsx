@@ -47,4 +47,46 @@ describe("SelectMenu", () => {
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Two" })).toBeInTheDocument();
   });
+
+  it("sorts by label unless asked to keep the given order", () => {
+    const options = [
+      { value: "all", label: "Todas" },
+      { value: "b", label: "Anuales" },
+    ];
+    const { rerender } = render(
+      <SelectMenu open onOpenChange={() => {}} value="all" onChange={() => {}} options={options} />,
+    );
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Anuales",
+      "Todas",
+    ]);
+
+    rerender(
+      <SelectMenu
+        open
+        keepOrder
+        onOpenChange={() => {}}
+        value="all"
+        onChange={() => {}}
+        options={options}
+      />,
+    );
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Todas",
+      "Anuales",
+    ]);
+  });
+
+  it("closes only itself on Escape, without reaching the sheet underneath", () => {
+    const onDocumentKeyDown = vi.fn();
+    document.addEventListener("keydown", onDocumentKeyDown);
+    render(<SelectMenuHarness />);
+    fireEvent.click(screen.getByRole("button", { name: "One" }));
+
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(onDocumentKeyDown).not.toHaveBeenCalled();
+    document.removeEventListener("keydown", onDocumentKeyDown);
+  });
 });

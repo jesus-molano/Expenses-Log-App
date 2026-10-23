@@ -29,11 +29,14 @@ import { applyAppTheme } from "@/shared/theme";
 import {
   addExpenseToStore,
   addExpensesToStore,
+  applyCaptureCommandsInStore,
   addIncomeEventToStore,
   clearExpensesFromStore,
   clearIncomeFromStore,
   closeMonthInStore,
+  createCategoryInStore,
   deleteBalanceCheckinInStore,
+  deleteCategoryInStore,
   deleteExpenseFromStore,
   deleteIncomeEventFromStore,
   dismissLastChanceReminderInStore,
@@ -52,6 +55,7 @@ import {
   reopenMonthInStore,
   restoreOccurrenceInStore,
   resumeSeriesInStore,
+  revertCaptureCommandsInStore,
   scheduleAmountChangeInStore,
   setSeriesAmountInStore,
   setTemplateReminderInStore,
@@ -60,6 +64,7 @@ import {
   togglePaidInStore,
   undoSalaryReceiptInStore,
   updateBudgetCycleInStore,
+  updateCategoryInStore,
   updateIncomeEventInStore,
   updateLanguageInStore,
   updateMoneySettingsInStore,
@@ -74,6 +79,11 @@ import {
   type SeriesAmountScope,
 } from "./store-commands";
 import type { ImportMode, ImportScope } from "./backup-commands";
+import type {
+  CaptureCommandChange,
+  ConfirmedCaptureCommand,
+} from "./capture-command-actions";
+import type { CategoryInput } from "./category-commands";
 import type {
   IncomeEventInput,
   MoneySettingsInput,
@@ -341,6 +351,30 @@ function useExpenseStoreValue() {
     persist(undoSalaryReceiptInStore(current(), monthId));
   }
 
+  // Devuelve el id de la categoría (la existente si ya había una con ese
+  // nombre) o null si el nombre no es válido.
+  function createCategory(input: CategoryInput): string | null {
+    const result = createCategoryInStore(current(), input);
+    if (result.store !== current()) persist(result.store);
+    return result.categoryId;
+
+  function updateCategory(categoryId: string, changes: Partial<CategoryInput>) {
+    persist(updateCategoryInStore(current(), categoryId, changes));
+
+  function deleteCategory(categoryId: string, replacementName: string) {
+    persist(deleteCategoryInStore(current(), categoryId, replacementName));
+
+  // Órdenes de la captura ya confirmadas. Devuelve lo necesario para
+  // deshacerlas.
+  function applyCaptureCommands(commands: ConfirmedCaptureCommand[]): CaptureCommandChange[] {
+    const result = applyCaptureCommandsInStore(current(), commands);
+    if (result.changes.length) persist(result.store);
+    return result.changes;
+
+  function revertCaptureCommands(changes: CaptureCommandChange[]) {
+    if (changes.length) persist(revertCaptureCommandsInStore(current(), changes));
+  }
+
   function closeMonth(monthId: string) {
     persist(closeMonthInStore(current(), monthId));
   }
@@ -439,6 +473,11 @@ function useExpenseStoreValue() {
     updateSalaryExtraPay,
     recordSalaryReceipt,
     undoSalaryReceipt,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    applyCaptureCommands,
+    revertCaptureCommands,
     closeMonth,
     reopenMonth,
     importStore,

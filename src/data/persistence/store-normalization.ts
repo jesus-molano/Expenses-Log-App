@@ -2,6 +2,12 @@ import {
   materializeClosedOccurrenceRecords,
   toMonthId,
 } from "@/domain/finance";
+import {
+  CATEGORY_NAME_MAX_LENGTH,
+  isCategoryTone,
+  newCategoryFields,
+} from "@/domain/categories";
+import { EXPENSE_DETAIL_KEYS, sanitizeExpenseDetails } from "@/domain/expense-details";
 import { dedupeOverrides } from "@/domain/overrides";
 import { normalizeAmountChanges, normalizePauses } from "@/domain/recurrence";
 import {
@@ -465,22 +471,6 @@ export function normalizeExpenseStore(
   });
 }
 
-// Las categorías llevan `updatedAt` para fusionarse por entidad; las de
-// stores antiguos no lo tienen y cargan igual. Uno ilegible se quita: sin él
-// gana la copia local, como antes.
-function normalizeCategories(value: unknown): ExpenseCategory[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(isRecord).map((raw) => {
-    const category = raw as ExpenseCategory;
-    if (category.updatedAt === undefined || isTimestamp(category.updatedAt)) {
-      return category;
-    }
-    const withoutTimestamp = { ...category };
-    delete withoutTimestamp.updatedAt;
-    return withoutTimestamp;
-  });
-}
-
 // Repara fechas y día de cobro imposibles (de la IA o de datos antiguos) para
 // que un gasto corrupto no rompa el render ni el resto del store.
 function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
@@ -502,6 +492,10 @@ function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
     const reminder = sanitizeTemplateReminder(template.reminder);
     const amountChanges = normalizeAmountChanges(template.amountChanges);
     const pauses = normalizePauses(template.pauses);
+    // Notas, enlace de baja, permanencia y método de pago: lo ilegible se
+    // descarta sin tocar el resto del gasto.
+    const details = sanitizeExpenseDetails(template);
+    const detailsChanged = EXPENSE_DETAIL_KEYS.some((key) => details[key] !== template[key]);
 
     if (
       startDate === template.startDate &&
@@ -509,7 +503,8 @@ function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
       dueDay === template.dueDay &&
       sameReminder(reminder, template.reminder) &&
       sameJson(amountChanges, template.amountChanges) &&
-      sameJson(pauses, template.pauses)
+      sameJson(pauses, template.pauses) &&
+      !detailsChanged
     ) {
       return template;
     }
@@ -518,10 +513,53 @@ function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
     delete repaired.reminder;
     delete repaired.amountChanges;
     delete repaired.pauses;
+    for (const key of EXPENSE_DETAIL_KEYS) delete repaired[key];
     if (reminder) repaired.reminder = reminder;
     if (amountChanges) repaired.amountChanges = amountChanges;
     if (pauses) repaired.pauses = pauses;
-    return repaired;
+    return { ...repaired, ...details };
+  });
+}
+
+// Una categoría sin id no se puede referenciar: se descarta. Sin nombre pasa
+// a General, y un color o icono desconocido vuelve al de una categoría nueva
+// con ese nombre (`newCategoryFields`: el de su preset o el neutro). Llevan
+// `updatedAt` para fusionarse por entidad; las de stores
+// antiguos no lo tienen y cargan igual. Uno ilegible se quita y la categoría
+// queda sin fecha: al fusionar pierde frente a una copia con fecha
+// (`latestUpdated`).
+function normalizeCategories(value: unknown): ExpenseCategory[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord).flatMap((raw) => {
+    const category = raw as ExpenseCategory;
+    if (typeof category.id !== "string" || !category.id) return [];
+
+    const rawName = typeof category.name === "string" ? category.name.trim() : "";
+    const name = (rawName || "General").slice(0, CATEGORY_NAME_MAX_LENGTH);
+    const defaults = newCategoryFields(
+      name,
+      isCategoryTone(category.tone) ? category.tone : undefined,
+    );
+    const tone = defaults.tone;
+    const icon =
+      typeof category.icon === "string" && category.icon ? category.icon : defaults.icon;
+    const userId = typeof category.userId === "string" ? category.userId : "demo";
+    const updatedAt = isTimestamp(category.updatedAt) ? category.updatedAt : undefined;
+
+    if (
+      name === category.name &&
+      tone === category.tone &&
+      icon === category.icon &&
+      userId === category.userId &&
+      updatedAt === category.updatedAt
+    ) {
+      return [category];
+    }
+
+    const next: ExpenseCategory = { ...category, name, tone, icon, userId };
+    if (updatedAt) next.updatedAt = updatedAt;
+    else delete next.updatedAt;
+    return [next];
   });
 }
 

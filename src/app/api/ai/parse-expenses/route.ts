@@ -12,13 +12,14 @@ import {
   generateJson,
   type GeminiFailureReason,
 } from "@/data/ai/gemini-client";
+import { normalizeCaptureCommand, type CaptureCommand } from "@/domain/capture-commands";
 import { PRESET_EXPENSE_CATEGORIES } from "@/domain/categories";
 import {
   CAPTURE_TEXT_MAX_LENGTH,
   normalizeCapturedExpense,
   type CapturedDraft,
 } from "@/domain/expense-capture";
-import { parseExpenseTextLocally } from "@/domain/parser";
+import { parseCaptureTextLocally } from "@/domain/parser";
 import { createClient } from "@/utils/supabase/server";
 
 const requestSchema = z.object({
@@ -36,6 +37,21 @@ const requestSchema = z.object({
         .map((name) => name.trim())
         .filter((name) => name.length > 0 && name.length <= 40)
         .slice(0, 40),
+    ),
+  // Nombres de los gastos del usuario, para entender órdenes sobre ellos
+  // ("marca la luz pagada"). Como las categorías, solo son una pista.
+  expenseNames: z
+    .array(z.string())
+    .max(500)
+    .optional()
+    .transform((names) =>
+      Array.from(
+        new Set(
+          (names ?? [])
+            .map((name) => name.trim())
+            .filter((name) => name.length > 0 && name.length <= 60),
+        ),
+      ).slice(0, 50),
     ),
 });
 
@@ -71,7 +87,12 @@ function resolveToday(clientToday: string | undefined, now = new Date()) {
   return format(now, "yyyy-MM-dd");
 }
 
-function respond(provider: "gemini" | "local", drafts: CapturedDraft[], extra = {}) {
+function respond(
+  provider: "gemini" | "local",
+  drafts: CapturedDraft[],
+  commands: CaptureCommand[],
+  extra = {},
+) {
   return NextResponse.json({
     provider,
     ...extra,
@@ -81,6 +102,8 @@ function respond(provider: "gemini" | "local", drafts: CapturedDraft[], extra = 
       missingFields,
       inferredFields,
     })),
+    // Órdenes sobre gastos existentes; un cliente anterior las ignora.
+    commands,
   });
 }
 
@@ -103,8 +126,10 @@ export async function POST(request: Request) {
       ...parsedRequest.data.categories,
     ]),
   );
-  const local = (reason: CaptureFallbackReason) =>
-    respond("local", parseExpenseTextLocally(text, { today, categories }), { reason });
+  const local = (reason: CaptureFallbackReason) => {
+    const parsed = parseCaptureTextLocally(text, { today, categories });
+    return respond("local", parsed.drafts, parsed.commands, { reason });
+  };
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return local("missing_key");
@@ -125,7 +150,12 @@ export async function POST(request: Request) {
       process.env.GEMINI_API_MODEL || GEMINI_DEFAULT_MODEL,
       process.env.GEMINI_FALLBACK_MODEL || GEMINI_FALLBACK_MODEL,
     ],
-    systemInstruction: buildCaptureSystemInstruction({ today, language, categories }),
+    systemInstruction: buildCaptureSystemInstruction({
+      today,
+      language,
+      categories,
+      expenseNames: parsedRequest.data.expenseNames,
+    }),
     userText: text,
     schema: buildCaptureResponseSchema(categories),
   });
@@ -134,9 +164,15 @@ export async function POST(request: Request) {
   const parsed = parseCaptureResponse(result.json);
   if (!parsed) return local("invalid_response");
 
+  const creates = parsed.items.filter((item) => !item.intent || item.intent === "create");
+  const commands = parsed.items.flatMap((item) => {
+    const command = normalizeCaptureCommand(item);
+    return command ? [command] : [];
+  });
   return respond(
     "gemini",
-    parsed.items.map((item) => normalizeCapturedExpense(item, { today, categories })),
+    creates.map((item) => normalizeCapturedExpense(item, { today, categories })),
+    commands,
     { droppedCount: parsed.droppedCount },
   );
 }

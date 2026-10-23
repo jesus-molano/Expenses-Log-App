@@ -69,6 +69,13 @@ Estado:
   - Atajos del manifest "Añadir gasto" y "Añadir por voz" (`/expenses/new?mode=voice`).
   - Atrás cierra la hoja abierta (`src/components/ui/sheet-history.ts`).
   - Pendiente de F2a: `OccurrenceActionSheet`, `ConfirmActionDialog` con `useDialogA11y` y M22.
+- **F3 (7, 9, 10 y 11): hecho.**
+  - Primeros pasos con la app vacía: chips de alta rápida (alquiler, luz, agua, internet, móvil, Netflix, Spotify, gimnasio y seguros) y checklist (primer gasto, sueldo, avisos e instalar). Por dispositivo (`expense-onboarding-v1`).
+  - Catálogo «Todos» desde la cabecera de Gastos: todas las series con búsqueda (también en notas) y filtros de estado, frecuencia y categoría. Sustituye a la hoja de recurrentes.
+  - Campos de contrato (notas, enlace de baja, permanencia con aviso a 30 días, método de pago) en el formulario, el detalle y la normalización; categorías propias con gestor en Ajustes (crear, renombrar, color y borrar pasando los gastos a otra).
+  - Órdenes en la captura («marca la luz pagada 71,20», «salta el gimnasio este mes», «mueve Netflix al 10») con `intent` en el esquema de Gemini y en el parser local, siempre confirmadas y con deshacer.
+  - Integrado con F0c-2, F1a-3, F2a y F3-1: borrar una categoría confirma con `ConfirmActionDialog` (con gastos que la usan, antes se elige en la fila a cuál pasan); una categoría con `updatedAt` gana al fusionar a su copia sin fecha; exportar e importar llevan los datos de contrato y las categorías propias (el CSV con `category_tone`), y sustituir con una copia marca también las categorías como editadas ahora.
+  - Integrado con F2b, F3 dinero y el ciclo de presupuesto: el formulario y el detalle llevan el aviso, el precio, la pausa y el fin junto a los datos de contrato; el catálogo muestra el precio del cobro que toca y cuenta lo pagado; pagar con una orden sugiere la media y pregunta por el importe de la serie; mover con una orden sigue el ciclo de Ajustes, y el CSV lleva avisos, pausas, cambios de precio, datos de contrato y categorías propias.
 - **Cambios de importe de una serie: hecho.** Al editar el importe, lo ya pasado y lo ya pagado no cambian (meses anteriores como registros; mes cerrado con "Pasar al mes siguiente", cobros pagados y adelantados con override) y el editor pregunta "Desde este mes" o "Desde el mes que viene" (`keepAmountBeforeSeriesChange`). Para un solo mes, se edita el cobro.
   - Tocar un gasto abre sus acciones (`OccurrenceActionSheet`, M19): pagar o deshacer, pagar con otro importe, mover solo este cobro (no a un mes cerrado), saltar este mes con "Deshacer" y editar la serie. Deslizar o arrastrar no cuentan como toque.
   - Hoja de acciones revisada: "Editar la serie" navega (sustituye la entrada de la hoja en el historial), "Pagado con otro importe" solo apunta lo pagado (la fila pagada muestra lo pagado), mover solo toca el cobro y no se ofrece para lo pagado de un mes cerrado ni más allá del mes siguiente, Intro la abre desde el teclado y los clicks de lector de pantalla cuentan.
@@ -491,11 +498,23 @@ Estado:
 5. **Cambios de precio programados** e historial de precio. **Hecho.**
 6. **Coste por categoría y anualizado.** **Hecho.**
    - `features/plan/lib/recurring-costs.ts`: los próximos 12 meses de presupuesto desde el mes activo, sin pagos únicos ni lo quitado del mes; lo pagado cuenta por lo pagado. Media al mes, parte del sueldo y desglose por gasto.
-7. **Onboarding:** chips de alta rápida y checklist.
+7. **Onboarding:** chips de alta rápida y checklist. **Hecho.**
+   - `features/expenses/lib/onboarding.ts` (presets, checklist y visibilidad), `use-onboarding` (permiso de avisos, modo instalado y `beforeinstallprompt`) y `OnboardingCard`.
+   - El sueldo se configura con la misma hoja que Plan (`PlanSettingsSheet`, con las pagas extra); los avisos enlazan a Ajustes; instalar usa el aviso del navegador o una pista (iOS: Compartir › Añadir a pantalla de inicio).
+   - No incluye datos demo relativos a hoy (no se pidió en este bloque).
 8. **Pagas extra y "¿Has cobrado?"**; ámbito "solo este mes" al editar el sueldo (M16). **Hecho** (el aviso push del día de cobro, tipo `payday`, es de F2b y usa el mismo día de cobro).
-9. **Catálogo "Todos"** con búsqueda y filtros.
-10. **Campos nuevos:** notas, URL de baja, permanencia, categorías propias y método de pago.
-11. **Comandos por voz o IA** ("marca la luz pagada 71,20").
+9. **Catálogo "Todos"** con búsqueda y filtros. **Hecho.**
+   - `lib/expense-catalog.ts` (próximo cobro, atrasado, coste de los próximos 12 meses, permanencia) y `catalog/ExpenseCatalogSheet`.
+   - Sustituye a la hoja de series (`RecurringOverviewSheet`). El botón de la cabecera marca con un punto las permanencias que acaban. El importe de cada serie es el del cobro que toca, con sus cambios de precio, y el coste anual cuenta lo ya pagado por lo pagado. `buildRecurringOverview` queda sin uso en la UI.
+10. **Campos nuevos:** notas, URL de baja, permanencia, categorías propias y método de pago. **Hecho.**
+    - `domain/expense-details.ts` (`sanitizeExpenseDetails`, `commitmentStatus`) y normalización en `normalizeTemplates` y `normalizeCategories`.
+    - Categorías con `updatedAt` y comandos en `stores/app/category-commands.ts`. Ajustes › Categorías y «Nueva categoría» en el formulario.
+    - Se escriben ya: van dentro de plantillas y categorías, que los builds anteriores guardan tal cual (ver `docs/state-persistence-sync.md`).
+11. **Comandos por voz o IA** ("marca la luz pagada 71,20"). **Hecho.**
+    - `intent` (create, pay, skip, move) en el esquema y el prompt, con los nombres de los gastos del usuario como contexto; la ruta devuelve `commands` aparte.
+    - `parseCaptureTextLocally` entiende las mismas órdenes (español e inglés) sin IA ni conexión.
+    - `domain/capture-commands.ts` resuelve serie y cobro; `CaptureCommandReview` las confirma; `capture-command-actions.ts` las aplica con los comandos de siempre (el mismo `payOccurrenceInStore` que «Pagado con otro importe»; corregir lo pagado conserva la fecha del pago) y las deshace. Mover sigue los límites de la hoja de acciones (`canMoveOccurrence` y `occurrenceMoveRange`, con el ciclo de Ajustes): ni a un mes cerrado, ni lo pagado de un mes cerrado, ni más allá del mes siguiente. Pagar otro importe sugiere la media de los últimos pagos y, al aplicar, pregunta "¿Actualizar el importe desde ahora?" como las acciones del cobro.
+    - Pendiente: medir las órdenes con la clave real en `scripts/eval-ai-parse.mjs` (sin clave en este entorno, como en F1b).
 12. **Resumen del mes** y **registro de saldo**. **Hecho.**
     - `features/plan/lib/month-summary.ts` y `MonthSummarySheet`. Plan lo ofrece al cerrar un mes, en la primera semana del siguiente y en los tres últimos días del propio.
     - `finance.balanceCheckins` por fecha, con borrado por `deletedAt` (ver `docs/state-persistence-sync.md`).

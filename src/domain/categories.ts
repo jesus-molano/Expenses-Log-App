@@ -1,5 +1,5 @@
 import { foldText } from "./text";
-import type { CategoryTone } from "./types";
+import type { CategoryTone, ExpenseCategory, ExpenseStore } from "./types";
 
 export type PresetExpenseCategory = {
   name: string;
@@ -25,14 +25,130 @@ export const PRESET_EXPENSE_CATEGORIES: PresetExpenseCategory[] = [
   { name: "General", icon: "WalletCards", tone: "slate" },
 ];
 
+export const CATEGORY_TONES: CategoryTone[] = [
+  "blue",
+  "green",
+  "orange",
+  "rose",
+  "violet",
+  "slate",
+];
+
+// Icono de las categorías que crea el usuario (las preset tienen el suyo).
+export const CUSTOM_CATEGORY_ICON = "Tag";
+export const CATEGORY_NAME_MAX_LENGTH = 30;
+
 // Los nombres guardados no llevan tildes ("Alimentacion"): se comparan sin
 // ellas para que "Alimentación" no acabe en General. La tilde se pone al
 // mostrarlos (`categoryLabel`).
 export function resolvePresetCategory(name: string): PresetExpenseCategory {
+  return findPresetCategory(name) ?? PRESET_EXPENSE_CATEGORIES.at(-1)!;
+}
+
+// La preset con ese nombre (sin tildes ni mayúsculas), si existe.
+export function findPresetCategory(name: string): PresetExpenseCategory | undefined {
   const folded = foldText(name);
-  return (
-    PRESET_EXPENSE_CATEGORIES.find(
-      (category) => foldText(category.name) === folded,
-    ) ?? PRESET_EXPENSE_CATEGORIES.at(-1)!
+  return PRESET_EXPENSE_CATEGORIES.find((category) => foldText(category.name) === folded);
+}
+
+export function isCategoryTone(value: unknown): value is CategoryTone {
+  return CATEGORY_TONES.includes(value as CategoryTone);
+}
+
+// Nombre, icono y color de una categoría nueva llamada `name`: los de la
+// preset si lo es (sin tildes ni mayúsculas) o los de una propia, con el color
+// elegido o el neutro. La usan el gestor, la importación del CSV y la
+// normalización del store (para el color o el icono que falten).
+export function newCategoryFields(
+  name: string,
+  tone?: CategoryTone,
+): Pick<ExpenseCategory, "name" | "icon" | "tone"> {
+  const preset = findPresetCategory(name);
+  return {
+    name: preset?.name ?? name.trim().slice(0, CATEGORY_NAME_MAX_LENGTH),
+    icon: preset?.icon ?? CUSTOM_CATEGORY_ICON,
+    tone: tone ?? preset?.tone ?? "slate",
+  };
+}
+
+// Lo que el usuario decide de una categoría propia.
+export type CategoryInput = {
+  name: string;
+  tone: CategoryTone;
+};
+
+export type CategoryNameError = "empty" | "tooLong" | "duplicate";
+
+// Un nombre vacío, demasiado largo o que ya usa otra categoría del usuario no
+// vale: dos categorías con el mismo nombre serían indistinguibles al elegir.
+export function validateCategoryName(
+  categories: Array<Pick<ExpenseCategory, "id" | "name">>,
+  name: string,
+  exceptId?: string,
+): CategoryNameError | null {
+  const trimmed = name.trim();
+  if (!trimmed) return "empty";
+  if (trimmed.length > CATEGORY_NAME_MAX_LENGTH) return "tooLong";
+  const folded = foldText(trimmed);
+  const taken = categories.some(
+    (category) => category.id !== exceptId && foldText(category.name) === folded,
   );
+  return taken ? "duplicate" : null;
+}
+
+export type CategoryOption = {
+  name: string;
+  icon: string;
+  tone: CategoryTone;
+  // Id de la categoría guardada, si ya existe en el store.
+  id?: string;
+  // Creada por el usuario (no es una preset).
+  custom: boolean;
+};
+
+// Lo que se puede elegir: las preset, con el color que el usuario les haya
+// dado, y después las propias por orden alfabético. Una preset renombrada
+// pasa a ser propia y la preset original sigue disponible.
+export function buildCategoryOptions(categories: ExpenseCategory[]): CategoryOption[] {
+  const byName = new Map(categories.map((category) => [foldText(category.name), category]));
+  const presets = PRESET_EXPENSE_CATEGORIES.map((preset): CategoryOption => {
+    const stored = byName.get(foldText(preset.name));
+    return {
+      name: preset.name,
+      icon: preset.icon,
+      tone: stored?.tone ?? preset.tone,
+      id: stored?.id,
+      custom: false,
+    };
+  });
+  const presetNames = new Set(PRESET_EXPENSE_CATEGORIES.map((preset) => foldText(preset.name)));
+  const custom = categories
+    .filter((category) => !presetNames.has(foldText(category.name)))
+    .sort((left, right) => left.name.localeCompare(right.name, "es", { sensitivity: "base" }))
+    .map(
+      (category): CategoryOption => ({
+        name: category.name,
+        icon: category.icon || CUSTOM_CATEGORY_ICON,
+        tone: category.tone,
+        id: category.id,
+        custom: true,
+      }),
+    );
+  return [...presets, ...custom];
+}
+
+export type CategoryUsage = {
+  // Series (gastos) que la usan.
+  templates: number;
+  // Cobros sueltos editados con esa categoría.
+  occurrences: number;
+};
+
+export function categoryUsage(store: ExpenseStore, categoryId: string): CategoryUsage {
+  return {
+    templates: store.templates.filter((template) => template.categoryId === categoryId)
+      .length,
+    occurrences: store.overrides.filter((override) => override.categoryId === categoryId)
+      .length,
+  };
 }

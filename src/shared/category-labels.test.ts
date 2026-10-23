@@ -22,7 +22,26 @@ describe("category labels", () => {
     expect(resolveCategoryName("Utilities")).toBe("Servicios");
     expect(resolveCategoryName("Vehículo")).toBe("Vehiculo");
     expect(resolveCategoryName("gimnasio")).toBe("Deporte");
-    expect(resolveCategoryName("Sin nombre conocido")).toBe("General");
+    expect(resolveCategoryName("  ")).toBe("General");
+  });
+
+  it("resolves custom categories the same way, before presets and aliases", () => {
+    const own = ["Caprichos", "Food"];
+    expect(resolveCategoryName("caprichos", own)).toBe("Caprichos");
+    expect(resolveCategoryName("CAPRÍCHOS", own)).toBe("Caprichos");
+    // Una propia que coincide con la etiqueta de una preset gana a la preset.
+    expect(resolveCategoryName("Food", own)).toBe("Food");
+    expect(resolveCategoryName("Food")).toBe("Alimentacion");
+    // Lo que no es ninguna conocida vuelve como categoría propia.
+    expect(resolveCategoryName(" Sin nombre conocido ")).toBe("Sin nombre conocido");
+    expect(categoryLabel("Caprichos", "en")).toBe("Caprichos");
+  });
+
+  it("keeps a custom name that is also an alias when aliases are off", () => {
+    expect(resolveCategoryName("Streaming")).toBe("Suscripciones");
+    expect(resolveCategoryName("Streaming", [], { aliases: false })).toBe("Streaming");
+    // Las etiquetas de las preset se siguen reconociendo.
+    expect(resolveCategoryName("Food", [], { aliases: false })).toBe("Alimentacion");
   });
 
   it("does not send accented preset names to General", () => {

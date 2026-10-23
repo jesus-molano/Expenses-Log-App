@@ -71,6 +71,15 @@ exports[`Gemini expense capture contract > uses only schema keywords Gemini acce
               },
             ],
           },
+          "intent": {
+            "enum": [
+              "create",
+              "pay",
+              "skip",
+              "move",
+            ],
+            "type": "string",
+          },
           "interval": {
             "anyOf": [
               {
@@ -114,6 +123,7 @@ exports[`Gemini expense capture contract > uses only schema keywords Gemini acce
           },
         },
         "propertyOrdering": [
+          "intent",
           "name",
           "amount",
           "categoryName",
@@ -125,6 +135,7 @@ exports[`Gemini expense capture contract > uses only schema keywords Gemini acce
           "startDate",
         ],
         "required": [
+          "intent",
           "name",
           "amount",
           "categoryName",

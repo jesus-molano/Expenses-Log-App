@@ -60,6 +60,49 @@ describe("Gemini expense capture contract", () => {
     expect(parseCaptureResponse({ nope: true })).toBeNull();
   });
 
+  it("asks for an intent and explains orders on existing expenses", () => {
+    const schema = buildCaptureResponseSchema(["Casa"]);
+    const item = schema.properties.expenses.items;
+    expect(item.properties.intent).toEqual({
+      type: "string",
+      enum: ["create", "pay", "skip", "move"],
+    });
+    expect(item.required[0]).toBe("intent");
+
+    const instruction = buildCaptureSystemInstruction({
+      today: "2026-10-23",
+      language: "es",
+      categories: ["Casa"],
+      expenseNames: ["Luz", "Netflix"],
+    });
+    expect(instruction).toContain("Gastos que ya tiene el usuario: Luz, Netflix.");
+    expect(instruction).toContain("marca la luz pagada 71,20");
+    expect(instruction).toMatch(/"intent":"move","name":"Netflix"[^}]*"dueDay":10/);
+    expect(
+      buildCaptureSystemInstruction({ today: "2026-10-23", language: "es", categories: [] }),
+    ).toContain("El usuario aún no tiene gastos guardados.");
+  });
+
+  it("reads intents, treating a missing or unknown one as a new expense", () => {
+    expect(
+      parseCaptureResponse({
+        expenses: [
+          { name: "Luz", amount: 60 },
+          { intent: "pay", name: "Luz", amount: 71.2 },
+          { intent: "teleport", name: "Gimnasio", amount: 35 },
+          { intent: "skip", name: null, amount: null },
+        ],
+      }),
+    ).toEqual({
+      items: [
+        expect.objectContaining({ intent: "create", name: "Luz", amount: 60 }),
+        expect.objectContaining({ intent: "pay", name: "Luz", amount: 71.2 }),
+        expect.objectContaining({ intent: "create", name: "Gimnasio" }),
+      ],
+      droppedCount: 1,
+    });
+  });
+
   it("chooses the thinking setting by model family", () => {
     expect(thinkingConfigFor("gemini-3.5-flash-lite")).toEqual({ thinkingLevel: "MINIMAL" });
     expect(thinkingConfigFor("gemini-3.1-flash-lite")).toEqual({ thinkingLevel: "MINIMAL" });

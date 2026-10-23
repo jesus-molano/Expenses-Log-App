@@ -1,4 +1,4 @@
-import { PRESET_EXPENSE_CATEGORIES } from "@/domain/categories";
+import { CATEGORY_NAME_MAX_LENGTH, PRESET_EXPENSE_CATEGORIES } from "@/domain/categories";
 import { matchCategoryName } from "@/domain/expense-capture";
 import { foldText } from "@/domain/text";
 import type { AppLanguage } from "@/domain/types";
@@ -36,11 +36,24 @@ export function categoryLabel(name: string, language: AppLanguage): string {
   return translationKey ? t(translationKey, language) : name;
 }
 
-// Nombre guardado de la categoría a partir de lo que se ve (en español o en
-// inglés, con o sin tildes) o de un alias; General si no se reconoce. Lo usa
+// Nombre guardado de la categoría a partir de lo que se ve. Primero las del
+// usuario (`categories`, sus nombres guardados), igual que en la captura;
+// después las preset por su nombre o su etiqueta en español o inglés, y sus
+// alias, todo sin tildes ni mayúsculas. Un nombre que no es ninguna de ellas
+// es una categoría propia y se conserva; General solo si viene vacío. Lo usa
 // la importación, que recibe las etiquetas tal como se exportaron.
-export function resolveCategoryName(label: string): string {
+// `aliases: false` cuando la etiqueta sale de una exportación de la app: es la
+// de una preset o el nombre de una propia, y una propia llamada como un alias
+// ("Streaming", "Hogar") no debe acabar en la preset.
+export function resolveCategoryName(
+  label: string,
+  categories: string[] = [],
+  { aliases = true }: { aliases?: boolean } = {},
+): string {
   const folded = foldText(label);
+  if (!folded) return "General";
+  const own = categories.find((name) => foldText(name) === folded);
+  if (own) return own;
   const preset = PRESET_EXPENSE_CATEGORIES.find((category) =>
     [
       category.name,
@@ -49,5 +62,9 @@ export function resolveCategoryName(label: string): string {
     ].some((candidate) => foldText(candidate) === folded),
   );
 
-  return preset?.name ?? matchCategoryName(label, []) ?? "General";
+  return (
+    preset?.name ??
+    (aliases ? matchCategoryName(label, []) : null) ??
+    label.trim().slice(0, CATEGORY_NAME_MAX_LENGTH)
+  );
 }

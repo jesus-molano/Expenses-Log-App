@@ -203,9 +203,10 @@ export function clearExpensesFromStore(store: ExpenseStore): ExpenseStore {
   };
 }
 
-// Pagado con otro importe: se apunta lo pagado; lo previsto del cobro y de la
-// serie no cambia, y "Marcar como pendiente" lo deshace del todo. Si ya estaba
-// pagado, solo corrige el importe y conserva la fecha de pago.
+// Marca un cobro como pagado (siempre pagado, no alterna) con lo pagado de
+// verdad, que puede ser otro importe: lo previsto del cobro y de la serie no
+// cambia, y "Marcar como pendiente" lo deshace del todo. Si ya estaba pagado
+// conserva la fecha del pago y solo corrige el importe.
 export function payOccurrenceInStore(
   store: ExpenseStore,
   occurrence: ExpenseOccurrence,

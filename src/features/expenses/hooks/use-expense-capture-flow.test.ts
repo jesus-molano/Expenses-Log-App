@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseExpenseTextLocally } from "@/domain/parser";
+import { parseCaptureTextLocally } from "@/domain/parser";
 import { useExpenseCaptureFlow } from "./use-expense-capture-flow";
 import type { CaptureResult, useQuickExpenseParser } from "./use-quick-expense-parser";
 
@@ -38,7 +38,7 @@ function setup(result: CaptureResult, quickText = "") {
 
 function captured(text: string, provider: CaptureResult["provider"] = "gemini"): CaptureResult {
   return {
-    drafts: parseExpenseTextLocally(text, { today }),
+    ...parseCaptureTextLocally(text, { today }),
     provider,
     reason: provider === "local" ? "unauthenticated" : null,
   };
@@ -124,6 +124,53 @@ describe("useExpenseCaptureFlow", () => {
 
     expect(hook.result.current.formOpen).toBe(true);
     expect(hook.result.current.notice).toBe("unauthenticated");
+  });
+
+  it("asks to confirm orders first and then reviews the new expenses", async () => {
+    const { hook, parser, respond } = setup(
+      captured("marca la luz pagada 71,20 y Netflix 12,99 el 5"),
+    );
+
+    act(() => hook.result.current.openCapture());
+    act(() => void hook.result.current.analyze());
+    await respond();
+
+    expect(hook.result.current.captureOpen).toBe(false);
+    expect(hook.result.current.formOpen).toBe(false);
+    expect(hook.result.current.isIdle).toBe(false);
+    expect(hook.result.current.commandReview).toMatchObject({
+      commands: [{ intent: "pay", target: "Luz", amount: 71.2 }],
+      drafts: [expect.objectContaining({ draft: expect.objectContaining({ name: "Netflix" }) })],
+    });
+
+    act(() => hook.result.current.finishCommands());
+    expect(hook.result.current.commandReview).toBeNull();
+    expect(hook.result.current.formOpen).toBe(true);
+    expect(hook.result.current.draft.name).toBe("Netflix");
+    expect(parser.reset).not.toHaveBeenCalled();
+  });
+
+  it("clears the capture after orders with no new expenses", async () => {
+    const { hook, parser, respond } = setup(captured("salta el gimnasio este mes"));
+
+    act(() => void hook.result.current.analyze());
+    await respond();
+    act(() => hook.result.current.finishCommands());
+
+    expect(hook.result.current.formOpen).toBe(false);
+    expect(hook.result.current.isIdle).toBe(true);
+    expect(parser.reset).toHaveBeenCalled();
+  });
+
+  it("opens the form with a quick-add draft", () => {
+    const { hook } = setup(captured("Netflix 12,99"));
+    const draft = { ...parseCaptureTextLocally("Luz 60", { today }).drafts[0].draft, amount: 0 };
+
+    act(() => hook.result.current.openDraftForm(draft));
+
+    expect(hook.result.current.formOpen).toBe(true);
+    expect(hook.result.current.draft).toBe(draft);
+    expect(hook.result.current.notice).toBeNull();
   });
 });
 

@@ -166,7 +166,10 @@ sincronizar.
 La mezcla actual usa ids:
 
 - Entidades cloud como base.
-- Entidades locales como entrada con prioridad final.
+- Entidades locales como entrada con prioridad final, salvo que la de la nube
+  tenga un `updatedAt` mas reciente (plantillas, categorias, ingresos,
+  registros). Una version con `updatedAt` gana a otra sin el: una categoria
+  renombrada no vuelve a su nombre antiguo por una copia que nunca tuvo fecha.
 - Tombstones combinados para filtrar elementos borrados.
 - Mapas mensuales de salario y ahorro: cloud + local, con local al final.
 - Sueldos borrados: `deleted.monthlySalary` guarda la hora del borrado
@@ -182,8 +185,10 @@ La mezcla actual usa ids:
   `updatedAt`). Sin el, el gasto sigue el aviso por defecto de
   `preferences.reminders`.
 - Categorias: llevan `updatedAt` desde F0c-2 y se fusionan por entidad como
-  plantillas, ingresos o registros. Las antiguas no lo tienen y gana la local;
-  los builds anteriores conservan el campo porque no reescriben las entidades.
+  plantillas, ingresos o registros. Las antiguas no lo tienen: pierden frente
+  a una copia con fecha (un cambio de nombre no se deshace) y, entre dos sin
+  fecha, gana la local. Los builds anteriores conservan el campo porque no
+  reescriben las entidades.
 - `finance.budgetCycle` (mes natural o desde el dia de cobro): gana el de
   `updatedAt` mas reciente; si solo uno de los dos stores lo tiene, se
   conserva.
@@ -195,8 +200,10 @@ La mezcla actual usa ids:
   (`finance.salaryReceipts`): por mes, la version con el `updatedAt` mas
   reciente. Deshacer un cobro marca `undone` con una version nueva en vez de
   borrar la entrada.
-- Cambios de precio (`amountChanges`) y pausas (`pauses`) viven dentro de la
-  plantilla y viajan con ella: gana la plantilla editada mas tarde.
+- Cambios de precio (`amountChanges`), pausas (`pauses`) y datos de contrato
+  (`notes`, `cancellationUrl`, `commitmentEndDate`, `paymentMethod`,
+  `paymentMethodDetail`) viven dentro de la plantilla y viajan con ella: gana
+  la plantilla editada mas tarde.
 
 La politica de hidratacion (`resolveHydratedStore`) protege los cambios hechos
 mientras llegaba el cloud store y los que quedaron sin subir en una sesion
@@ -237,6 +244,15 @@ Reglas para campos nuevos:
   por defecto (solo los gastos con aviso propio, a las 8), sin perder datos.
   La normalizacion corrige valores imposibles (hora, antelacion, zona) y
   conserva las claves que añada un build mas nuevo dentro del objeto.
+- Campos de contrato de las plantillas (`notes`, `cancellationUrl`,
+  `commitmentEndDate`, `paymentMethod`, `paymentMethodDetail`) y `updatedAt` de
+  las categorias: viven dentro de entidades que todos los builds guardan tal
+  cual (las plantillas y categorias nunca se reconstruyen campo a campo), asi
+  que un build anterior los conserva al guardar y al fusionar. La
+  normalizacion (`sanitizeExpenseDetails`, `normalizeCategories`) descarta solo
+  lo ilegible: un enlace que no es http(s), una fecha imposible, un metodo de
+  pago desconocido; una categoria sin id. Un store sin estos campos carga
+  igual.
 - El cierre con restos (F1a-3) no añade campos: cada resto se resuelve con
   overrides (pagado, saltado o movido al primer dia del mes siguiente: el 1
   o, con el ciclo anclado al cobro, el dia de cobro), el ahorro con
@@ -269,9 +285,29 @@ Reglas para campos nuevos:
     `finance`, que los builds con passthrough conservan y fusionan por mes; un
     build anterior no cuenta la paga extra ni lo cobrado.
 
-## Vista del mes
+## Categorias
 
-No se sincroniza:
+Las categorias son entidades del store (`id`, `name`, `icon`, `tone`,
+`updatedAt`). Las preset se crean al usarlas por primera vez; las propias, con
+`createCategoryInStore`. `findOrCreateCategory` reconoce cualquier categoria
+guardada por su nombre (sin tildes ni mayusculas) antes de recurrir a la preset
+equivalente. Renombrar o cambiar el color actualiza `updatedAt`; borrar
+(`deleteCategoryInStore`) pasa las plantillas, overrides y registros que la
+usan a otra categoria y deja su id como tombstone en `deleted.categories`.
+
+Al fusionar gana la copia con el `updatedAt` mas reciente; una con fecha gana
+a otra sin ella y, entre dos sin fecha, gana la local. La copia JSON lleva las
+categorias tal cual. El CSV exporta el nombre visible y el color
+(`category_tone`); al importar, `resolveCategoryName` reconoce primero las
+categorias del dispositivo, despues las preset (en los dos idiomas, sin
+tildes) y sus alias, y un nombre que no es ninguna de ellas vuelve como
+categoria propia con su color. Los alias solo cuentan en filas sin
+`category_tone` (hojas hechas a mano): una propia exportada que se llama como
+un alias ("Streaming", "Hogar") vuelve como propia y no como la preset.
+
+## Preferencias de dispositivo
+
+No se sincronizan y viven fuera del store:
 
 - El mes que se mira vive en `sessionStorage['expense-view-month']`, por
   pestaña y compartido entre Gastos y Plan: al cambiar de mes en una pestaña,
@@ -281,6 +317,10 @@ No se sincroniza:
 - El "Aun no" a "¿Has cobrado?" se guarda por dispositivo y por mes, con el
   dia, en `localStorage['salary-prompt-dismissed:YYYY-MM']`: vuelve a preguntar
   al dia siguiente.
+- `expense-onboarding-v1` (`src/data/persistence/onboarding-store.ts`):
+  `{startedAt, dismissedAt}` de la guia de primeros pasos. La guia se ve con el
+  store vacio (salvo mientras carga la nube) y, si el primer gasto se añadio
+  con ella a la vista, hasta ocultarla.
 
 ## Cola de guardado
 
@@ -324,17 +364,20 @@ Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/Ba
   (para que Excel lea las tildes), coma como separador e importes con punto y
   dos decimales (`2200.00`). La columna `type` distingue:
   - `expense`: una fila por gasto (frecuencia, intervalo, mes anual, rrule,
-    inicio, fin, pausas, cambios de precio, dia de cobro, aviso, descripcion).
-    `reminder_days` lleva los dias de antelacion del aviso propio, `off` si el
-    aviso propio esta apagado o nada si el gasto sigue el aviso por defecto de
-    Ajustes. Las pausas van como `inicio/fin` (`inicio/` si sigue abierta) y
-    los cambios de precio como `fecha=importe`, separados por espacios.
+    inicio, fin, pausas, cambios de precio, dia de cobro, aviso, descripcion y
+    los datos de contrato: `notes`, `cancellation_url`, `commitment_end_date`,
+    `payment_method`, `payment_method_detail`). `reminder_days` lleva los dias
+    de antelacion del aviso propio, `off` si el aviso propio esta apagado o
+    nada si el gasto sigue el aviso por defecto de Ajustes. Las pausas van como
+    `inicio/fin` (`inicio/` si sigue abierta) y los cambios de precio como
+    `fecha=importe`, separados por espacios.
   - `occurrence`: el historico hasta el final del mes actual (los meses
     cerrados tambien de gastos borrados) y, de despues, solo los cobros con
     cambios (por ejemplo, pagados por adelantado).
   - Las cabeceras y los valores de frecuencia y estado no se traducen; la
-    categoria sale como se ve en la app y se reconoce en los dos idiomas al
-    importar (`resolveCategoryName`). El texto que empieza por `= + - @` lleva
+    categoria sale como se ve en la app, con su color en `category_tone`, y se
+    reconoce en los dos idiomas al importar (`resolveCategoryName`; las
+    propias, por su nombre). El texto que empieza por `= + - @` lleva
     un apostrofo delante para que una hoja de calculo no lo ejecute como
     formula; se quita al importar.
 
@@ -357,7 +400,7 @@ Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/Ba
    - **Sustituir** (`replaceStoreContents`): deja solo lo importado y lo hace
      de forma que aguante una fusion posterior con la nube u otro dispositivo
      (si la subida falla o hay otro dispositivo sin sincronizar). Todo lo
-     importado se marca como editado ahora; lo que solo estaba en los datos
+     importado (tambien las categorias) se marca como editado ahora; lo que solo estaba en los datos
      actuales recibe tombstone si su id es aleatorio (gastos, categorias,
      ingresos, aportaciones, historico de gastos que desaparecen) o queda en
      estado neutro si es determinista (cobros `ovr:*` en estado pendiente,

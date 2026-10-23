@@ -70,10 +70,47 @@ export function resolveActiveMonth(
 
 // Mes activo con el ciclo de Ajustes, el mismo que ven Gastos y Plan: su id,
 // el día en que empieza y el ciclo con el que se reparten los demás meses.
+// Es también el mes abierto a cambios: lo anterior ya es historial.
 export function activeBudgetMonth(finance: FinanceStore, today: string) {
   const cycle = resolveBudgetCycle(finance);
   const monthId = resolveActiveMonth(today, finance.monthClosures, cycle);
   return { monthId, start: periodStart(monthId, cycle), cycle };
+}
+
+export type OccurrenceMoveRange = { min: string; max: string };
+
+// Primer y último día a los que se puede mover un cobro: no a un mes cerrado
+// ni más allá del mes que se puede ver después del abierto. Con el ciclo
+// anclado al cobro el mes abierto empieza el día de cobro, pero nunca antes
+// del mes natural de `today` (los anteriores ya son historial). Es la regla
+// de las acciones del cobro y de las órdenes de la captura.
+export function occurrenceMoveRange(
+  openMonthId: string,
+  cycle: BudgetCycle = CALENDAR_CYCLE,
+  today?: string,
+): OccurrenceMoveRange {
+  const openStart = periodRange(openMonthId, cycle).start;
+  const calendarStart = today ? `${today.slice(0, 7)}-01` : openStart;
+  return {
+    min: openStart > calendarStart ? openStart : calendarStart,
+    max: periodRange(addMonthId(openMonthId, 1), cycle).end,
+  };
+}
+
+// Lo pagado (o saltado) antes del mes abierto es historial y no se mueve (ni
+// arrastrando, ni desde las acciones del cobro, ni con una orden de la
+// captura). "Antes" es antes del primer día al que se puede mover un cobro,
+// así que con el ciclo anclado al cobro sigue los mismos días.
+export function canMoveOccurrence(
+  occurrence: ExpenseOccurrence,
+  openMonthId: string,
+  cycle: BudgetCycle = CALENDAR_CYCLE,
+  today?: string,
+) {
+  return (
+    occurrence.status === "due" ||
+    occurrence.dueDate >= occurrenceMoveRange(openMonthId, cycle, today).min
+  );
 }
 
 export type MonthCloseStatus = {

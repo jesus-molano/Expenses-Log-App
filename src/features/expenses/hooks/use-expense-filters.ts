@@ -5,14 +5,12 @@ import { addDays, parseISO } from "date-fns";
 import {
   addMonthId,
   monthPendingSummary,
-  monthRange,
   selectCarryOverOccurrences,
 } from "@/domain/budget-month";
 import { periodRange, resolveBudgetCycle } from "@/domain/budget-cycle";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
 import { occurrencesDueBetween } from "@/domain/finance";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
-import { buildRecurringOverview } from "../lib/recurring-overview";
 import { buildTimelineSections } from "../lib/timeline";
 
 // Primeros días del mes siguiente que se resumen al final del mes visto.
@@ -50,17 +48,6 @@ function buildExpenseFilters(
   const previewEnd = toDateOnly(
     addDays(parseISO(nextMonthStart), NEXT_MONTH_PREVIEW_DAYS - 1),
   );
-
-  // La vista de series se mide siempre contra el mes natural: mirar otro mes
-  // no convierte en atrasado lo que vence más adelante en este.
-  const calendarMonth = monthRange(today.slice(0, 7));
-  const recurringOverviewItems = buildRecurringOverview({
-    templates: store.templates,
-    overrides: store.overrides,
-    windowStart: calendarMonth.start,
-    windowEnd: calendarMonth.end,
-    language,
-  });
 
   const visibleOccurrences = [
     ...selectCarryOverOccurrences(store, todayDate, language, monthId, cycle),
@@ -105,6 +92,5 @@ function buildExpenseFilters(
     nextMonthPreview,
     visibleOccurrences,
     timelineSections,
-    recurringOverviewItems,
   };
 }

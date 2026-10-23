@@ -692,6 +692,85 @@ describe("normalizeExpenseStore", () => {
     expect(store.templates[0]).toBe(template);
   });
 
+  it("keeps valid contract details and drops broken ones from old or edited stores", () => {
+    const base = {
+      startDate: "2026-09-01",
+      dueDay: 5,
+      createdAt: "2026-09-01T00:00:00.000Z",
+    };
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      categories: [],
+      overrides: [],
+      templates: [
+        // Un store anterior sin los campos nuevos se carga igual.
+        { id: "old", ...base },
+        {
+          id: "full",
+          ...base,
+          notes: " Permanencia con Vodafone ",
+          cancellationUrl: "vodafone.es/baja",
+          commitmentEndDate: "2027-03-15",
+          paymentMethod: "direct_debit",
+          paymentMethodDetail: "ES12 ···· 3456",
+        },
+        {
+          id: "broken",
+          ...base,
+          notes: 42,
+          cancellationUrl: "javascript:alert(1)",
+          commitmentEndDate: "nunca",
+          paymentMethod: "gold",
+        },
+      ],
+    });
+
+    const [old, full, broken] = store.templates;
+    expect(old).toEqual({ id: "old", ...base });
+    expect(full).toMatchObject({
+      notes: "Permanencia con Vodafone",
+      cancellationUrl: "https://vodafone.es/baja",
+      commitmentEndDate: "2027-03-15",
+      paymentMethod: "direct_debit",
+      paymentMethodDetail: "ES12 ···· 3456",
+    });
+    for (const key of ["notes", "cancellationUrl", "commitmentEndDate", "paymentMethod"]) {
+      expect(key in broken).toBe(false);
+    }
+    expect(broken).toMatchObject({ id: "broken", startDate: "2026-09-01" });
+  });
+
+  it("repairs categories and keeps their update time and unknown fields", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      templates: [],
+      overrides: [],
+      categories: [
+        { id: "casa", userId: "u1", name: "Casa", icon: "Home", tone: "green" },
+        { id: "viajes", name: " Viajes ", tone: "pink", updatedAt: "2026-10-20T00:00:00.000Z", future: 1 },
+        { id: "ocio", name: "Ocio", updatedAt: "ayer" },
+        { id: "", name: "Sin id" },
+        { id: "sin-nombre", name: "  " },
+        "texto",
+      ],
+    });
+
+    expect(store.categories).toEqual([
+      { id: "casa", userId: "u1", name: "Casa", icon: "Home", tone: "green" },
+      {
+        id: "viajes",
+        userId: "demo",
+        name: "Viajes",
+        icon: "Tag",
+        tone: "slate",
+        updatedAt: "2026-10-20T00:00:00.000Z",
+        future: 1,
+      },
+      { id: "ocio", userId: "demo", name: "Ocio", icon: "Gamepad2", tone: "violet" },
+      { id: "sin-nombre", userId: "demo", name: "General", icon: "WalletCards", tone: "slate" },
+    ]);
+  });
+
   it("keeps category timestamps and still loads categories written without them", () => {
     const store = normalizeExpenseStore({
       schemaVersion: 3,
@@ -704,9 +783,9 @@ describe("normalizeExpenseStore", () => {
     });
 
     expect(store.categories).toEqual([
-      { id: "new", name: "Casa", icon: "Home", tone: "green", updatedAt: "2026-10-23T10:00:00.000Z" },
-      { id: "old", name: "Ocio", icon: "Gamepad2", tone: "violet" },
-      { id: "broken", name: "Salud", icon: "HeartPulse", tone: "rose" },
+      { id: "new", userId: "demo", name: "Casa", icon: "Home", tone: "green", updatedAt: "2026-10-23T10:00:00.000Z" },
+      { id: "old", userId: "demo", name: "Ocio", icon: "Gamepad2", tone: "violet" },
+      { id: "broken", userId: "demo", name: "Salud", icon: "HeartPulse", tone: "rose" },
     ]);
   });
 });

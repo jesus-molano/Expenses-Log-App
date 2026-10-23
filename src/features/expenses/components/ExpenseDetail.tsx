@@ -1,9 +1,9 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { formatCurrency } from "@/domain/calendar";
+import { formatCurrency, toDateOnly } from "@/domain/calendar";
 import { resolveReminderPreferences } from "@/domain/reminder-schedule";
 import type {
   AppLanguage,
@@ -16,6 +16,7 @@ import type { SeriesAmountScope } from "@/stores/app/store-commands";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
+import { ExpenseContractSummary } from "@/features/expenses/components/ExpenseContractSummary";
 import { ExpenseForm } from "@/features/expenses/components/ExpenseForm";
 import { ExpenseDetailDialogs } from "@/features/expenses/components/ExpenseDetailDialogs";
 
@@ -112,6 +113,7 @@ function ExpenseDetailForm({
 }) {
   const now = useCurrentDate();
   const editor = useExpenseEditor({ template, expenseStore, language, now });
+  const today = toDateOnly(now);
 
   return (
     <main className="app-page app-page-safe min-h-dvh px-4">
@@ -152,12 +154,16 @@ function ExpenseDetailForm({
             </p>
           </div>
 
+          <ExpenseContractSummary template={template} today={today} language={language} />
+
           <div className="mt-5">
             <ExpenseForm
               form={editor.form}
               amountText={editor.amountText}
               language={language}
               reminderPreferences={resolveReminderPreferences(expenseStore.store)}
+              categories={expenseStore.store.categories}
+              onCreateCategory={expenseStore.createCategory}
               onFormChange={editor.setForm}
               onAmountTextChange={editor.setAmountText}
             />

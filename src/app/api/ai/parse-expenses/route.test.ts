@@ -120,6 +120,51 @@ describe("/api/ai/parse-expenses", () => {
     });
   });
 
+  it("returns orders on existing expenses apart from new expenses", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "test-key");
+    signedIn();
+    const empty = { categoryName: null, frequency: null, interval: null, unit: null, annualMonth: null, startDate: null };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      geminiReply({
+        expenses: [
+          { ...luz, intent: "create" },
+          { ...empty, intent: "pay", name: "Luz", amount: 71.2, dueDay: null },
+          { ...empty, intent: "move", name: "Netflix", amount: null, dueDay: 10 },
+          // Una orden sin el gasto al que se refiere no sirve.
+          { ...empty, intent: "skip", name: "", amount: null, dueDay: null },
+        ],
+      }),
+    );
+
+    const payload = await (
+      await POST(parseRequest({ expenseNames: ["Luz", " Netflix ", "Luz", "x".repeat(80)] }))
+    ).json();
+
+    expect(sentBody(fetchSpy).systemInstruction.parts[0].text).toContain(
+      "Gastos que ya tiene el usuario: Luz, Netflix.",
+    );
+    expect(payload.expenses).toEqual([expect.objectContaining({ name: "Luz", amount: 64.75 })]);
+    expect(payload.commands).toEqual([
+      { intent: "pay", target: "Luz", amount: 71.2, day: null, date: null, month: null },
+      { intent: "move", target: "Netflix", amount: null, day: 10, date: null, month: null },
+    ]);
+    expect(payload.droppedCount).toBe(1);
+  });
+
+  it("understands orders with the local parser too", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "");
+
+    const payload = await (
+      await POST(parseRequest({ text: "marca la luz pagada 71,20 y Netflix 12,99 el 5" }))
+    ).json();
+
+    expect(payload.provider).toBe("local");
+    expect(payload.commands).toEqual([
+      { intent: "pay", target: "Luz", amount: 71.2, day: null, date: null, month: null },
+    ]);
+    expect(payload.expenses).toEqual([expect.objectContaining({ name: "Netflix", amount: 12.99 })]);
+  });
+
   it("sends LOW thinking to Flash models that reject MINIMAL", async () => {
     vi.stubEnv("GEMINI_API_KEY", "test-key");
     vi.stubEnv("GEMINI_API_MODEL", "gemini-3.8-flash");

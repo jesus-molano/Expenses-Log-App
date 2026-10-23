@@ -221,6 +221,24 @@ describe("replaceStoreContents", () => {
     }
   });
 
+  it("keeps the imported name of a category over a dated copy in a later merge", () => {
+    const renamedHere = normalizeExpenseStore({
+      ...current,
+      categories: [
+        { id: "cat-home", userId: "demo", name: "Hogar", icon: "Home", tone: "green", updatedAt: "2026-10-20T00:00:00.000Z" },
+      ],
+    });
+    const restored = replaceStoreContents(renamedHere, imported, { scope: "all", now });
+
+    expect(byId(restored.categories, "cat-home")).toMatchObject({ name: "Casa", updatedAt: stamp });
+    for (const merged of [
+      mergeExpenseStores(restored, renamedHere),
+      mergeExpenseStores(renamedHere, restored),
+    ]) {
+      expect(byId(merged.categories, "cat-home")?.name).toBe("Casa");
+    }
+  });
+
   it("lets a later import bring back an id that a previous replace removed", () => {
     const back = replaceStoreContents(replaced, current, { scope: "all", now: new Date("2026-10-24T10:00:00.000Z") });
 

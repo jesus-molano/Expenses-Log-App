@@ -79,6 +79,27 @@ describe("paying a different amount", () => {
     expect(back.override?.amountPaid).toBeUndefined();
     vi.useRealTimers();
   });
+
+  it("keeps the original payment date when correcting what an already paid charge cost", async () => {
+    const { payOccurrenceInStore } = await import("./expense-commands");
+    const { generateStoreOccurrences } = await import("@/domain/finance");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-05T10:00:00"));
+    const store = addExpenseToStore(emptyStore, { ...monthly("Luz", 5), amount: 60 });
+    const due = generateStoreOccurrences(store, "2026-10-05", "2026-10-05")[0];
+    const paid = payOccurrenceInStore(store, due, 60);
+    const paidAt = generateStoreOccurrences(paid, "2026-10-05", "2026-10-05")[0].override?.paidAt;
+
+    vi.setSystemTime(new Date("2026-10-23T10:00:00"));
+    const paidOccurrence = generateStoreOccurrences(paid, "2026-10-05", "2026-10-05")[0];
+    const corrected = payOccurrenceInStore(paid, paidOccurrence, 71.2);
+    expect(generateStoreOccurrences(corrected, "2026-10-05", "2026-10-05")[0].override).toMatchObject({
+      paidAt,
+      amountPaid: 71.2,
+    });
+    expect(payOccurrenceInStore(paid, paidOccurrence, 0)).toBe(paid);
+    vi.useRealTimers();
+  });
 });
 describe("expenses that started in a past month (M18)", () => {
   beforeEach(() => {

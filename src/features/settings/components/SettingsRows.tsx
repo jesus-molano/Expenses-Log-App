@@ -1,6 +1,7 @@
 export { AccountRow } from "./rows/AccountRow";
 export { BackupRows } from "./rows/BackupRows";
 export { BudgetCycleRow } from "./rows/BudgetCycleRow";
+export { CategoriesRow } from "./rows/CategoriesRow";
 export { DangerRows } from "./rows/DangerRows";
 export { InstallRow } from "./rows/InstallRow";
 export { LanguageRow } from "./rows/LanguageRow";

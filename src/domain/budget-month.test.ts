@@ -4,12 +4,14 @@ import {
   buildMonthContext,
   buildMonthPlan,
   buildPaydayOutlook,
+  canMoveOccurrence,
   configuredPayday,
   defaultDateInMonth,
   getNextPayday,
   isMonthClosed,
   monthCloseStatus,
   monthPendingSummary,
+  occurrenceMoveRange,
   paymentSettlesMonth,
   resolveActiveMonth,
   selectCarryOverOccurrences,
@@ -656,6 +658,50 @@ describe("payday-anchored budget month", () => {
     expect(monthCloseStatus(occurrences, "2026-11")).toMatchObject({
       pendingCount: 2,
       pendingTotal: 30,
+    });
+  });
+});
+
+describe("moving a charge", () => {
+  const paydayFinance = (dayOfMonth: number) => ({
+    ...emptyFinanceStore,
+    monthlySalary: {
+      "2026-09": { amount: 2000, dayOfMonth, updatedAt: "2026-09-01T00:00:00.000Z" },
+    },
+    budgetCycle: { anchor: "payday" as const, updatedAt: "2026-10-01T00:00:00.000Z" },
+  });
+
+  it("keeps calendar months from the open month to the end of the next one", () => {
+    expect(occurrenceMoveRange("2026-10")).toEqual({ min: "2026-10-01", max: "2026-11-30" });
+    expect(canMoveOccurrence(occurrence("old", 10, "2026-09-08", "paid"), "2026-10")).toBe(false);
+    expect(canMoveOccurrence(occurrence("late", 10, "2026-09-08"), "2026-10")).toBe(true);
+    expect(canMoveOccurrence(occurrence("now", 10, "2026-10-08", "paid"), "2026-10")).toBe(true);
+  });
+
+  it("follows the payday cycle, never before the calendar month of today", () => {
+    // Cobro el 28: "noviembre" va del 28 de octubre al 27 de noviembre.
+    const late = resolveBudgetCycle(paydayFinance(28));
+    expect(occurrenceMoveRange("2026-11", late, "2026-10-30")).toEqual({
+      min: "2026-10-28",
+      max: "2026-12-27",
+    });
+    // Lo pagado el 29 de octubre es de este ciclo; lo del 20, del anterior.
+    expect(
+      canMoveOccurrence(occurrence("internet", 10, "2026-10-29", "paid"), "2026-11", late, "2026-10-30"),
+    ).toBe(true);
+    expect(
+      canMoveOccurrence(occurrence("gym", 10, "2026-10-20", "paid"), "2026-11", late, "2026-10-30"),
+    ).toBe(false);
+    expect(
+      canMoveOccurrence(occurrence("gym", 10, "2026-10-20"), "2026-11", late, "2026-10-30"),
+    ).toBe(true);
+
+    // Cobro el 5: "octubre" va del 5 de octubre al 4 de noviembre, pero el 2
+    // de noviembre octubre ya es historial.
+    const early = resolveBudgetCycle(paydayFinance(5));
+    expect(occurrenceMoveRange("2026-10", early, "2026-11-02")).toEqual({
+      min: "2026-11-01",
+      max: "2026-12-04",
     });
   });
 });

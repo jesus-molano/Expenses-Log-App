@@ -3,6 +3,7 @@
 import { type FormEvent, useState } from "react";
 import { toDateOnly } from "@/domain/calendar";
 import { currentSeriesAmount } from "@/domain/series-lifecycle";
+import { EXPENSE_DETAIL_KEYS } from "@/domain/expense-details";
 import type {
   AppLanguage,
   DraftExpense,
@@ -116,6 +117,9 @@ export function useExpenseEditor({
         endDate: draft.endDate,
         recurrence: draft.recurrence,
         reminder: draft.reminder,
+        // Un dato vaciado se borra (undefined) en lugar de conservar el viejo.
+        ...Object.fromEntries(EXPENSE_DETAIL_KEYS.map((key) => [key, undefined])),
+        ...draft.details,
       }),
     );
     // replace: volver atrás desde el listado no debe reabrir el editor.

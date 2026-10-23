@@ -10,7 +10,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import type { PaidAmountAverage } from "@/domain/amount-history";
 import { formatCurrency } from "@/domain/calendar";
-import { PRESET_EXPENSE_CATEGORIES } from "@/domain/categories";
+import { buildCategoryOptions } from "@/domain/categories";
 import { paidAmount } from "@/domain/finance";
 import { isOccurrenceOverdue } from "@/domain/pending";
 import type {
@@ -65,7 +65,8 @@ export function MonthlyExpenseRow({
         : null,
     [editor.editing, editor.status, occurrence, suggestPaidAmount],
   );
-  const categoryOptions = PRESET_EXPENSE_CATEGORIES.map((category) => {
+  // Las preset con el color del usuario y sus categorías propias.
+  const categoryOptions = buildCategoryOptions(categories).map((category) => {
     const Icon = categoryIconMap[category.icon] ?? WalletCards;
 
     return {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseExpenseTextLocally } from "./parser";
+import { parseCaptureTextLocally, parseExpenseTextLocally } from "./parser";
 
 const today = "2026-10-23";
 
@@ -115,5 +115,64 @@ describe("parseExpenseTextLocally", () => {
     })[0];
 
     expect(result.draft.categoryName).toBe("Suscripciones");
+  });
+});
+
+describe("parseCaptureTextLocally commands", () => {
+  const command = (intent: string, target: string, extra: Record<string, unknown> = {}) => ({
+    intent,
+    target,
+    amount: null,
+    day: null,
+    date: null,
+    month: null,
+    ...extra,
+  });
+
+  it.each([
+    ["marca la luz pagada 71,20", command("pay", "Luz", { amount: 71.2 })],
+    ["Marca la luz de octubre como pagada", command("pay", "Luz", { month: 10 })],
+    ["ya he pagado el alquiler", command("pay", "Alquiler")],
+    ["pagué el seguro del coche 420", command("pay", "Seguro del coche", { amount: 420 })],
+    ["mark electricity paid 71.20", command("pay", "Electricity", { amount: 71.2 })],
+    ["salta el gimnasio este mes", command("skip", "Gimnasio")],
+    ["salta el seguro el mes que viene", command("skip", "Seguro", { month: 11 })],
+    ["skip the gym this month", command("skip", "Gym")],
+    ["mueve Netflix al 10", command("move", "Netflix", { day: 10 })],
+    ["cambia la luz al día 12", command("move", "Luz", { day: 12 })],
+    ["mueve el gimnasio al 3/11", command("move", "Gimnasio", { date: "2026-11-03" })],
+    ["move Netflix to the 10th", command("move", "Netflix", { day: 10 })],
+  ])("reads the command %j", (text, expected) => {
+    expect(parseCaptureTextLocally(text, { today })).toEqual({ drafts: [], commands: [expected] });
+  });
+
+  it("keeps new expenses that only look like commands", () => {
+    for (const text of ["Paga extra 1000 en junio", "cambiar aceite 50 anual", "Netflix 12,99 el 5"]) {
+      const result = parseCaptureTextLocally(text, { today });
+      expect(result.commands).toEqual([]);
+      expect(result.drafts).toHaveLength(1);
+    }
+  });
+
+  it("splits commands without amounts and lets a following part reuse the verb", () => {
+    expect(
+      parseCaptureTextLocally("salta el gimnasio y netflix este mes", { today }).commands,
+    ).toEqual([command("skip", "Gimnasio"), command("skip", "Netflix")]);
+    expect(
+      parseCaptureTextLocally("marca la luz y el agua pagadas", { today }).commands,
+    ).toEqual([command("pay", "Luz"), command("pay", "Agua")]);
+  });
+
+  it("mixes a command and a new expense in the same text", () => {
+    const result = parseCaptureTextLocally("marca la luz pagada 71,20 y Netflix 12,99 el 5", {
+      today,
+    });
+
+    expect(result.commands).toEqual([command("pay", "Luz", { amount: 71.2 })]);
+    expect(result.drafts.map(({ draft }) => [draft.name, draft.amount, draft.dueDay])).toEqual([
+      ["Netflix", 12.99, 5],
+    ]);
+    // parseExpenseTextLocally sigue devolviendo solo las altas.
+    expect(parseExpenseTextLocally("marca la luz pagada 71,20", { today })).toEqual([]);
   });
 });

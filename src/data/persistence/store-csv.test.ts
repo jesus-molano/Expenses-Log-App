@@ -306,6 +306,92 @@ describe("csvToStore", () => {
     });
   });
 
+  it("round-trips contract details and custom categories with their colour", () => {
+    const withDetails = normalizeExpenseStore(
+      {
+        ...emptyStore,
+        categories: [
+          { id: "cat-treats", userId: "demo", name: "Caprichos", icon: "Tag", tone: "violet" },
+          { id: "cat-subs", userId: "demo", name: "Suscripciones", icon: "Sparkles", tone: "violet" },
+        ],
+        templates: [
+          template("gym", "Gimnasio", 39.9, "cat-treats", "2026-09-03", {
+            notes: "=Permanencia\nde un año",
+            cancellationUrl: "https://gym.example/baja",
+            commitmentEndDate: "2027-03-15",
+            paymentMethod: "direct_debit",
+            paymentMethodDetail: "ES12 ···· 3456",
+          }),
+          template("netflix", "Netflix", 12.99, "cat-subs", "2026-09-05"),
+        ],
+      },
+      today,
+    );
+
+    const { store: imported, skippedRows } = csvToStore(
+      storeToCsv(withDetails, { today, language: "en" }),
+      { now: today },
+    );
+
+    expect(skippedRows).toBe(0);
+    const gym = imported.templates.find((item) => item.id === "gym");
+    expect(gym).toMatchObject({
+      notes: "=Permanencia\nde un año",
+      cancellationUrl: "https://gym.example/baja",
+      commitmentEndDate: "2027-03-15",
+      paymentMethod: "direct_debit",
+      paymentMethodDetail: "ES12 ···· 3456",
+    });
+    const netflix = imported.templates.find((item) => item.id === "netflix");
+    expect(netflix && "notes" in netflix).toBe(false);
+    const categories = new Map(imported.categories.map((category) => [category.id, category]));
+    // La propia vuelve con su nombre y su color, no como General.
+    expect(categories.get(gym?.categoryId ?? "")).toMatchObject({
+      name: "Caprichos",
+      tone: "violet",
+      icon: "Tag",
+    });
+    expect(categories.get(netflix?.categoryId ?? "")?.name).toBe("Suscripciones");
+  });
+
+  it("brings back a custom category named like an alias as its own, not as the preset", () => {
+    const withStreaming = normalizeExpenseStore(
+      {
+        ...emptyStore,
+        categories: [
+          { id: "cat-streaming", userId: "demo", name: "Streaming", icon: "Tag", tone: "blue" },
+        ],
+        templates: [template("netflix", "Netflix", 12.99, "cat-streaming", "2026-09-05")],
+      },
+      today,
+    );
+
+    const { store: imported } = csvToStore(storeToCsv(withStreaming, { today }), { now: today });
+    const netflix = imported.templates.find((item) => item.id === "netflix");
+    expect(imported.categories.find((category) => category.id === netflix?.categoryId)).toMatchObject({
+      name: "Streaming",
+      tone: "blue",
+      icon: "Tag",
+    });
+
+    // En una hoja hecha a mano (sin color) los alias siguen valiendo.
+    const { store: handMade } = csvToStore(["name,amount,category", "Mercado,60,comida"].join("\n"), {
+      now: today,
+    });
+    expect(handMade.categories[0]?.name).toBe("Alimentacion");
+  });
+
+  it("reuses a custom category of this device written with other accents or casing", () => {
+    const current = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [{ id: "cat-treats", userId: "demo", name: "Caprichos", icon: "Tag", tone: "rose" }],
+    });
+    const csv = ["name,amount,category", "Cine,9,CAPRÍCHOS"].join("\n");
+    const { store: imported } = csvToStore(csv, { now: today, current });
+
+    expect(imported.templates[0]?.categoryId).toBe("cat-treats");
+  });
+
   it("reuses the categories that already exist with the same name", () => {
     const { store: imported } = csvToStore(storeToCsv(store, { today, language: "en" }), {
       now: today,

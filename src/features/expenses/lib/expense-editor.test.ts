@@ -40,6 +40,21 @@ describe("expenseEditorValues", () => {
       dueDay: 5,
     });
     expect(expenseEditorValues(template, undefined, "es").form.categoryName).toBe("General");
+    // Una categoría propia se abre con su nombre, no como General.
+    expect(expenseEditorValues(template, "Caprichos", "es").form.categoryName).toBe("Caprichos");
+  });
+
+  it("opens the contract details of the series", () => {
+    const withDetails = expenseEditorValues(
+      { ...template, notes: "Permanencia", paymentMethod: "direct_debit", commitmentEndDate: "2027-03-15" },
+      "Suscripciones",
+      "es",
+    );
+    expect(withDetails.form).toMatchObject({
+      notes: "Permanencia",
+      paymentMethod: "direct_debit",
+      commitmentEndDate: "2027-03-15",
+    });
   });
 
   it("edits the amount that applies now when the series has price changes", () => {
@@ -92,6 +107,17 @@ describe("hasUnsavedExpenseChanges", () => {
         form: { ...values.form, reminder: { enabled: true, daysBeforeCharge: 3 } },
       })),
     ).toBe(true);
+  });
+
+  it("detects contract details and ignores ones that would save the same", () => {
+    expect(edit((values) => ({ ...values, form: { ...values.form, notes: "Permanencia" } }))).toBe(true);
+    expect(
+      edit((values) => ({ ...values, form: { ...values.form, paymentMethod: "card" } })),
+    ).toBe(true);
+    expect(edit((values) => ({ ...values, form: { ...values.form, notes: "   " } }))).toBe(false);
+    expect(
+      edit((values) => ({ ...values, form: { ...values.form, cancellationUrl: "javascript:x" } })),
+    ).toBe(false);
   });
 
   it("treats an emptied or invalid amount as a change", () => {

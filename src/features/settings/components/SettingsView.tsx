@@ -12,6 +12,7 @@ import {
   AccountRow,
   BackupRows,
   BudgetCycleRow,
+  CategoriesRow,
   DangerRows,
   InstallRow,
   LanguageRow,
@@ -56,6 +57,7 @@ export function SettingsView() {
             <InstallRow language={settings.currentLanguage} />
             <OfflineRow language={settings.currentLanguage} />
             <BudgetCycleRow settings={settings} />
+            <CategoriesRow language={settings.currentLanguage} />
             <ThemeRow settings={settings} />
             <LanguageRow settings={settings} />
             <BackupRows language={settings.currentLanguage} />

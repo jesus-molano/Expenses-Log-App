@@ -23,6 +23,7 @@ import {
   readExpenseStoreFromOtherTab,
   saveExpenseStore,
 } from "./local-store";
+import { normalizeExpenseStore } from "./store-normalization";
 
 function template(id: string): ExpenseTemplate {
   return {
@@ -380,6 +381,56 @@ function occurrenceRecord(
   };
 }
 
+describe("mergeExpenseStores with categories and contract details", () => {
+  it("keeps the latest rename of a category and the latest edit of a series", () => {
+    const category = { id: "viajes", userId: "demo", icon: "Tag", tone: "rose" as const };
+    const local = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [{ ...category, name: "Viajes", updatedAt: "2026-10-20T00:00:00.000Z" }],
+    });
+    const cloud = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [{ ...category, name: "Vacaciones", updatedAt: "2026-10-22T00:00:00.000Z" }],
+    });
+
+    expect(mergeExpenseStores(local, cloud).categories).toEqual([
+      expect.objectContaining({ name: "Vacaciones" }),
+    ]);
+    expect(mergeExpenseStores(cloud, local).categories).toEqual([
+      expect.objectContaining({ name: "Vacaciones" }),
+    ]);
+  });
+
+  it("keeps a rename over an old copy of the category that never had an update time", () => {
+    const category = { id: "ocio", userId: "demo", icon: "Gamepad2", tone: "violet" as const };
+    const renamed = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [{ ...category, name: "Caprichos", updatedAt: "2026-10-22T00:00:00.000Z" }],
+    });
+    const stale = normalizeExpenseStore({ ...emptyStore, categories: [{ ...category, name: "Ocio" }] });
+
+    // El dispositivo con la copia antigua fusiona sus cambios con la nube.
+    expect(mergeExpenseStores(stale, renamed).categories).toEqual([
+      expect.objectContaining({ name: "Caprichos" }),
+    ]);
+    expect(mergeExpenseStores(renamed, stale).categories).toEqual([
+      expect.objectContaining({ name: "Caprichos" }),
+    ]);
+  });
+
+  it("does not bring back a category deleted on another device", () => {
+    const category = { id: "viajes", userId: "demo", name: "Viajes", icon: "Tag", tone: "rose" as const };
+    const local = normalizeExpenseStore({ ...emptyStore, categories: [category] });
+    const cloud = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [],
+      deleted: { ...emptyStore.deleted, categories: ["viajes"] },
+    });
+
+    expect(mergeExpenseStores(local, cloud).categories).toEqual([]);
+  });
+});
+
 describe("loadExpenseStore", () => {
   it("keeps a copy of an unreadable store before falling back to empty", () => {
     window.localStorage.setItem("expense-log-store-v1", "{not json");
@@ -463,12 +514,21 @@ describe("mergeExpenseStores categories", () => {
     }
   });
 
-  it("lets the local copy win for categories without a timestamp", () => {
+  it("lets the local copy win when neither category has a timestamp", () => {
+    const merged = mergeExpenseStores(
+      { ...emptyStore, categories: [{ ...category, icon: "Local" }] },
+      { ...emptyStore, categories: [{ ...category, icon: "Cloud" }] },
+    );
+
+    expect(merged.categories[0].icon).toBe("Local");
+  });
+
+  it("prefers the copy with a timestamp over an older copy without one", () => {
     const merged = mergeExpenseStores(
       { ...emptyStore, categories: [{ ...category, icon: "Local" }] },
       { ...emptyStore, categories: [{ ...category, icon: "Cloud", updatedAt: "2026-10-23T10:00:00.000Z" }] },
     );
 
-    expect(merged.categories[0].icon).toBe("Local");
+    expect(merged.categories[0].icon).toBe("Cloud");
   });
 });
