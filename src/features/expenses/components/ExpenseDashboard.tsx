@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ActionToast } from "@/components/ui/ActionToast";
 import type {
   CreateExpenseOptions,
@@ -54,6 +54,15 @@ export function ExpenseDashboard({
   const month = useActiveMonth({ store, language, now, closeMonth, reopenMonth });
   const filters = useExpenseFilters(store, language, now, month.viewMonthId);
   const actionToast = useActionToast();
+  const monthHeadingRef = useRef<HTMLHeadingElement>(null);
+  const showCloseCard =
+    month.suggestAdvance && month.viewMonthId === month.activeMonthId;
+
+  // La tarjeta, el aviso o el chip que se acaba de usar desaparece: el foco
+  // pasa al título del mes para que el teclado y el lector no se pierdan.
+  function focusMonthHeading() {
+    window.requestAnimationFrame(() => monthHeadingRef.current?.focus());
+  }
   const quickParser = useQuickExpenseParser(language);
   const chrome = useScrollChrome();
   const runViewTransition = useViewTransitionAction();
@@ -83,6 +92,7 @@ export function ExpenseDashboard({
 
   function advanceMonth() {
     month.advance();
+    focusMonthHeading();
     actionToast.show({
       message: capitalize(
         t("expenses.monthActive", language).replace(
@@ -94,6 +104,7 @@ export function ExpenseDashboard({
       onAction: () => {
         month.reopen();
         actionToast.dismiss();
+        focusMonthHeading();
       },
     });
   }
@@ -148,17 +159,27 @@ export function ExpenseDashboard({
           canBrowseBack={month.canBrowseBack}
           canBrowseForward={month.canBrowseForward}
           onBrowse={month.browse}
-          onReset={month.reset}
-          onReopen={month.reopen}
+          onReset={() => {
+            month.reset();
+            focusMonthHeading();
+          }}
+          onReopen={() => {
+            month.reopen();
+            focusMonthHeading();
+          }}
+          headingRef={monthHeadingRef}
         />
-        {month.suggestAdvance && month.viewMonthId === month.activeMonthId ? (
+        {showCloseCard ? (
           <MonthCloseCard
             status={month.closeStatus}
             nextMonthId={month.nextMonthId}
             hasPayday={month.payday !== null}
             language={language}
             onAdvance={advanceMonth}
-            onDismiss={month.dismiss}
+            onDismiss={() => {
+              month.dismiss();
+              focusMonthHeading();
+            }}
           />
         ) : null}
       </div>
@@ -168,6 +189,8 @@ export function ExpenseDashboard({
         categories={store.categories}
         today={filters.today}
         monthId={month.viewMonthId}
+        openMonthId={month.calendarMonthId}
+        autoScroll={!showCloseCard}
         language={language}
         onTogglePaid={togglePaidWithMonthCheck}
         onMoveOccurrenceOnly={(occurrence, dueDate, sortOrder) =>
@@ -222,6 +245,8 @@ export function ExpenseDashboard({
           message={actionToast.toast.message}
           actionLabel={actionToast.toast.actionLabel}
           onAction={actionToast.toast.onAction}
+          onPause={actionToast.pause}
+          onResume={actionToast.resume}
         />
       ) : lastChanceReminder ? (
         <LastChanceReminderToast

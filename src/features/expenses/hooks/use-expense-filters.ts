@@ -38,7 +38,7 @@ function buildExpenseFilters(
   monthId: string,
 ) {
   const today = toDateOnly(todayDate);
-  const { start: windowStart, end: currentMonthEnd } = monthRange(monthId);
+  const { start: windowStart } = monthRange(monthId);
   const timelineWindowEnd = toDateOnly(
     addDays(
       parseISO(monthRange(addMonthId(monthId, 1)).start),
@@ -46,11 +46,14 @@ function buildExpenseFilters(
     ),
   );
 
+  // La vista de series se mide siempre contra el mes natural: mirar otro mes
+  // no convierte en atrasado lo que vence más adelante en este.
+  const calendarMonth = monthRange(today.slice(0, 7));
   const recurringOverviewItems = buildRecurringOverview({
     templates: store.templates,
     overrides: store.overrides,
-    windowStart,
-    windowEnd: currentMonthEnd,
+    windowStart: calendarMonth.start,
+    windowEnd: calendarMonth.end,
     language,
   });
 

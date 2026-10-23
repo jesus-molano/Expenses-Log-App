@@ -1,4 +1,7 @@
+"use client";
+
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useRef, type RefObject } from "react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import type { AppLanguage } from "@/domain/types";
@@ -15,6 +18,8 @@ type MonthBarProps = {
   onBrowse: (delta: number) => void;
   onReset: () => void;
   onReopen: () => void;
+  // Destino del foco cuando desaparece o se desactiva el botón usado.
+  headingRef: RefObject<HTMLHeadingElement | null>;
 };
 
 // Selector del mes que se mira. Debajo ofrece volver al mes activo, o al
@@ -29,8 +34,22 @@ export function MonthBar({
   onBrowse,
   onReset,
   onReopen,
+  headingRef,
 }: MonthBarProps) {
   const name = (id: string) => formatMonthName(id, language);
+  const backRef = useRef<HTMLButtonElement>(null);
+  const forwardRef = useRef<HTMLButtonElement>(null);
+
+  // Al llegar al límite el botón pulsado se desactiva y perdería el foco.
+  useEffect(() => {
+    const active = document.activeElement;
+    if (
+      (active === backRef.current && !canBrowseBack) ||
+      (active === forwardRef.current && !canBrowseForward)
+    ) {
+      headingRef.current?.focus();
+    }
+  }, [canBrowseBack, canBrowseForward, headingRef]);
 
   return (
     <nav
@@ -38,6 +57,7 @@ export function MonthBar({
       className="flex items-center justify-between gap-2"
     >
       <IconButton
+        ref={backRef}
         variant="ghost"
         onClick={() => onBrowse(-1)}
         disabled={!canBrowseBack}
@@ -48,7 +68,9 @@ export function MonthBar({
 
       <div className="grid min-w-0 justify-items-center gap-0.5 text-center">
         <h2
-          className="text-base font-semibold text-[var(--app-text)]"
+          ref={headingRef}
+          tabIndex={-1}
+          className="app-focus-ring rounded-[var(--app-radius-sm)] text-base font-semibold text-[var(--app-text)]"
           aria-live="polite"
         >
           {capitalize(formatMonthName(monthId, language, { withYear: true }))}
@@ -74,6 +96,7 @@ export function MonthBar({
       </div>
 
       <IconButton
+        ref={forwardRef}
         variant="ghost"
         onClick={() => onBrowse(1)}
         disabled={!canBrowseForward}

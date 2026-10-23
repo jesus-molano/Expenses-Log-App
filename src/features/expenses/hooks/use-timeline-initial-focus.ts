@@ -3,12 +3,13 @@
 import { useEffect, useRef } from "react";
 import type { TimelineSection } from "../lib/timeline";
 
-// Enfoca la sección relevante al abrir y cada vez que cambia `focusKey` (el
-// día o el mes que se mira).
+// Enfoca la sección relevante al abrir y cada vez que cambia el día. Con
+// `enabled` a false (hay algo arriba que no debe quedar tapado) ese día no se
+// desplaza.
 export function useTimelineInitialFocus(
   sections: TimelineSection[],
   today: string,
-  focusKey: string = today,
+  enabled = true,
 ) {
   const focusRef = useRef<HTMLElement | null>(null);
   const focusedDay = useRef<string | null>(null);
@@ -28,8 +29,9 @@ export function useTimelineInitialFocus(
         : Math.max(0, nextRelevantIndex);
 
   useEffect(() => {
-    if (focusedDay.current === focusKey || !focusRef.current) return;
-    focusedDay.current = focusKey;
+    if (focusedDay.current === today || !focusRef.current) return;
+    focusedDay.current = today;
+    if (!enabled) return;
 
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
@@ -57,7 +59,7 @@ export function useTimelineInitialFocus(
         });
       });
     });
-  }, [focusKey, sections]);
+  }, [enabled, sections, today]);
 
   return { focusIndex, focusRef };
 }

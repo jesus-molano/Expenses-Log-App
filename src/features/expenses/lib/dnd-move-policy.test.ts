@@ -78,4 +78,37 @@ describe("resolveDragMove", () => {
       }),
     ).toBe("ignore");
   });
+
+  it("never drops into a closed month while looking at a past month", () => {
+    const octoberBill = occurrence("2026-10-03");
+    const viewing = { currentMonth: "2026-09", openMonth: "2026-10" };
+
+    expect(
+      resolveDragMove({ occurrence: octoberBill, target: { date: "2026-09-15", rowId: undefined }, ...viewing }),
+    ).toBe("ignore");
+    expect(isDropTargetAllowed({ date: "2026-09-15" }, "2026-09", "2026-10")).toBe(false);
+    expect(isDropTargetAllowed({ date: "2026-10-05" }, "2026-09", "2026-10")).toBe(true);
+  });
+
+  it("does not move paid history from a closed month", () => {
+    const paidSeptember = { ...occurrence("2026-09-01", true), status: "paid" as const };
+    const unpaidSeptember = occurrence("2026-09-20");
+
+    expect(
+      resolveDragMove({
+        occurrence: paidSeptember,
+        target: { date: "2026-10-05", rowId: undefined },
+        currentMonth: "2026-09",
+        openMonth: "2026-10",
+      }),
+    ).toBe("ignore");
+    expect(
+      resolveDragMove({
+        occurrence: unpaidSeptember,
+        target: { date: "2026-10-05", rowId: undefined },
+        currentMonth: "2026-10",
+        openMonth: "2026-10",
+      }),
+    ).toBe("single");
+  });
 });

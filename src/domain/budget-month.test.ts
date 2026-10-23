@@ -17,6 +17,10 @@ import {
   occurrencesDueBetween,
 } from "./finance";
 import { emptyFinanceStore } from "./finance";
+import {
+  closeMonthInStore,
+  reopenMonthInStore,
+} from "@/stores/app/finance-commands";
 import { emptyStore } from "./seed";
 import type {
   ExpenseOccurrence,
@@ -183,6 +187,41 @@ describe("month context", () => {
     expect(paymentSettlesMonth(buildMonthContext(store, "2026-10-10"), power)).toBe(
       false,
     );
+  });
+});
+
+describe("carry-over for a viewed month", () => {
+  it("does not pull bills that are not due yet into a future month", () => {
+    const store: ExpenseStore = {
+      ...emptyStore,
+      templates: [template("internet", "2026-10-25", 25), template("old", "2026-10-02", 2)],
+    };
+
+    const carried = selectCarryOverOccurrences(
+      store,
+      new Date(2026, 9, 23, 12),
+      "es",
+      "2026-11",
+    );
+
+    expect(carried.map((item) => item.template.id)).toEqual(["old"]);
+  });
+});
+
+describe("closing and reopening with a slow clock", () => {
+  it("keeps every change after the previous one", () => {
+    const closed = closeMonthInStore(emptyStore, "2026-10", new Date("2026-10-28T10:00:00.000Z"));
+    // Otro dispositivo con el reloj 5 minutos atrasado reabre.
+    const reopened = reopenMonthInStore(closed, "2026-10", new Date("2026-10-28T09:57:00.000Z"));
+
+    expect(isMonthClosed(reopened.finance.monthClosures, "2026-10")).toBe(false);
+    expect(
+      reopened.finance.monthClosures!["2026-10"].updatedAt >
+        closed.finance.monthClosures!["2026-10"].updatedAt,
+    ).toBe(true);
+
+    const closedAgain = closeMonthInStore(reopened, "2026-10", new Date("2026-10-28T09:58:00.000Z"));
+    expect(isMonthClosed(closedAgain.finance.monthClosures, "2026-10")).toBe(true);
   });
 });
 

@@ -262,7 +262,7 @@ export function closeMonthInStore(
   monthId: string,
   now: Date = new Date(),
 ): ExpenseStore {
-  const timestamp = now.toISOString();
+  const timestamp = afterPreviousChange(store.finance.monthClosures?.[monthId], now);
   return withMonthClosure(store, monthId, {
     closedAt: timestamp,
     updatedAt: timestamp,
@@ -277,12 +277,26 @@ export function reopenMonthInStore(
 ): ExpenseStore {
   const closure = store.finance.monthClosures?.[monthId];
   if (!closure) return store;
-  const timestamp = now.toISOString();
+  const timestamp = afterPreviousChange(closure, now);
   return withMonthClosure(store, monthId, {
     ...closure,
     reopenedAt: timestamp,
     updatedAt: timestamp,
   });
+}
+
+// Cada cierre o reapertura queda después del cambio anterior aunque el reloj
+// de este dispositivo vaya atrasado: si no, reabrir no surtiría efecto y el
+// merge se quedaría con la versión vieja.
+function afterPreviousChange(closure: MonthClosure | undefined, now: Date) {
+  const previous = closure
+    ? Math.max(
+        Date.parse(closure.updatedAt),
+        Date.parse(closure.closedAt),
+        Date.parse(closure.reopenedAt ?? closure.closedAt),
+      )
+    : -Infinity;
+  return new Date(Math.max(now.getTime(), previous + 1)).toISOString();
 }
 
 function withMonthClosure(

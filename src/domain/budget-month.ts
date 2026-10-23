@@ -1,7 +1,7 @@
 import { endOfMonth, parseISO } from "date-fns";
 import { daysBetween, toDateOnly } from "./calendar";
 import { getMonthlySalarySettings, occurrencesDueBetween } from "./finance";
-import { monthPendingSummary } from "./pending";
+import { isOccurrenceOverdue, monthPendingSummary } from "./pending";
 import type {
   AppLanguage,
   ExpenseOccurrence,
@@ -131,7 +131,10 @@ export function selectCarryOverOccurrences(
   ).filter(
     (occurrence) =>
       templateIds.has(occurrence.template.id) &&
-      (occurrence.status === "due" ||
+      // Al mirar un mes futuro, lo del mes anterior que aún no ha vencido no
+      // es un resto: sigue en su mes.
+      ((occurrence.status === "due" &&
+        (previousMonth.end < todayId || isOccurrenceOverdue(occurrence, todayId))) ||
         (occurrence.status === "paid" && paidOn(occurrence) === todayId)),
   );
 }
