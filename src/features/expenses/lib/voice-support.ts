@@ -64,13 +64,16 @@ export function joinWords(...parts: string[]) {
 
 type RecognitionResultLike = { isFinal: boolean; 0: { transcript: string } };
 
-// "doscientos" no empieza por la palabra "dos": el prefijo tiene que acabar
-// en un límite de palabra.
+// "doscientos" no empieza por la palabra "dos": un prefijo de una sola
+// palabra tiene que acabar en un límite de palabra. Una frase de varias
+// palabras que Android reenvía puede cambiar el final de la última ("doce
+// euro" → "doce euros") y sigue siendo la misma.
 function startsWithWords(text: string, prefix: string) {
   const folded = text.toLocaleLowerCase();
   const foldedPrefix = prefix.toLocaleLowerCase();
   if (!folded.startsWith(foldedPrefix)) return false;
-  return folded.length === foldedPrefix.length || /[\s.,;:!?]/.test(folded[foldedPrefix.length]);
+  if (folded.length === foldedPrefix.length || /\s/.test(foldedPrefix.trim())) return true;
+  return /[^\p{L}\p{N}]/u.test(folded[foldedPrefix.length]);
 }
 
 // Texto de una sesión de reconocimiento a partir de todos sus resultados.
