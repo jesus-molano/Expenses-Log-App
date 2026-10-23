@@ -32,6 +32,8 @@ type DragScrollAnchor = {
 type UseExpenseDndOptions = {
   sections: TimelineSection[];
   currentMonth: string;
+  // Mes natural: no se suelta antes de él aunque se mire un mes pasado.
+  openMonth?: string;
   onMoveOccurrenceOnly: (
     occurrence: ExpenseOccurrence,
     dueDate: string,
@@ -46,6 +48,7 @@ type UseExpenseDndOptions = {
 export function useExpenseDnd({
   sections,
   currentMonth,
+  openMonth = currentMonth,
   onMoveOccurrenceOnly,
   onMoveOccurrenceSeries,
 }: UseExpenseDndOptions) {
@@ -103,7 +106,9 @@ export function useExpenseDnd({
   function handleDragMove(event: DragMoveEvent) {
     autoScrollWithDrag(event);
     const target = getDropTargetFromEvent(event);
-    setActiveDropTarget(isDropTargetAllowed(target, currentMonth) ? target : null);
+    setActiveDropTarget(
+      isDropTargetAllowed(target, currentMonth, openMonth) ? target : null,
+    );
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -115,7 +120,7 @@ export function useExpenseDnd({
 
     if (!occurrence || !target) return;
 
-    const action = resolveDragMove({ occurrence, target, currentMonth });
+    const action = resolveDragMove({ occurrence, target, currentMonth, openMonth });
     if (action === "series") {
       scheduleSeriesMove(occurrence, target.date, target);
     } else if (action === "single") {

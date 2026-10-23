@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useState,
+  useRef,
 } from "react";
 import type {
   AppLanguage,
@@ -24,12 +25,14 @@ import {
   addIncomeEventToStore,
   clearExpensesFromStore,
   clearIncomeFromStore,
+  closeMonthInStore,
   deleteExpenseFromStore,
   deleteIncomeEventFromStore,
   dismissLastChanceReminderInStore,
   moveOccurrenceInStore,
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
+  reopenMonthInStore,
   skipOccurrenceInStore,
   togglePaidInStore,
   updateIncomeEventInStore,
@@ -90,36 +93,45 @@ export function useExpenseStore() {
 
 function useExpenseStoreValue() {
   const [store, setStore] = useState<ExpenseStore>(emptyStore);
-  const hydrateStore = useCallback((nextStore: ExpenseStore) => {
+  // Último store guardado. Los comandos parten siempre de él: un handler
+  // creado en un render anterior (la acción de un aviso, un temporizador) no
+  // debe deshacer lo que pasó después.
+  const storeRef = useRef(store);
+  const commitStore = useCallback((nextStore: ExpenseStore) => {
+    storeRef.current = nextStore;
     setStore(nextStore);
   }, []);
-  const persistence = useStorePersistence({ onHydrate: hydrateStore });
+  const persistence = useStorePersistence({ onHydrate: commitStore });
+
+  function current() {
+    return storeRef.current;
+  }
 
   function persist(nextStore: ExpenseStore) {
     persistence.persist(
-      preserveClosedOccurrenceRecords(store, nextStore),
-      setStore,
+      preserveClosedOccurrenceRecords(current(), nextStore),
+      commitStore,
     );
   }
 
   function addExpense(draft: DraftExpense, options: CreateExpenseOptions = {}) {
-    persist(addExpenseToStore(store, draft, options));
+    persist(addExpenseToStore(current(), draft, options));
   }
 
   async function deleteExpense(templateId: string) {
-    const recordedStore = materializeClosedOccurrenceRecords(store);
+    const recordedStore = materializeClosedOccurrenceRecords(current());
     await persistence.persistImmediately(
       deleteExpenseFromStore(recordedStore, templateId),
-      setStore,
+      commitStore,
       t("settings.savingChanges"),
     );
   }
 
   async function clearExpenses() {
-    const occurrenceRecordIds = (store.occurrenceRecords ?? []).map(
+    const occurrenceRecordIds = (current().occurrenceRecords ?? []).map(
       (record) => record.id,
     );
-    const clearedStore = clearExpensesFromStore(store);
+    const clearedStore = clearExpensesFromStore(current());
     await persistence.persistImmediately(
       {
         ...clearedStore,
@@ -135,29 +147,29 @@ function useExpenseStoreValue() {
           ),
         },
       },
-      setStore,
+      commitStore,
       t("settings.clearingCloudExpenses"),
     );
   }
 
   async function clearIncome() {
     await persistence.persistImmediately(
-      clearIncomeFromStore(store),
-      setStore,
+      clearIncomeFromStore(current()),
+      commitStore,
       t("settings.clearingCloudIncome"),
     );
   }
 
   function togglePaid(occurrence: ExpenseOccurrence) {
-    persist(togglePaidInStore(store, occurrence));
+    persist(togglePaidInStore(current(), occurrence));
   }
 
   function skipOccurrence(occurrence: ExpenseOccurrence) {
-    persist(skipOccurrenceInStore(store, occurrence));
+    persist(skipOccurrenceInStore(current(), occurrence));
   }
 
   function dismissLastChanceReminder(occurrence: ExpenseOccurrence) {
-    persist(dismissLastChanceReminderInStore(store, occurrence));
+    persist(dismissLastChanceReminderInStore(current(), occurrence));
   }
 
   function moveOccurrence(
@@ -165,11 +177,11 @@ function useExpenseStoreValue() {
     dueDate: string,
     sortOrder?: number,
   ) {
-    persist(moveOccurrenceInStore(store, occurrence, dueDate, sortOrder));
+    persist(moveOccurrenceInStore(current(), occurrence, dueDate, sortOrder));
   }
 
   function moveOccurrenceSeries(occurrence: ExpenseOccurrence, dueDate: string) {
-    persist(moveOccurrenceSeriesInStore(store, occurrence, dueDate));
+    persist(moveOccurrenceSeriesInStore(current(), occurrence, dueDate));
   }
 
   function moveOccurrenceOnly(
@@ -177,51 +189,59 @@ function useExpenseStoreValue() {
     dueDate: string,
     sortOrder?: number,
   ) {
-    persist(moveOccurrenceOnlyInStore(store, occurrence, dueDate, sortOrder));
+    persist(moveOccurrenceOnlyInStore(current(), occurrence, dueDate, sortOrder));
   }
 
   function updateMoneySettings(input: MoneySettingsInput) {
-    persist(updateMoneySettingsInStore(store, input));
+    persist(updateMoneySettingsInStore(current(), input));
   }
 
   function updateMonthlySavingsTarget(input: MonthlySavingsTargetInput) {
-    persist(updateMonthlySavingsTargetInStore(store, input));
+    persist(updateMonthlySavingsTargetInStore(current(), input));
   }
 
   function updateMonthlySavingsContribution(
     input: MonthlySavingsContributionInput,
   ) {
-    persist(updateMonthlySavingsContributionInStore(store, input));
+    persist(updateMonthlySavingsContributionInStore(current(), input));
   }
 
   function updateMonthlySalary(input: MonthlySalaryInput) {
-    persist(updateMonthlySalaryInStore(store, input));
+    persist(updateMonthlySalaryInStore(current(), input));
   }
 
   function addIncomeEvent(input: IncomeEventInput) {
-    persist(addIncomeEventToStore(store, input));
+    persist(addIncomeEventToStore(current(), input));
   }
 
   function deleteIncomeEvent(eventId: string) {
-    persist(deleteIncomeEventFromStore(store, eventId));
+    persist(deleteIncomeEventFromStore(current(), eventId));
   }
 
   function updateIncomeEvent(eventId: string, input: IncomeEventInput) {
-    persist(updateIncomeEventInStore(store, eventId, input));
+    persist(updateIncomeEventInStore(current(), eventId, input));
   }
 
   function updateMonthlyExpenseOccurrence(input: MonthlyExpenseOverrideInput) {
-    persist(updateMonthlyExpenseOccurrenceInStore(store, input));
+    persist(updateMonthlyExpenseOccurrenceInStore(current(), input));
+  }
+
+  function closeMonth(monthId: string) {
+    persist(closeMonthInStore(current(), monthId));
+  }
+
+  function reopenMonth(monthId: string) {
+    persist(reopenMonthInStore(current(), monthId));
   }
 
   function updateTheme(theme: AppTheme) {
     applyAppTheme(theme);
-    persist(updateThemeInStore(store, theme));
+    persist(updateThemeInStore(current(), theme));
   }
 
   function updateLanguage(language: AppLanguage) {
     persistLanguagePreference(language);
-    persist(updateLanguageInStore(store, language));
+    persist(updateLanguageInStore(current(), language));
   }
 
   return {
@@ -245,6 +265,8 @@ function useExpenseStoreValue() {
     deleteIncomeEvent,
     updateIncomeEvent,
     updateMonthlyExpenseOccurrence,
+    closeMonth,
+    reopenMonth,
     updateTheme,
     updateLanguage,
     syncStatus: persistence.syncStatus,

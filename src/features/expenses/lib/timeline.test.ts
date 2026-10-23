@@ -21,6 +21,22 @@ describe("timeline sections", () => {
     expect(overdue?.items.map((item) => item.id)).toEqual(["icloud", "movistar"]);
     expect(overdue?.total).toBe(63.99);
   });
+
+  it("does not call a weekend due date overdue until the bank charge day passes", () => {
+    // Vence el sábado 31 y el banco lo carga el lunes 2.
+    const weekend = {
+      ...occurrence("gym", "2026-10-31", 30),
+      estimatedChargeDate: "2026-11-02",
+    };
+    const sectionOn = (today: string) =>
+      buildTimelineSections([weekend], today, "es").find(
+        (section) => section.items.length > 0,
+      )!;
+
+    expect(sectionOn("2026-11-01").id).toBe("future-2026-10-31");
+    expect(sectionOn("2026-11-02").id).toBe("today");
+    expect(sectionOn("2026-11-03").id).toBe("carry-over-2026-10");
+  });
 });
 
 function occurrence(

@@ -1,5 +1,6 @@
 ﻿import { addDays, format, isSameDay, isWeekend, parseISO } from "date-fns";
 import { enUS, es } from "date-fns/locale";
+import { daysBetween } from "@/domain/calendar";
 import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import {
@@ -99,6 +100,7 @@ export function buildTimelineSections(
   occurrences: ExpenseOccurrence[],
   today: string,
   language: AppLanguage = "es",
+  monthId: string = today.slice(0, 7),
 ): TimelineSection[] {
   const sections = new Map<string, TimelineSection>();
 
@@ -133,20 +135,51 @@ export function buildTimelineSections(
     }))
     .sort((a, b) => sortSections(a, b, today));
 
-  if (!timelineSections.some((section) => section.id === "today")) {
-    timelineSections.push({
-      id: "today",
-      title: t("expenses.today", language),
-      subtitle: t("expenses.controlPoint", language),
-      tone: "pending",
-      priority: 2,
-      total: 0,
-      anchorDate: today,
-      items: [],
-    });
+  const placeholder = placeholderSection(today, monthId, language);
+  if (
+    placeholder &&
+    !timelineSections.some((section) => section.id === placeholder.id)
+  ) {
+    timelineSections.push(placeholder);
   }
 
   return timelineSections.sort((a, b) => sortSections(a, b, today));
+}
+
+// Punto de referencia vacío: "Hoy" en el mes natural y, si se mira el mes
+// siguiente antes de que empiece, cuántos días faltan. Un mes pasado no lleva.
+function placeholderSection(
+  today: string,
+  monthId: string,
+  language: AppLanguage,
+): TimelineSection | null {
+  const base = { tone: "pending" as const, priority: 2, total: 0, items: [] };
+  if (monthId === today.slice(0, 7)) {
+    return {
+      ...base,
+      id: "today",
+      title: t("expenses.today", language),
+      subtitle: t("expenses.controlPoint", language),
+      anchorDate: today,
+    };
+  }
+  if (monthId < today.slice(0, 7)) return null;
+
+  const monthStart = `${monthId}-01`;
+  const days = daysBetween(today, monthStart);
+  const month = format(parseISO(monthStart), "LLLL", {
+    locale: language === "en" ? enUS : es,
+  });
+  return {
+    ...base,
+    id: "month-start",
+    title: (days === 1
+      ? t("expenses.monthStartsTomorrow", language)
+      : t("expenses.monthStartsIn", language).replace("{days}", String(days))
+    ).replace("{month}", month),
+    subtitle: t("expenses.monthStartsSubtitle", language),
+    anchorDate: monthStart,
+  };
 }
 
 function sortSections(

@@ -227,6 +227,8 @@
   --app-shadow-overlay: var(--app-shadow);
   --app-bottom-nav-height: 5.35rem;
   --app-fab-offset: calc(var(--app-bottom-nav-height) + 0.85rem + env(safe-area-inset-bottom));
+  /* Los avisos flotantes quedan por encima del botón de añadir. */
+  --app-toast-offset: calc(var(--app-fab-offset) + 3.25rem + 0.75rem);
   --app-sheet-backdrop: color-mix(in srgb, var(--app-bg) 76%, transparent);
   --app-category-blue: var(--noctalia-blue);
   --app-category-green: var(--noctalia-green);

@@ -36,6 +36,9 @@ export function TimelineNormalItems({
   onTogglePaid,
 }: TimelineNormalItemsProps) {
   if (!section.items.length) {
+    // Solo "Hoy" explica que no hay cargos; el aviso de inicio de mes ya lo
+    // dice en su título.
+    if (section.id !== "today") return null;
     return (
       <div className="app-empty-line px-3 py-3 text-sm font-medium">
         {t("expenses.todayEmpty", language)}

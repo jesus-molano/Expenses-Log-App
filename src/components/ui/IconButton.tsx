@@ -1,6 +1,6 @@
 import { cn } from "@/shared/ui";
 
-type IconButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+type IconButtonProps = React.ComponentProps<"button"> & {
   variant?: "default" | "danger" | "ghost";
   size?: "sm" | "md" | "lg" | "touch";
 };

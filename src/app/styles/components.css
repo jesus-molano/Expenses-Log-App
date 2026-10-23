@@ -839,10 +839,11 @@
   transform: translateY(0.75rem) scale(0.92);
 }
 
-.app-last-chance-toast {
+.app-last-chance-toast,
+.app-action-toast {
   position: fixed;
   right: 1rem;
-  bottom: calc(var(--app-bottom-nav-height) + 1.5rem + env(safe-area-inset-bottom));
+  bottom: var(--app-toast-offset);
   left: 1rem;
   z-index: 35;
   display: grid;
@@ -857,6 +858,11 @@
   box-shadow: var(--app-shadow-overlay);
   padding: 0.75rem;
   backdrop-filter: blur(16px);
+}
+
+.app-action-toast {
+  grid-template-columns: minmax(0, 1fr) auto;
+  border-color: var(--app-border);
 }
 
 @media (min-width: 640px) {

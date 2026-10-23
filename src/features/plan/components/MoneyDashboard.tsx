@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { type FormEvent, useMemo, useState } from "react";
-import { format, startOfMonth, subMonths } from "date-fns";
+import { format, parseISO, subMonths } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import { Button } from "@/components/ui/Button";
 import { MoneyInput } from "@/components/ui/MoneyInput";
@@ -14,6 +14,7 @@ import {
   isEventInMonth,
   toMonthId,
 } from "@/domain/finance";
+import { resolveActiveMonth } from "@/domain/budget-month";
 import type { AppLanguage } from "@/domain/types";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
@@ -62,8 +63,14 @@ export function MoneyDashboard() {
   const today = useCurrentDate();
   const currentYear = today.getFullYear();
   const todayDateOnly = toDateOnly(today);
-  const currentMonthId = toMonthId(today);
-  const currentMonthDate = useMemo(() => startOfMonth(today), [today]);
+  // "Este mes" es el mes activo: tras pasar a noviembre, Plan y Gastos
+  // cuentan lo mismo.
+  const activeMonth = useMemo(() => {
+    const id = resolveActiveMonth(todayDateOnly, store.finance.monthClosures);
+    return { id, date: parseISO(`${id}-01`), year: Number(id.slice(0, 4)) };
+  }, [store.finance.monthClosures, todayDateOnly]);
+  const currentMonthId = activeMonth.id;
+  const currentMonthDate = activeMonth.date;
   const currentOccurrences = useMemo(
     () => occurrencesForMonth(store, currentMonthDate, language),
     [currentMonthDate, language, store],
@@ -128,7 +135,15 @@ export function MoneyDashboard() {
       ),
     [language, reviewYear, store, today],
   );
-  const availableYears = useMemo(() => getAvailableYears(store, today), [store, today]);
+  // Al pasar de diciembre a enero, el año activo también se puede elegir.
+  const activeYear = activeMonth.year;
+  const availableYears = useMemo(
+    () =>
+      Array.from(new Set([...getAvailableYears(store, today), activeYear])).sort(
+        (a, b) => a - b,
+      ),
+    [activeYear, store, today],
+  );
   const selectedSummary =
     reviewMoneySeries.find((item) => item.id === selectedMonthId) ??
     reviewMoneySeries[0];
@@ -177,8 +192,12 @@ export function MoneyDashboard() {
     savingsMonthId: currentMonthId,
     onSave: updateMoneySettings,
   });
+  // Un ingreso extra cuenta en el mes que se está viendo: con el mes
+  // siguiente ya activo, se fecha el día 1 de ese mes.
+  const incomeDate =
+    todayDateOnly.slice(0, 7) >= currentMonthId ? todayDateOnly : `${currentMonthId}-01`;
   const oneOffIncome = useOneOffIncomeForm({
-    today: todayDateOnly,
+    today: incomeDate,
     onAddIncome: addIncomeEvent,
   });
   const skipDialog = useSkipOccurrenceConfirmation(skipOccurrence);
@@ -191,9 +210,9 @@ export function MoneyDashboard() {
   });
 
   function selectReviewYear(year: number) {
-    setReviewYearOverride(year === currentYear ? null : year);
+    setReviewYearOverride(year === activeYear ? null : year);
     setSelectedMonthIdOverride(
-      year === currentYear ? null : `${year}-01-01`,
+      year === activeYear ? null : `${year}-01-01`,
     );
     setExpandedReview(false);
   }

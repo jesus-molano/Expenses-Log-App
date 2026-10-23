@@ -8,6 +8,15 @@ export type MonthPendingSummary = {
   spillToNextMonthTotal: number;
 };
 
+// Atrasado solo cuando ya pasó el día en que se espera el cargo: lo que vence
+// en fin de semana no sale atrasado el lunes en que el banco lo cobra.
+export function isOccurrenceOverdue(
+  occurrence: Pick<ExpenseOccurrence, "status" | "estimatedChargeDate">,
+  today: string,
+) {
+  return occurrence.status === "due" && occurrence.estimatedChargeDate < today;
+}
+
 // Regla única de "Por pagar" del mes: lo pendiente cuyo dueDate cae en el mes.
 // La usan la cabecera de Gastos y el plan del mes.
 export function monthPendingSummary(

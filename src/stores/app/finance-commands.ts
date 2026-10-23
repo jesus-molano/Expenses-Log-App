@@ -6,7 +6,7 @@ import {
   toMonthId,
   updateIncomeEvent,
 } from "@/domain/finance";
-import type { ExpenseStore } from "@/domain/types";
+import type { ExpenseStore, MonthClosure } from "@/domain/types";
 import type {
   IncomeEventInput,
   MoneySettingsInput,
@@ -255,4 +255,60 @@ function mergeDeletedIds(
   next: string[],
 ): string[] {
   return Array.from(new Set([...(current ?? []), ...next]));
+}
+
+export function closeMonthInStore(
+  store: ExpenseStore,
+  monthId: string,
+  now: Date = new Date(),
+): ExpenseStore {
+  const timestamp = afterPreviousChange(store.finance.monthClosures?.[monthId], now);
+  return withMonthClosure(store, monthId, {
+    closedAt: timestamp,
+    updatedAt: timestamp,
+  });
+}
+
+// Reabrir no borra el cierre: un borrado no sobreviviría al merge con la nube.
+export function reopenMonthInStore(
+  store: ExpenseStore,
+  monthId: string,
+  now: Date = new Date(),
+): ExpenseStore {
+  const closure = store.finance.monthClosures?.[monthId];
+  if (!closure) return store;
+  const timestamp = afterPreviousChange(closure, now);
+  return withMonthClosure(store, monthId, {
+    ...closure,
+    reopenedAt: timestamp,
+    updatedAt: timestamp,
+  });
+}
+
+// Cada cierre o reapertura queda después del cambio anterior aunque el reloj
+// de este dispositivo vaya atrasado: si no, reabrir no surtiría efecto y el
+// merge se quedaría con la versión vieja.
+function afterPreviousChange(closure: MonthClosure | undefined, now: Date) {
+  const previous = closure
+    ? Math.max(
+        Date.parse(closure.updatedAt),
+        Date.parse(closure.closedAt),
+        Date.parse(closure.reopenedAt ?? closure.closedAt),
+      )
+    : -Infinity;
+  return new Date(Math.max(now.getTime(), previous + 1)).toISOString();
+}
+
+function withMonthClosure(
+  store: ExpenseStore,
+  monthId: string,
+  closure: MonthClosure,
+): ExpenseStore {
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      monthClosures: { ...store.finance.monthClosures, [monthId]: closure },
+    },
+  };
 }

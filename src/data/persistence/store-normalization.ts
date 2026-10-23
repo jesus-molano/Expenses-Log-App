@@ -13,6 +13,7 @@ import type {
   ExpenseStore,
   ExpenseTemplate,
   FinanceStore,
+  MonthClosure,
   MonthlySavingsContribution,
   MonthlySavingsTarget,
 } from "@/domain/types";
@@ -35,6 +36,7 @@ export const FINANCE_KEYS = [
   "monthlySalary",
   "monthlySavingsTargets",
   "monthlySavingsContributions",
+  "monthClosures",
 ] as const;
 
 export const DELETED_KEYS = [
@@ -141,7 +143,38 @@ function normalizeFinanceStore(
     monthlySalary: normalizeMonthlySalary(finance.monthlySalary),
     monthlySavingsTargets,
     monthlySavingsContributions,
+    ...withMonthClosures(normalizeMonthClosures(finance.monthClosures)),
   };
+}
+
+function normalizeMonthClosures(value: unknown): Record<string, MonthClosure> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
+      if (
+        !/^\d{4}-\d{2}$/.test(monthId) ||
+        !isRecord(entry) ||
+        !isTimestamp(entry.closedAt)
+      ) {
+        return [];
+      }
+      const closure: MonthClosure = {
+        closedAt: entry.closedAt,
+        updatedAt: isTimestamp(entry.updatedAt) ? entry.updatedAt : entry.closedAt,
+      };
+      if (isTimestamp(entry.reopenedAt)) closure.reopenedAt = entry.reopenedAt;
+      return [[monthId, closure]];
+    }),
+  );
+}
+
+// Solo se escribe cuando hay algún cierre, para no añadir la clave a todos los
+// stores.
+export function withMonthClosures(closures: Record<string, MonthClosure>) {
+  return Object.keys(closures).length > 0 ? { monthClosures: closures } : {};
+}
+
+function isTimestamp(value: unknown): value is string {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
 
 function normalizeMonthlySalary(

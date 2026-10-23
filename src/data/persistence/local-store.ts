@@ -12,6 +12,7 @@ import {
   STORE_KEYS,
   normalizeExpenseStore,
   unknownEntries,
+  withMonthClosures,
 } from "./store-normalization";
 
 const STORAGE_KEY = "expense-log-store-v1";
@@ -129,6 +130,12 @@ export function mergeExpenseStores(
         normalizedCloudStore.finance.monthlySavingsContributions,
         normalizedLocalStore.finance.monthlySavingsContributions,
         deleted.savingsContributions,
+      ),
+      ...withMonthClosures(
+        mergeMonthlyRecord(
+          normalizedCloudStore.finance.monthClosures,
+          normalizedLocalStore.finance.monthClosures,
+        ),
       ),
     },
     preferences: {

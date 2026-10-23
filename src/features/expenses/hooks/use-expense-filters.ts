@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { addDays, addMonths, endOfMonth, parseISO, startOfMonth } from "date-fns";
+import { addDays, parseISO } from "date-fns";
 import {
+  addMonthId,
   monthPendingSummary,
+  monthRange,
   selectCarryOverOccurrences,
 } from "@/domain/budget-month";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
@@ -14,16 +16,18 @@ import { buildTimelineSections } from "../lib/timeline";
 
 const NEXT_MONTH_VISIBLE_DAYS = 7;
 
+// `monthId` es el mes que se mira (el activo por defecto); `now`, el día real.
 export function useExpenseFilters(
   store: ExpenseStore,
   language: AppLanguage,
   now: Date,
+  monthId: string = toDateOnly(now).slice(0, 7),
 ) {
   const today = toDateOnly(now);
 
   return useMemo(
-    () => buildExpenseFilters(store, language, parseISO(today)),
-    [store, language, today],
+    () => buildExpenseFilters(store, language, parseISO(today), monthId),
+    [store, language, today, monthId],
   );
 }
 
@@ -31,39 +35,39 @@ function buildExpenseFilters(
   store: ExpenseStore,
   language: AppLanguage,
   todayDate: Date,
+  monthId: string,
 ) {
   const today = toDateOnly(todayDate);
-  const currentMonthId = today.slice(0, 7);
-  const windowStart = toDateOnly(startOfMonth(todayDate));
-  const currentMonthEnd = toDateOnly(endOfMonth(todayDate));
+  const { start: windowStart } = monthRange(monthId);
   const timelineWindowEnd = toDateOnly(
     addDays(
-      startOfMonth(addMonths(todayDate, 1)),
+      parseISO(monthRange(addMonthId(monthId, 1)).start),
       NEXT_MONTH_VISIBLE_DAYS - 1,
     ),
   );
 
+  // La vista de series se mide siempre contra el mes natural: mirar otro mes
+  // no convierte en atrasado lo que vence más adelante en este.
+  const calendarMonth = monthRange(today.slice(0, 7));
   const recurringOverviewItems = buildRecurringOverview({
     templates: store.templates,
     overrides: store.overrides,
-    windowStart,
-    windowEnd: currentMonthEnd,
+    windowStart: calendarMonth.start,
+    windowEnd: calendarMonth.end,
     language,
   });
 
   const visibleOccurrences = [
-    ...selectCarryOverOccurrences(store, todayDate, language),
+    ...selectCarryOverOccurrences(store, todayDate, language, monthId),
     ...occurrencesDueBetween(store, windowStart, timelineWindowEnd, language),
   ].filter((occurrence) => occurrence.status !== "skipped");
 
-  const pendingTotal = monthPendingSummary(
-    visibleOccurrences,
-    currentMonthId,
-  ).total;
+  const pendingTotal = monthPendingSummary(visibleOccurrences, monthId).total;
   const timelineSections = buildTimelineSections(
     visibleOccurrences,
     today,
     language,
+    monthId,
   );
   const nextOccurrence =
     visibleOccurrences.find(

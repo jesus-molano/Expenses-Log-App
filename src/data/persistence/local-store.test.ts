@@ -5,7 +5,11 @@ import type {
   ExpenseStore,
   ExpenseTemplate,
 } from "@/domain/types";
-import { clearIncomeFromStore } from "@/stores/app/finance-commands";
+import {
+  clearIncomeFromStore,
+  closeMonthInStore,
+  reopenMonthInStore,
+} from "@/stores/app/finance-commands";
 import {
   clearExpenseLocalData,
   loadExpenseStore,
@@ -189,6 +193,26 @@ describe("mergeExpenseStores", () => {
       },
     });
     expect(merged.finance.monthlySalary).toEqual({ "2026-07": editedLater });
+  });
+
+  it("keeps the latest close or reopen of a month from either store", () => {
+    const closed = closeMonthInStore(
+      emptyStore,
+      "2026-10",
+      new Date("2026-10-28T10:00:00.000Z"),
+    );
+    const reopened = reopenMonthInStore(
+      closed,
+      "2026-10",
+      new Date("2026-10-28T11:00:00.000Z"),
+    );
+
+    expect(mergeExpenseStores(closed, reopened).finance.monthClosures)
+      .toEqual(reopened.finance.monthClosures);
+    expect(mergeExpenseStores(reopened, closed).finance.monthClosures)
+      .toEqual(reopened.finance.monthClosures);
+    expect("monthClosures" in mergeExpenseStores(emptyStore, emptyStore).finance)
+      .toBe(false);
   });
 
   it("keeps fields it does not know from both stores", () => {

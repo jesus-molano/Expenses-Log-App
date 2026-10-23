@@ -1,13 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
+  addMonthId,
+  buildMonthContext,
+  configuredPayday,
+  isMonthClosed,
+  monthCloseStatus,
   monthPendingSummary,
+  paymentSettlesMonth,
+  resolveActiveMonth,
   selectCarryOverOccurrences,
+  shouldSuggestAdvance,
 } from "./budget-month";
 import { estimateChargeDate } from "./calendar";
 import {
   materializeClosedOccurrenceRecords,
   occurrencesDueBetween,
 } from "./finance";
+import { emptyFinanceStore } from "./finance";
+import {
+  closeMonthInStore,
+  reopenMonthInStore,
+} from "@/stores/app/finance-commands";
 import { emptyStore } from "./seed";
 import type {
   ExpenseOccurrence,
@@ -31,6 +44,184 @@ describe("monthPendingSummary", () => {
     expect(summary.total).toBe(70);
     expect(summary.count).toBe(2);
     expect(summary.spillToNextMonthTotal).toBe(40);
+  });
+});
+
+describe("active month", () => {
+  const closedOctober = {
+    "2026-10": {
+      closedAt: "2026-10-28T10:00:00.000Z",
+      updatedAt: "2026-10-28T10:00:00.000Z",
+    },
+  };
+
+  it("moves one month ahead only while the calendar month is closed", () => {
+    expect(resolveActiveMonth("2026-10-28", undefined)).toBe("2026-10");
+    expect(resolveActiveMonth("2026-10-28", closedOctober)).toBe("2026-11");
+    // El cierre de octubre deja de importar cuando llega noviembre.
+    expect(resolveActiveMonth("2026-11-02", closedOctober)).toBe("2026-11");
+    expect(resolveActiveMonth("2026-12-31", closedOctober)).toBe("2026-12");
+  });
+
+  it("treats a reopened month as open until it is closed again", () => {
+    const reopened = {
+      "2026-10": {
+        ...closedOctober["2026-10"],
+        reopenedAt: "2026-10-28T10:05:00.000Z",
+        updatedAt: "2026-10-28T10:05:00.000Z",
+      },
+    };
+
+    expect(isMonthClosed(reopened, "2026-10")).toBe(false);
+    expect(resolveActiveMonth("2026-10-28", reopened)).toBe("2026-10");
+  });
+
+  it("adds months across years", () => {
+    expect(addMonthId("2026-12", 1)).toBe("2027-01");
+    expect(addMonthId("2026-01", -1)).toBe("2025-12");
+  });
+});
+
+describe("month close suggestion", () => {
+  const settled = monthCloseStatus(
+    [
+      occurrence("rent", 700, "2026-10-01", "paid"),
+      occurrence("gym", 30, "2026-10-12", "paid"),
+      occurrence("skipped", 5, "2026-10-20", "skipped"),
+      occurrence("next-rent", 700, "2026-11-01", "paid"),
+      occurrence("next-gym", 30, "2026-11-12"),
+    ],
+    "2026-10",
+  );
+
+  it("summarises the month and what is already paid of the next one", () => {
+    expect(settled).toEqual({
+      monthId: "2026-10",
+      paidCount: 2,
+      pendingCount: 0,
+      pendingTotal: 0,
+      nextMonthPaidCount: 1,
+    });
+  });
+
+  it("suggests advancing near month end or once payday has arrived", () => {
+    expect(shouldSuggestAdvance({ status: settled, today: "2026-10-21", payday: null }))
+      .toBe(true);
+    expect(shouldSuggestAdvance({ status: settled, today: "2026-10-20", payday: null }))
+      .toBe(false);
+    expect(shouldSuggestAdvance({ status: settled, today: "2026-10-15", payday: 15 }))
+      .toBe(true);
+  });
+
+  it("does not suggest advancing with pending bills, an empty month or another month", () => {
+    const pending = monthCloseStatus(
+      [
+        occurrence("rent", 700, "2026-10-01", "paid"),
+        occurrence("internet", 30, "2026-10-28"),
+      ],
+      "2026-10",
+    );
+    const empty = monthCloseStatus([], "2026-10");
+
+    expect(shouldSuggestAdvance({ status: pending, today: "2026-10-30", payday: 1 }))
+      .toBe(false);
+    expect(shouldSuggestAdvance({ status: empty, today: "2026-10-30", payday: 1 }))
+      .toBe(false);
+    expect(shouldSuggestAdvance({ status: settled, today: "2026-11-30", payday: 1 }))
+      .toBe(false);
+  });
+
+  it("uses the payday only when a salary is configured", () => {
+    const withSalary = {
+      ...emptyFinanceStore,
+      monthlySalary: { "2026-09": { amount: 2000, dayOfMonth: 31 } },
+    };
+
+    expect(configuredPayday(emptyFinanceStore, "2026-10")).toBeNull();
+    expect(configuredPayday(withSalary, "2026-08")).toBeNull();
+    expect(configuredPayday(withSalary, "2026-10")).toBe(31);
+  });
+});
+
+describe("month context", () => {
+  const store: ExpenseStore = {
+    ...emptyStore,
+    templates: [template("rent", "2026-10-01", 1), template("power", "2026-10-25", 25)],
+    overrides: [
+      {
+        id: "ovr:rent:2026-10-01",
+        userId: "demo",
+        templateId: "rent",
+        occurrenceDate: "2026-10-01",
+        status: "paid",
+      },
+      {
+        id: "ovr:rent:2026-11-01",
+        userId: "demo",
+        templateId: "rent",
+        occurrenceDate: "2026-11-01",
+        status: "paid",
+      },
+    ],
+  };
+
+  it("knows the active month, what is pending and what next month already has", () => {
+    const context = buildMonthContext(store, "2026-10-28");
+
+    expect(context).toMatchObject({
+      calendarMonthId: "2026-10",
+      activeMonthId: "2026-10",
+      nextMonthId: "2026-11",
+      payday: null,
+      closeStatus: { paidCount: 1, pendingCount: 1, nextMonthPaidCount: 1 },
+    });
+  });
+
+  it("detects the payment that leaves the month settled", () => {
+    const context = buildMonthContext(store, "2026-10-28");
+    const power = occurrencesDueBetween(store, "2026-10-25", "2026-10-25").find(
+      (item) => item.template.id === "power",
+    )!;
+
+    expect(paymentSettlesMonth(context, power)).toBe(true);
+    expect(paymentSettlesMonth(buildMonthContext(store, "2026-10-10"), power)).toBe(
+      false,
+    );
+  });
+});
+
+describe("carry-over for a viewed month", () => {
+  it("does not pull bills that are not due yet into a future month", () => {
+    const store: ExpenseStore = {
+      ...emptyStore,
+      templates: [template("internet", "2026-10-25", 25), template("old", "2026-10-02", 2)],
+    };
+
+    const carried = selectCarryOverOccurrences(
+      store,
+      new Date(2026, 9, 23, 12),
+      "es",
+      "2026-11",
+    );
+
+    expect(carried.map((item) => item.template.id)).toEqual(["old"]);
+  });
+});
+
+describe("closing and reopening with a slow clock", () => {
+  it("keeps every change after the previous one", () => {
+    const closed = closeMonthInStore(emptyStore, "2026-10", new Date("2026-10-28T10:00:00.000Z"));
+    // Otro dispositivo con el reloj 5 minutos atrasado reabre.
+    const reopened = reopenMonthInStore(closed, "2026-10", new Date("2026-10-28T09:57:00.000Z"));
+
+    expect(isMonthClosed(reopened.finance.monthClosures, "2026-10")).toBe(false);
+    expect(
+      reopened.finance.monthClosures!["2026-10"].updatedAt >
+        closed.finance.monthClosures!["2026-10"].updatedAt,
+    ).toBe(true);
+
+    const closedAgain = closeMonthInStore(reopened, "2026-10", new Date("2026-10-28T09:58:00.000Z"));
+    expect(isMonthClosed(closedAgain.finance.monthClosures, "2026-10")).toBe(true);
   });
 });
 
