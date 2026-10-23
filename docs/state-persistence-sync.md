@@ -28,8 +28,12 @@ Los comandos se dividen por responsabilidad:
 
 - `expense-commands`: crea templates, categorias y overrides; paga, salta,
   mueve o borra gastos.
-- `finance-commands`: modifica salario mensual, objetivos, aportaciones reales
-  e ingresos.
+- `finance-commands`: modifica salario mensual (con ambito "solo este mes" o
+  "desde este mes"), pagas extra, la respuesta a "¿Has cobrado?", objetivos,
+  aportaciones reales e ingresos.
+- `series-commands`: pagar con otro importe, cambiar el importe de la serie
+  desde ahora, programar o quitar un precio, finalizar, pausar, reanudar y
+  quitar una pausa. Ninguno reescribe un cobro pagado ni un mes cerrado.
 - `preference-commands`: actualiza tema e idioma en el store.
 
 Los comandos reciben un `ExpenseStore` y devuelven otro. Esta forma mantiene la
@@ -108,6 +112,12 @@ La mezcla actual usa ids:
   hasta esa hora, tambien copias antiguas de otro dispositivo; uno editado
   despues se conserva.
 - Preferencias: local, luego cloud, luego defaults.
+- Pagas extra (`finance.salaryExtraPays`) y respuestas a "¿Has cobrado?"
+  (`finance.salaryReceipts`): por mes, la version con el `updatedAt` mas
+  reciente. Deshacer un cobro marca `undone` con una version nueva en vez de
+  borrar la entrada.
+- Cambios de precio (`amountChanges`) y pausas (`pauses`) viven dentro de la
+  plantilla y viajan con ella: gana la plantilla editada mas tarde.
 
 La politica de hidratacion (`resolveHydratedStore`) protege los cambios hechos
 mientras llegaba el cloud store y los que quedaron sin subir en una sesion
@@ -142,6 +152,22 @@ Reglas para campos nuevos:
   tambien. Si un build antiguo lo descarta, el mes activo vuelve a ser el
   natural. Se fusiona por mes con el `updatedAt` mas reciente; reabrir guarda
   `reopenedAt` en vez de borrar la entrada.
+
+- Excepcion: los campos de F3 de dinero tambien se escriben ya, porque cada uno
+  degrada a un comportamiento anterior y no a perder datos:
+  - `templates[].amountChanges` y `templates[].pauses`: los builds con
+    passthrough conservan la plantilla tal cual, pero no los aplican; hasta
+    actualizar, una suscripcion en pausa vuelve a pedir sus cobros y un precio
+    programado no se aplica. La normalizacion descarta entradas ilegibles y una
+    pausa con un fin imposible (mejor volver a ver los cobros que esconderlos).
+  - `monthlySalary[mes].onlyThisMonth`: un build anterior lo descarta al
+    normalizar y el sueldo de "solo este mes" se arrastra a los siguientes
+    (el comportamiento de antes de M16).
+  - `finance.salaryExtraPays` y `finance.salaryReceipts`: claves nuevas de
+    `finance`, que los builds con passthrough conservan y fusionan por mes; un
+    build anterior no cuenta la paga extra ni lo cobrado.
+- "Aun no" a "¿Has cobrado?" se guarda por dispositivo y no se sincroniza
+  (`salary-prompt-dismissed:<mes>` en localStorage, con el dia).
 
 ## Cola de guardado
 

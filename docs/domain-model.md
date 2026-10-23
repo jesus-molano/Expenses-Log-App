@@ -29,6 +29,11 @@ Un `ExpenseTemplate` representa la serie:
 - Regla de recurrencia.
 - `reminder`: recordatorio opcional antes del cobro, con `enabled` y
   `daysBeforeCharge` de 1 a 5.
+- `amountChanges`: precios con fecha (`{from, amount}`). Cada cobro cuesta el
+  precio del ultimo cambio que ya habia empezado en su fecha
+  (`templateAmountOn`); antes del primero rige `amount`.
+- `pauses`: rangos de fechas (`{from, to?}`, ambos incluidos; sin `to`, hasta
+  reanudar) en los que no se generan cobros.
 - Estado `active`.
 - Timestamps de creacion y actualizacion.
 
@@ -45,6 +50,12 @@ Una `ExpenseOccurrence` no es una entidad persistida por si misma. Se deriva de
 un template, una fecha de ocurrencia y sus overrides. Incluye fecha estimada de
 cobro, estado y orden visual.
 
+Finalizar una suscripcion fija `endDate` en su ultimo cobro (incluido) y
+pausarla añade un rango a `pauses`; ninguno de los dos tapa un cobro ya pagado.
+Cambiar el importe de la serie desde un mes fija con override el importe que
+tenian los cobros pagados y los del mes cerrado, y quita los cambios de precio
+que empezaban antes; los meses anteriores ya son registros y no cambian.
+
 ## Overrides
 
 `ExpenseOccurrenceOverride` guarda excepciones para una ocurrencia concreta:
@@ -53,7 +64,9 @@ cobro, estado y orden visual.
 - Fecha movida (`dueDate`) cuando cambia respecto a la ocurrencia original.
 - Orden manual (`sortOrder`).
 - Cambios puntuales de nombre, importe o categoria.
-- Datos de pago (`paidAt`, `amountPaid`).
+- Datos de pago (`paidAt`, `amountPaid`). `amountPaid` es lo que costo de
+  verdad: un recibo variable conserva lo previsto (`amount` de la serie o del
+  override) y se ve la diferencia.
 - Metadata de recordatorio descartado:
   `reminderDismissedAt` y `reminderDismissedChargeDate`.
 - Nota opcional.
@@ -76,7 +89,13 @@ existente o crea una nueva segun el nombre normalizado.
 `FinanceStore` contiene:
 
 - `incomeEvents`: ingresos puntuales con importe, fecha y nota.
-- `monthlySalary`: salario por mes, indexado por `YYYY-MM`.
+- `monthlySalary`: salario por mes, indexado por `YYYY-MM`. Vale desde su mes
+  hasta el siguiente con sueldo propio; uno con `onlyThisMonth` ("solo este
+  mes") solo vale para su mes.
+- `salaryExtraPays`: pagas extra vigentes desde su mes (meses 1-12 y, si no es
+  un sueldo mas, su importe).
+- `salaryReceipts`: respuesta a "¿Has cobrado?" por mes. Lo cobrado sustituye
+  al sueldo previsto (fijo mas paga extra) de ese mes.
 - `monthlySavingsTargets`: objetivo habitual efectivo desde un mes.
 - `monthlySavingsContributions`: transferencia real registrada para cada mes.
 
