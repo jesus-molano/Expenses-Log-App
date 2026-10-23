@@ -165,15 +165,54 @@ Endpoints principales:
 
 ## AI y rate limit
 
-El parseo AI usa `GEMINI_API_KEY` y `GEMINI_API_MODEL`, con modelo por defecto
-`gemini-2.5-flash`.
+El parseo AI usa `GEMINI_API_KEY`, `GEMINI_API_MODEL` (por defecto
+`gemini-3.5-flash-lite`) y `GEMINI_FALLBACK_MODEL` (por defecto
+`gemini-3.1-flash-lite`). `gemini-2.5-*` es legacy: Google lo marca como
+obsoleto y en Vertex ya esta retirado.
+
+Peticion (`src/data/ai/gemini-client.ts`, REST `generateContent`):
+
+- Clave en la cabecera `x-goog-api-key`, nunca en la URL.
+- `systemInstruction` por peticion (`src/data/ai/expense-capture-prompt.ts`):
+  fecha de hoy con dia de la semana (la manda el cliente y se acepta a ±2 dias
+  de la del servidor), idioma, categorias permitidas, reglas y ejemplos.
+- `responseJsonSchema` escrito a mano (categorias como enum, campos `null`
+  cuando no aparecen), sin `temperature`, `maxOutputTokens: 1024`.
+- Razonamiento por modelo: Flash-Lite con `MINIMAL`, Flash 3.x con `LOW`
+  (rechazan `MINIMAL`), 2.5 con `thinkingBudget: 0`. Si el modelo rechaza el
+  ajuste, se repite sin el.
+- Plazo total de 10 s para los dos modelos. 404, 429 y 5xx pasan al modelo de
+  respaldo; un 429 se reintenta solo si `retryDelay` es de 2 s o menos. 401/403
+  (clave), bloqueos, respuestas truncadas o JSON invalido no se reintentan.
+- Se comprueban `promptFeedback.blockReason` y `finishReason`, y se ignoran las
+  partes `thought`.
+- Los errores se registran con modelo y motivo, sin el texto del usuario.
+
+Respuesta: cada gasto pasa por `normalizeCapturedExpense`
+(`src/domain/expense-capture.ts`), igual que el parser local. Un importe que
+no aparece queda a 0 y se marca como pendiente (nunca se inventa); el dia, la
+fecha, la frecuencia o la categoria deducidos se marcan para revisar. Un
+elemento invalido se descarta sin perder el resto (`droppedCount`). El cliente
+abre el formulario si hay un gasto o una revision con todos si hay varios.
+
+Motivos de fallback (`reason`): `missing_key`, `unauthenticated`,
+`rate_limited`, `auth_failed`, `model_unavailable`, `quota_exhausted`,
+`blocked`, `truncated`, `invalid_response`, `timeout`, `ai_unavailable` y, en
+el cliente, `offline` (sin conexion se usa el parser local directamente).
+
+Cuota: el nivel gratuito tiene limites por minuto y por dia que solo se ven en
+AI Studio; el diario se reinicia a medianoche del Pacifico (las 09:00 en
+Espana). En el nivel gratuito Google puede usar el contenido para mejorar sus
+productos, y sus terminos piden el nivel de pago para apps ofrecidas a usuarios
+del EEE. El limite diario propio (`ai_usage`) queda diferido mientras solo use
+la app su dueño.
 
 Capas de proteccion actuales:
 
 - Validacion de request con Zod.
 - Longitud maxima de texto.
 - Requisito de usuario autenticado para llamar a Gemini.
-- Timeout de 8 segundos.
+- Plazo de 10 segundos en el servidor y 12 en el cliente.
 - Fallback local por error o respuesta invalida.
 - Rate limit en memoria por usuario dentro del endpoint.
 - Rate limit externo configurado en Vercel Firewall para proteger el endpoint.
@@ -227,6 +266,7 @@ Privadas/opcionales:
 
 - `GEMINI_API_KEY`
 - `GEMINI_API_MODEL`
+- `GEMINI_FALLBACK_MODEL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `CRON_SECRET`
 - `VAPID_PUBLIC_KEY`

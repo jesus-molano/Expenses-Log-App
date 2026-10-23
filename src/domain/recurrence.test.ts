@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { estimateChargeDate } from "./calendar";
-import { generateOccurrences, generateTemplateDates } from "./recurrence";
+import {
+  firstChargeAlreadyPassed,
+  firstOccurrenceDate,
+  generateOccurrences,
+  generateTemplateDates,
+} from "./recurrence";
 import type { ExpenseTemplate } from "./types";
 
 const baseTemplate: ExpenseTemplate = {
@@ -260,5 +265,35 @@ describe("generateTemplateDates with invalid data", () => {
         "2026-12-31",
       ),
     ).toEqual([]);
+  });
+});
+
+describe("first charge of a new expense", () => {
+  const draft = {
+    name: "Netflix",
+    description: "",
+    amount: 10,
+    categoryName: "Suscripciones",
+    dueDay: 25,
+    recurrence: { frequency: "monthly" as const },
+  };
+
+  it("uses the charge day, not the start date", () => {
+    expect(firstOccurrenceDate({ ...draft, startDate: "2026-10-01" })).toBe("2026-10-25");
+    expect(firstChargeAlreadyPassed({ ...draft, startDate: "2026-10-01" }, "2026-10-23")).toBe(false);
+    expect(firstChargeAlreadyPassed({ ...draft, dueDay: 5, startDate: "2026-10-01" }, "2026-10-23")).toBe(true);
+  });
+
+  it("counts from the 1st when there is no start date", () => {
+    expect(firstChargeAlreadyPassed({ ...draft, dueDay: 5 }, "2026-10-23")).toBe(true);
+  });
+
+  it("does not ask for a yearly expense due in another month", () => {
+    expect(
+      firstChargeAlreadyPassed(
+        { ...draft, dueDay: 5, startDate: "2026-10-01", recurrence: { frequency: "yearly", annualMonth: 3 } },
+        "2026-10-23",
+      ),
+    ).toBe(false);
   });
 });

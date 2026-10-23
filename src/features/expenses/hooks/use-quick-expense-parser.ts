@@ -1,96 +1,154 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { toDateOnly } from "@/domain/calendar";
+import {
+  CAPTURE_TEXT_MAX_LENGTH,
+  type CaptureField,
+  type CapturedDraft,
+} from "@/domain/expense-capture";
 import { parseExpenseTextLocally } from "@/domain/parser";
 import type { AppLanguage, DraftExpense } from "@/domain/types";
 import { t } from "@/shared/i18n";
-import { createEmptyDraft } from "../lib/dashboard-config";
+import { captureReasonLabel, type CaptureReason } from "../lib/capture-labels";
 
-type ParserStatus = "idle" | "loading" | "gemini" | "local" | "error";
+type ParserStatus = "idle" | "loading" | "done";
 type ParserStatusTone = "neutral" | "success" | "warning";
-type LocalFallbackReason =
-  | "missing_key"
-  | "rate_limited"
-  | "quota_exhausted"
-  | "ai_unavailable"
-  | "invalid_response"
-  | "timeout"
-  | "unauthenticated";
+
+export type { CaptureReason };
+
+export type CaptureResult = {
+  drafts: CapturedDraft[];
+  provider: "gemini" | "local";
+  reason: CaptureReason | null;
+};
 
 type ParseResponse = {
   provider?: "gemini" | "local";
-  reason?: LocalFallbackReason;
+  reason?: CaptureReason;
   expenses?: DraftExpense[];
+  review?: Array<{ missingFields?: CaptureField[]; inferredFields?: CaptureField[] }>;
 };
 
-export function useQuickExpenseParser(language: AppLanguage) {
+// El navegador espera algo más que el plazo del servidor (10 s) antes de
+// rendirse y usar el parser local.
+const CLIENT_TIMEOUT_MS = 12_000;
+
+export function useQuickExpenseParser({
+  language,
+  categories,
+}: {
+  language: AppLanguage;
+  categories: string[];
+}) {
   const [quickText, setQuickText] = useState("");
   const [status, setStatus] = useState<ParserStatus>("idle");
-  const [fallbackReason, setFallbackReason] = useState<
-    LocalFallbackReason | null
-  >(null);
+  const [result, setResult] = useState<CaptureResult | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
+  const cancelledRef = useRef(false);
 
-  async function parse(): Promise<DraftExpense | null> {
-    const text = quickText.trim();
+  function finish(next: CaptureResult) {
+    setResult(next);
+    setStatus("done");
+    return next;
+  }
+
+  async function parse(): Promise<CaptureResult | null> {
+    // Un texto más largo que lo que acepta el servidor se recorta aquí en vez
+    // de fallar con un 400 que parecería "IA no disponible".
+    const text = quickText.trim().slice(0, CAPTURE_TEXT_MAX_LENGTH);
     if (!text) return null;
 
+    const today = toDateOnly(new Date());
+    const local = (reason: CaptureReason): CaptureResult => ({
+      drafts: parseExpenseTextLocally(text, { today, categories }),
+      provider: "local",
+      reason,
+    });
+    if (!navigator.onLine) return finish(local("offline"));
+
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    cancelledRef.current = false;
+    const timer = window.setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
     setStatus("loading");
-    setFallbackReason(null);
+    setResult(null);
 
     try {
       const response = await fetch("/api/ai/parse-expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, today, language, categories }),
+        signal: controller.signal,
       });
-
       if (!response.ok) throw new Error("AI parse failed");
 
       const payload = (await response.json()) as ParseResponse;
-      const first = payload.expenses?.[0] as DraftExpense | undefined;
-      if (payload.provider === "gemini") {
-        setStatus("gemini");
-      } else {
-        setFallbackReason(payload.reason ?? "ai_unavailable");
-        setStatus("local");
+      return finish({
+        drafts: (payload.expenses ?? []).map((draft, index) => ({
+          draft,
+          missingFields: payload.review?.[index]?.missingFields ?? [],
+          inferredFields: payload.review?.[index]?.inferredFields ?? [],
+        })),
+        provider: payload.provider ?? "local",
+        reason: payload.reason ?? null,
+      });
+    } catch (error) {
+      if (cancelledRef.current) {
+        setStatus("idle");
+        return null;
       }
-
-      return first ?? parseExpenseTextLocally(text)[0] ?? createEmptyDraft();
-    } catch {
-      setStatus("error");
-      setFallbackReason("ai_unavailable");
-      return parseExpenseTextLocally(text)[0] ?? createEmptyDraft();
+      return finish(
+        local((error as { name?: string })?.name === "AbortError" ? "timeout" : "ai_unavailable"),
+      );
+    } finally {
+      window.clearTimeout(timer);
+      if (controllerRef.current === controller) controllerRef.current = null;
     }
   }
 
-  const localStatusLabel = fallbackReason
-    ? {
-        missing_key: t("expenses.aiNotConfigured", language),
-        rate_limited: t("expenses.aiRateLimited", language),
-        quota_exhausted: t("expenses.aiQuotaExhausted", language),
-        ai_unavailable: t("expenses.aiUnavailable", language),
-        invalid_response: t("expenses.aiInvalidResponse", language),
-        timeout: t("expenses.aiTimeout", language),
-        unauthenticated: t("expenses.aiRequiresLogin", language),
-      }[fallbackReason]
-    : t("expenses.aiLocal", language);
+  function cancel() {
+    cancelledRef.current = true;
+    controllerRef.current?.abort();
+    setStatus("idle");
+  }
 
-  const statusLabel = {
-    idle: "",
-    loading: t("expenses.analyzing", language),
-    gemini: t("expenses.aiReady", language),
-    local: localStatusLabel,
-    error: t("expenses.aiUnavailable", language),
-  }[status];
+  function reset() {
+    cancel();
+    setQuickText("");
+    setResult(null);
+  }
+
+  const statusLabel =
+    status === "loading"
+      ? t("expenses.analyzing", language)
+      : status === "done" && result
+        ? result.provider === "local"
+          ? captureReasonLabel(result.reason, language)
+          : result.drafts.length === 0
+            ? t("expenses.aiNothingFound", language)
+            : result.drafts.length > 1
+              ? t("expenses.aiFoundMany", language).replace("{count}", String(result.drafts.length))
+              : t("expenses.aiReady", language)
+        : "";
   const statusTone: ParserStatusTone =
-    status === "gemini" ? "success" : status === "idle" ? "neutral" : "warning";
+    status === "done" && result?.provider === "gemini" && result.drafts.length > 0
+      ? "success"
+      : status === "done"
+        ? "warning"
+        : "neutral";
 
   return {
     quickText,
     status,
+    result,
     statusLabel,
     statusTone,
+    needsLogin: result?.reason === "unauthenticated",
     setQuickText,
     parse,
+    cancel,
+    reset,
   };
 }

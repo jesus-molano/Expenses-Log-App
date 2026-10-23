@@ -1,68 +1,87 @@
 import { NextResponse } from "next/server";
-import {
-  parseExpenseTextLocally,
-  parseExpensesResponseSchema,
-} from "@/domain/parser";
-import { createClient } from "@/utils/supabase/server";
+import { addDays, format } from "date-fns";
 import { z } from "zod";
+import {
+  buildCaptureResponseSchema,
+  buildCaptureSystemInstruction,
+  parseCaptureResponse,
+} from "@/data/ai/expense-capture-prompt";
+import {
+  GEMINI_DEFAULT_MODEL,
+  GEMINI_FALLBACK_MODEL,
+  generateJson,
+  type GeminiFailureReason,
+} from "@/data/ai/gemini-client";
+import { PRESET_EXPENSE_CATEGORIES } from "@/domain/categories";
+import {
+  CAPTURE_TEXT_MAX_LENGTH,
+  normalizeCapturedExpense,
+  type CapturedDraft,
+} from "@/domain/expense-capture";
+import { parseExpenseTextLocally } from "@/domain/parser";
+import { createClient } from "@/utils/supabase/server";
 
 const requestSchema = z.object({
-  text: z.string().trim().min(1).max(2000),
+  text: z.string().trim().min(1).max(CAPTURE_TEXT_MAX_LENGTH),
+  today: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  language: z.enum(["es", "en"]).optional(),
+  // Categorías raras (muy largas o demasiadas) se descartan sin rechazar el
+  // texto: solo sirven de pista al modelo.
+  categories: z
+    .array(z.string())
+    .max(500)
+    .optional()
+    .transform((names) =>
+      (names ?? [])
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0 && name.length <= 40)
+        .slice(0, 40),
+    ),
 });
 
-type LocalFallbackReason =
+export type CaptureFallbackReason =
   | "missing_key"
   | "rate_limited"
-  | "quota_exhausted"
-  | "ai_unavailable"
-  | "invalid_response"
-  | "timeout"
-  | "unauthenticated";
+  | "unauthenticated"
+  | GeminiFailureReason;
 
 const requestBuckets = new Map<string, number[]>();
+// Guarda contra ráfagas, por instancia; la cuota real la pone Google.
 const GEMINI_REQUESTS_PER_MINUTE = 20;
-const GEMINI_TIMEOUT_MS = 8000;
-
-function jsonInstruction(text: string) {
-  return `Extract expenses from this Spanish text and return only JSON with this shape: {"expenses":[{"name":"string","description":"string","amount":12.34,"categoryName":"string","startDate":"YYYY-MM-DD","dueDay":1,"recurrence":{"frequency":"once|monthly|quarterly|yearly|custom","interval":1,"unit":"day|week|month|year"}}]}. Use "once" for one-time expenses. Text: ${text}`;
-}
-
-function localResponse(text: string, reason: LocalFallbackReason) {
-  return NextResponse.json({
-    provider: "local",
-    reason,
-    expenses: parseExpenseTextLocally(text),
-  });
-}
 
 function isRateLimited(key: string) {
   const now = Date.now();
-  const windowStart = now - 60_000;
   const recent = (requestBuckets.get(key) ?? []).filter(
-    (timestamp) => timestamp > windowStart,
+    (timestamp) => timestamp > now - 60_000,
   );
-
   if (recent.length >= GEMINI_REQUESTS_PER_MINUTE) {
     requestBuckets.set(key, recent);
     return true;
   }
-
   requestBuckets.set(key, [...recent, now]);
   return false;
 }
 
-function reasonFromGeminiStatus(status: number): LocalFallbackReason {
-  if (status === 429) return "quota_exhausted";
-  if (status >= 500) return "ai_unavailable";
-  return "invalid_response";
+// La fecha la manda el cliente (su zona horaria), pero solo se acepta a dos
+// días de la del servidor.
+function resolveToday(clientToday: string | undefined, now = new Date()) {
+  const min = format(addDays(now, -2), "yyyy-MM-dd");
+  const max = format(addDays(now, 2), "yyyy-MM-dd");
+  if (clientToday && clientToday >= min && clientToday <= max) return clientToday;
+  return format(now, "yyyy-MM-dd");
 }
 
-function parseJsonPayload(text: string) {
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return null;
-  }
+function respond(provider: "gemini" | "local", drafts: CapturedDraft[], extra = {}) {
+  return NextResponse.json({
+    provider,
+    ...extra,
+    // `expenses` sigue siendo la lista de borradores para clientes anteriores.
+    expenses: drafts.map((item) => item.draft),
+    review: drafts.map(({ missingFields, inferredFields }) => ({
+      missingFields,
+      inferredFields,
+    })),
+  });
 }
 
 export async function POST(request: Request) {
@@ -76,11 +95,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const { text, language = "es" } = parsedRequest.data;
+  const today = resolveToday(parsedRequest.data.today);
+  const categories = Array.from(
+    new Set([
+      ...PRESET_EXPENSE_CATEGORIES.map((category) => category.name),
+      ...parsedRequest.data.categories,
+    ]),
+  );
+  const local = (reason: CaptureFallbackReason) =>
+    respond("local", parseExpenseTextLocally(text, { today, categories }), { reason });
 
-  if (!apiKey) {
-    return localResponse(parsedRequest.data.text, "missing_key");
-  }
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return local("missing_key");
 
   const supabase = await createClient();
   const {
@@ -89,73 +116,27 @@ export async function POST(request: Request) {
   } = supabase
     ? await supabase.auth.getUser()
     : { data: { user: null }, error: null };
+  if (userError || !user) return local("unauthenticated");
+  if (isRateLimited(`user:${user.id}`)) return local("rate_limited");
 
-  if (userError || !user) {
-    return localResponse(parsedRequest.data.text, "unauthenticated");
-  }
+  const result = await generateJson({
+    apiKey,
+    models: [
+      process.env.GEMINI_API_MODEL || GEMINI_DEFAULT_MODEL,
+      process.env.GEMINI_FALLBACK_MODEL || GEMINI_FALLBACK_MODEL,
+    ],
+    systemInstruction: buildCaptureSystemInstruction({ today, language, categories }),
+    userText: text,
+    schema: buildCaptureResponseSchema(categories),
+  });
+  if (!result.ok) return local(result.reason);
 
-  if (isRateLimited(`user:${user.id}`)) {
-    return localResponse(parsedRequest.data.text, "rate_limited");
-  }
+  const parsed = parseCaptureResponse(result.json);
+  if (!parsed) return local("invalid_response");
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
-
-  try {
-    const model = process.env.GEMINI_API_MODEL ?? "gemini-2.5-flash";
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: jsonInstruction(parsedRequest.data.text) }],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.1,
-          },
-        }),
-        signal: controller.signal,
-      },
-    );
-
-    if (!response.ok) {
-      return localResponse(
-        parsedRequest.data.text,
-        reasonFromGeminiStatus(response.status),
-      );
-    }
-
-    const payload = await response.json();
-    const text =
-      payload.candidates?.[0]?.content?.parts
-        ?.map((part: { text?: string }) => part.text ?? "")
-        .join("") ?? "";
-    const aiJson = parseJsonPayload(text);
-    if (!aiJson) {
-      return localResponse(parsedRequest.data.text, "invalid_response");
-    }
-
-    const parsed = parseExpensesResponseSchema.safeParse(aiJson);
-
-    if (!parsed.success) {
-      return localResponse(parsedRequest.data.text, "invalid_response");
-    }
-
-    return NextResponse.json({ provider: "gemini", expenses: parsed.data.expenses });
-  } catch (error) {
-    return localResponse(
-      parsedRequest.data.text,
-      error instanceof DOMException && error.name === "AbortError"
-        ? "timeout"
-        : "ai_unavailable",
-    );
-  } finally {
-    clearTimeout(timeout);
-  }
+  return respond(
+    "gemini",
+    parsed.items.map((item) => normalizeCapturedExpense(item, { today, categories })),
+    { droppedCount: parsed.droppedCount },
+  );
 }

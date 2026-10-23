@@ -1,13 +1,8 @@
 ﻿"use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ActionToast } from "@/components/ui/ActionToast";
-import type {
-  CreateExpenseOptions,
-  DraftExpense,
-  ExpenseOccurrence,
-} from "@/domain/types";
-import { createEmptyDraft } from "@/features/expenses/lib/dashboard-config";
+import type { ExpenseOccurrence } from "@/domain/types";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
 import { ExpenseFormSheet } from "@/features/expenses/components/ExpenseFormSheet";
 import { ExpenseList } from "@/features/expenses/components/ExpenseList";
@@ -18,10 +13,12 @@ import {
   AddExpenseButton,
   QuickCapture,
 } from "@/features/expenses/components/QuickCapture";
+import { QuickCaptureReview } from "@/features/expenses/components/QuickCaptureReview";
 import { RecurringOverviewButton } from "@/features/expenses/components/RecurringOverviewButton";
 import { RecurringOverviewSheet } from "@/features/expenses/components/RecurringOverviewSheet";
 import { useActionToast } from "@/features/expenses/hooks/use-action-toast";
 import { useActiveMonth } from "@/features/expenses/hooks/use-active-month";
+import { useExpenseCaptureFlow } from "@/features/expenses/hooks/use-expense-capture-flow";
 import { useExpenseFilters } from "@/features/expenses/hooks/use-expense-filters";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { useQuickExpenseParser } from "@/features/expenses/hooks/use-quick-expense-parser";
@@ -42,6 +39,7 @@ export function ExpenseDashboard({
   const {
     store,
     addExpense,
+    addExpenses,
     togglePaid,
     dismissLastChanceReminder,
     moveOccurrenceOnly,
@@ -63,32 +61,24 @@ export function ExpenseDashboard({
   function focusMonthHeading() {
     window.requestAnimationFrame(() => monthHeadingRef.current?.focus());
   }
-  const quickParser = useQuickExpenseParser(language);
+  const categoryNames = useMemo(
+    () => store.categories.map((category) => category.name),
+    [store.categories],
+  );
+  const quickParser = useQuickExpenseParser({ language, categories: categoryNames });
+  const capture = useExpenseCaptureFlow({
+    parser: quickParser,
+    initialFormOpen: initialNewExpense,
+    addExpense,
+    addExpenses,
+  });
   const chrome = useScrollChrome();
   const runViewTransition = useViewTransitionAction();
-  const [draft, setDraft] = useState<DraftExpense>(() => createEmptyDraft());
-  const [sheetOpen, setSheetOpen] = useState(initialNewExpense);
-  const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [recurringOpen, setRecurringOpen] = useState(false);
   const [hiddenReminderId, setHiddenReminderId] = useState<string | null>(null);
   const lastChanceReminder = buildLastChanceReminders(store, now).find(
     (reminder) => reminder.occurrence.id !== hiddenReminderId,
   );
-
-  function openEmptySheet() {
-    setDraft(createEmptyDraft());
-    setAddSheetOpen(false);
-    setSheetOpen(true);
-  }
-
-  async function analyzeQuickText() {
-    const parsedDraft = await quickParser.parse();
-    if (!parsedDraft) return;
-
-    setDraft(parsedDraft);
-    setAddSheetOpen(false);
-    setSheetOpen(true);
-  }
 
   function advanceMonth() {
     month.advance();
@@ -128,12 +118,6 @@ export function ExpenseDashboard({
       ),
       onAction: advanceMonth,
     });
-  }
-
-  function saveDraft(nextDraft: DraftExpense, options?: CreateExpenseOptions) {
-    addExpense(nextDraft, options);
-    setDraft(createEmptyDraft());
-    setSheetOpen(false);
   }
 
   return (
@@ -203,32 +187,50 @@ export function ExpenseDashboard({
 
       <AddExpenseButton
         language={language}
-        visible={!addSheetOpen && !sheetOpen}
-        onClick={() => setAddSheetOpen(true)}
+        visible={capture.isIdle}
+        onClick={capture.openCapture}
       />
 
       <QuickCapture
-        open={addSheetOpen}
+        open={capture.captureOpen}
         value={quickParser.quickText}
         statusLabel={quickParser.statusLabel}
         statusTone={quickParser.statusTone}
         isParsing={quickParser.status === "loading"}
+        needsLogin={quickParser.needsLogin}
         language={language}
-        onClose={() => setAddSheetOpen(false)}
-        onValueChange={(value) => {
-          quickParser.setQuickText(value);
-        }}
-        onAnalyze={analyzeQuickText}
-        onManualAdd={openEmptySheet}
+        onClose={capture.closeCapture}
+        onValueChange={quickParser.setQuickText}
+        onAnalyze={capture.analyze}
+        onCancel={capture.cancelAnalysis}
+        onManualAdd={capture.openManualForm}
       />
 
+      {capture.reviewItems ? (
+        <QuickCaptureReview
+          items={capture.reviewItems}
+          excludedIds={capture.excludedIds}
+          initialStatus={capture.reviewStatus}
+          notice={capture.notice}
+          existingNames={store.templates.map((template) => template.name)}
+          language={language}
+          onToggle={capture.toggleReviewItem}
+          onInitialStatusChange={capture.setReviewStatus}
+          onEdit={capture.editReviewItem}
+          onSave={capture.saveReviewed}
+          onClose={capture.closeReview}
+        />
+      ) : null}
+
       <ExpenseFormSheet
-        key={`${draft.name}:${draft.description}:${draft.amount}:${draft.categoryName}:${draft.dueDay}:${sheetOpen}`}
-        open={sheetOpen}
-        draft={draft}
+        key={capture.formKey}
+        open={capture.formOpen}
+        draft={capture.draft}
+        review={capture.draftReview}
+        notice={capture.notice}
         language={language}
-        onClose={() => setSheetOpen(false)}
-        onSave={saveDraft}
+        onClose={capture.closeForm}
+        onSave={capture.saveForm}
       />
 
       <RecurringOverviewSheet

@@ -44,6 +44,11 @@ Estado:
   - Mes activo con `monthClosures`, tarjeta "Octubre al día · Pasar a noviembre", aviso al pagar el último recibo y "Volver a octubre".
   - Selector de mes en Gastos (un año atrás y el mes siguiente). Plan sigue al mes activo.
   - `monthClosures` se escribe sin esperar la semana de passthrough: si un build antiguo lo descarta, el mes activo vuelve al natural y no se pierde ningún dato.
+- **F1b: hecho.**
+  - Cliente Gemini con cabecera, esquema, thinking por modelo, respaldo y plazo de 10 s.
+  - Normalizador común con el parser local, que se reescribe (NFD, día antes que importe, frecuencias y meses).
+  - Captura con la IA primero, varios gastos con revisión y "Guardar N".
+  - El script de evaluación con la clave real (`scripts/eval-ai-parse.mjs`) queda pendiente: no hay clave en este entorno.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
@@ -319,13 +324,16 @@ Estado:
   - Vocabulario: semanal, quincenal, bimestral, semestral y nombres de mes.
   - Recibe `today` como parámetro.
   - Tabla de 30-40 frases.
+  - Una parte sin número se une a la siguiente ("luz y gas 80 y netflix 12,99"); el nombre conserva conectores y símbolos ("Seguro del coche", "Disney+").
+  - Horas, fechas dd/mm y años no cuentan como importe; si quedan varios números, el importe se marca para revisar.
 - **Cliente:**
   - `parse()` devuelve {drafts[], provider, reason}, con `AbortController` y aborto a 12 s, `cancel()` y `reset()`.
   - Sin conexión: parser local con el motivo `offline`.
   - `GET /api/ai/status`.
   - `QuickCapture` con la IA primero:
     - `<form>` con textarea autoajustable.
-    - Enter envía; Shift+Enter salta de línea y se respeta `isComposing`.
+    - Con teclado físico, Enter envía (Shift+Enter salta de línea, respetando `isComposing`). En pantallas táctiles Enter salta de línea y se envía con el botón.
+    - Cancelar y Manual descartan la respuesta en curso; la que llegue después se ignora.
     - Chips de ejemplo, estado visible y CTA de login.
     - "Manual" como opción secundaria.
   - `QuickCaptureReview`:
@@ -333,7 +341,9 @@ Estado:
     - Incluir/editar por tarjeta.
     - No deja guardar un ítem sin importe.
     - "Guardar N" con `addExpensesToStore` (fold con un solo persist, solo `DraftExpense` completos).
-  - Banner de proveedor y motivo en `ExpenseFormSheet`. La key del formulario pasa a ser un nonce de sesión.
+    - La selección vive en el flujo, por id estable, y sobrevive a editar un ítem.
+    - Si algún primer cobro ya pasó este mes, pregunta Pendiente/Pagado, como el formulario (`firstChargeAlreadyPassed`).
+  - Banner de proveedor y motivo (con el enlace de login) en `ExpenseFormSheet` y en la revisión. La key del formulario pasa a ser un nonce de sesión.
 - **Docs:** actualizar `.env.example`, README y `docs/platform.md`. Nota: en el nivel gratuito Google puede usar el contenido, y los términos piden nivel de pago para apps ofrecidas a usuarios del EEE.
 - **Tests:**
   - `route.test.ts`: cabecera sin `key=`; esquema y thinking enviados (3.8 recibe LOW); parciales; 401/403/404; blocked; MAX_TOKENS; timeout.
