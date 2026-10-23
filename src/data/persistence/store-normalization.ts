@@ -9,13 +9,18 @@ import {
   toDateOnly,
 } from "@/domain/calendar";
 import type {
+  ExpenseAmountChange,
   ExpenseOccurrenceOverride,
+  ExpensePause,
   ExpenseStore,
   ExpenseTemplate,
   FinanceStore,
   MonthClosure,
+  MonthlySalarySettings,
   MonthlySavingsContribution,
   MonthlySavingsTarget,
+  SalaryExtraPaySettings,
+  SalaryReceipt,
 } from "@/domain/types";
 import { normalizeAppLanguage } from "@/shared/i18n";
 import { normalizeAppTheme } from "@/shared/theme";
@@ -37,6 +42,8 @@ export const FINANCE_KEYS = [
   "monthlySavingsTargets",
   "monthlySavingsContributions",
   "monthClosures",
+  "salaryExtraPays",
+  "salaryReceipts",
 ] as const;
 
 export const DELETED_KEYS = [
@@ -144,7 +151,66 @@ function normalizeFinanceStore(
     monthlySavingsTargets,
     monthlySavingsContributions,
     ...withMonthClosures(normalizeMonthClosures(finance.monthClosures)),
+    ...withNonEmpty("salaryExtraPays", normalizeSalaryExtraPays(finance.salaryExtraPays)),
+    ...withNonEmpty("salaryReceipts", normalizeSalaryReceipts(finance.salaryReceipts)),
   };
+}
+
+// Las claves nuevas solo se escriben cuando tienen algo, para no añadirlas a
+// todos los stores.
+export function withNonEmpty<K extends string, T>(
+  key: K,
+  record: Record<string, T>,
+): Partial<Record<K, Record<string, T>>> {
+  return Object.keys(record).length > 0
+    ? ({ [key]: record } as Record<K, Record<string, T>>)
+    : {};
+}
+
+function normalizeSalaryExtraPays(
+  value: unknown,
+): Record<string, SalaryExtraPaySettings> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
+      if (!/^\d{4}-\d{2}$/.test(monthId) || !isRecord(entry)) return [];
+      const months = Array.isArray(entry.months)
+        ? Array.from(
+            new Set(
+              entry.months
+                .map(Number)
+                .filter((month) => Number.isInteger(month) && month >= 1 && month <= 12),
+            ),
+          ).sort((a, b) => a - b)
+        : [];
+      const amount = Number(entry.amount);
+      const settings: SalaryExtraPaySettings = {
+        months,
+        updatedAt: isTimestamp(entry.updatedAt) ? entry.updatedAt : monthTimestamp(monthId),
+      };
+      if (entry.amount !== undefined && Number.isFinite(amount) && amount > 0) {
+        settings.amount = amount;
+      }
+      return [[monthId, settings]];
+    }),
+  );
+}
+
+function normalizeSalaryReceipts(value: unknown): Record<string, SalaryReceipt> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
+      if (!/^\d{4}-\d{2}$/.test(monthId) || !isRecord(entry)) return [];
+      const amount = Number(entry.amount);
+      const receivedOn = normalizeDateOnly(entry.receivedOn);
+      if (!Number.isFinite(amount) || amount < 0 || !receivedOn) return [];
+      const receipt: SalaryReceipt = {
+        amount,
+        receivedOn,
+        updatedAt: isTimestamp(entry.updatedAt) ? entry.updatedAt : monthTimestamp(monthId),
+      };
+      if (entry.undone === true) receipt.undone = true;
+      return [[monthId, receipt]];
+    }),
+  );
 }
 
 function normalizeMonthClosures(value: unknown): Record<string, MonthClosure> {
@@ -183,22 +249,19 @@ function normalizeMonthlySalary(
   return Object.fromEntries(
     Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
       if (!/^\d{4}-\d{2}$/.test(monthId) || !isRecord(entry)) return [];
-      return [
-        [
-          monthId,
-          {
-            amount: Math.max(Number(entry.amount ?? 0), 0),
-            dayOfMonth: Math.min(
-              Math.max(Number(entry.dayOfMonth ?? 28), 1),
-              31,
-            ),
-            updatedAt:
-              typeof entry.updatedAt === "string"
-                ? entry.updatedAt
-                : monthTimestamp(monthId),
-          },
-        ],
-      ];
+      const salary: MonthlySalarySettings = {
+        amount: Math.max(Number(entry.amount ?? 0), 0),
+        dayOfMonth: Math.min(
+          Math.max(Number(entry.dayOfMonth ?? 28), 1),
+          31,
+        ),
+        updatedAt:
+          typeof entry.updatedAt === "string"
+            ? entry.updatedAt
+            : monthTimestamp(monthId),
+      };
+      if (entry.onlyThisMonth === true) salary.onlyThisMonth = true;
+      return [[monthId, salary]];
     }),
   );
 }
@@ -361,17 +424,67 @@ function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
     const dueDay = Number.isInteger(Number(template.dueDay))
       ? Math.min(Math.max(Number(template.dueDay), 1), 31)
       : Number(startDate.slice(8, 10));
+    const amountChanges = normalizeAmountChanges(template.amountChanges);
+    const pauses = normalizePauses(template.pauses);
 
     if (
       startDate === template.startDate &&
       endDate === template.endDate &&
-      dueDay === template.dueDay
+      dueDay === template.dueDay &&
+      sameJson(amountChanges, template.amountChanges) &&
+      sameJson(pauses, template.pauses)
     ) {
       return template;
     }
 
-    return { ...template, startDate, endDate, dueDay };
+    const normalized: ExpenseTemplate = { ...template, startDate, endDate, dueDay };
+    delete normalized.amountChanges;
+    delete normalized.pauses;
+    if (amountChanges) normalized.amountChanges = amountChanges;
+    if (pauses) normalized.pauses = pauses;
+    return normalized;
   });
+}
+
+// Cambios de precio legibles, uno por fecha (gana el último) y en orden. Uno
+// con fecha o importe imposible se descarta.
+function normalizeAmountChanges(value: unknown): ExpenseAmountChange[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const byDate = new Map<string, ExpenseAmountChange>();
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    const from = normalizeDateOnly(entry.from);
+    const amount = Number(entry.amount);
+    if (!from || !Number.isFinite(amount) || amount <= 0) continue;
+    byDate.set(from, { from, amount });
+  }
+  const changes = [...byDate.values()].sort((a, b) => a.from.localeCompare(b.from));
+  return changes.length ? changes : undefined;
+}
+
+// Pausas legibles y en orden. Una con un fin ilegible o anterior al inicio se
+// descarta: mejor volver a ver los cobros que esconderlos para siempre.
+function normalizePauses(value: unknown): ExpensePause[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const byStart = new Map<string, ExpensePause>();
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    const from = normalizeDateOnly(entry.from);
+    if (!from) continue;
+    if (entry.to === undefined || entry.to === null) {
+      byStart.set(from, { from });
+      continue;
+    }
+    const to = normalizeDateOnly(entry.to);
+    if (!to || to < from) continue;
+    byStart.set(from, { from, to });
+  }
+  const pauses = [...byStart.values()].sort((a, b) => a.from.localeCompare(b.from));
+  return pauses.length ? pauses : undefined;
+}
+
+function sameJson(a: unknown, b: unknown) {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function normalizeOccurrenceRecords(

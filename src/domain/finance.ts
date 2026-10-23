@@ -13,6 +13,8 @@ import type {
   MonthlySavingsContribution,
   MonthlySavingsTarget,
   MonthlySalarySettings,
+  SalaryExtraPaySettings,
+  SalaryReceipt,
 } from "./types";
 
 const DEFAULT_PAYDAY = 28;
@@ -77,8 +79,72 @@ export function getMonthlySalarySettings(
     amount: 0,
     dayOfMonth: DEFAULT_PAYDAY,
   };
+  // Un sueldo de "solo este mes" no se arrastra a los meses siguientes.
+  const candidates = Object.entries(finance.monthlySalary ?? {})
+    .filter(
+      ([key, salary]) =>
+        /^\d{4}-\d{2}$/.test(key) &&
+        (key === monthId || (key < monthId && !salary.onlyThisMonth)),
+    )
+    .sort(([a], [b]) => b.localeCompare(a));
 
-  return latestRecordValue(finance.monthlySalary, monthId, fallback);
+  return candidates[0]?.[1] ?? fallback;
+}
+
+// Configuración de pagas extra vigente en el mes (la última desde ese mes).
+export function getSalaryExtraPaySettings(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): SalaryExtraPaySettings | null {
+  return latestRecordValue<SalaryExtraPaySettings | null>(
+    finance.salaryExtraPays,
+    toMonthId(monthDate),
+    null,
+  );
+}
+
+// Paga extra que llega ese mes (0 si no toca): la configuración vigente en el
+// mes dice en qué meses hay paga y, si no fija importe, es un sueldo más.
+export function getSalaryExtraPay(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): number {
+  const monthId = toMonthId(monthDate);
+  const settings = getSalaryExtraPaySettings(finance, monthId);
+  if (!settings?.months.includes(Number(monthId.slice(5, 7)))) return 0;
+  return Math.max(
+    settings.amount ?? getMonthlySalarySettings(finance, monthId).amount,
+    0,
+  );
+}
+
+// Sueldo previsto del mes: el fijo más la paga extra si toca.
+export function getExpectedSalary(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): number {
+  return (
+    Math.max(Number(getMonthlySalarySettings(finance, monthDate).amount), 0) +
+    getSalaryExtraPay(finance, monthDate)
+  );
+}
+
+// Cobro confirmado en "¿Has cobrado?" (uno deshecho no cuenta).
+export function getSalaryReceipt(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): SalaryReceipt | null {
+  const receipt = finance.salaryReceipts?.[toMonthId(monthDate)];
+  return receipt && !receipt.undone ? receipt : null;
+}
+
+// Lo que costó de verdad un cobro: lo pagado si se anotó, si no lo previsto.
+export function paidAmountOf(occurrence: ExpenseOccurrence): number {
+  return (
+    occurrence.override?.amountPaid ??
+    occurrence.record?.amountPaid ??
+    occurrence.template.amount
+  );
 }
 
 // Tombstones de sueldo: "<mes>@<hora>" o "*@<hora>" (todos los meses). Al
@@ -158,8 +224,12 @@ export function buildMonthlyMoneyPlan({
   const monthStart = toDateOnly(startOfMonth(monthDate));
   const monthEnd = toDateOnly(endOfMonth(monthDate));
   const month = monthStart.slice(0, 7);
-  const salarySettings = getMonthlySalarySettings(finance, month);
-  const salaryIncomeTotal = Math.max(Number(salarySettings.amount), 0);
+  const salaryExtraPayTotal = getSalaryExtraPay(finance, month);
+  const salaryReceipt = getSalaryReceipt(finance, month);
+  // Lo cobrado de verdad sustituye a lo previsto en cuanto se confirma.
+  const salaryIncomeTotal = salaryReceipt
+    ? Math.max(salaryReceipt.amount, 0)
+    : getExpectedSalary(finance, month);
   const monthlySavingsTarget = getMonthlySavingsTarget(finance, month);
   const extraIncomeTotal = includeExtraIncome
     ? finance.incomeEvents
@@ -187,8 +257,7 @@ export function buildMonthlyMoneyPlan({
     0,
   );
   const paidExpensesTotal = paidOccurrences.reduce(
-    (sum, occurrence) =>
-      sum + (occurrence.override?.amountPaid ?? occurrence.record?.amountPaid ?? occurrence.template.amount),
+    (sum, occurrence) => sum + paidAmountOf(occurrence),
     0,
   );
   const pendingExpensesTotal = pendingSummary.total;
@@ -234,6 +303,8 @@ export function buildMonthlyMoneyPlan({
     incomeTotal,
     fixedIncomeTotal: salaryIncomeTotal,
     salaryIncomeTotal,
+    salaryExtraPayTotal,
+    ...(salaryReceipt ? { salaryReceipt } : {}),
     extraIncomeTotal,
     plannedExpensesTotal,
     paidExpensesTotal,

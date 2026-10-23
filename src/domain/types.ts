@@ -34,6 +34,20 @@ export type RecurrenceRule = {
   annualMonth?: number;
 };
 
+// Cambio de precio con fecha: desde `from` (incluido) cada cobro cuesta
+// `amount`. Antes del primero rige el `amount` de la plantilla.
+export type ExpenseAmountChange = {
+  from: string;
+  amount: number;
+};
+
+// Pausa de una serie: no se generan los cobros con fecha entre `from` y `to`
+// (ambos incluidos). Sin `to`, dura hasta que se reanude.
+export type ExpensePause = {
+  from: string;
+  to?: string;
+};
+
 export type ExpenseTemplate = {
   id: string;
   userId: string;
@@ -47,6 +61,8 @@ export type ExpenseTemplate = {
   dueDay: number;
   recurrence: RecurrenceRule;
   reminder?: ExpenseReminderSettings;
+  amountChanges?: ExpenseAmountChange[];
+  pauses?: ExpensePause[];
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -124,6 +140,25 @@ export type MonthlySalarySettings = {
   amount: number;
   dayOfMonth: number;
   updatedAt?: string;
+  // "Solo este mes": vale para su mes y los siguientes vuelven al anterior.
+  onlyThisMonth?: boolean;
+};
+
+// Pagas extra: meses (1-12) en los que llega una paga además del sueldo. Vale
+// desde su mes, como el sueldo. Sin importe, cada paga es un sueldo más.
+export type SalaryExtraPaySettings = {
+  months: number[];
+  amount?: number;
+  updatedAt: string;
+};
+
+// Respuesta a "¿Has cobrado?" de un mes. Deshacer marca `undone` en lugar de
+// borrar la entrada, para que el merge con otro dispositivo lo respete.
+export type SalaryReceipt = {
+  amount: number;
+  receivedOn: string;
+  updatedAt: string;
+  undone?: boolean;
 };
 
 export type MonthlySavingsTarget = {
@@ -156,6 +191,8 @@ export type FinanceStore = {
   monthlySavingsTargets: Record<string, number | MonthlySavingsTarget>;
   monthlySavingsContributions?: Record<string, MonthlySavingsContribution>;
   monthClosures?: Record<string, MonthClosure>;
+  salaryExtraPays?: Record<string, SalaryExtraPaySettings>;
+  salaryReceipts?: Record<string, SalaryReceipt>;
 };
 
 export type ExpenseOccurrenceRecordSource = "native" | "legacy-derived";
@@ -200,6 +237,10 @@ export type MonthlyMoneyPlan = {
   incomeTotal: number;
   fixedIncomeTotal: number;
   salaryIncomeTotal: number;
+  // Parte del sueldo previsto que es paga extra (ya incluida en el sueldo).
+  salaryExtraPayTotal: number;
+  // Lo que se respondió en "¿Has cobrado?"; si existe, es el sueldo del mes.
+  salaryReceipt?: SalaryReceipt;
   extraIncomeTotal: number;
   plannedExpensesTotal: number;
   paidExpensesTotal: number;

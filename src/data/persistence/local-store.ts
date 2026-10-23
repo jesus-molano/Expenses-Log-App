@@ -13,6 +13,7 @@ import {
   normalizeExpenseStore,
   unknownEntries,
   withMonthClosures,
+  withNonEmpty,
 } from "./store-normalization";
 
 const STORAGE_KEY = "expense-log-store-v1";
@@ -135,6 +136,21 @@ export function mergeExpenseStores(
         mergeMonthlyRecord(
           normalizedCloudStore.finance.monthClosures,
           normalizedLocalStore.finance.monthClosures,
+        ),
+      ),
+      // Por mes, la versión editada más tarde (pagas extra y "¿Has cobrado?").
+      ...withNonEmpty(
+        "salaryExtraPays",
+        mergeMonthlyRecord(
+          normalizedCloudStore.finance.salaryExtraPays,
+          normalizedLocalStore.finance.salaryExtraPays,
+        ),
+      ),
+      ...withNonEmpty(
+        "salaryReceipts",
+        mergeMonthlyRecord(
+          normalizedCloudStore.finance.salaryReceipts,
+          normalizedLocalStore.finance.salaryReceipts,
         ),
       ),
     },

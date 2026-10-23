@@ -1,6 +1,11 @@
 import { endOfMonth, parseISO } from "date-fns";
 import { daysBetween, toDateOnly } from "./calendar";
-import { getMonthlySalarySettings, occurrencesDueBetween } from "./finance";
+import {
+  getExpectedSalary,
+  getMonthlySalarySettings,
+  getSalaryReceipt,
+  occurrencesDueBetween,
+} from "./finance";
 import { isOccurrenceOverdue, monthPendingSummary } from "./pending";
 import type {
   AppLanguage,
@@ -88,6 +93,30 @@ export function configuredPayday(finance: FinanceStore, monthId: string) {
   );
   const salary = getMonthlySalarySettings(finance, monthId);
   return hasSalary && salary.amount > 0 ? salary.dayOfMonth : null;
+}
+
+export type SalaryPrompt = {
+  monthId: string;
+  payday: number;
+  expectedAmount: number;
+};
+
+// "¿Has cobrado?": desde el día de cobro del mes natural (el último día si el
+// mes es más corto) hasta que se responda, y solo con el sueldo configurado.
+export function salaryPromptFor(
+  finance: FinanceStore,
+  today: string,
+): SalaryPrompt | null {
+  const monthId = today.slice(0, 7);
+  const payday = configuredPayday(finance, monthId);
+  if (payday === null || getSalaryReceipt(finance, monthId)) return null;
+  const lastDay = Number(monthRange(monthId).end.slice(8, 10));
+  if (Number(today.slice(8, 10)) < Math.min(payday, lastDay)) return null;
+  return {
+    monthId,
+    payday,
+    expectedAmount: getExpectedSalary(finance, monthId),
+  };
 }
 
 // Se ofrece pasar de mes cuando el mes natural tiene recibos, ninguno

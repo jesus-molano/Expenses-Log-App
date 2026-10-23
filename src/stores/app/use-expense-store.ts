@@ -13,7 +13,9 @@ import type {
   AppTheme,
   CreateExpenseOptions,
   DraftExpense,
+  ExpenseAmountChange,
   ExpenseOccurrence,
+  ExpensePause,
   ExpenseStore,
 } from "@/domain/types";
 import { emptyStore } from "@/domain/seed";
@@ -30,12 +32,23 @@ import {
   deleteExpenseFromStore,
   deleteIncomeEventFromStore,
   dismissLastChanceReminderInStore,
+  endSeriesInStore,
   moveOccurrenceInStore,
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
+  pauseSeriesInStore,
+  payOccurrenceWithAmountInStore,
+  reactivateSeriesInStore,
+  recordSalaryReceiptInStore,
+  removeAmountChangeInStore,
+  removePauseInStore,
   reopenMonthInStore,
+  resumeSeriesInStore,
+  scheduleAmountChangeInStore,
+  setSeriesAmountInStore,
   skipOccurrenceInStore,
   togglePaidInStore,
+  undoSalaryReceiptInStore,
   updateIncomeEventInStore,
   updateLanguageInStore,
   updateMoneySettingsInStore,
@@ -43,7 +56,9 @@ import {
   updateMonthlySalaryInStore,
   updateMonthlySavingsContributionInStore,
   updateMonthlySavingsTargetInStore,
+  updateSalaryExtraPayInStore,
   updateThemeInStore,
+  type SeriesAmountScope,
 } from "./store-commands";
 import type {
   IncomeEventInput,
@@ -52,6 +67,8 @@ import type {
   MonthlySalaryInput,
   MonthlySavingsContributionInput,
   MonthlySavingsTargetInput,
+  SalaryExtraPayInput,
+  SalaryReceiptInput,
 } from "./store-types";
 import { preserveClosedOccurrenceRecords } from "./store-history";
 import { useStorePersistence } from "./use-store-persistence";
@@ -231,6 +248,58 @@ function useExpenseStoreValue() {
     persist(updateMonthlyExpenseOccurrenceInStore(current(), input));
   }
 
+  function payOccurrenceWithAmount(occurrence: ExpenseOccurrence, amountPaid: number) {
+    persist(payOccurrenceWithAmountInStore(current(), occurrence, amountPaid));
+  }
+
+  function setSeriesAmount(
+    templateId: string,
+    amount: number,
+    scope: SeriesAmountScope = "current",
+  ) {
+    persist(setSeriesAmountInStore(current(), templateId, amount, { scope }));
+  }
+
+  function scheduleAmountChange(templateId: string, change: ExpenseAmountChange) {
+    persist(scheduleAmountChangeInStore(current(), templateId, change));
+  }
+
+  function removeAmountChange(templateId: string, from: string) {
+    persist(removeAmountChangeInStore(current(), templateId, from));
+  }
+
+  function endSeries(templateId: string, lastChargeDate: string) {
+    persist(endSeriesInStore(current(), templateId, lastChargeDate));
+  }
+
+  function reactivateSeries(templateId: string) {
+    persist(reactivateSeriesInStore(current(), templateId));
+  }
+
+  function pauseSeries(templateId: string, pause: ExpensePause) {
+    persist(pauseSeriesInStore(current(), templateId, pause));
+  }
+
+  function resumeSeries(templateId: string) {
+    persist(resumeSeriesInStore(current(), templateId));
+  }
+
+  function removePause(templateId: string, from: string) {
+    persist(removePauseInStore(current(), templateId, from));
+  }
+
+  function updateSalaryExtraPay(input: SalaryExtraPayInput) {
+    persist(updateSalaryExtraPayInStore(current(), input));
+  }
+
+  function recordSalaryReceipt(input: SalaryReceiptInput) {
+    persist(recordSalaryReceiptInStore(current(), input));
+  }
+
+  function undoSalaryReceipt(monthId: string) {
+    persist(undoSalaryReceiptInStore(current(), monthId));
+  }
+
   function closeMonth(monthId: string) {
     persist(closeMonthInStore(current(), monthId));
   }
@@ -271,6 +340,18 @@ function useExpenseStoreValue() {
     deleteIncomeEvent,
     updateIncomeEvent,
     updateMonthlyExpenseOccurrence,
+    payOccurrenceWithAmount,
+    setSeriesAmount,
+    scheduleAmountChange,
+    removeAmountChange,
+    endSeries,
+    reactivateSeries,
+    pauseSeries,
+    resumeSeries,
+    removePause,
+    updateSalaryExtraPay,
+    recordSalaryReceipt,
+    undoSalaryReceipt,
     closeMonth,
     reopenMonth,
     updateTheme,

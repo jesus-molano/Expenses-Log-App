@@ -11,8 +11,10 @@
 import { RRule } from "rrule";
 import type {
   DraftExpense,
+  ExpenseAmountChange,
   ExpenseOccurrence,
   ExpenseOccurrenceOverride,
+  ExpensePause,
   ExpenseTemplate,
   AppLanguage,
   RecurrenceRule,
@@ -26,7 +28,10 @@ import {
 } from "./calendar";
 
 // Lo que decide en qué fechas cae un gasto.
-type TemplateSchedule = Pick<ExpenseTemplate, "startDate" | "endDate" | "dueDay" | "recurrence">;
+type TemplateSchedule = Pick<
+  ExpenseTemplate,
+  "startDate" | "endDate" | "dueDay" | "recurrence" | "pauses"
+>;
 
 function nextDate(date: Date, rule: RecurrenceRule): Date {
   const interval = Math.max(rule.interval ?? 1, 1);
@@ -90,7 +95,20 @@ function annualTemplateDates(
   return dates;
 }
 
+// Fechas en las que cae un gasto dentro del rango. El fin (`endDate`) se
+// incluye y los cobros que caen en una pausa no se generan.
 export function generateTemplateDates(
+  template: TemplateSchedule,
+  fromDate: string,
+  toDate: string,
+): string[] {
+  const dates = scheduledTemplateDates(template, fromDate, toDate);
+  return template.pauses?.length
+    ? dates.filter((date) => !isPausedOn(template.pauses, date))
+    : dates;
+}
+
+function scheduledTemplateDates(
   template: TemplateSchedule,
   fromDate: string,
   toDate: string,
@@ -164,6 +182,81 @@ export function firstChargeAlreadyPassed(draft: DraftExpense, today: string) {
   return first !== null && first.slice(0, 7) === today.slice(0, 7) && first < today;
 }
 
+// Si la fecha cae dentro de alguna pausa (ambos extremos incluidos; sin fin,
+// la pausa sigue abierta).
+export function isPausedOn(pauses: ExpensePause[] | undefined, date: string) {
+  return (pauses ?? []).some(
+    (pause) => pause.from <= date && (!pause.to || date <= pause.to),
+  );
+}
+
+// La pausa que afecta hoy a la serie o, si no hay, la próxima programada.
+export function currentOrNextPause(
+  pauses: ExpensePause[] | undefined,
+  today: string,
+): { pause: ExpensePause; active: boolean } | null {
+  const sorted = [...(pauses ?? [])].sort((a, b) => a.from.localeCompare(b.from));
+  const active = sorted.find((pause) => isPausedOn([pause], today));
+  if (active) return { pause: active, active: true };
+  const next = sorted.find((pause) => pause.from > today);
+  return next ? { pause: next, active: false } : null;
+}
+
+// Añade una pausa (una por fecha de inicio: otra con el mismo inicio la
+// sustituye), ordenadas por inicio.
+export function withPause(
+  pauses: ExpensePause[] | undefined,
+  pause: ExpensePause,
+): ExpensePause[] {
+  return [
+    ...(pauses ?? []).filter((existing) => existing.from !== pause.from),
+    pause.to ? { from: pause.from, to: pause.to } : { from: pause.from },
+  ].sort((a, b) => a.from.localeCompare(b.from));
+}
+
+// Reanudar hoy: la pausa que cubre hoy termina ayer, para que el cobro de hoy
+// y los siguientes vuelvan. Si empezaba hoy, desaparece. Las pausas futuras
+// siguen programadas.
+export function resumePausesOn(
+  pauses: ExpensePause[] | undefined,
+  today: string,
+): ExpensePause[] {
+  const yesterday = toDateOnly(addDays(parseISO(today), -1));
+  return (pauses ?? []).flatMap((pause) => {
+    if (!isPausedOn([pause], today)) return [pause];
+    return pause.from > yesterday ? [] : [{ from: pause.from, to: yesterday }];
+  });
+}
+
+// Importe de la serie para un cobro de esa fecha: el del último cambio de
+// precio que ya ha empezado o, si no hay ninguno, el de la plantilla.
+export function templateAmountOn(
+  template: Pick<ExpenseTemplate, "amount" | "amountChanges">,
+  date: string,
+): number {
+  let amount = template.amount;
+  let effectiveFrom = "";
+  for (const change of template.amountChanges ?? []) {
+    if (change.from <= date && change.from >= effectiveFrom) {
+      amount = change.amount;
+      effectiveFrom = change.from;
+    }
+  }
+  return amount;
+}
+
+// Programa un precio desde una fecha (uno por fecha: el nuevo sustituye al
+// que hubiera ese día), ordenados por fecha.
+export function withAmountChange(
+  changes: ExpenseAmountChange[] | undefined,
+  change: ExpenseAmountChange,
+): ExpenseAmountChange[] {
+  return [
+    ...(changes ?? []).filter((existing) => existing.from !== change.from),
+    { from: change.from, amount: change.amount },
+  ].sort((a, b) => a.from.localeCompare(b.from));
+}
+
 export function generateOccurrences(
   templates: ExpenseTemplate[],
   overrides: ExpenseOccurrenceOverride[],
@@ -189,7 +282,7 @@ export function generateOccurrences(
         const effectiveTemplate = {
           ...template,
           name: override?.name ?? template.name,
-          amount: override?.amount ?? template.amount,
+          amount: override?.amount ?? templateAmountOn(template, date),
           categoryId: override?.categoryId ?? template.categoryId,
         };
 
