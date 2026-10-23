@@ -138,14 +138,6 @@ export function getSalaryReceipt(
   return receipt && !receipt.undone ? receipt : null;
 }
 
-// Lo que costó de verdad un cobro: lo pagado si se anotó, si no lo previsto.
-export function paidAmountOf(occurrence: ExpenseOccurrence): number {
-  return (
-    occurrence.override?.amountPaid ??
-    occurrence.record?.amountPaid ??
-    occurrence.template.amount
-  );
-}
 
 // Tombstones de sueldo: "<mes>@<hora>" o "*@<hora>" (todos los meses). Al
 // fusionar desaparece cualquier sueldo de ese mes editado hasta esa hora, de
@@ -257,7 +249,7 @@ export function buildMonthlyMoneyPlan({
     0,
   );
   const paidExpensesTotal = paidOccurrences.reduce(
-    (sum, occurrence) => sum + paidAmountOf(occurrence),
+    (sum, occurrence) => sum + paidAmount(occurrence),
     0,
   );
   const pendingExpensesTotal = pendingSummary.total;
@@ -328,6 +320,11 @@ export function buildMonthlyMoneyPlan({
     investmentContribution: 0,
     shortfall: billsShortfall,
   };
+}
+
+// Lo que se pagó de un cobro (puede diferir de lo previsto).
+export function paidAmount(occurrence: ExpenseOccurrence) {
+  return occurrence.override?.amountPaid ?? occurrence.record?.amountPaid ?? occurrence.template.amount;
 }
 
 export function generateStoreOccurrences(

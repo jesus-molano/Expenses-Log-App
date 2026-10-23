@@ -23,8 +23,14 @@ export function useExpenseDndSensors() {
         tolerance: 8,
       },
     }),
+    // Intro queda para abrir las acciones del cobro; Espacio arrastra.
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
+      keyboardCodes: {
+        start: ["Space"],
+        cancel: ["Escape"],
+        end: ["Space", "Enter"],
+      },
     }),
   );
 }

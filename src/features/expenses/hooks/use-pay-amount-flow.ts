@@ -2,7 +2,7 @@
 
 import { type FormEvent, useMemo, useState } from "react";
 import { suggestedPaidAmount } from "@/domain/amount-history";
-import { paidAmountOf } from "@/domain/finance";
+import { paidAmount } from "@/domain/finance";
 import type { AppLanguage, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 import { type SeriesAmountPrompt, useSeriesAmountPrompt } from "./use-series-amount-prompt";
@@ -10,7 +10,7 @@ import { type SeriesAmountPrompt, useSeriesAmountPrompt } from "./use-series-amo
 type UsePayAmountFlowOptions = {
   store: ExpenseStore;
   language: AppLanguage;
-  payOccurrenceWithAmount: (occurrence: ExpenseOccurrence, amountPaid: number) => void;
+  payOccurrence: (occurrence: ExpenseOccurrence, amountPaid: number) => void;
   setSeriesAmount: (templateId: string, amount: number) => void;
   onSeriesUpdated?: (prompt: SeriesAmountPrompt) => void;
 };
@@ -21,7 +21,7 @@ type UsePayAmountFlowOptions = {
 export function usePayAmountFlow({
   store,
   language,
-  payOccurrenceWithAmount,
+  payOccurrence,
   setSeriesAmount,
   onSeriesUpdated,
 }: UsePayAmountFlowOptions) {
@@ -46,7 +46,7 @@ export function usePayAmountFlow({
     setOccurrence(target);
     setAmountText(
       formatMoneyInput(
-        target.status === "paid" ? paidAmountOf(target) : target.template.amount,
+        target.status === "paid" ? paidAmount(target) : target.template.amount,
         language,
       ),
     );
@@ -63,7 +63,7 @@ export function usePayAmountFlow({
     const amount = parseMoneyInput(amountText);
     // El campo valida antes de enviar; esto solo protege de un importe vacío.
     if (amount === null || amount <= 0) return;
-    payOccurrenceWithAmount(occurrence, amount);
+    payOccurrence(occurrence, amount);
     if (
       amount !== occurrence.template.amount &&
       seriesPrompt.askAfterPayment(occurrence.template.id, amount)

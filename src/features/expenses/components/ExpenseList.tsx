@@ -24,6 +24,7 @@ type ExpenseListProps = {
   autoScroll?: boolean;
   language?: AppLanguage;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
+  onOpenOccurrence: (occurrence: ExpenseOccurrence) => void;
   onMoveOccurrenceOnly: (
     occurrence: ExpenseOccurrence,
     dueDate: string,
@@ -41,6 +42,7 @@ export function ExpenseList({
   autoScroll = true,
   language = "es",
   onTogglePaid,
+  onOpenOccurrence,
   onMoveOccurrenceOnly,
   onMoveOccurrenceSeries,
 }: ExpenseListProps) {
@@ -93,6 +95,7 @@ export function ExpenseList({
                 activeOccurrence={dnd.activeOccurrence}
                 activeDropTarget={dnd.activeDropTarget}
                 onTogglePaid={onTogglePaid}
+                onOpenOccurrence={onOpenOccurrence}
               />
             ))}
           </div>

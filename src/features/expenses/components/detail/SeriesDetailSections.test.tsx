@@ -6,7 +6,7 @@ import type { ExpenseStore, ExpenseTemplate } from "@/domain/types";
 import {
   endSeriesInStore,
   pauseSeriesInStore,
-  payOccurrenceWithAmountInStore,
+  payOccurrenceInStore,
   reactivateSeriesInStore,
   removeAmountChangeInStore,
   removePauseInStore,
@@ -67,7 +67,7 @@ function DetailHarness() {
     removePause: apply(removePauseInStore),
     scheduleAmountChange: apply(scheduleAmountChangeInStore),
     removeAmountChange: apply(removeAmountChangeInStore),
-    payOccurrenceWithAmount: apply(payOccurrenceWithAmountInStore),
+    payOccurrence: apply(payOccurrenceInStore),
     setSeriesAmount: (templateId: string, amount: number) =>
       setStore((current) => setSeriesAmountInStore(current, templateId, amount)),
   } as unknown as ReturnType<typeof useExpenseStore>;

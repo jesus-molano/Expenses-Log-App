@@ -1,6 +1,6 @@
 import { addDays, endOfMonth, parseISO, subMonths } from "date-fns";
 import { toDateOnly } from "./calendar";
-import { generateStoreOccurrences, paidAmountOf } from "./finance";
+import { generateStoreOccurrences, paidAmount } from "./finance";
 import type { AppLanguage, ExpenseOccurrence, ExpenseStore } from "./types";
 
 // Hasta dónde se mira atrás para el historial y las sugerencias de importe.
@@ -23,7 +23,7 @@ export function averagePaidAmount(
     .slice(0, count);
   if (!recent.length) return null;
 
-  const total = recent.reduce((sum, occurrence) => sum + paidAmountOf(occurrence), 0);
+  const total = recent.reduce((sum, occurrence) => sum + paidAmount(occurrence), 0);
   return { amount: roundCents(total / recent.length), count: recent.length };
 }
 
@@ -94,7 +94,7 @@ export function buildChargeHistory(
     .slice(0, limit)
     .map((occurrence) => {
       const planned = occurrence.template.amount;
-      const paid = occurrence.status === "paid" ? paidAmountOf(occurrence) : null;
+      const paid = occurrence.status === "paid" ? paidAmount(occurrence) : null;
       return {
         occurrence,
         planned,

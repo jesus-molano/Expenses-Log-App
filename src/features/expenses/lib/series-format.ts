@@ -1,6 +1,7 @@
 import { format, parseISO } from "date-fns";
 import { enUS, es } from "date-fns/locale";
-import type { PriceHistoryEntry } from "@/domain/amount-history";
+import type { PaidAmountAverage, PriceHistoryEntry } from "@/domain/amount-history";
+import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 
@@ -35,4 +36,16 @@ export function priceRangeLabel(
       ? format(parseISO(entry.from), "LLL", { locale: localeOf(language) })
       : from;
   return `${fromLabel} – ${to}`;
+}
+
+// "Media de los 3 últimos: 68,20 €" (o "Último pago: …" con uno solo).
+export function paidAmountSuggestionLabel(
+  suggestion: PaidAmountAverage,
+  language: AppLanguage,
+) {
+  return (
+    suggestion.count === 1
+      ? t("bills.payAverageOne", language)
+      : t("bills.payAverageMany", language).replace("{count}", String(suggestion.count))
+  ).replace("{amount}", formatCurrency(suggestion.amount));
 }

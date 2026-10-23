@@ -39,6 +39,28 @@ export function seriesHasUpcomingCharges(template: ExpenseTemplate, today: strin
   );
 }
 
+export type SeriesAmountPrompt = {
+  templateId: string;
+  name: string;
+  from: number;
+  to: number;
+};
+
+// "¿Actualizar el importe desde ahora?" tras pagar con otro importe: solo si
+// la serie sigue y lo pagado es distinto de lo que costarían los próximos
+// cobros.
+export function seriesAmountPromptFor(
+  store: ExpenseStore,
+  templateId: string,
+  paidAmount: number,
+  today: string,
+): SeriesAmountPrompt | null {
+  const template = store.templates.find((item) => item.id === templateId);
+  if (!template || !seriesHasUpcomingCharges(template, today)) return null;
+  const from = currentSeriesAmount(template, today, store.finance.monthClosures);
+  return from === paidAmount ? null : { templateId, name: template.name, from, to: paidAmount };
+}
+
 // Cobros de la serie desde una fecha (los de meses cerrados como registros),
 // hasta 13 meses después de esa fecha o de hoy.
 export function seriesOccurrencesFrom(

@@ -21,6 +21,7 @@ type TimelineNormalItemsProps = {
   activeOccurrence: ExpenseOccurrence | null;
   activeDropTarget: DropTarget | null;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
+  onOpenOccurrence: (occurrence: ExpenseOccurrence) => void;
 };
 
 export function TimelineNormalItems({
@@ -34,6 +35,7 @@ export function TimelineNormalItems({
   activeOccurrence,
   activeDropTarget,
   onTogglePaid,
+  onOpenOccurrence,
 }: TimelineNormalItemsProps) {
   if (!section.items.length) {
     // Solo "Hoy" explica que no hay cargos; el aviso de inicio de mes ya lo
@@ -63,6 +65,7 @@ export function TimelineNormalItems({
           today={today}
           language={language}
           onTogglePaid={onTogglePaid}
+          onOpenOccurrence={onOpenOccurrence}
           dropPosition={
             activeDropTarget?.rowId === occurrence.id
               ? activeDropTarget.position

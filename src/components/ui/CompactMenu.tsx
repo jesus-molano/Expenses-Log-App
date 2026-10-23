@@ -2,6 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { useMenuViewportClamp } from "./use-menu-viewport-clamp";
 
 type CompactMenuProps = {
   open: boolean;
@@ -27,6 +28,7 @@ export function CompactMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const openWithKeyboardRef = useRef(false);
   const suppressTriggerClickUntilRef = useRef(0);
+  useMenuViewportClamp(open, align, menuRef, popupRef);
 
   useEffect(() => {
     if (!open) return;
@@ -125,10 +127,15 @@ export function CompactMenu({
         aria-expanded={open}
         aria-haspopup={menuRole}
         onKeyDown={handleTriggerKeyDown}
-        className="app-control app-select-trigger inline-flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-[var(--app-radius-sm)] px-3 text-sm font-semibold"
+        className="app-control app-select-trigger inline-flex min-h-9 w-full min-w-0 items-center justify-between gap-2 rounded-[var(--app-radius-sm)] px-3 py-1.5 text-sm font-semibold"
       >
         {leading}
-        <span className="min-w-0 truncate">{label}</span>
+        {/* La etiqueta salta de linea completa y el boton crece en alto.
+            flex-1: queda pegada al icono inicial, no centrada entre icono y
+            flecha. */}
+        <span className="min-w-0 flex-1 break-words text-left leading-snug [overflow-wrap:anywhere]">
+          {label}
+        </span>
         <ChevronDown
           size={16}
           className="app-select-chevron shrink-0 text-[var(--app-text-muted)]"
@@ -149,7 +156,7 @@ export function CompactMenu({
                   : "min(24rem, calc(100vw - 2rem))",
             } as React.CSSProperties
           }
-          className={`app-select-menu-panel absolute top-10 z-50 grid min-w-full gap-0.5 rounded-[var(--app-radius-lg)] p-1.5 ${
+          className={`app-select-menu-panel absolute top-[calc(100%+0.25rem)] z-50 grid min-w-full gap-0.5 rounded-[var(--app-radius-lg)] p-1.5 ${
             align === "left" ? "left-0" : "right-0"
           }`}
         >

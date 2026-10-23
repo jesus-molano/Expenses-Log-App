@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { enUS, es } from "date-fns/locale";
-import { Check, Pencil, Sparkles, WalletCards, X } from "lucide-react";
+import { Check, Pencil, WalletCards, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { DatePickerField } from "@/components/ui/DatePickerField";
 import { MoneyInput } from "@/components/ui/MoneyInput";
@@ -11,13 +11,14 @@ import { SelectMenu } from "@/components/ui/SelectMenu";
 import type { PaidAmountAverage } from "@/domain/amount-history";
 import { formatCurrency } from "@/domain/calendar";
 import { PRESET_EXPENSE_CATEGORIES } from "@/domain/categories";
-import { paidAmountOf } from "@/domain/finance";
+import { paidAmount } from "@/domain/finance";
 import { isOccurrenceOverdue } from "@/domain/pending";
 import type {
   AppLanguage,
   ExpenseCategory,
   ExpenseOccurrence,
 } from "@/domain/types";
+import { PaidAmountSuggestion } from "@/features/expenses/components/PaidAmountSuggestion";
 import { categoryIconMap } from "@/features/expenses/lib/expense-form-options";
 import {
   useMonthlyExpenseRowEditor,
@@ -25,7 +26,6 @@ import {
 } from "@/features/plan/hooks/use-monthly-expense-row-editor";
 import { categoryLabel } from "@/shared/category-labels";
 import { t } from "@/shared/i18n";
-import { formatMoneyInput } from "@/shared/money";
 
 export function MonthlyExpenseRow({
   occurrence,
@@ -155,7 +155,7 @@ export function MonthlyExpenseRow({
                 type="button"
                 onClick={() => editor.setStatus(status)}
                 aria-pressed={selected}
-                className="app-monthly-status-option h-9 text-sm font-semibold"
+                className="app-monthly-status-option min-h-9 px-2 text-sm font-semibold"
                 data-status={status}
                 data-selected={selected ? "true" : "false"}
               >
@@ -179,22 +179,11 @@ export function MonthlyExpenseRow({
               />
             </label>
             {suggestion ? (
-              <button
-                type="button"
-                onClick={() =>
-                  editor.setPaidAmount(formatMoneyInput(suggestion.amount, language))
-                }
-                className="app-chip app-focus-ring inline-flex min-h-11 items-center gap-1.5 justify-self-start px-3 text-left text-xs font-semibold"
-              >
-                <Sparkles size={14} aria-hidden="true" />
-                {(suggestion.count === 1
-                  ? t("bills.payAverageOne", language)
-                  : t("bills.payAverageMany", language).replace(
-                      "{count}",
-                      String(suggestion.count),
-                    )
-                ).replace("{amount}", formatCurrency(suggestion.amount))}
-              </button>
+              <PaidAmountSuggestion
+                suggestion={suggestion}
+                language={language}
+                onUse={editor.setPaidAmount}
+              />
             ) : null}
           </div>
         ) : null}
@@ -204,7 +193,7 @@ export function MonthlyExpenseRow({
 
   const isPaid = occurrence.status === "paid";
   // Pagado con otro importe: se ve lo pagado y lo previsto al lado.
-  const shownAmount = isPaid ? paidAmountOf(occurrence) : occurrence.template.amount;
+  const shownAmount = isPaid ? paidAmount(occurrence) : occurrence.template.amount;
   const plannedNote =
     isPaid && shownAmount !== occurrence.template.amount
       ? ` - ${t("bills.plannedHint", language).replace(
@@ -219,14 +208,19 @@ export function MonthlyExpenseRow({
       ? t("expenses.overdue", language)
       : t("common.pending", language);
 
+  // En movil, dos filas: nombre | importe arriba y detalle | acciones debajo.
+  // Son tres columnas (texto, hueco, importe): el nombre ocupa las dos
+  // primeras y las acciones las dos ultimas, asi el nombre solo cede el ancho
+  // del importe y el detalle el de los botones. Desde sm vuelven a ser las
+  // columnas de la tabla.
   return (
     <div
-      className="app-list-item app-monthly-table-row app-monthly-expense-row grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-2"
+      className="app-list-item app-monthly-table-row app-monthly-expense-row grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-2 gap-y-1 px-3 py-2 sm:items-center"
       data-has-pay-action={onTogglePaid ? "true" : undefined}
     >
-      <div className="min-w-0">
+      <div className="contents sm:block sm:min-w-0">
         <p
-          className={`truncate text-sm font-semibold ${
+          className={`col-[1/3] row-start-1 min-w-0 break-words text-sm font-semibold ${
             isPaid
               ? "text-[var(--app-text-subtle)] line-through"
               : "text-[var(--app-text)]"
@@ -234,7 +228,7 @@ export function MonthlyExpenseRow({
         >
           {occurrence.template.name}
         </p>
-        <p className="mt-0.5 truncate text-xs font-medium text-[var(--app-text-muted)]">
+        <p className="col-start-1 row-start-2 min-w-0 break-words text-xs font-medium text-[var(--app-text-muted)] sm:mt-0.5">
           {format(new Date(`${occurrence.dueDate}T00:00:00`), "d MMM", {
             locale,
           })}{" "}
@@ -243,7 +237,7 @@ export function MonthlyExpenseRow({
         </p>
       </div>
       <p
-        className={`app-money text-sm font-semibold ${
+        className={`app-money col-start-3 row-start-1 justify-self-end whitespace-nowrap text-sm font-semibold sm:col-auto sm:row-auto sm:justify-self-auto ${
           isPaid
             ? "text-[var(--app-text-subtle)] line-through"
             : "text-[var(--app-text)]"
@@ -251,7 +245,7 @@ export function MonthlyExpenseRow({
       >
         {formatCurrency(shownAmount)}
       </p>
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="col-[2/4] row-start-2 flex shrink-0 items-center gap-1 justify-self-end sm:col-auto sm:row-auto sm:justify-self-auto">
         {onTogglePaid ? (
           <IconButton
             type="button"

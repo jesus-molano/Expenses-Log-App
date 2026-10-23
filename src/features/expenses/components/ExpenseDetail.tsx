@@ -127,16 +127,18 @@ function ExpenseDetailForm({
           onSubmit={editor.saveExpense}
           className="app-section-card mt-4 p-5"
         >
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-[var(--app-accent)]">
+          {/* Si el nombre no cabe junto al importe, el importe baja a su propia
+              linea en vez de recortar el nombre. */}
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+            <div className="min-w-0 max-w-full">
+              <p className="break-words text-sm font-medium text-[var(--app-accent)]">
                 {localizedRecurrenceLabel(editor.form.recurrence, language)}
               </p>
-              <h1 className="mt-1 truncate text-3xl font-semibold text-[var(--app-text)]">
+              <h1 className="mt-1 break-words text-3xl font-semibold text-[var(--app-text)]">
                 {editor.form.name || template.name}
               </h1>
             </div>
-            <p className="app-money shrink-0 text-xl font-semibold text-[var(--app-text)]">
+            <p className="app-money shrink-0 whitespace-nowrap text-xl font-semibold text-[var(--app-text)]">
               {formatCurrency(editor.previewAmount)}
             </p>
           </div>

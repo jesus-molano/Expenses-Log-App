@@ -31,9 +31,11 @@ Los comandos se dividen por responsabilidad:
 - `finance-commands`: modifica salario mensual (con ambito "solo este mes" o
   "desde este mes"), pagas extra, la respuesta a "¿Has cobrado?", objetivos,
   aportaciones reales e ingresos.
-- `series-commands`: pagar con otro importe, cambiar el importe de la serie
-  desde ahora, programar o quitar un precio, finalizar, pausar, reanudar y
-  quitar una pausa. Ninguno reescribe un cobro pagado ni un mes cerrado.
+- `series-commands`: cambiar el importe de la serie desde ahora, programar o
+  quitar un precio, finalizar, pausar, reanudar y quitar una pausa. Ninguno
+  reescribe un cobro pagado ni un mes cerrado. Pagar con otro importe
+  (`payOccurrenceInStore`, en `expense-commands`) apunta lo pagado sin tocar
+  lo previsto y, si el cobro ya estaba pagado, conserva su fecha de pago.
 - `preference-commands`: actualiza tema e idioma en el store.
 
 Los comandos reciben un `ExpenseStore` y devuelven otro. Esta forma mantiene la

@@ -19,6 +19,7 @@ type TimelineExpandedMonthProps = {
   activeOccurrence: ExpenseOccurrence | null;
   activeDropTarget: DropTarget | null;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
+  onOpenOccurrence: (occurrence: ExpenseOccurrence) => void;
 };
 
 export function TimelineExpandedMonth({
@@ -31,6 +32,7 @@ export function TimelineExpandedMonth({
   activeOccurrence,
   activeDropTarget,
   onTogglePaid,
+  onOpenOccurrence,
 }: TimelineExpandedMonthProps) {
   const itemsByDate = groupMonthItemsByDate(allSections, dates[0]);
 
@@ -46,6 +48,7 @@ export function TimelineExpandedMonth({
       activeOccurrence={activeOccurrence}
       activeDropTarget={activeDropTarget}
       onTogglePaid={onTogglePaid}
+      onOpenOccurrence={onOpenOccurrence}
     />
   ));
 }

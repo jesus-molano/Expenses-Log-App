@@ -6,6 +6,7 @@ import {
   pauseResumeChoices,
   pauseStartChoices,
   pauseUntilResume,
+  seriesAmountPromptFor,
   seriesLifecycle,
 } from "./series-lifecycle";
 import type { ExpenseOccurrenceOverride, ExpenseStore, ExpenseTemplate } from "./types";
@@ -126,5 +127,35 @@ describe("series lifecycle status", () => {
       seriesLifecycle({ ...gym, pauses: [{ from: "2026-12-01", to: "2026-12-31" }] }, "2026-10-23")
         .pause,
     ).toMatchObject({ active: false, firstSkipped: "2026-12-05", resumesOn: "2027-01-05" });
+  });
+});
+
+describe("series amount prompt", () => {
+  it("asks only when what was paid differs from the upcoming charges", () => {
+    const store = storeWith();
+
+    expect(seriesAmountPromptFor(store, "gym", 35, "2026-10-23")).toBeNull();
+    expect(seriesAmountPromptFor(store, "gym", 39.9, "2026-10-23")).toEqual({
+      templateId: "gym",
+      name: "Gimnasio",
+      from: 35,
+      to: 39.9,
+    });
+  });
+
+  it("compares with the scheduled price in force and skips finished or one-off series", () => {
+    const priced = {
+      ...emptyStore,
+      templates: [
+        { ...gym, amountChanges: [{ from: "2026-10-01", amount: 39.9 }] },
+        { ...gym, id: "once", recurrence: { frequency: "once" as const } },
+        { ...gym, id: "ended", endDate: "2026-09-30" },
+      ],
+    };
+
+    expect(seriesAmountPromptFor(priced, "gym", 39.9, "2026-10-23")).toBeNull();
+    expect(seriesAmountPromptFor(priced, "once", 50, "2026-10-23")).toBeNull();
+    expect(seriesAmountPromptFor(priced, "ended", 50, "2026-10-23")).toBeNull();
+    expect(seriesAmountPromptFor(priced, "missing", 50, "2026-10-23")).toBeNull();
   });
 });

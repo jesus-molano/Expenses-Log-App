@@ -26,6 +26,7 @@ type TimelineSectionBlockProps = {
   activeOccurrence: ExpenseOccurrence | null;
   activeDropTarget: DropTarget | null;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
+  onOpenOccurrence: (occurrence: ExpenseOccurrence) => void;
 };
 
 export function TimelineSectionBlock({
@@ -42,6 +43,7 @@ export function TimelineSectionBlock({
   activeOccurrence,
   activeDropTarget,
   onTogglePaid,
+  onOpenOccurrence,
 }: TimelineSectionBlockProps) {
   const expandedDays = getExpandedSectionDays({
     section,
@@ -83,6 +85,7 @@ export function TimelineSectionBlock({
             activeOccurrence={activeOccurrence}
             activeDropTarget={activeDropTarget}
             onTogglePaid={onTogglePaid}
+            onOpenOccurrence={onOpenOccurrence}
           />
         ) : (
           <TimelineNormalItems
@@ -96,6 +99,7 @@ export function TimelineSectionBlock({
             activeOccurrence={activeOccurrence}
             activeDropTarget={activeDropTarget}
             onTogglePaid={onTogglePaid}
+            onOpenOccurrence={onOpenOccurrence}
           />
         )}
       </div>

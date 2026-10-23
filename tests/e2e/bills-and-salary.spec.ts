@@ -67,19 +67,6 @@ async function storedFinance(page: Page) {
   return page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) ?? "{}").finance, STORAGE_KEY);
 }
 
-async function swipeToPay(page: Page, name: string) {
-  const row = page.locator('[data-expense-row="true"]').filter({ hasText: name }).first();
-  await row.scrollIntoViewIfNeeded();
-  const box = await row.boundingBox();
-  expect(box).not.toBeNull();
-  const startX = Math.min(box!.x + box!.width - 12, 354);
-  const y = box!.y + box!.height / 2;
-  await page.mouse.move(startX, y);
-  await page.mouse.down();
-  await page.mouse.move(startX - 240, y, { steps: 10 });
-  await page.mouse.up();
-}
-
 function expenseRow(page: Page, name: string) {
   return page.locator('[data-expense-row="true"]').filter({ hasText: name }).first();
 }
@@ -96,18 +83,17 @@ test("pays a variable bill with another amount and updates the series from now o
   });
   await page.goto("/");
 
-  await swipeToPay(page, "Luz");
-  const toast = page.getByRole("status").filter({ hasText: "Pagado: Luz" });
-  await expect(toast).toBeVisible();
-  await toast.getByRole("button", { name: "Otro importe" }).click();
+  const row = expenseRow(page, "Luz");
+  await row.scrollIntoViewIfNeeded();
+  await row.click();
+  const sheet = page.getByRole("dialog", { name: "Luz" });
+  await sheet.getByRole("button", { name: "Pagado con otro importe" }).click();
 
-  const sheet = page.getByRole("dialog", { name: "Importe pagado" });
-  await expect(sheet.getByText(/Previsto: 60,00\s*€/)).toBeVisible();
   const suggestion = sheet.getByRole("button", { name: /Media de los 2 últimos: 72,00/ });
   await expect(suggestion).toBeVisible();
   await suggestion.click();
-  await expect(sheet.getByLabel("Lo que pagaste")).toHaveValue("72");
-  await sheet.getByLabel("Lo que pagaste").fill("74,30");
+  await expect(sheet.getByLabel("Importe cobrado")).toHaveValue("72");
+  await sheet.getByLabel("Importe cobrado").fill("74,30");
   await sheet.getByRole("button", { name: "Guardar pago" }).click();
 
   await expect(
@@ -116,7 +102,7 @@ test("pays a variable bill with another amount and updates the series from now o
   await expect(sheet.getByText(/pasarán de 60,00\s*€ a 74,30\s*€/)).toBeVisible();
   await sheet.getByRole("button", { name: "Actualizar" }).click();
 
-  await expect(sheet).toHaveCount(0);
+  await expect(sheet).toBeHidden();
   await expect(page.getByRole("status").filter({ hasText: /Luz pasa a 74,30/ })).toBeVisible();
   await expect(expenseRow(page, "Luz")).toContainText(/74,30/);
   await expect(expenseRow(page, "Luz")).toContainText(/previsto 60,00/);

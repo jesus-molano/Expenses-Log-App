@@ -2,7 +2,6 @@
 
 import type { FormEvent } from "react";
 import { useId } from "react";
-import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { MoneyInput } from "@/components/ui/MoneyInput";
@@ -12,9 +11,9 @@ import type { PaidAmountAverage } from "@/domain/amount-history";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
 import { t } from "@/shared/i18n";
-import { formatMoneyInput } from "@/shared/money";
 import type { SeriesAmountPrompt } from "../hooks/use-series-amount-prompt";
 import { formatChargeDate } from "../lib/series-format";
+import { PaidAmountSuggestion } from "./PaidAmountSuggestion";
 import { SeriesAmountQuestion } from "./SeriesAmountQuestion";
 
 type PayAmountSheetProps = {
@@ -45,12 +44,6 @@ export function PayAmountSheet({
   onClose,
 }: PayAmountSheetProps) {
   const titleId = useId();
-  const suggestionText = suggestion
-    ? (suggestion.count === 1
-        ? t("bills.payAverageOne", language)
-        : t("bills.payAverageMany", language).replace("{count}", String(suggestion.count))
-      ).replace("{amount}", formatCurrency(suggestion.amount))
-    : null;
 
   return (
     <Sheet ariaLabelledBy={titleId} contentClassName="sm:max-w-sm" onBackdropClick={onClose}>
@@ -88,19 +81,12 @@ export function PayAmountSheet({
                 autoFocus
               />
             </Field>
-            {suggestion && suggestionText ? (
-              <button
-                type="button"
-                onClick={() => onAmountTextChange(formatMoneyInput(suggestion.amount, language))}
-                aria-label={`${suggestionText}. ${t("bills.useSuggestion", language).replace(
-                  "{amount}",
-                  formatCurrency(suggestion.amount),
-                )}`}
-                className="app-chip app-focus-ring inline-flex min-h-11 items-center gap-2 justify-self-start px-3 text-left text-sm font-semibold"
-              >
-                <Sparkles size={15} aria-hidden="true" />
-                {suggestionText}
-              </button>
+            {suggestion ? (
+              <PaidAmountSuggestion
+                suggestion={suggestion}
+                language={language}
+                onUse={onAmountTextChange}
+              />
             ) : null}
             <Button type="submit" variant="primary" className="mt-2 w-full">
               {t("bills.paySave", language)}

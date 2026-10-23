@@ -111,41 +111,41 @@ describe("series hooks", () => {
 
   describe("usePayAmountFlow", () => {
     function setup() {
-      const payOccurrenceWithAmount = vi.fn();
+      const payOccurrence = vi.fn();
       const setSeriesAmount = vi.fn();
       const onSeriesUpdated = vi.fn();
       const hook = renderHook(() =>
         usePayAmountFlow({
           store,
           language: "es",
-          payOccurrenceWithAmount,
+          payOccurrence,
           setSeriesAmount,
           onSeriesUpdated,
         }),
       );
-      return { ...hook, payOccurrenceWithAmount, setSeriesAmount, onSeriesUpdated };
+      return { ...hook, payOccurrence, setSeriesAmount, onSeriesUpdated };
     }
 
     it("suggests the average of the last payments and pays the planned amount without asking", () => {
-      const { result, payOccurrenceWithAmount } = setup();
+      const { result, payOccurrence } = setup();
 
       act(() => result.current.open(october()));
       expect(result.current.amountText).toBe("60");
       expect(result.current.suggestion).toEqual({ amount: 72, count: 2 });
 
       act(() => result.current.save(submitEvent));
-      expect(payOccurrenceWithAmount).toHaveBeenCalledWith(october(), 60);
+      expect(payOccurrence).toHaveBeenCalledWith(october(), 60);
       expect(result.current.occurrence).toBeNull();
     });
 
     it("asks to update the series after paying a different amount", () => {
-      const { result, payOccurrenceWithAmount, setSeriesAmount, onSeriesUpdated } = setup();
+      const { result, payOccurrence, setSeriesAmount, onSeriesUpdated } = setup();
 
       act(() => result.current.open(october()));
       act(() => result.current.setAmountText("74,30"));
       act(() => result.current.save(submitEvent));
 
-      expect(payOccurrenceWithAmount).toHaveBeenCalledWith(october(), 74.3);
+      expect(payOccurrence).toHaveBeenCalledWith(october(), 74.3);
       expect(result.current.seriesPrompt).toMatchObject({ from: 60, to: 74.3 });
 
       act(() => result.current.applySeries());
@@ -155,7 +155,7 @@ describe("series hooks", () => {
     });
 
     it("keeps the sheet open on an unreadable amount and prefills what was paid", () => {
-      const { result, payOccurrenceWithAmount } = setup();
+      const { result, payOccurrence } = setup();
       const september = generateStoreOccurrences(store, "2026-09-08", "2026-09-08")[0];
 
       act(() => result.current.open(september));
@@ -163,7 +163,7 @@ describe("series hooks", () => {
       act(() => result.current.setAmountText("mucho"));
       act(() => result.current.save(submitEvent));
 
-      expect(payOccurrenceWithAmount).not.toHaveBeenCalled();
+      expect(payOccurrence).not.toHaveBeenCalled();
       expect(result.current.occurrence).not.toBeNull();
     });
   });

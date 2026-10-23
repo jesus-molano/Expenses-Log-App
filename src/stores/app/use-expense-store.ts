@@ -37,16 +37,17 @@ import {
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
   pauseSeriesInStore,
-  payOccurrenceWithAmountInStore,
   reactivateSeriesInStore,
   recordSalaryReceiptInStore,
   removeAmountChangeInStore,
   removePauseInStore,
   reopenMonthInStore,
+  restoreOccurrenceInStore,
   resumeSeriesInStore,
   scheduleAmountChangeInStore,
   setSeriesAmountInStore,
   skipOccurrenceInStore,
+  payOccurrenceInStore,
   togglePaidInStore,
   undoSalaryReceiptInStore,
   updateIncomeEventInStore,
@@ -186,8 +187,16 @@ function useExpenseStoreValue() {
     persist(togglePaidInStore(current(), occurrence));
   }
 
+  function payOccurrence(occurrence: ExpenseOccurrence, amountPaid: number) {
+    persist(payOccurrenceInStore(current(), occurrence, amountPaid));
+  }
+
   function skipOccurrence(occurrence: ExpenseOccurrence) {
     persist(skipOccurrenceInStore(current(), occurrence));
+  }
+
+  function restoreOccurrence(occurrence: ExpenseOccurrence) {
+    persist(restoreOccurrenceInStore(current(), occurrence));
   }
 
   function dismissLastChanceReminder(occurrence: ExpenseOccurrence) {
@@ -246,10 +255,6 @@ function useExpenseStoreValue() {
 
   function updateMonthlyExpenseOccurrence(input: MonthlyExpenseOverrideInput) {
     persist(updateMonthlyExpenseOccurrenceInStore(current(), input));
-  }
-
-  function payOccurrenceWithAmount(occurrence: ExpenseOccurrence, amountPaid: number) {
-    persist(payOccurrenceWithAmountInStore(current(), occurrence, amountPaid));
   }
 
   function setSeriesAmount(
@@ -327,7 +332,9 @@ function useExpenseStoreValue() {
     clearExpenses,
     clearIncome,
     togglePaid,
+    payOccurrence,
     skipOccurrence,
+    restoreOccurrence,
     dismissLastChanceReminder,
     moveOccurrence,
     moveOccurrenceSeries,
@@ -340,7 +347,6 @@ function useExpenseStoreValue() {
     deleteIncomeEvent,
     updateIncomeEvent,
     updateMonthlyExpenseOccurrence,
-    payOccurrenceWithAmount,
     setSeriesAmount,
     scheduleAmountChange,
     removeAmountChange,

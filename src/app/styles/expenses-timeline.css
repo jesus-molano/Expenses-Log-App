@@ -41,6 +41,12 @@
   background: var(--app-surface) !important;
 }
 
+/* Categoria de la fila: radio pequeno en vez de pildora. En una linea se ve
+   igual; si el nombre salta a dos lineas no queda como una capsula. */
+.app-chip.app-expense-row-category {
+  border-radius: var(--app-radius-sm);
+}
+
 /* Timeline */
 .app-timeline-dot {
   background: color-mix(in srgb, var(--app-accent) 82%, var(--app-accent-2));

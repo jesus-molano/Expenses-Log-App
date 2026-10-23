@@ -82,7 +82,7 @@ export function useSeriesDetail({
     payFlow: usePayAmountFlow({
       store,
       language,
-      payOccurrenceWithAmount: expenseStore.payOccurrenceWithAmount,
+      payOccurrence: expenseStore.payOccurrence,
       setSeriesAmount: expenseStore.setSeriesAmount,
     }),
     reactivate: () => expenseStore.reactivateSeries(template.id),

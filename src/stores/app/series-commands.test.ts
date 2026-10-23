@@ -7,7 +7,7 @@ import { closeMonthInStore } from "./finance-commands";
 import {
   endSeriesInStore,
   pauseSeriesInStore,
-  payOccurrenceWithAmountInStore,
+  payOccurrenceInStore,
   reactivateSeriesInStore,
   removeAmountChangeInStore,
   removePauseInStore,
@@ -79,7 +79,7 @@ describe("series commands", () => {
 
   describe("paying a different amount", () => {
     it("keeps the planned amount and records what was paid", () => {
-      const next = payOccurrenceWithAmountInStore(store, occurrenceOn(store, "2026-10-08"), 74.3);
+      const next = payOccurrenceInStore(store, occurrenceOn(store, "2026-10-08"), 74.3);
 
       expect(summary(next)).toMatchObject({ "2026-10": "60/74.3", "2026-11": 60 });
       expect(next.overrides[0]).toMatchObject({ status: "paid", amountPaid: 74.3 });
@@ -90,7 +90,7 @@ describe("series commands", () => {
       const paidAt = paidStore.overrides[0].paidAt;
       vi.setSystemTime(new Date("2026-10-25T10:00:00"));
 
-      const next = payOccurrenceWithAmountInStore(
+      const next = payOccurrenceInStore(
         paidStore,
         occurrenceOn(paidStore, "2026-10-08"),
         71.2,
@@ -100,14 +100,14 @@ describe("series commands", () => {
     });
 
     it("ignores an unreadable amount", () => {
-      expect(payOccurrenceWithAmountInStore(store, occurrenceOn(store, "2026-10-08"), 0)).toBe(store);
+      expect(payOccurrenceInStore(store, occurrenceOn(store, "2026-10-08"), 0)).toBe(store);
     });
 
     it("can then update the series from now on without touching what is paid", () => {
       store = pay(store, "2026-09-08");
       const paid = commit(
         store,
-        payOccurrenceWithAmountInStore(store, occurrenceOn(store, "2026-10-08"), 74.3),
+        payOccurrenceInStore(store, occurrenceOn(store, "2026-10-08"), 74.3),
       );
 
       const updated = commit(paid, setSeriesAmountInStore(paid, "luz", 74.3));

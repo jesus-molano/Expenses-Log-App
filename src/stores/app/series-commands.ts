@@ -1,7 +1,6 @@
 import { addDays, parseISO } from "date-fns";
 import { addMonthId, resolveActiveMonth } from "@/domain/budget-month";
 import { isValidDateOnly, toDateOnly } from "@/domain/calendar";
-import { occurrenceKeyOf } from "@/domain/overrides";
 import {
   resumePausesOn,
   withAmountChange,
@@ -24,39 +23,6 @@ import {
   type SeriesAmountScope,
 } from "./expense-commands";
 import { upsertOccurrenceOverride } from "./occurrence-overrides";
-
-// Paga un cobro con lo que costó de verdad. Lo previsto no cambia: así se ve
-// la diferencia en los recibos variables. Si ya estaba pagado, solo corrige
-// el importe y conserva la fecha de pago.
-export function payOccurrenceWithAmountInStore(
-  store: ExpenseStore,
-  occurrence: ExpenseOccurrence,
-  amountPaid: number,
-  now: Date = new Date(),
-): ExpenseStore {
-  if (!Number.isFinite(amountPaid) || amountPaid <= 0) return store;
-  const key = keyOf(occurrence);
-  const existing = store.overrides.find(
-    (override) => occurrenceKeyOf(override) === occurrenceKeyOf(key),
-  );
-  const previousPaidAt =
-    existing?.status === "paid"
-      ? existing.paidAt
-      : !existing && occurrence.record?.status === "paid"
-        ? occurrence.record.paidAt
-        : undefined;
-
-  return upsertOccurrenceOverride(
-    store,
-    key,
-    {
-      status: "paid",
-      paidAt: previousPaidAt ?? now.toISOString(),
-      amountPaid,
-    },
-    { now: now.toISOString() },
-  );
-}
 
 // Cambia el importe de la serie desde el mes activo (o el siguiente) sin
 // reescribir lo pasado ni lo pagado (`keepAmountBeforeSeriesChange`). Los

@@ -18,18 +18,18 @@ export function TimelineSectionHeader({
     >
       <div className="min-w-0">
         <h2
-          className={`truncate font-semibold leading-tight first-letter:uppercase text-[var(--app-text)] ${
+          className={`break-words font-semibold leading-tight first-letter:uppercase text-[var(--app-text)] ${
             section.id === "today" ? "text-[19px]" : "text-[16px]"
           }`}
         >
           {section.title}
         </h2>
-        <p className="mt-0.5 text-xs text-[var(--app-text-muted)]">
+        <p className="mt-0.5 break-words text-xs text-[var(--app-text-muted)]">
           {section.subtitle}
         </p>
       </div>
       {section.items.length > 1 && section.total > 0 ? (
-        <p className="app-money shrink-0 text-sm font-semibold text-[var(--app-text)]">
+        <p className="app-money shrink-0 whitespace-nowrap text-sm font-semibold text-[var(--app-text)]">
           {formatCurrency(section.total)}
         </p>
       ) : null}

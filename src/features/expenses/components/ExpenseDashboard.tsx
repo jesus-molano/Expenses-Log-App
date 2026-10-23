@@ -1,8 +1,12 @@
 ﻿"use client";
 
+import { useRouter } from "next/navigation";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ActionToast } from "@/components/ui/ActionToast";
-import { formatCurrency } from "@/domain/calendar";
+import { suggestedPaidAmount } from "@/domain/amount-history";
+import { addMonthId, monthRange } from "@/domain/budget-month";
+import { formatCurrency, toDateOnly } from "@/domain/calendar";
+import { seriesAmountPromptFor } from "@/domain/series-lifecycle";
 import type { ExpenseOccurrence } from "@/domain/types";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
 import { ExpenseFormSheet } from "@/features/expenses/components/ExpenseFormSheet";
@@ -10,7 +14,8 @@ import { ExpenseList } from "@/features/expenses/components/ExpenseList";
 import { LastChanceReminderToast } from "@/features/expenses/components/LastChanceReminderToast";
 import { MonthBar } from "@/features/expenses/components/MonthBar";
 import { MonthCloseCard } from "@/features/expenses/components/MonthCloseCard";
-import { PayAmountSheet } from "@/features/expenses/components/PayAmountSheet";
+import { NextMonthPreview } from "@/features/expenses/components/NextMonthPreview";
+import { OccurrenceActionSheet } from "@/features/expenses/components/OccurrenceActionSheet";
 import {
   AddExpenseButton,
   QuickCapture,
@@ -22,12 +27,12 @@ import { useActionToast } from "@/features/expenses/hooks/use-action-toast";
 import { useActiveMonth } from "@/features/expenses/hooks/use-active-month";
 import { useExpenseCaptureFlow } from "@/features/expenses/hooks/use-expense-capture-flow";
 import { useExpenseFilters } from "@/features/expenses/hooks/use-expense-filters";
-import { usePayAmountFlow } from "@/features/expenses/hooks/use-pay-amount-flow";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { useQuickExpenseParser } from "@/features/expenses/hooks/use-quick-expense-parser";
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
 import { useViewTransitionAction } from "@/features/expenses/hooks/use-view-transition-action";
 import { buildLastChanceReminders } from "@/features/expenses/lib/last-chance-reminders";
+import { canMoveOccurrence } from "@/features/expenses/lib/dnd-move-policy";
 import { capitalize, formatMonthName } from "@/features/expenses/lib/month-view";
 import {
   markNewExpenseIntentHandled,
@@ -50,12 +55,15 @@ export function ExpenseDashboard({
     addExpense,
     addExpenses,
     togglePaid,
+    skipOccurrence,
+    restoreOccurrence,
+    payOccurrence,
+    moveOccurrence,
     dismissLastChanceReminder,
     moveOccurrenceOnly,
     moveOccurrenceSeries,
     closeMonth,
     reopenMonth,
-    payOccurrenceWithAmount,
     setSeriesAmount,
     recordSalaryReceipt,
     undoSalaryReceipt,
@@ -68,43 +76,6 @@ export function ExpenseDashboard({
   const monthHeadingRef = useRef<HTMLHeadingElement>(null);
   const showCloseCard =
     month.suggestAdvance && month.viewMonthId === month.activeMonthId;
-  // Recibos variables: tras pagar se puede anotar otro importe.
-  const payFlow = usePayAmountFlow({
-    store,
-    language,
-    payOccurrenceWithAmount,
-    setSeriesAmount,
-    onSeriesUpdated: (prompt) =>
-      actionToast.show({
-        message: t("bills.seriesUpdated", language)
-          .replace("{name}", prompt.name)
-          .replace("{amount}", formatCurrency(prompt.to)),
-      }),
-  });
-  const salaryPrompt = useSalaryPrompt({
-    finance: store.finance,
-    now,
-    language,
-    recordSalaryReceipt,
-    onRecorded: (input) =>
-      actionToast.show({
-        message: capitalize(
-          t("salary.received", language).replace(
-            "{month}",
-            formatMonthName(input.monthId, language),
-          ),
-        ),
-        actionLabel: t("common.undo", language),
-        onAction: () => {
-          undoSalaryReceipt(input.monthId);
-          actionToast.dismiss();
-        },
-      }),
-  });
-  const showSalaryPrompt =
-    salaryPrompt.prompt !== null &&
-    (month.viewMonthId === month.activeMonthId ||
-      month.viewMonthId === month.calendarMonthId);
 
   // La tarjeta, el aviso o el chip que se acaba de usar desaparece: el foco
   // pasa al título del mes para que el teclado y el lector no se pierdan.
@@ -134,7 +105,48 @@ export function ExpenseDashboard({
   });
   const chrome = useScrollChrome();
   const runViewTransition = useViewTransitionAction();
+  const router = useRouter();
   const [recurringOpen, setRecurringOpen] = useState(false);
+  // Cobro tocado en la lista: abre sus acciones.
+  const [selectedOccurrence, setSelectedOccurrence] = useState<ExpenseOccurrence | null>(null);
+  // Recibos variables: al pagar otro importe desde las acciones del cobro se
+  // sugiere la media de los últimos pagos.
+  const paidSuggestion = useMemo(
+    () =>
+      selectedOccurrence
+        ? suggestedPaidAmount(
+            store,
+            selectedOccurrence.template.id,
+            selectedOccurrence.occurrenceDate,
+            language,
+          )
+        : null,
+    [language, selectedOccurrence, store],
+  );
+  const salaryPrompt = useSalaryPrompt({
+    finance: store.finance,
+    now,
+    language,
+    recordSalaryReceipt,
+    onRecorded: (input) =>
+      actionToast.show({
+        message: capitalize(
+          t("salary.received", language).replace(
+            "{month}",
+            formatMonthName(input.monthId, language),
+          ),
+        ),
+        actionLabel: t("common.undo", language),
+        onAction: () => {
+          undoSalaryReceipt(input.monthId);
+          actionToast.dismiss();
+        },
+      }),
+  });
+  const showSalaryPrompt =
+    salaryPrompt.prompt !== null &&
+    (month.viewMonthId === month.activeMonthId ||
+      month.viewMonthId === month.calendarMonthId);
   const [hiddenReminderId, setHiddenReminderId] = useState<string | null>(null);
   const lastChanceReminder = buildLastChanceReminders(store, now).find(
     (reminder) => reminder.occurrence.id !== hiddenReminderId,
@@ -160,29 +172,14 @@ export function ExpenseDashboard({
   }
 
   function togglePaidWithMonthCheck(occurrence: ExpenseOccurrence) {
+    payWithMonthCheck(occurrence, () => togglePaid(occurrence));
+  }
+
+  // Si el pago deja el mes al día, se ofrece pasar al siguiente.
+  function payWithMonthCheck(occurrence: ExpenseOccurrence, pay: () => void) {
     const settles = month.settlesMonth(occurrence);
-    runViewTransition(() => togglePaid(occurrence));
-    const paidMessage = t("bills.paidToast", language).replace(
-      "{name}",
-      occurrence.template.name,
-    );
-    if (occurrence.status === "paid") {
-      // Despagado: el aviso "pagado" de ese cobro ya no vale.
-      if (actionToast.toast?.message === paidMessage) actionToast.dismiss();
-      return;
-    }
-    if (!settles) {
-      // Recibos variables: tras pagar se puede anotar lo que costó de verdad.
-      actionToast.show({
-        message: paidMessage,
-        actionLabel: t("bills.otherAmount", language),
-        onAction: () => {
-          actionToast.dismiss();
-          payFlow.open(occurrence);
-        },
-      });
-      return;
-    }
+    runViewTransition(pay);
+    if (!settles) return;
     actionToast.show({
       message: capitalize(
         t("expenses.monthSettledTitle", language).replace(
@@ -199,6 +196,32 @@ export function ExpenseDashboard({
       onAction: advanceMonth,
     });
   }
+
+  function payOtherAmount(occurrence: ExpenseOccurrence, amount: number) {
+    payWithMonthCheck(occurrence, () => payOccurrence(occurrence, amount));
+  }
+
+  function skipWithUndo(occurrence: ExpenseOccurrence) {
+    runViewTransition(() => skipOccurrence(occurrence));
+    actionToast.show({
+      message: t("expenses.occurrenceSkipped", language).replace(
+        "{name}",
+        occurrence.template.name,
+      ),
+      actionLabel: t("common.undo", language),
+      onAction: () => {
+        runViewTransition(() => restoreOccurrence(occurrence));
+        actionToast.dismiss();
+      },
+    });
+  }
+
+  // No se mueve a un mes ya cerrado.
+  const openMonthId =
+    month.activeMonthId > month.calendarMonthId ? month.activeMonthId : month.calendarMonthId;
+  const openMonthStart = `${openMonthId}-01`;
+  // Hasta el final del mes que se puede ver después del abierto.
+  const lastMoveDate = monthRange(addMonthId(openMonthId, 1)).end;
 
   return (
     <DashboardShell
@@ -274,6 +297,7 @@ export function ExpenseDashboard({
         autoScroll={!showCloseCard}
         language={language}
         onTogglePaid={togglePaidWithMonthCheck}
+        onOpenOccurrence={setSelectedOccurrence}
         onMoveOccurrenceOnly={(occurrence, dueDate, sortOrder) =>
           runViewTransition(() => moveOccurrenceOnly(occurrence, dueDate, sortOrder))
         }
@@ -281,6 +305,17 @@ export function ExpenseDashboard({
           runViewTransition(() => moveOccurrenceSeries(occurrence, dueDate))
         }
       />
+
+      {filters.nextMonthPreview && month.viewMonthId === month.activeMonthId && month.canBrowseForward ? (
+        <NextMonthPreview
+          {...filters.nextMonthPreview}
+          language={language}
+          onShow={() => {
+            month.browse(1);
+            focusMonthHeading();
+          }}
+        />
+      ) : null}
 
       <AddExpenseButton
         language={language}
@@ -331,6 +366,42 @@ export function ExpenseDashboard({
         onSave={capture.saveForm}
       />
 
+      {selectedOccurrence ? (
+        <OccurrenceActionSheet
+          key={selectedOccurrence.id}
+          occurrence={selectedOccurrence}
+          minMoveDate={openMonthStart}
+          maxMoveDate={lastMoveDate}
+          canMove={canMoveOccurrence(selectedOccurrence, openMonthId)}
+          language={language}
+          onClose={() => setSelectedOccurrence(null)}
+          onTogglePaid={togglePaidWithMonthCheck}
+          onPayAmount={payOtherAmount}
+          // Mover desde aquí solo toca este cobro (override), nunca la serie.
+          onMove={(occurrence, dueDate) =>
+            runViewTransition(() => moveOccurrence(occurrence, dueDate))
+          }
+          onSkip={skipWithUndo}
+          suggestion={paidSuggestion}
+          seriesPromptFor={(occurrence, amount) =>
+            seriesAmountPromptFor(store, occurrence.template.id, amount, toDateOnly(now))
+          }
+          onApplySeries={(prompt) => {
+            setSeriesAmount(prompt.templateId, prompt.to);
+            // Sin pisar otro aviso (p. ej. "Octubre al día · Pasar a noviembre").
+            if (actionToast.toast) return;
+            actionToast.show({
+              message: t("bills.seriesUpdated", language)
+                .replace("{name}", prompt.name)
+                .replace("{amount}", formatCurrency(prompt.to)),
+            });
+          }}
+          // replace: la entrada de la hoja en el historial pasa a ser la del
+          // detalle, y Atrás desde el detalle vuelve al listado.
+          onEditSeries={(occurrence) => router.replace(`/expenses/${occurrence.template.id}`)}
+        />
+      ) : null}
+
       <RecurringOverviewSheet
         open={recurringOpen}
         items={filters.recurringOverviewItems}
@@ -338,21 +409,6 @@ export function ExpenseDashboard({
         language={language}
         onClose={() => setRecurringOpen(false)}
       />
-
-      {payFlow.occurrence ? (
-        <PayAmountSheet
-          occurrence={payFlow.occurrence}
-          amountText={payFlow.amountText}
-          suggestion={payFlow.suggestion}
-          seriesPrompt={payFlow.seriesPrompt}
-          language={language}
-          today={filters.today}
-          onAmountTextChange={payFlow.setAmountText}
-          onSubmit={payFlow.save}
-          onApplySeries={payFlow.applySeries}
-          onClose={payFlow.close}
-        />
-      ) : null}
 
       {actionToast.toast ? (
         <ActionToast

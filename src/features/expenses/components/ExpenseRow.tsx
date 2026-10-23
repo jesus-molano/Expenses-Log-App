@@ -19,6 +19,8 @@ type ExpenseRowProps = {
   today: string;
   language?: AppLanguage;
   onTogglePaid: (occurrence: ExpenseOccurrence) => void;
+  // Tocar la fila (sin deslizar ni arrastrar) abre sus acciones.
+  onOpenOccurrence?: (occurrence: ExpenseOccurrence) => void;
   dropPosition?: "before" | "after" | null;
   dragging?: boolean;
 };
@@ -29,6 +31,7 @@ export function ExpenseRow({
   today,
   language = "es",
   onTogglePaid,
+  onOpenOccurrence,
   dropPosition = null,
   dragging = false,
 }: ExpenseRowProps) {
@@ -70,6 +73,23 @@ export function ExpenseRow({
     setDragRef(node);
   }
 
+  function openFromTap(event: React.MouseEvent<HTMLDivElement>) {
+    // Un deslizamiento o un arrastre acaban con un click que no es un toque.
+    // Un click sin puntero (lector de pantalla, teclado) siempre cuenta.
+    const tap = swipe.consumeTap();
+    if (dragActive || (event.detail !== 0 && !tap)) return;
+    onOpenOccurrence?.(occurrence);
+  }
+
+  function openFromKeyboard(event: React.KeyboardEvent<HTMLDivElement>) {
+    listeners?.onKeyDown?.(event);
+    // Espacio arrastra (teclado de dnd-kit); Intro abre las acciones.
+    if (event.key !== "Enter" || event.defaultPrevented || dragActive) return;
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    onOpenOccurrence?.(occurrence);
+  }
+
   function stopButtonPointer(event: React.PointerEvent<HTMLButtonElement>) {
     event.stopPropagation();
   }
@@ -95,6 +115,8 @@ export function ExpenseRow({
       data-timeline-date={occurrence.dueDate}
       data-expense-row="true"
       data-expense-row-id={occurrence.id}
+      onClick={openFromTap}
+      onKeyDown={openFromKeyboard}
       className={`relative overflow-visible rounded-2xl ${
         dragActive ? "z-0" : ""
       } ${
@@ -117,7 +139,7 @@ export function ExpenseRow({
           viewTransitionName: `expense-${occurrence.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`,
         }}
         aria-label={`${occurrence.template.name} ${statusLabelForA11y(paid, language)}`}
-        className={`app-expense-row-card grid min-h-[4.25rem] touch-pan-y select-none grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-[var(--app-radius-md)] border px-3.5 py-3 transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out will-change-transform sm:grid-cols-[minmax(0,1fr)_auto_auto] ${
+        className={`app-expense-row-card grid min-h-[4.25rem] touch-pan-y select-none grid-cols-[minmax(0,1fr)] items-center gap-2 rounded-[var(--app-radius-md)] border px-3.5 py-3 transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out will-change-transform sm:grid-cols-[minmax(0,1fr)_auto] ${
           dragActive
             ? "invisible app-surface-raised border-[var(--app-border-strong)]"
             : swipe.direction

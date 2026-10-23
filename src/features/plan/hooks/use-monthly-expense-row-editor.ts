@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { paidAmountOf } from "@/domain/finance";
+import { paidAmount as paidAmountOf } from "@/domain/finance";
 import type {
   AppLanguage,
   ExpenseCategory,

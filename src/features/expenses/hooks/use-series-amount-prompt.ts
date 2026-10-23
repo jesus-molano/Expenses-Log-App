@@ -2,18 +2,10 @@
 
 import { useState } from "react";
 import { toDateOnly } from "@/domain/calendar";
-import {
-  currentSeriesAmount,
-  seriesHasUpcomingCharges,
-} from "@/domain/series-lifecycle";
+import { type SeriesAmountPrompt, seriesAmountPromptFor } from "@/domain/series-lifecycle";
 import type { ExpenseStore } from "@/domain/types";
 
-export type SeriesAmountPrompt = {
-  templateId: string;
-  name: string;
-  from: number;
-  to: number;
-};
+export type { SeriesAmountPrompt };
 
 type UseSeriesAmountPromptOptions = {
   store: ExpenseStore;
@@ -21,8 +13,6 @@ type UseSeriesAmountPromptOptions = {
 };
 
 // "¿Actualizar el importe desde ahora?" tras pagar un recibo con otro importe.
-// Solo se pregunta si la serie sigue y el importe pagado es distinto del que
-// tendrían los próximos cobros.
 export function useSeriesAmountPrompt({
   store,
   setSeriesAmount,
@@ -30,13 +20,9 @@ export function useSeriesAmountPrompt({
   const [prompt, setPrompt] = useState<SeriesAmountPrompt | null>(null);
 
   function askAfterPayment(templateId: string, paidAmount: number, now = new Date()) {
-    const template = store.templates.find((item) => item.id === templateId);
-    const today = toDateOnly(now);
-    if (!template || !seriesHasUpcomingCharges(template, today)) return false;
-    const from = currentSeriesAmount(template, today, store.finance.monthClosures);
-    if (from === paidAmount) return false;
-    setPrompt({ templateId, name: template.name, from, to: paidAmount });
-    return true;
+    const next = seriesAmountPromptFor(store, templateId, paidAmount, toDateOnly(now));
+    setPrompt(next);
+    return next !== null;
   }
 
   function apply() {
