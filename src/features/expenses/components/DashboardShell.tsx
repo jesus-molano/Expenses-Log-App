@@ -50,14 +50,13 @@ export function DashboardShell({
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                {/* Alto fijo de una línea: el chip sin conexión no empuja la
-                    cifra; si no cabe, se recorta el título (el mes sigue en la
-                    barra de mes). */}
-                <div className="flex h-4 min-w-0 items-center">
-                  <p className="truncate text-xs font-semibold uppercase tracking-wide text-[var(--app-text-subtle)]">
+                {/* El título nunca se recorta: si el chip sin conexión no cabe
+                    a su lado, pasa a la línea siguiente. */}
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <p className="break-words text-xs font-semibold uppercase tracking-wide text-[var(--app-text-subtle)]">
                     {headlineTitle}
                   </p>
-                  <OfflineStatusChip language={language} className="ml-2" />
+                  <OfflineStatusChip language={language} />
                 </div>
                 <p className="app-money mt-1 text-[32px] font-semibold leading-none text-[var(--app-text)]">
                   {headlineLabel}
