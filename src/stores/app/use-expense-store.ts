@@ -27,6 +27,8 @@ import {
   clearExpensesFromStore,
   clearIncomeFromStore,
   closeMonthInStore,
+  createCategoryInStore,
+  deleteCategoryInStore,
   deleteExpenseFromStore,
   deleteIncomeEventFromStore,
   dismissLastChanceReminderInStore,
@@ -36,6 +38,7 @@ import {
   reopenMonthInStore,
   skipOccurrenceInStore,
   togglePaidInStore,
+  updateCategoryInStore,
   updateIncomeEventInStore,
   updateLanguageInStore,
   updateMoneySettingsInStore,
@@ -45,6 +48,7 @@ import {
   updateMonthlySavingsTargetInStore,
   updateThemeInStore,
 } from "./store-commands";
+import type { CategoryInput } from "./category-commands";
 import type {
   IncomeEventInput,
   MoneySettingsInput,
@@ -231,6 +235,22 @@ function useExpenseStoreValue() {
     persist(updateMonthlyExpenseOccurrenceInStore(current(), input));
   }
 
+  // Devuelve el id de la categoría (la existente si ya había una con ese
+  // nombre) o null si el nombre no es válido.
+  function createCategory(input: CategoryInput): string | null {
+    const result = createCategoryInStore(current(), input);
+    if (result.store !== current()) persist(result.store);
+    return result.categoryId;
+  }
+
+  function updateCategory(categoryId: string, changes: Partial<CategoryInput>) {
+    persist(updateCategoryInStore(current(), categoryId, changes));
+  }
+
+  function deleteCategory(categoryId: string, replacementName: string) {
+    persist(deleteCategoryInStore(current(), categoryId, replacementName));
+  }
+
   function closeMonth(monthId: string) {
     persist(closeMonthInStore(current(), monthId));
   }
@@ -271,6 +291,9 @@ function useExpenseStoreValue() {
     deleteIncomeEvent,
     updateIncomeEvent,
     updateMonthlyExpenseOccurrence,
+    createCategory,
+    updateCategory,
+    deleteCategory,
     closeMonth,
     reopenMonth,
     updateTheme,

@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { resolvePresetCategory } from "@/domain/categories";
+import { EXPENSE_DETAIL_KEYS, sanitizeExpenseDetails } from "@/domain/expense-details";
 import type {
   AppLanguage,
   DraftExpense,
@@ -38,12 +38,18 @@ export function useExpenseEditor({
     name: template.name,
     description: template.description,
     amount: template.amount,
-    categoryName: resolvePresetCategory(category?.name ?? "General").name,
+    // El nombre tal cual: una categoría propia no debe volver a General.
+    categoryName: category?.name ?? "General",
     startDate: template.startDate,
     dueDay: template.dueDay,
     endDate: template.endDate,
     recurrence: template.recurrence,
     reminder: template.reminder,
+    notes: template.notes,
+    cancellationUrl: template.cancellationUrl,
+    commitmentEndDate: template.commitmentEndDate,
+    paymentMethod: template.paymentMethod,
+    paymentMethodDetail: template.paymentMethodDetail,
   }));
 
   const previewAmount = parseMoneyInput(amountText) ?? 0;
@@ -67,6 +73,9 @@ export function useExpenseEditor({
         endDate: form.endDate || undefined,
         recurrence: form.recurrence,
         reminder: form.reminder,
+        // Un dato vaciado se borra (undefined) en lugar de conservar el viejo.
+        ...Object.fromEntries(EXPENSE_DETAIL_KEYS.map((key) => [key, undefined])),
+        ...sanitizeExpenseDetails(form),
       }),
     );
     // replace: volver atrás desde el listado no debe reabrir el editor.

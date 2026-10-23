@@ -15,6 +15,7 @@ import {
   loadExpenseStore,
   mergeExpenseStores,
 } from "./local-store";
+import { normalizeExpenseStore } from "./store-normalization";
 
 function template(id: string): ExpenseTemplate {
   return {
@@ -297,6 +298,39 @@ function occurrenceRecord(
     ...overrides,
   };
 }
+
+describe("mergeExpenseStores with categories and contract details", () => {
+  it("keeps the latest rename of a category and the latest edit of a series", () => {
+    const category = { id: "viajes", userId: "demo", icon: "Tag", tone: "rose" as const };
+    const local = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [{ ...category, name: "Viajes", updatedAt: "2026-10-20T00:00:00.000Z" }],
+    });
+    const cloud = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [{ ...category, name: "Vacaciones", updatedAt: "2026-10-22T00:00:00.000Z" }],
+    });
+
+    expect(mergeExpenseStores(local, cloud).categories).toEqual([
+      expect.objectContaining({ name: "Vacaciones" }),
+    ]);
+    expect(mergeExpenseStores(cloud, local).categories).toEqual([
+      expect.objectContaining({ name: "Vacaciones" }),
+    ]);
+  });
+
+  it("does not bring back a category deleted on another device", () => {
+    const category = { id: "viajes", userId: "demo", name: "Viajes", icon: "Tag", tone: "rose" as const };
+    const local = normalizeExpenseStore({ ...emptyStore, categories: [category] });
+    const cloud = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [],
+      deleted: { ...emptyStore.deleted, categories: ["viajes"] },
+    });
+
+    expect(mergeExpenseStores(local, cloud).categories).toEqual([]);
+  });
+});
 
 describe("loadExpenseStore", () => {
   it("keeps a copy of an unreadable store before falling back to empty", () => {

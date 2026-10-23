@@ -2,6 +2,13 @@ import {
   materializeClosedOccurrenceRecords,
   toMonthId,
 } from "@/domain/finance";
+import {
+  CATEGORY_NAME_MAX_LENGTH,
+  CUSTOM_CATEGORY_ICON,
+  findPresetCategory,
+  isCategoryTone,
+} from "@/domain/categories";
+import { EXPENSE_DETAIL_KEYS, sanitizeExpenseDetails } from "@/domain/expense-details";
 import { dedupeOverrides } from "@/domain/overrides";
 import {
   buildDateWithDay,
@@ -9,6 +16,7 @@ import {
   toDateOnly,
 } from "@/domain/calendar";
 import type {
+  ExpenseCategory,
   ExpenseOccurrenceOverride,
   ExpenseStore,
   ExpenseTemplate,
@@ -309,7 +317,7 @@ export function normalizeExpenseStore(
     ...(keepUnknownKeys ? unknownEntries(store, STORE_KEYS) : {}),
     schemaVersion: 3,
     categories: Array.isArray(store.categories)
-      ? (store.categories as ExpenseStore["categories"])
+      ? normalizeCategories(store.categories)
       : [],
     templates: Array.isArray(store.templates)
       ? normalizeTemplates(store.templates, today)
@@ -361,16 +369,59 @@ function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
     const dueDay = Number.isInteger(Number(template.dueDay))
       ? Math.min(Math.max(Number(template.dueDay), 1), 31)
       : Number(startDate.slice(8, 10));
+    // Notas, enlace de baja, permanencia y método de pago: lo ilegible se
+    // descarta sin tocar el resto del gasto.
+    const details = sanitizeExpenseDetails(template);
+    const detailsChanged = EXPENSE_DETAIL_KEYS.some((key) => details[key] !== template[key]);
 
     if (
       startDate === template.startDate &&
       endDate === template.endDate &&
-      dueDay === template.dueDay
+      dueDay === template.dueDay &&
+      !detailsChanged
     ) {
       return template;
     }
 
-    return { ...template, startDate, endDate, dueDay };
+    const next: ExpenseTemplate = { ...template, startDate, endDate, dueDay };
+    for (const key of EXPENSE_DETAIL_KEYS) delete next[key];
+    return { ...next, ...details };
+  });
+}
+
+// Una categoría sin id no se puede referenciar: se descarta. Sin nombre pasa
+// a General, y un color o icono desconocido vuelve al de su preset o al
+// neutro.
+function normalizeCategories(value: unknown[]): ExpenseCategory[] {
+  return value.filter(isRecord).flatMap((raw) => {
+    const category = raw as ExpenseCategory;
+    if (typeof category.id !== "string" || !category.id) return [];
+
+    const rawName = typeof category.name === "string" ? category.name.trim() : "";
+    const name = (rawName || "General").slice(0, CATEGORY_NAME_MAX_LENGTH);
+    const preset = findPresetCategory(name);
+    const tone = isCategoryTone(category.tone) ? category.tone : preset?.tone ?? "slate";
+    const icon =
+      typeof category.icon === "string" && category.icon
+        ? category.icon
+        : preset?.icon ?? CUSTOM_CATEGORY_ICON;
+    const userId = typeof category.userId === "string" ? category.userId : "demo";
+    const updatedAt = isTimestamp(category.updatedAt) ? category.updatedAt : undefined;
+
+    if (
+      name === category.name &&
+      tone === category.tone &&
+      icon === category.icon &&
+      userId === category.userId &&
+      updatedAt === category.updatedAt
+    ) {
+      return [category];
+    }
+
+    const next: ExpenseCategory = { ...category, name, tone, icon, userId };
+    if (updatedAt) next.updatedAt = updatedAt;
+    else delete next.updatedAt;
+    return [next];
   });
 }
 

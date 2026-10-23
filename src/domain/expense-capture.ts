@@ -1,11 +1,14 @@
 import { buildDateWithDay, normalizeDateOnly, toDateOnly } from "./calendar";
 import { PRESET_EXPENSE_CATEGORIES } from "./categories";
+import { foldText, hasWord } from "./text";
 import type {
   CustomRecurrenceUnit,
   DraftExpense,
   RecurrenceFrequency,
   RecurrenceRule,
 } from "./types";
+
+export { foldText };
 
 // Lo que se acepta analizar de una vez (el campo de texto lo limita igual).
 export const CAPTURE_TEXT_MAX_LENGTH = 2000;
@@ -70,18 +73,6 @@ const CATEGORY_HINTS: Array<[string, string[]]> = [
   ["Deudas", ["prestamo", "tarjeta", "financiacion", "cuota"]],
 ];
 
-// Sin tildes ni mayúsculas, para comparar lo que dice el usuario o la IA.
-export function foldText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .trim();
-}
-
-function hasWord(text: string, phrase: string) {
-  return new RegExp(`(^|[^\\p{L}\\p{N}])${phrase}($|[^\\p{L}\\p{N}])`, "u").test(text);
-}
 
 export function detectCategoryFromText(text: string) {
   const folded = foldText(text);

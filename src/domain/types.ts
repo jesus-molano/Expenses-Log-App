@@ -24,6 +24,30 @@ export type ExpenseCategory = {
   name: string;
   icon: string;
   tone: CategoryTone;
+  // Último cambio (crear, renombrar o cambiar el color), para fusionar.
+  updatedAt?: string;
+};
+
+// Cómo se paga un gasto. `paymentMethodDetail` concreta cuál ("Visa ···4321").
+export type PaymentMethod =
+  | "card"
+  | "direct_debit"
+  | "transfer"
+  | "cash"
+  | "bizum"
+  | "paypal"
+  | "other";
+
+// Datos de contrato opcionales de un gasto. Todos se normalizan en
+// `sanitizeExpenseDetails` (domain/expense-details.ts).
+export type ExpenseDetails = {
+  notes?: string;
+  // Solo http(s): se abre como enlace externo.
+  cancellationUrl?: string;
+  // Fin de la permanencia (YYYY-MM-DD): hasta entonces darse de baja penaliza.
+  commitmentEndDate?: string;
+  paymentMethod?: PaymentMethod;
+  paymentMethodDetail?: string;
 };
 
 export type RecurrenceRule = {
@@ -50,7 +74,7 @@ export type ExpenseTemplate = {
   active: boolean;
   createdAt: string;
   updatedAt: string;
-};
+} & ExpenseDetails;
 
 export type ExpenseReminderSettings = {
   enabled: boolean;
@@ -102,7 +126,7 @@ export type DraftExpense = {
   endDate?: string;
   recurrence: RecurrenceRule;
   reminder?: ExpenseReminderSettings;
-};
+} & ExpenseDetails;
 
 export type CreateExpenseOptions = {
   initialStatus?: Extract<OccurrenceStatus, "due" | "paid">;
