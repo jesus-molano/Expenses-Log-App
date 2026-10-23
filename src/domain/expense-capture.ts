@@ -1,4 +1,5 @@
 import { buildDateWithDay, normalizeDateOnly, toDateOnly } from "./calendar";
+import type { CaptureIntent } from "./capture-commands";
 import { PRESET_EXPENSE_CATEGORIES } from "./categories";
 import { foldText, hasWord } from "./text";
 import type {
@@ -28,6 +29,8 @@ export type CapturedExpenseItem = {
   description?: string | null;
   // El parser local eligió el importe entre varios números: hay que revisarlo.
   amountGuessed?: boolean;
+  // Alta (por defecto) u orden sobre un gasto existente.
+  intent?: CaptureIntent | null;
 };
 
 export type CaptureField = "amount" | "dueDay" | "startDate" | "categoryName" | "frequency";

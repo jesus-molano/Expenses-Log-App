@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import type { CaptureCommand } from "@/domain/capture-commands";
 import type { CapturedDraft } from "@/domain/expense-capture";
 import type {
   AppLanguage,
@@ -18,6 +19,13 @@ type Review = Pick<CapturedDraft, "missingFields" | "inferredFields">;
 // cambia al guardar uno desde el formulario.
 export type ReviewItem = CapturedDraft & { id: string };
 type InitialStatus = NonNullable<CreateExpenseOptions["initialStatus"]>;
+// Órdenes de una captura pendientes de confirmar, y las altas que venían
+// con ellas (se revisan después).
+export type CommandReview = {
+  id: number;
+  commands: CaptureCommand[];
+  drafts: CapturedDraft[];
+};
 
 // Flujo de añadir gastos: captura por texto (IA o local), formulario de uno
 // y revisión de varios. El dashboard solo compone.
@@ -49,6 +57,7 @@ export function useExpenseCaptureFlow({
   const [editingId, setEditingId] = useState<string | null>(null);
   // Por qué se usó el análisis local, para avisarlo donde se abra el borrador.
   const [notice, setNotice] = useState<CaptureReason | null>(null);
+  const [commandReview, setCommandReview] = useState<CommandReview | null>(null);
   // Cada apertura del formulario empieza de cero aunque el borrador coincida.
   const [formKey, setFormKey] = useState(0);
   // Una respuesta que llega después de cancelar o de pasar a manual se ignora.
@@ -105,22 +114,48 @@ export function useExpenseCaptureFlow({
     dictation.start();
   }
 
+  function showDrafts(drafts: CapturedDraft[]) {
+    if (drafts.length === 1) {
+      openForm(drafts[0].draft, drafts[0]);
+    } else if (drafts.length > 1) {
+      clearReview();
+      setReviewItems(
+        drafts.map((item) => ({ ...item, id: `capture-${(nextIdRef.current += 1)}` })),
+      );
+    }
+  }
+
   async function analyze(textOverride?: string) {
     const request = ++requestRef.current;
     const result = await parser.parse(textOverride);
     if (request !== requestRef.current) return;
-    if (!result || result.drafts.length === 0) return;
+    if (!result || result.drafts.length + result.commands.length === 0) return;
 
     setCaptureOpen(false);
     setNotice(result.provider === "local" ? result.reason : null);
-    if (result.drafts.length === 1) {
-      openForm(result.drafts[0].draft, result.drafts[0]);
-    } else {
-      clearReview();
-      setReviewItems(
-        result.drafts.map((item) => ({ ...item, id: `capture-${(nextIdRef.current += 1)}` })),
-      );
+    // Las órdenes se confirman primero; las altas, después.
+    if (result.commands.length) {
+      setCommandReview({
+        id: (nextIdRef.current += 1),
+        commands: result.commands,
+        drafts: result.drafts,
+      });
+      return;
     }
+    showDrafts(result.drafts);
+  }
+
+  // Tras aplicar o descartar las órdenes, siguen las altas de la misma
+  // captura, si las había.
+  function finishCommands() {
+    const drafts = commandReview?.drafts ?? [];
+    setCommandReview(null);
+    if (drafts.length) {
+      showDrafts(drafts);
+      return;
+    }
+    setNotice(null);
+    parser.reset();
   }
 
   function saveForm(nextDraft: DraftExpense, options?: CreateExpenseOptions) {
@@ -162,7 +197,9 @@ export function useExpenseCaptureFlow({
     reviewItems: formOpen ? null : reviewItems,
     excludedIds,
     reviewStatus,
-    isIdle: !captureOpen && !formOpen && !reviewItems,
+    commandReview,
+    finishCommands,
+    isIdle: !captureOpen && !formOpen && !reviewItems && !commandReview,
     dictation: { ...dictation, toggle: toggleDictation },
     openCapture: () => {
       dictation.reset();

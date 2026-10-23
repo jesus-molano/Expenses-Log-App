@@ -157,6 +157,27 @@ export function clearExpensesFromStore(store: ExpenseStore): ExpenseStore {
   };
 }
 
+// Marca un cobro como pagado (siempre pagado, no alterna), con lo pagado de
+// verdad si se indica. Si ya estaba pagado conserva la fecha del pago y solo
+// corrige el importe.
+export function payOccurrenceInStore(
+  store: ExpenseStore,
+  occurrence: ExpenseOccurrence,
+  amountPaid: number = occurrence.template.amount,
+): ExpenseStore {
+  const now = new Date().toISOString();
+  return upsertOccurrenceOverride(
+    store,
+    keyOf(occurrence),
+    {
+      status: "paid",
+      paidAt: occurrence.status === "paid" ? occurrence.override?.paidAt ?? now : now,
+      amountPaid,
+    },
+    { now },
+  );
+}
+
 export function togglePaidInStore(
   store: ExpenseStore,
   occurrence: ExpenseOccurrence,

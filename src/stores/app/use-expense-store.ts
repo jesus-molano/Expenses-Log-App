@@ -23,6 +23,7 @@ import { applyAppTheme } from "@/shared/theme";
 import {
   addExpenseToStore,
   addExpensesToStore,
+  applyCaptureCommandsInStore,
   addIncomeEventToStore,
   clearExpensesFromStore,
   clearIncomeFromStore,
@@ -36,6 +37,7 @@ import {
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
   reopenMonthInStore,
+  revertCaptureCommandsInStore,
   skipOccurrenceInStore,
   togglePaidInStore,
   updateCategoryInStore,
@@ -48,6 +50,10 @@ import {
   updateMonthlySavingsTargetInStore,
   updateThemeInStore,
 } from "./store-commands";
+import type {
+  CaptureCommandChange,
+  ConfirmedCaptureCommand,
+} from "./capture-command-actions";
 import type { CategoryInput } from "./category-commands";
 import type {
   IncomeEventInput,
@@ -251,6 +257,18 @@ function useExpenseStoreValue() {
     persist(deleteCategoryInStore(current(), categoryId, replacementName));
   }
 
+  // Órdenes de la captura ya confirmadas. Devuelve lo necesario para
+  // deshacerlas.
+  function applyCaptureCommands(commands: ConfirmedCaptureCommand[]): CaptureCommandChange[] {
+    const result = applyCaptureCommandsInStore(current(), commands);
+    if (result.changes.length) persist(result.store);
+    return result.changes;
+  }
+
+  function revertCaptureCommands(changes: CaptureCommandChange[]) {
+    if (changes.length) persist(revertCaptureCommandsInStore(current(), changes));
+  }
+
   function closeMonth(monthId: string) {
     persist(closeMonthInStore(current(), monthId));
   }
@@ -294,6 +312,8 @@ function useExpenseStoreValue() {
     createCategory,
     updateCategory,
     deleteCategory,
+    applyCaptureCommands,
+    revertCaptureCommands,
     closeMonth,
     reopenMonth,
     updateTheme,

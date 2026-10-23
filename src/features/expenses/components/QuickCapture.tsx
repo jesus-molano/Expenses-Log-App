@@ -199,7 +199,7 @@ export function QuickCapture({
             {dictationMessage}
           </p>
           <p id="quick-expense-hint" className="text-xs text-[var(--app-text-muted)]">
-            {t("expenses.captureHint", language)}
+            {t("expenses.captureHint", language)} {t("captureCommands.hint", language)}
           </p>
 
           <div
@@ -207,7 +207,7 @@ export function QuickCapture({
             role="group"
             aria-label={t("expenses.captureExamples", language)}
           >
-            {EXAMPLES[language].map((example) => (
+            {[...EXAMPLES[language], t("captureCommands.example", language)].map((example) => (
               <button
                 key={example}
                 type="button"

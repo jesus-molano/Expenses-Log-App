@@ -3,6 +3,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ActionToast } from "@/components/ui/ActionToast";
 import type { ExpenseOccurrence } from "@/domain/types";
+import { CaptureCommandReview } from "@/features/expenses/components/CaptureCommandReview";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
 import { ExpenseFormSheet } from "@/features/expenses/components/ExpenseFormSheet";
 import { ExpenseList } from "@/features/expenses/components/ExpenseList";
@@ -58,6 +59,8 @@ export function ExpenseDashboard({
     reopenMonth,
     createCategory,
     updateMoneySettings,
+    applyCaptureCommands,
+    revertCaptureCommands,
     syncStatus,
   } = useExpenseStore();
   const language = store.preferences?.language ?? "es";
@@ -78,7 +81,16 @@ export function ExpenseDashboard({
     () => store.categories.map((category) => category.name),
     [store.categories],
   );
-  const quickParser = useQuickExpenseParser({ language, categories: categoryNames });
+  // Para que la IA entienda órdenes sobre los gastos existentes.
+  const expenseNames = useMemo(
+    () => store.templates.filter((template) => template.active).map((template) => template.name),
+    [store.templates],
+  );
+  const quickParser = useQuickExpenseParser({
+    language,
+    categories: categoryNames,
+    expenseNames,
+  });
   // `?mode=voice` (atajo "Añadir por voz") se lee en el cliente para que la
   // página siga siendo estática y precacheada.
   const [newExpenseIntent] = useState(() => readNewExpenseIntent(initialNewExpense));
@@ -164,6 +176,23 @@ export function ExpenseDashboard({
         ),
       ),
       onAction: advanceMonth,
+    });
+  }
+
+  function applyCommands(confirmed: Parameters<typeof applyCaptureCommands>[0]) {
+    const changes = applyCaptureCommands(confirmed);
+    capture.finishCommands();
+    if (!changes.length) return;
+    actionToast.show({
+      message:
+        changes.length === 1
+          ? t("captureCommands.appliedOne", language)
+          : t("captureCommands.applied", language).replace("{count}", String(changes.length)),
+      actionLabel: t("common.undo", language),
+      onAction: () => {
+        revertCaptureCommands(changes);
+        actionToast.dismiss();
+      },
     });
   }
 
@@ -273,6 +302,21 @@ export function ExpenseDashboard({
         onCancel={capture.cancelAnalysis}
         onManualAdd={capture.openManualForm}
       />
+
+      {capture.commandReview ? (
+        <CaptureCommandReview
+          key={capture.commandReview.id}
+          commands={capture.commandReview.commands}
+          pendingDrafts={capture.commandReview.drafts.length}
+          store={store}
+          today={filters.today}
+          monthId={month.viewMonthId}
+          notice={capture.notice}
+          language={language}
+          onApply={applyCommands}
+          onClose={capture.finishCommands}
+        />
+      ) : null}
 
       {capture.reviewItems ? (
         <QuickCaptureReview
