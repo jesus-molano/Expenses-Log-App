@@ -1,5 +1,6 @@
 import { addDays, parseISO } from "date-fns";
-import { addMonthId, resolveActiveMonth } from "@/domain/budget-month";
+import { periodStart } from "@/domain/budget-cycle";
+import { activeBudgetMonth, addMonthId } from "@/domain/budget-month";
 import { isValidDateOnly, toDateOnly } from "@/domain/calendar";
 import {
   resumePausesOn,
@@ -27,7 +28,8 @@ import { upsertOccurrenceOverride } from "./occurrence-overrides";
 // Cambia el importe de la serie desde el mes activo (o el siguiente) sin
 // reescribir lo pasado ni lo pagado (`keepAmountBeforeSeriesChange`). Los
 // cambios de precio que empezaban antes dejan de aplicar desde ahí; los
-// programados para más adelante se mantienen.
+// programados para más adelante se mantienen. Los meses siguen el ciclo del
+// presupuesto: con el anclado al cobro, el mes empieza el día de cobro.
 export function setSeriesAmountInStore(
   store: ExpenseStore,
   templateId: string,
@@ -40,11 +42,11 @@ export function setSeriesAmountInStore(
   const template = findTemplate(store, templateId);
   if (!template || !Number.isFinite(amount) || amount <= 0) return store;
 
-  const activeMonthId = resolveActiveMonth(
-    toDateOnly(today),
-    store.finance?.monthClosures,
-  );
-  const from = `${scope === "next" ? addMonthId(activeMonthId, 1) : activeMonthId}-01`;
+  const active = activeBudgetMonth(store.finance, toDateOnly(today));
+  const from =
+    scope === "next"
+      ? periodStart(addMonthId(active.monthId, 1), active.cycle)
+      : active.start;
   const kept = keepAmountBeforeSeriesChange(store, templateId, amount, {
     scope,
     today,

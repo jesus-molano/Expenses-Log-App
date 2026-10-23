@@ -1,5 +1,5 @@
 import { addDays, addMonths, addYears, endOfMonth, parseISO, subYears } from "date-fns";
-import { resolveActiveMonth } from "./budget-month";
+import { activeBudgetMonth } from "./budget-month";
 import { toDateOnly } from "./calendar";
 import { generateStoreOccurrences } from "./finance";
 import {
@@ -20,14 +20,15 @@ const PREPAID_HORIZON_MONTHS = 13;
 const CHOICE_HORIZON_YEARS = 3;
 
 // Importe de la serie para lo que empieza ahora: el vigente hoy o, si el mes
-// activo ya es el siguiente, el de su día 1. Es el que cambia "Desde este mes".
+// activo ya es el siguiente, el del día en que empieza. Es el que cambia
+// "Desde este mes". El mes activo sigue el ciclo del presupuesto.
 export function currentSeriesAmount(
   template: ExpenseTemplate,
   today: string,
-  closures?: FinanceStore["monthClosures"],
+  finance: FinanceStore,
 ): number {
-  const activeStart = `${resolveActiveMonth(today, closures)}-01`;
-  return templateAmountOn(template, activeStart > today ? activeStart : today);
+  const { start } = activeBudgetMonth(finance, today);
+  return templateAmountOn(template, start > today ? start : today);
 }
 
 // Si tiene sentido proponer un importe nuevo para los próximos cobros: la serie
@@ -57,7 +58,7 @@ export function seriesAmountPromptFor(
 ): SeriesAmountPrompt | null {
   const template = store.templates.find((item) => item.id === templateId);
   if (!template || !seriesHasUpcomingCharges(template, today)) return null;
-  const from = currentSeriesAmount(template, today, store.finance.monthClosures);
+  const from = currentSeriesAmount(template, today, store.finance);
   return from === paidAmount ? null : { templateId, name: template.name, from, to: paidAmount };
 }
 

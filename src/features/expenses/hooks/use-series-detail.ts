@@ -37,7 +37,7 @@ export function useSeriesDetail({
   const { store } = expenseStore;
   const today = toDateOnly(now);
   const lifecycle = seriesLifecycle(template, today);
-  const currentAmount = currentSeriesAmount(template, today, store.finance.monthClosures);
+  const currentAmount = currentSeriesAmount(template, today, store.finance);
   const scheduledChanges = (template.amountChanges ?? []).filter(
     (change) => change.from > today,
   );

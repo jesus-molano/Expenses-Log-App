@@ -41,11 +41,7 @@ export function useExpenseEditor({
 }: UseExpenseEditorOptions) {
   const { store, persist, deleteExpense } = expenseStore;
   // El importe que se edita es el que rige ahora (con sus cambios de precio).
-  const currentAmount = currentSeriesAmount(
-    template,
-    toDateOnly(now),
-    store.finance.monthClosures,
-  );
+  const currentAmount = currentSeriesAmount(template, toDateOnly(now), store.finance);
   // Valores al abrir: los cambios sin guardar se miden contra ellos.
   const [initialValues, setInitialValues] = useState(() =>
     expenseEditorValues(

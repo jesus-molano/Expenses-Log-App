@@ -68,6 +68,14 @@ export function resolveActiveMonth(
     : calendarMonthId;
 }
 
+// Mes activo con el ciclo de Ajustes, el mismo que ven Gastos y Plan: su id,
+// el día en que empieza y el ciclo con el que se reparten los demás meses.
+export function activeBudgetMonth(finance: FinanceStore, today: string) {
+  const cycle = resolveBudgetCycle(finance);
+  const monthId = resolveActiveMonth(today, finance.monthClosures, cycle);
+  return { monthId, start: periodStart(monthId, cycle), cycle };
+}
+
 export type MonthCloseStatus = {
   monthId: string;
   paidCount: number;

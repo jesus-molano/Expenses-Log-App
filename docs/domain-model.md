@@ -173,8 +173,9 @@ la mayor parte de sus dias:
   de cobro.
 
 El mes activo, los cierres (tambien el cierre con restos), el "Por pagar",
-"Hasta el cobro", la timeline, el plan del mes, el anual y la revision usan
-esos dias. El sueldo, el ahorro y los cierres siguen
+"Hasta el cobro", la timeline, el plan del mes, el anual, la revision y el
+cambio de importe de una serie "desde este mes" o "desde el mes que viene"
+(`activeBudgetMonth`) usan esos dias. El sueldo, el ahorro y los cierres siguen
 indexados por el id del mes; con el ciclo anclado al cobro, la nomina que abre
 un mes es el sueldo de ese mes (la del 28 de octubre es la de "noviembre"), y
 "¿Has cobrado?" la guarda en ese mes. El historial que se congela en

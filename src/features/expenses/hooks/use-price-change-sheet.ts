@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { addMonthId, resolveActiveMonth } from "@/domain/budget-month";
+import { activeBudgetMonth, addMonthId } from "@/domain/budget-month";
 import { toDateOnly } from "@/domain/calendar";
 import type {
   AppLanguage,
@@ -36,7 +36,8 @@ export function usePriceChangeSheet({
   const [open, setOpen] = useState(false);
   const [monthId, setMonthId] = useState("");
   const [amountText, setAmountText] = useState("");
-  const activeMonthId = resolveActiveMonth(toDateOnly(now), finance.monthClosures);
+  // El mes activo, con el ciclo del presupuesto (el mismo que en Gastos).
+  const activeMonthId = activeBudgetMonth(finance, toDateOnly(now)).monthId;
   const monthChoices = Array.from({ length: PRICE_CHANGE_MONTHS }, (_, index) =>
     addMonthId(activeMonthId, index + 1),
   );

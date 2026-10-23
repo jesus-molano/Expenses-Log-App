@@ -139,7 +139,7 @@ export function getSalaryReceipt(
 
 // Sueldo del mes: lo cobrado de verdad en cuanto se confirma en "¿Has
 // cobrado?" y, hasta entonces, lo previsto (el fijo más la paga extra si
-// toca). Es el que leen Plan, el resumen del mes y las previsiones.
+// toca). Es el que leen Plan, el resumen del mes y el coste por categoría.
 export function getMonthSalary(
   finance: FinanceStore,
   monthDate: Date | string,

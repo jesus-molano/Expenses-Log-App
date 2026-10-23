@@ -1,5 +1,6 @@
-import { endOfMonth, startOfMonth } from "date-fns";
-import { addMonthId, resolveActiveMonth } from "@/domain/budget-month";
+import { startOfMonth } from "date-fns";
+import { periodIdOf, periodRange } from "@/domain/budget-cycle";
+import { activeBudgetMonth, addMonthId } from "@/domain/budget-month";
 import { normalizeDateOnly, toDateOnly } from "@/domain/calendar";
 import { generateStoreOccurrences } from "@/domain/finance";
 import { occurrenceKeyOf, overrideIdFor } from "@/domain/overrides";
@@ -404,9 +405,10 @@ export function keepAmountBeforeSeriesChange(
   if (!template) return store;
 
   const todayId = toDateOnly(today);
-  const activeMonthId = resolveActiveMonth(todayId, store.finance?.monthClosures);
+  // El mes activo y los demás, con el ciclo del presupuesto (como en Gastos).
+  const { monthId: activeMonthId, cycle } = activeBudgetMonth(store.finance, todayId);
   const from = `${todayId.slice(0, 7)}-01`;
-  const to = toDateOnly(endOfMonth(new Date(`${addMonthId(activeMonthId, 1)}-01T00:00:00`)));
+  const to = periodRange(addMonthId(activeMonthId, 1), cycle).end;
   const now = today.toISOString();
 
   return generateStoreOccurrences(store, from, to)
@@ -418,7 +420,7 @@ export function keepAmountBeforeSeriesChange(
         occurrence.template.amount !== nextAmount,
     )
     .filter((occurrence) => {
-      const monthId = occurrence.dueDate.slice(0, 7);
+      const monthId = periodIdOf(occurrence.dueDate, cycle);
       return (
         occurrence.status === "paid" ||
         monthId < activeMonthId ||

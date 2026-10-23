@@ -158,4 +158,30 @@ describe("series amount prompt", () => {
     expect(seriesAmountPromptFor(priced, "ended", 50, "2026-10-23")).toBeNull();
     expect(seriesAmountPromptFor(priced, "missing", 50, "2026-10-23")).toBeNull();
   });
+
+  it("measures the active month with the payday-anchored budget cycle", () => {
+    // Cobro el 28 y octubre cerrado: "noviembre" empezó el 28 de octubre, así
+    // que hoy rige el precio de hoy y no el que empieza el 1 de noviembre.
+    const anchored: ExpenseStore = {
+      ...emptyStore,
+      templates: [{ ...gym, amountChanges: [{ from: "2026-11-01", amount: 39.9 }] }],
+      finance: {
+        ...emptyStore.finance,
+        monthlySalary: { "2026-09": { amount: 2000, dayOfMonth: 28 } },
+        budgetCycle: { anchor: "payday", updatedAt: "2026-10-01T00:00:00.000Z" },
+        monthClosures: {
+          "2026-10": {
+            closedAt: "2026-10-27T10:00:00.000Z",
+            updatedAt: "2026-10-27T10:00:00.000Z",
+          },
+        },
+      },
+    };
+
+    expect(seriesAmountPromptFor(anchored, "gym", 35, "2026-10-29")).toBeNull();
+    expect(seriesAmountPromptFor(anchored, "gym", 39.9, "2026-10-29")).toMatchObject({
+      from: 35,
+      to: 39.9,
+    });
+  });
 });

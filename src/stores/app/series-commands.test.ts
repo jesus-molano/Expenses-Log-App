@@ -160,6 +160,39 @@ describe("series commands", () => {
       expect(summary(next)).toMatchObject({ "2026-10": 60, "2026-11": 70 });
     });
 
+    it("follows the payday-anchored budget month the app shows", () => {
+      // Cobro el 28 y octubre cerrado: "noviembre" va del 28 de octubre al 27
+      // de noviembre, así que el cobro del 29 de octubre ya es de noviembre.
+      vi.setSystemTime(new Date("2026-10-29T10:00:00"));
+      store = {
+        ...store,
+        templates: [{ ...luz, startDate: "2026-06-29", dueDay: 29 }],
+        finance: {
+          ...store.finance,
+          monthlySalary: { "2026-09": { amount: 2000, dayOfMonth: 28 } },
+          budgetCycle: { anchor: "payday", updatedAt: "2026-10-01T00:00:00.000Z" },
+        },
+      };
+      store = commit(store, closeMonthInStore(store, "2026-10", new Date("2026-10-27T10:00:00")));
+
+      const fromNow = commit(store, setSeriesAmountInStore(store, "luz", 70));
+      const fromNext = commit(store, setSeriesAmountInStore(store, "luz", 70, { scope: "next" }));
+
+      expect(summary(fromNow, "2026-09-01", "2026-12-31")).toEqual({
+        "2026-09": 60,
+        "2026-10": 70,
+        "2026-11": 70,
+        "2026-12": 70,
+      });
+      // "Desde el mes que viene": diciembre empieza el 28 de noviembre.
+      expect(summary(fromNext, "2026-09-01", "2026-12-31")).toEqual({
+        "2026-09": 60,
+        "2026-10": 60,
+        "2026-11": 70,
+        "2026-12": 70,
+      });
+    });
+
     it("pins a paid charge priced by a scheduled change at that price", () => {
       store = {
         ...store,
