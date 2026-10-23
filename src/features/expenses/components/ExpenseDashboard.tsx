@@ -19,6 +19,7 @@ import { useQuickExpenseParser } from "@/features/expenses/hooks/use-quick-expen
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
 import { useViewTransitionAction } from "@/features/expenses/hooks/use-view-transition-action";
 import { buildLastChanceReminders } from "@/features/expenses/lib/last-chance-reminders";
+import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
 
 type DashboardProps = {
@@ -37,7 +38,8 @@ export function ExpenseDashboard({
     moveOccurrenceSeries,
   } = useExpenseStore();
   const language = store.preferences?.language ?? "es";
-  const filters = useExpenseFilters(store, language);
+  const now = useCurrentDate();
+  const filters = useExpenseFilters(store, language, now);
   const quickParser = useQuickExpenseParser(language);
   const chrome = useScrollChrome();
   const runViewTransition = useViewTransitionAction();
@@ -46,7 +48,7 @@ export function ExpenseDashboard({
   const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [recurringOpen, setRecurringOpen] = useState(false);
   const [hiddenReminderId, setHiddenReminderId] = useState<string | null>(null);
-  const lastChanceReminder = buildLastChanceReminders(store).find(
+  const lastChanceReminder = buildLastChanceReminders(store, now).find(
     (reminder) => reminder.occurrence.id !== hiddenReminderId,
   );
 

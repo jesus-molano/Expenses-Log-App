@@ -58,8 +58,10 @@ const ExpenseStoreContext = createContext<ExpenseStoreContextValue | null>(null)
 
 export function ExpenseStoreProvider({
   children,
+  fallback = null,
 }: {
   children: React.ReactNode;
+  fallback?: React.ReactNode;
 }) {
   const value = useExpenseStoreValue();
 
@@ -72,7 +74,7 @@ export function ExpenseStoreProvider({
           { className: "app-hydrated-content", "data-state": "ready" },
           children,
         )
-      : null,
+      : fallback,
   );
 }
 

@@ -38,6 +38,20 @@ function sectionMeta(
     };
   }
 
+  const dueMonthId = occurrence.dueDate.slice(0, 7);
+  if (visualState === "overdue" && dueMonthId < today.slice(0, 7)) {
+    return {
+      id: `carry-over-${dueMonthId}`,
+      title: t("expenses.carryOverTitle", language).replace(
+        "{month}",
+        format(parseISO(`${dueMonthId}-01`), "LLLL", { locale }),
+      ),
+      subtitle: t("expenses.carryOverSubtitle", language),
+      tone: visualState,
+      priority: 1,
+    };
+  }
+
   if (visualState === "overdue") {
     return {
       id: "overdue",

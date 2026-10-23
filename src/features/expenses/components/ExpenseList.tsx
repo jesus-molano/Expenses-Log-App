@@ -40,6 +40,7 @@ export function ExpenseList({
   const { focusIndex, focusRef } = useTimelineInitialFocus(sections, today);
   const dnd = useExpenseDnd({
     sections,
+    currentMonth,
     onMoveOccurrenceOnly,
     onMoveOccurrenceSeries,
   });

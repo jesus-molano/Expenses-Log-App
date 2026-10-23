@@ -3,7 +3,7 @@ import { enUS, es } from "date-fns/locale";
 import { toDateOnly } from "@/domain/calendar";
 import {
   buildMonthlyMoneyPlan,
-  generateStoreOccurrences,
+  occurrencesDueBetween,
   toMonthId,
 } from "@/domain/finance";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
@@ -14,7 +14,7 @@ export function occurrencesForMonth(
   monthDate: Date,
   language: AppLanguage,
 ) {
-  return generateStoreOccurrences(
+  return occurrencesDueBetween(
     store,
     toDateOnly(startOfMonth(monthDate)),
     toDateOnly(endOfMonth(monthDate)),

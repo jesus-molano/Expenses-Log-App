@@ -110,3 +110,50 @@ main {
 .app-hydrated-content {
   min-height: 100dvh;
 }
+
+/* Pantalla de carga: visible hasta que la app hidrata, también sin JavaScript. */
+.app-boot-shell {
+  min-height: 100dvh;
+}
+
+.app-boot-skeleton {
+  border-radius: var(--app-radius-md);
+  background: color-mix(in srgb, var(--app-surface-raised) 72%, transparent);
+  animation: app-boot-pulse 1.4s ease-in-out infinite;
+}
+
+.app-boot-skeleton-header {
+  height: 7.5rem;
+}
+
+.app-boot-skeleton-row {
+  height: 4.25rem;
+}
+
+.app-boot-help {
+  opacity: 0;
+  visibility: hidden;
+  animation: app-boot-reveal 0s linear 6s forwards;
+}
+
+.app-boot-text[lang="en"],
+html[lang="en"] .app-boot-text[lang="es"] {
+  display: none;
+}
+
+html[lang="en"] .app-boot-text[lang="en"] {
+  display: revert;
+}
+
+@keyframes app-boot-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes app-boot-reveal {
+  to {
+    opacity: 1;
+    visibility: visible;
+  }
+}

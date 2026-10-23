@@ -13,12 +13,12 @@ export function TimelineSectionHeader({
   return (
     <header
       className={`mb-1.5 flex items-end justify-between gap-3 ${
-        section.anchorDate < today ? "opacity-70" : ""
+        section.anchorDate < today && section.tone === "paid" ? "opacity-70" : ""
       }`}
     >
       <div className="min-w-0">
         <h2
-          className={`truncate font-semibold capitalize leading-tight text-[var(--app-text)] ${
+          className={`truncate font-semibold leading-tight first-letter:uppercase text-[var(--app-text)] ${
             section.id === "today" ? "text-[19px]" : "text-[16px]"
           }`}
         >

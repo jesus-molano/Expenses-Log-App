@@ -97,6 +97,26 @@ describe("useStorePersistence", () => {
     window.localStorage.clear();
   });
 
+  it("opens with local data when the Supabase client cannot be created", async () => {
+    const localStore = storeWithTemplate("local");
+    const onHydrate = vi.fn();
+
+    saveExpenseStore(localStore);
+    vi.mocked(createClient).mockImplementation(() => {
+      throw new Error("Invalid Supabase configuration");
+    });
+
+    const { result } = renderHook(() => useStorePersistence({ onHydrate }));
+
+    await waitFor(() => expect(result.current.isHydrated).toBe(true));
+    expect(onHydrate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        templates: [expect.objectContaining({ id: "local" })],
+      }),
+    );
+    expect(result.current.syncStatus).toBe("local");
+  });
+
   it("does not rehydrate stale initial state over local edits made while cloud loads", async () => {
     const initialStore = storeWithTemplate("initial");
     const latestStore = storeWithTemplate("latest");

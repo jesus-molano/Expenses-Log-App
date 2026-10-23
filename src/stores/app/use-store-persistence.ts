@@ -58,14 +58,28 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
 
   useEffect(() => {
     let active = true;
-    const supabase = createClient();
+    // Primero los datos locales: la app debe abrirse aunque falle Supabase.
+    hydrateLocalSnapshot();
+    const supabase = createSupabaseClient();
     supabaseRef.current = supabase;
 
     function hydrateLocalSnapshot() {
-      const localStore = applyRuntimePreferences(loadExpenseStore());
-      saveExpenseStore(localStore);
-      if (active) onHydrate(localStore);
-      markHydrated();
+      try {
+        const localStore = applyRuntimePreferences(loadExpenseStore());
+        saveExpenseStore(localStore);
+        if (active) onHydrate(localStore);
+      } finally {
+        markHydrated();
+      }
+    }
+
+    function createSupabaseClient() {
+      try {
+        return createClient();
+      } catch (error) {
+        markError(error, "settings.cloudSyncError");
+        return null;
+      }
     }
 
     function markHydrated() {
@@ -154,8 +168,6 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
         markError(error, "settings.cloudSyncError");
       }
     }
-
-    hydrateLocalSnapshot();
 
     refreshAuthRef.current = () => {
       if (!supabase) {

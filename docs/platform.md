@@ -32,6 +32,69 @@ El service worker tambien maneja:
 
 - `push`: muestra notificacion con titulo, cuerpo, icono y URL.
 - `notificationclick`: cierra la notificacion y abre la URL asociada.
+- `message` `GET_OFFLINE_STATUS`: responde por `MessageChannel` cuantas
+  entradas del precache espera y cuantas tiene ya en cache.
+
+### Instalacion del precache y diagnostico
+
+La instalacion del precache es todo o nada: una sola URL que responde con
+error deja activo el service worker anterior. Para que ese caso se pueda ver y
+reparar:
+
+- El precache usa `concurrency: 4`. Durante `install`, los 429 y 5xx se
+  reintentan dos veces (a 1 s y a 3 s).
+- Si una URL sigue fallando, la instalacion se rechaza en el acto. Serwist 9.5
+  deja colgada la promesa de su precache cuando una entrada falla, y Chromium
+  no da la instalacion por fallida hasta que se resuelven todas las promesas
+  de `waitUntil`. Por eso `sw.ts` registra los listeners de Serwist a mano y le
+  pasa un evento cuyo `waitUntil` no registra esa promesa. La unica promesa
+  registrada compite entre el exito de Serwist y el rechazo del plugin de
+  diagnostico.
+- Si una URL sigue fallando, el service worker envia `PRECACHE_FAILED` con la
+  ruta y el status a todas las ventanas. `PwaRegister` lo guarda en
+  `localStorage['offline-diag-v1']`, igual que una instalacion que acaba en
+  `redundant`.
+- Ajustes muestra la fila "Uso sin conexion" con estos estados:
+  - Lista: todo el precache esta en cache.
+  - Preparando: el worker se esta instalando o la cache aun esta incompleta.
+  - Fallo: muestra la URL y el status del ultimo error.
+  - Version antigua: hay un worker activo que no responde al estado, como el
+    `sw.js` escrito a mano anterior a Serwist (cache `expense-reminders-*`).
+  - No preparada / no soportado.
+- `PwaRegister` llama a `registration.update()` al volver a primer plano (como
+  mucho una vez por minuto) y pide `navigator.storage.persist()`.
+
+La logica pura comun vive en `src/pwa/cache-policy.ts` y
+`src/features/settings/lib/offline-readiness.ts`. El diagnostico guardado vive
+en `src/data/persistence/offline-diagnostic-store.ts`. Un fallo generico (sin
+URL) no sustituye a uno con URL de la misma instalacion, y no se borra mientras
+haya una instalacion nueva en curso.
+
+### Arranque sin pantalla vacia
+
+`ExpenseStoreProvider` pinta un `fallback` hasta hidratar el store local. El
+layout le pasa `AppBootShell`, un componente de servidor sin hooks que queda en
+el HTML prerenderizado:
+
+- Muestra un skeleton y, a los 6 s (por CSS, tambien sin JavaScript), un bloque
+  de ayuda con "Reintentar" y "Reparar (con conexion)".
+- Lista los recursos que no cargaron, si los hay.
+
+El script inline `boot-guard` del `<head>` (`src/app/providers/boot-guard-script.ts`)
+no depende del runtime de Next. `next/script` con `beforeInteractive` no sirve
+aqui, porque lo ejecuta el propio runtime. Next coloca antes sus preloads, CSS
+y chunks. El script:
+
+- Aplica idioma y tema desde cookies.
+- Recoge los errores de carga posteriores y, al cargar el documento, recupera
+  de `performance` los anteriores.
+- Escribe solo en nodos que React no compara al hidratar
+  (`dangerouslySetInnerHTML` mas `suppressHydrationWarning`).
+- A los 6 s anuncia la ayuda en la region `role="status"`.
+- Con `?sw-reset=1`, y solo si una peticion real a la red responde, desregistra
+  el service worker y borra sus caches (nunca `localStorage`).
+
+`src/app/global-error.tsx` cubre los errores del layout raiz.
 
 ## Supabase Auth
 

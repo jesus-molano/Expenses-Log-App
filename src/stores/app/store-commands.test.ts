@@ -62,6 +62,33 @@ describe("store commands", () => {
     expect(deleted.finance).toEqual(emptyStore.finance);
   });
 
+  it("does not overwrite the series due day when moving a closed-month record", () => {
+    const added = addExpenseToStore(emptyStore, {
+      ...draft,
+      startDate: "2026-08-31",
+      dueDay: 31,
+    });
+    const template = added.templates[0];
+    const recordOccurrence = {
+      id: `${template.id}:2026-09-30`,
+      template: { ...template, dueDay: 30 },
+      occurrenceDate: "2026-09-30",
+      dueDate: "2026-09-30",
+      estimatedChargeDate: "2026-09-30",
+      estimatedChargeLabel: "",
+      status: "due" as const,
+      sortOrder: 0,
+      record: { id: "record" } as ExpenseOccurrence["record"],
+    };
+
+    const moved = moveOccurrenceOnlyInStore(added, recordOccurrence, "2026-10-06");
+
+    expect(moved.templates[0].dueDay).toBe(31);
+    expect(moved.overrides).toEqual([
+      expect.objectContaining({ occurrenceDate: "2026-09-30", dueDate: "2026-10-06" }),
+    ]);
+  });
+
   it("clears only expense data", () => {
     const added = addExpenseToStore(emptyStore, draft);
     const cleared = clearExpensesFromStore(added);

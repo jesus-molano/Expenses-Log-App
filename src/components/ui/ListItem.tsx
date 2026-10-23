@@ -6,6 +6,7 @@ type ListItemProps = {
   description?: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
+  wrapDescription?: boolean;
 };
 
 export function ListItem({
@@ -14,6 +15,7 @@ export function ListItem({
   description,
   action,
   className,
+  wrapDescription = false,
 }: ListItemProps) {
   return (
     <div
@@ -29,11 +31,21 @@ export function ListItem({
           </span>
         ) : null}
         <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-[var(--app-text)]">
+          <span
+            className={cn(
+              "block text-sm font-semibold text-[var(--app-text)]",
+              wrapDescription ? "break-words" : "truncate",
+            )}
+          >
             {title}
           </span>
           {description ? (
-            <span className="block truncate text-xs font-medium text-[var(--app-text-muted)]">
+            <span
+              className={cn(
+                "block text-xs font-medium text-[var(--app-text-muted)]",
+                wrapDescription ? "break-words" : "truncate",
+              )}
+            >
               {description}
             </span>
           ) : null}
