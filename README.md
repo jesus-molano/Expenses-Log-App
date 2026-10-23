@@ -100,4 +100,10 @@ npm run lint
 npm run test
 npm run build
 npm run e2e
+npm run e2e:offline
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the same checks on every pull
+request and on `main`: lint, `tsc --noEmit`, unit tests in UTC and
+`Atlantic/Canary`, the production build, Playwright e2e and the offline cold
+start. Vercel only builds the preview.
