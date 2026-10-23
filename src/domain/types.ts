@@ -232,12 +232,6 @@ export type MonthlyMoneyPlan = {
     amount: number;
     overdue: boolean;
   };
-  // Compatibilidad temporal con los consumidores del reparto existente.
-  expensesContribution: number;
-  savingsContribution: number;
-  remainingContribution: number;
-  investmentContribution: number;
-  shortfall: number;
 };
 
 export type ExpenseStore = {

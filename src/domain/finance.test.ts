@@ -56,10 +56,10 @@ describe("finance", () => {
       occurrences: [occurrence("Gastos de casa", 660, "2026-06-01")],
     });
 
-    expect(plan.expensesContribution).toBe(660);
+    expect(plan.expectedExpensesTotal).toBe(660);
     expect(plan.savingsTarget).toBe(300);
-    expect(plan.savingsContribution).toBe(0);
-    expect(plan.remainingContribution).toBe(1280);
+    expect(plan.savingsActual).toBe(0);
+    expect(plan.freeAccordingToPlan).toBe(1280);
   });
 
   it("reports shortfall when income cannot cover fixed expenses", () => {
@@ -79,9 +79,9 @@ describe("finance", () => {
       occurrences: [occurrence("Gastos de casa", 660, "2026-06-01")],
     });
 
-    expect(plan.expensesContribution).toBe(500);
-    expect(plan.shortfall).toBe(160);
-    expect(plan.remainingContribution).toBe(0);
+    expect(plan.incomeTotal).toBe(500);
+    expect(plan.billsShortfall).toBe(160);
+    expect(plan.freeAccordingToPlan).toBe(0);
   });
 
   it("does not count skipped month occurrences as fixed expenses", () => {

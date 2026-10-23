@@ -1,5 +1,6 @@
 import { buildDateWithDay, normalizeDateOnly, toDateOnly } from "./calendar";
 import { PRESET_EXPENSE_CATEGORIES } from "./categories";
+import { foldText } from "./text";
 import type {
   CustomRecurrenceUnit,
   DraftExpense,
@@ -70,14 +71,8 @@ const CATEGORY_HINTS: Array<[string, string[]]> = [
   ["Deudas", ["prestamo", "tarjeta", "financiacion", "cuota"]],
 ];
 
-// Sin tildes ni mayúsculas, para comparar lo que dice el usuario o la IA.
-export function foldText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .trim();
-}
+// Se sigue exportando desde aquí para los imports que ya lo usan.
+export { foldText };
 
 function hasWord(text: string, phrase: string) {
   return new RegExp(`(^|[^\\p{L}\\p{N}])${phrase}($|[^\\p{L}\\p{N}])`, "u").test(text);

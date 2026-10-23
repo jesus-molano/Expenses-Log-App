@@ -217,6 +217,45 @@
   color: var(--app-text);
 }
 
+/* Opción de una elección con radio nativo (por ejemplo, combinar o sustituir). */
+.app-choice-card {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  background: color-mix(in srgb, var(--app-panel-soft-alpha) 58%, var(--app-surface));
+  color: var(--app-text);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.app-choice-card:hover {
+  background: color-mix(in srgb, var(--app-control-hover) 42%, var(--app-surface));
+}
+
+.app-choice-card:has(input:focus-visible) {
+  box-shadow: var(--app-focus);
+}
+
+.app-choice-card[data-selected="true"] {
+  border-color: color-mix(in srgb, var(--app-accent) 46%, transparent);
+  background: color-mix(in srgb, var(--app-accent) 10%, var(--app-surface));
+}
+
+.app-choice-card[data-tone="danger"][data-selected="true"] {
+  border-color: color-mix(in srgb, var(--app-danger) 46%, transparent);
+  background: color-mix(in srgb, var(--app-danger) 10%, var(--app-surface));
+}
+
+.app-choice-card input {
+  accent-color: var(--app-accent);
+}
+
+.app-choice-card[data-tone="danger"] input {
+  accent-color: var(--app-danger);
+}
+
 .app-one-off-income-icon {
   display: grid;
   width: 1.35rem;

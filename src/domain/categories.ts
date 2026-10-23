@@ -1,3 +1,4 @@
+import { foldText } from "./text";
 import type { CategoryTone } from "./types";
 
 export type PresetExpenseCategory = {
@@ -24,10 +25,14 @@ export const PRESET_EXPENSE_CATEGORIES: PresetExpenseCategory[] = [
   { name: "General", icon: "WalletCards", tone: "slate" },
 ];
 
+// Los nombres guardados no llevan tildes ("Alimentacion"): se comparan sin
+// ellas para que "Alimentación" no acabe en General. La tilde se pone al
+// mostrarlos (`categoryLabel`).
 export function resolvePresetCategory(name: string): PresetExpenseCategory {
+  const folded = foldText(name);
   return (
     PRESET_EXPENSE_CATEGORIES.find(
-      (category) => category.name.toLowerCase() === name.trim().toLowerCase(),
+      (category) => foldText(category.name) === folded,
     ) ?? PRESET_EXPENSE_CATEGORIES.at(-1)!
   );
 }

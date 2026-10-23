@@ -2,11 +2,11 @@ import { parseMoneyInput } from "@/shared/money";
 import { toDateOnly } from "./calendar";
 import {
   detectCategoryFromText,
-  foldText,
   normalizeCapturedExpense,
   type CapturedDraft,
   type CapturedExpenseItem,
 } from "./expense-capture";
+import { foldText } from "./text";
 
 // Parser sin conexión ni IA. Entiende frases cortas en español o inglés:
 // "Netflix 12,99 el 5", "seguro del coche 420 al año en marzo",

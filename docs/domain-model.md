@@ -71,6 +71,13 @@ resuelve el design system mediante tokens de categoria.
 Cuando se crea un gasto desde texto o formulario, la app reutiliza una categoria
 existente o crea una nueva segun el nombre normalizado.
 
+Los nombres guardados son los de las categorias preset y no llevan tildes
+(`Alimentacion`, `Vehiculo`, `Educacion/Trabajo`). No se renombran para no romper
+los stores existentes: `resolvePresetCategory` compara sin tildes y
+`categoryLabel` (`src/shared/category-labels.ts`) muestra la etiqueta con tildes
+y traducida. `resolveCategoryName` hace el camino inverso (de la etiqueta, en
+cualquiera de los dos idiomas, al nombre guardado) para la importacion CSV.
+
 ## Finanzas
 
 `FinanceStore` contiene:

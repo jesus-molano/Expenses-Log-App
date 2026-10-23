@@ -137,7 +137,10 @@ reparar:
     `sw.js` escrito a mano anterior a Serwist (cache `expense-reminders-*`).
   - No preparada / no soportado.
 - `PwaRegister` llama a `registration.update()` al volver a primer plano (como
-  mucho una vez por minuto) y pide `navigator.storage.persist()`.
+  mucho una vez por minuto) y pide `navigator.storage.persist()`. Ajustes ›
+  Copias y datos ensena si el navegador lo ha concedido y permite pedirlo a
+  mano; las copias automaticas del store van a IndexedDB (ver
+  `docs/state-persistence-sync.md`, "Copias, exportar e importar").
 - Sin navigation preload, abrir la app con conexion arranca el build que ya
   estaba en cache; el nuevo se instala y activa en segundo plano. Cuando cambia
   el controlador, `PwaRegister` recarga la pagina la siguiente vez que pasa a

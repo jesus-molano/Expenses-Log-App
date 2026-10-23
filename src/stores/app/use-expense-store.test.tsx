@@ -61,4 +61,27 @@ describe("useExpenseStore", () => {
     ]);
     expect(latest.finance.monthClosures?.["2026-10"]).toBeDefined();
   });
+
+  it("imports a backup and restores a copy, saving the result on this device", async () => {
+    const { result } = renderHook(() => useExpenseStore(), {
+      wrapper: ExpenseStoreProvider,
+    });
+    await waitFor(() => expect(result.current.isHydrated).toBe(true));
+    const backup: ExpenseStore = {
+      ...store,
+      templates: [{ ...store.templates[0], id: "rent", name: "Alquiler", amount: 700 }],
+    };
+
+    await act(() => result.current.importStore(backup, { mode: "merge", scope: "all" }));
+    expect(result.current.store.templates.map((item) => item.id).sort()).toEqual([
+      "gym",
+      "rent",
+    ]);
+
+    await act(() => result.current.restoreSnapshot(store));
+    expect(result.current.store.templates.map((item) => item.id)).toEqual(["gym"]);
+    expect(result.current.store.deleted?.templates).toContain("rent");
+    const saved = JSON.parse(window.localStorage.getItem("expense-log-store-v1") ?? "{}");
+    expect(saved.templates.map((item: { id: string }) => item.id)).toEqual(["gym"]);
+  });
 });

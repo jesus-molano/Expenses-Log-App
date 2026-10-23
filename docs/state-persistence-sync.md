@@ -19,6 +19,8 @@ El hook expone:
 - Comandos financieros: salario, objetivo de ahorro, aportacion real, ingresos,
   overrides mensuales y cerrar o reabrir un mes.
 - Comandos de preferencias: tema e idioma.
+- Copias: `importStore`, `restoreSnapshot` y `takeSnapshot` (ver "Copias,
+  exportar e importar").
 - Estado de sync: `syncStatus`, `syncMessage`, `isHydrated`.
 
 `useExpenseStore` falla explicitamente si se llama fuera del provider. Eso evita
@@ -35,6 +37,8 @@ Los comandos se dividen por responsabilidad:
 - `finance-commands`: modifica salario mensual, objetivos, aportaciones reales
   e ingresos.
 - `preference-commands`: actualiza tema e idioma en el store.
+- `backup-commands`: combina o sustituye el store con uno importado o con una
+  copia.
 
 Los comandos reciben un `ExpenseStore` y devuelven otro. Esta forma mantiene la
 logica testeable y evita mutaciones ocultas dentro de componentes.
@@ -243,6 +247,85 @@ El estado de sync comunica preparando cloud, guardando, guardado, pendiente de
 subir, local o error. "Pendiente" solo se muestra para fallos temporales (sin
 red, cortes, servidor reiniciando) con cambios sin subir; el resto se muestra
 como error. Los mensajes se traducen con `src/shared/i18n`.
+
+## Copias, exportar e importar
+
+Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/BackupRows.tsx`).
+
+### Exportar
+
+- **JSON** (`src/data/persistence/backup-file.ts`): el store completo dentro de
+  un sobre `{kind: "expense-log-backup", version: 1, exportedAt, store}`. El
+  archivo se llama `expense-log-AAAA-MM-DD.json`.
+- **CSV** (`src/data/persistence/store-csv.ts`): un solo archivo UTF-8 con BOM
+  (para que Excel lea las tildes), coma como separador e importes con punto y
+  dos decimales (`2200.00`). La columna `type` distingue:
+  - `expense`: una fila por gasto (frecuencia, intervalo, mes anual, rrule,
+    inicio, fin, dia de cobro, aviso, descripcion).
+  - `occurrence`: el historico hasta el final del mes actual (los meses
+    cerrados tambien de gastos borrados) y, de despues, solo los cobros con
+    cambios (por ejemplo, pagados por adelantado).
+  - Las cabeceras y los valores de frecuencia y estado no se traducen; la
+    categoria sale como se ve en la app y se reconoce en los dos idiomas al
+    importar (`resolveCategoryName`). El texto que empieza por `= + - @` lleva
+    un apostrofo delante para que una hoja de calculo no lo ejecute como
+    formula; se quita al importar.
+
+### Importar
+
+1. Se lee el archivo (maximo 5 MB). Si empieza por `{` o acaba en `.json`, se
+   trata como JSON (con sobre o el store a secas) y pasa por
+   `normalizeImportedExpenseStore`, que ademas descarta las entidades a las que
+   les falta lo imprescindible (id, nombre, importe, fechas validas). Si no,
+   como CSV: acepta `;` y coma decimal (Excel en espanol) y un CSV hecho a mano
+   con solo `name` y `amount`. Las filas ilegibles se cuentan y se saltan.
+2. Se ensena una vista previa: lo que trae el archivo y cuantos gastos, pagos
+   e ingresos quedarian al combinar o al sustituir.
+3. Antes de aplicar se guarda una copia "Antes de importar".
+4. Se aplica con `importStoreInStore` (`src/stores/app/backup-commands.ts`) y
+   `persistImmediately`:
+   - **Combinar**: `mergeExpenseStores(actual, importado)`, como con la nube.
+     Por id gana la version mas reciente, los borrados siguen borrados y las
+     preferencias del dispositivo se mantienen.
+   - **Sustituir** (`replaceStoreContents`): deja solo lo importado y lo hace
+     de forma que aguante una fusion posterior con la nube u otro dispositivo
+     (si la subida falla o hay otro dispositivo sin sincronizar). Todo lo
+     importado se marca como editado ahora; lo que solo estaba en los datos
+     actuales recibe tombstone si su id es aleatorio (gastos, categorias,
+     ingresos, aportaciones, historico de gastos que desaparecen) o queda en
+     estado neutro si es determinista (cobros `ovr:*` en estado pendiente,
+     cierres de mes reabiertos, sueldos con tombstone por mes), porque un
+     tombstone de un id determinista impediria volver a usarlo. Un id que el
+     archivo trae se quita de los tombstones. Limite conocido: los objetivos de
+     ahorro no tienen tombstone, asi que un mes que solo estaba en los datos
+     actuales puede volver en esa fusion.
+   - El CSV solo trae gastos, cobros e historico: sustituir no toca Plan,
+     ingresos ni preferencias. Los meses cerrados vuelven como historico
+     (`occurrenceRecords`) y los abiertos como overrides de su gasto.
+
+### Copias automaticas
+
+- Viven en IndexedDB (`expense-log-backups`, `src/data/persistence/snapshot-store.ts`),
+  nunca en localStorage: varias copias llenarian su cupo y entonces fallaria
+  guardar el propio store. Sin IndexedDB no hay copias y la app sigue igual.
+- `useStoreSnapshots` (en el provider) guarda una diaria 4 s despues de
+  hidratar y al volver a la app: una por dia natural y solo si los datos han
+  cambiado desde la ultima copia (huella FNV-1a sin preferencias). Un store
+  vacio no se copia.
+- Tambien se guarda una antes de importar, restaurar o limpiar gastos o
+  ingresos, y otra cuando el usuario pulsa "Guardar copia ahora".
+- Se quedan las 7 diarias y las 5 de otro tipo mas recientes
+  (`snapshot-policy.ts`).
+- Restaurar es sustituir con alcance completo, despues de guardar una copia
+  "Antes de restaurar"; la copia pasa por `normalizeExpenseStore`, asi que una
+  guardada por una version anterior sigue cargando.
+
+### Almacenamiento persistente
+
+La fila "Almacenamiento persistente" ensena `navigator.storage.persisted()` y el
+espacio usado, y ofrece "Proteger" (`navigator.storage.persist()`) si el
+navegador lo permite y aun no lo ha concedido. `PwaRegister` lo sigue pidiendo
+en silencio al registrar el service worker.
 
 ## Reglas actuales y limites
 

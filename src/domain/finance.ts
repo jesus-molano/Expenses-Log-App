@@ -11,7 +11,6 @@ import type {
   IncomeEvent,
   MonthlyMoneyPlan,
   MonthlySavingsContribution,
-  MonthlySavingsTarget,
   MonthlySalarySettings,
 } from "./types";
 
@@ -111,16 +110,6 @@ export function getMonthlySavingsTarget(
     typeof value === "number" ? value : Number(value?.amount ?? 0),
     0,
   );
-}
-
-export function getMonthlySavingsTargetEntry(
-  finance: FinanceStore,
-  monthDate: Date | string,
-): MonthlySavingsTarget | null {
-  const monthId = toMonthId(monthDate);
-  const value = latestRecordValue(finance.monthlySavingsTargets, monthId, 0);
-  if (typeof value === "number") return null;
-  return value ?? null;
 }
 
 export function getMonthlySavingsContribution(
@@ -263,11 +252,6 @@ export function buildMonthlyMoneyPlan({
     billsShortfall,
     savingsGoalShortfall,
     nextPending,
-    expensesContribution: Math.min(incomeTotal, expectedExpensesTotal),
-    savingsContribution: savingsActual,
-    remainingContribution: freeAccordingToPlan,
-    investmentContribution: 0,
-    shortfall: billsShortfall,
   };
 }
 
@@ -506,7 +490,9 @@ function occurrenceFromRecord(
   };
 }
 
-function earliestOccurrenceDate(store: ExpenseStore): string | null {
+// Primera fecha con algo en el store: el inicio de un gasto, un override o un
+// registro del histórico.
+export function earliestOccurrenceDate(store: ExpenseStore): string | null {
   const dates = [
     ...store.templates.map((template) => template.startDate),
     ...store.overrides.map((override) => override.occurrenceDate),

@@ -22,7 +22,7 @@ import {
   type MonthlyExpenseUpdateInput,
 } from "@/features/plan/hooks/use-monthly-expense-row-editor";
 import { categoryLabel } from "@/shared/category-labels";
-import { t } from "@/shared/i18n";
+import { formatMessage, t } from "@/shared/i18n";
 
 export function MonthlyExpenseRow({
   occurrence,
@@ -201,12 +201,12 @@ export function MonthlyExpenseRow({
           <IconButton
             type="button"
             onClick={onTogglePaid}
-            aria-label={
-              language === "es"
-                ? `Marcar ${occurrence.template.name} como pagado`
-                : `Mark ${occurrence.template.name} as paid`
-            }
-            title={language === "es" ? "Marcar como pagado" : "Mark as paid"}
+            aria-label={formatMessage(
+              "plan.markPaidNamed",
+              { name: occurrence.template.name },
+              language,
+            )}
+            title={t("plan.markPaid", language)}
             size="touch"
             className="text-[var(--app-success)]"
           >

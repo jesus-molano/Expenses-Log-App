@@ -36,7 +36,6 @@ import {
   getAvailableYears,
   occurrencesForMonth,
   phaseLabel,
-  planCopy,
 } from "../lib/plan-dashboard";
 import { AnnualPlanSection } from "./AnnualPlanSection";
 import { CurrentMonthPlanSection } from "./CurrentMonthPlanSection";
@@ -66,7 +65,6 @@ export function MoneyDashboard() {
   const chrome = useScrollChrome();
   const isCompactChart = useCompactChart();
   const language = store.preferences?.language ?? "es";
-  const copy = planCopy(language);
   const locale = language === "en" ? enUS : es;
   const today = useCurrentDate();
   const todayDateOnly = toDateOnly(today);
@@ -113,7 +111,7 @@ export function MoneyDashboard() {
   const monthLabel = format(currentMonthDate, "MMMM yyyy", { locale });
   const savingsLabel =
     currentMonthId === activeMonthId
-      ? copy.savingsThisMonth
+      ? t("plan.savingsThisMonth", language)
       : capitalize(
           t("monthClose.savingsForMonth", language).replace(
             "{month}",
@@ -331,9 +329,8 @@ export function MoneyDashboard() {
           />
           <CurrentMonthPlanSection
             language={language}
-            copy={copy}
             monthLabel={monthLabel}
-            phaseLabel={plan.phase === "current" ? null : phaseLabel(plan.phase, copy)}
+            phaseLabel={plan.phase === "current" ? null : phaseLabel(plan.phase, language)}
             savingsLabel={savingsLabel}
             paydayOutlook={paydayOutlook}
             plan={plan}
@@ -352,7 +349,6 @@ export function MoneyDashboard() {
 
         <AnnualPlanSection
           language={language}
-          copy={copy}
           year={annualYear}
           availableYears={availableYears}
           moneySeries={annualMoneySeries}
@@ -366,7 +362,6 @@ export function MoneyDashboard() {
 
         <MonthlyReviewSection
           language={language}
-          copy={copy}
           reviewYear={reviewYear}
           availableYears={availableYears}
           selectedSummary={selectedSummary}
@@ -414,9 +409,9 @@ export function MoneyDashboard() {
       ) : null}
 
       {extraSheetOpen ? (
-        <Sheet ariaLabel={copy.extraIncome} onBackdropClick={() => setExtraSheetOpen(false)}>
+        <Sheet ariaLabel={t("plan.extraIncome", language)} onBackdropClick={() => setExtraSheetOpen(false)}>
           <div className="p-5">
-            <SheetHeader title={copy.extraIncome} onClose={() => setExtraSheetOpen(false)} language={language} />
+            <SheetHeader title={t("plan.extraIncome", language)} onClose={() => setExtraSheetOpen(false)} language={language} />
             <div className="mt-5">
               <OneOffIncomePanel
                 language={language}
@@ -436,19 +431,19 @@ export function MoneyDashboard() {
       ) : null}
 
       {savingsMonthId ? (
-        <Sheet ariaLabel={copy.editSavings} onBackdropClick={() => setSavingsMonthId(null)} contentClassName="sm:max-w-sm">
+        <Sheet ariaLabel={t("plan.editSavings", language)} onBackdropClick={() => setSavingsMonthId(null)} contentClassName="sm:max-w-sm">
           <form onSubmit={saveSavings} className="p-5">
             <SheetHeader
-              title={copy.editSavings}
+              title={t("plan.editSavings", language)}
               subtitle={format(new Date(`${savingsMonthId}-01T00:00:00`), "MMMM yyyy", { locale })}
               onClose={() => setSavingsMonthId(null)}
               language={language}
             />
             <p className="mt-5 text-sm text-[var(--app-text-muted)]">
-              {copy.monthlyGoal}: <span className="app-money font-semibold text-[var(--app-text)]">{formatCurrency(getMonthlySavingsTarget(store.finance, savingsMonthId))}</span>
+              {t("plan.monthlyGoal", language)}: <span className="app-money font-semibold text-[var(--app-text)]">{formatCurrency(getMonthlySavingsTarget(store.finance, savingsMonthId))}</span>
             </p>
             <label className="mt-4 grid gap-1.5 text-sm font-semibold text-[var(--app-text-muted)]">
-              {copy.actualTransfer}
+              {t("plan.actualTransfer", language)}
               <MoneyInput
                 value={savingsActualText}
                 allowZero
@@ -457,11 +452,11 @@ export function MoneyDashboard() {
               />
             </label>
             {activeSavingsContribution?.source === "legacy" && !activeSavingsContribution.transferredAt ? (
-              <p className="mt-3 text-xs text-[var(--app-warning)]">{copy.legacySavingDate}</p>
+              <p className="mt-3 text-xs text-[var(--app-warning)]">{t("plan.legacySavingDate", language)}</p>
             ) : null}
-            <p className="mt-3 text-xs leading-relaxed text-[var(--app-text-muted)]">{copy.singleContribution}</p>
+            <p className="mt-3 text-xs leading-relaxed text-[var(--app-text-muted)]">{t("plan.singleContribution", language)}</p>
             <Button type="submit" variant="primary" className="mt-5 w-full">
-              {copy.saveSavings}
+              {t("plan.saveSavings", language)}
             </Button>
           </form>
         </Sheet>

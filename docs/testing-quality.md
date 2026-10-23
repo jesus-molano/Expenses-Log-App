@@ -62,9 +62,18 @@ Hay tests de:
 - Mes activo y cierre de mes: sugerencias, restos, "Hasta el cobro", fases del
   plan, cobros anteriores de un gasto nuevo y la hoja de cierre (hook y
   componente), mas e2e con `page.clock` el 28-oct y el 1-nov.
+- Exportar e importar JSON y CSV (ida y vuelta, CSV de Excel en espanol,
+  errores), combinar o sustituir (incluida la fusion posterior con los datos
+  antiguos) y la politica de copias automaticas.
 - Estilos del design system.
+- Contraste AA de `--app-text-subtle` en todos los temas
+  (`src/shared/theme-contrast.test.ts`) y ausencia de ternarios de texto por
+  idioma en la interfaz (`src/shared/i18n-audit.test.ts`).
 - Flujos e2e de dashboard, tooltip de la grafica, menus sin recorte y
   accesibilidad critica.
+- Flujos e2e de copias (`tests/e2e/backup.spec.ts`): exportar JSON y CSV,
+  sustituir con una copia y restaurar la anterior, combinar un CSV de Excel,
+  errores de importacion y copia diaria.
 
 ## Cuando agregar tests
 

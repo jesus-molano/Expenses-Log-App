@@ -7,6 +7,7 @@ import {
   toMonthId,
 } from "@/domain/finance";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
+import { t } from "@/shared/i18n";
 import type { MoneySeriesItem } from "../types";
 
 export function occurrencesForMonth(
@@ -90,117 +91,9 @@ export function formatShortDate(date: string, language: AppLanguage) {
 
 export function phaseLabel(
   phase: MoneySeriesItem["phase"],
-  copy: ReturnType<typeof planCopy>,
+  language: AppLanguage,
 ) {
-  if (phase === "projected") return copy.projected;
-  if (phase === "current") return copy.current;
-  return copy.registered;
-}
-
-export function planCopy(language: AppLanguage) {
-  if (language === "en") {
-    return {
-      toPay: "To pay",
-      planFor: "Plan for",
-      of: "of",
-      paidReceipts: "receipts paid",
-      noReceipts: "No recurring receipts this month.",
-      paidProgress: "Paid receipts progress",
-      overdue: "Overdue",
-      nextReceipt: "Next receipt",
-      allPaid: "Everything planned is paid",
-      noUpcomingReceipt: "No upcoming receipt",
-      monthEquation: "Month overview",
-      expectedIncome: "Expected income",
-      fixedIncome: "Fixed",
-      extras: "extras",
-      expectedFinalExpenses: "Expected final recurring cost",
-      paid: "Paid",
-      pending: "pending",
-      reservedSavings: "Reserved savings",
-      goal: "Goal",
-      actual: "Actual",
-      freeAccordingToPlan: "Free according to plan",
-      freeDisclaimer: "Full-month projection. It is not your bank balance and does not include small day-to-day spending.",
-      missingForReceipts: "Missing for receipts:",
-      unfundedGoal: "Savings goal not funded by this plan:",
-      savingsThisMonth: "Savings this month",
-      pendingReceipts: "Pending receipts",
-      quickActions: "Plan actions",
-      extraIncome: "Add one-off income",
-      annualPlan: "Annual plan",
-      annualSubtitle: "Twelve registered, current and projected months.",
-      annualRecurring: "Planned recurring",
-      annualPaid: "Paid recorded",
-      savedThisYear: "Actually saved",
-      annualCapacity: "Maximum capacity",
-      monthlyReview: "Monthly review",
-      comparedWithPrevious: "Compared with the previous calendar month.",
-      legacyDerived: "Legacy-derived history",
-      recurringExpenses: "Recurring expenses",
-      actualSavings: "Actual savings",
-      editFixedIncome: "Edit fixed income",
-      editSavings: "Edit savings",
-      monthlyGoal: "Monthly goal",
-      actualTransfer: "Actual transfer",
-      legacySavingDate: "Imported amount: transfer date was not recorded.",
-      singleContribution: "There is one editable savings contribution per month. Enter 0 to remove it.",
-      saveSavings: "Save savings",
-      projected: "Projected",
-      current: "Current month",
-      registered: "Registered",
-    };
-  }
-
-  return {
-    toPay: "Por pagar",
-    planFor: "Plan de",
-    of: "de",
-    paidReceipts: "recibos pagados",
-    noReceipts: "Sin recibos recurrentes este mes.",
-    paidProgress: "Progreso de recibos pagados",
-    overdue: "Vencido",
-    nextReceipt: "Próximo recibo",
-    allPaid: "Todo lo previsto está pagado",
-    noUpcomingReceipt: "No hay un próximo recibo",
-    monthEquation: "Resumen del mes",
-    expectedIncome: "Ingresos previstos",
-    fixedIncome: "Fijo",
-    extras: "extras",
-    expectedFinalExpenses: "Gasto recurrente final previsto",
-    paid: "Pagado",
-    pending: "pendiente",
-    reservedSavings: "Ahorro reservado",
-    goal: "Objetivo",
-    actual: "Real",
-    freeAccordingToPlan: "Libre según el plan",
-    freeDisclaimer: "Proyección del mes completo. No es el saldo bancario y no incluye los gastos pequeños del día a día.",
-    missingForReceipts: "Faltan para pagar recibos:",
-    unfundedGoal: "Objetivo de ahorro que este plan no financia:",
-    savingsThisMonth: "Ahorro de este mes",
-    pendingReceipts: "Recibos pendientes",
-    quickActions: "Acciones del plan",
-    extraIncome: "Añadir ingreso extra",
-    annualPlan: "Plan anual",
-    annualSubtitle: "Doce meses registrados, actuales o proyectados.",
-    annualRecurring: "Recurrente previsto",
-    annualPaid: "Pagado registrado",
-    savedThisYear: "Ahorrado real",
-    annualCapacity: "Capacidad máxima",
-    monthlyReview: "Revisión mensual",
-    comparedWithPrevious: "Comparado con el mes natural anterior.",
-    legacyDerived: "Histórico derivado",
-    recurringExpenses: "Gastos recurrentes",
-    actualSavings: "Ahorro real",
-    editFixedIncome: "Editar ingreso fijo",
-    editSavings: "Editar ahorro",
-    monthlyGoal: "Objetivo mensual",
-    actualTransfer: "Transferencia real",
-    legacySavingDate: "Importe heredado: no se registró la fecha de transferencia.",
-    singleContribution: "Hay una sola aportación editable por mes. Escribe 0 para eliminarla.",
-    saveSavings: "Guardar ahorro",
-    projected: "Proyectado",
-    current: "Mes actual",
-    registered: "Registrado",
-  };
+  if (phase === "projected") return t("plan.projected", language);
+  if (phase === "current") return t("plan.current", language);
+  return t("plan.registered", language);
 }
