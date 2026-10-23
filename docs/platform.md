@@ -208,9 +208,11 @@ Peticion (`src/data/ai/gemini-client.ts`, REST `generateContent`):
 - Clave en la cabecera `x-goog-api-key`, nunca en la URL.
 - `systemInstruction` por peticion (`src/data/ai/expense-capture-prompt.ts`):
   fecha de hoy con dia de la semana (la manda el cliente y se acepta a ±2 dias
-  de la del servidor), idioma, categorias permitidas, reglas y ejemplos.
+  de la del servidor), idioma, categorias permitidas, nombres de los gastos del
+  usuario (`expenseNames`, hasta 50, solo como pista), reglas y ejemplos.
 - `responseJsonSchema` escrito a mano (categorias como enum, campos `null`
-  cuando no aparecen), sin `temperature`, `maxOutputTokens: 1024`.
+  cuando no aparecen, `intent` en cada elemento), sin `temperature`,
+  `maxOutputTokens: 1024`.
 - Razonamiento por modelo: Flash-Lite con `MINIMAL`, Flash 3.x con `LOW`
   (rechazan `MINIMAL`), 2.5 con `thinkingBudget: 0`. Si el modelo rechaza el
   ajuste, se repite sin el.
@@ -227,6 +229,20 @@ no aparece queda a 0 y se marca como pendiente (nunca se inventa); el dia, la
 fecha, la frecuencia o la categoria deducidos se marcan para revisar. Un
 elemento invalido se descarta sin perder el resto (`droppedCount`). El cliente
 abre el formulario si hay un gasto o una revision con todos si hay varios.
+
+Ordenes sobre gastos existentes: cada elemento lleva `intent` (`create`,
+`pay`, `skip` o `move`). Sin `intent` (modelos o respuestas anteriores) es un
+alta. "Marca la luz pagada 71,20", "salta el gimnasio este mes" o "mueve
+Netflix al 10" llegan en `commands` (`{intent, target, amount, day, date,
+month}`, `normalizeCaptureCommand` en `src/domain/capture-commands.ts`), aparte
+de `expenses`; un cliente anterior las ignora. El parser local
+(`parseCaptureTextLocally`) entiende las mismas ordenes en español e ingles,
+asi que funcionan sin sesion y sin conexion. Nunca se aplican solas:
+`resolveCaptureCommand` busca la serie por parecido del nombre y el cobro del
+mes que se mira (o del mes nombrado), la hoja "Confirma los cambios" deja
+elegir la serie si es ambigua, corregir lo pagado y, al mover un mensual, si
+cambia solo ese cobro o tambien los siguientes; se aplican con los comandos de
+siempre y el aviso permite deshacerlas.
 
 Motivos de fallback (`reason`): `missing_key`, `unauthenticated`,
 `rate_limited`, `auth_failed`, `model_unavailable`, `quota_exhausted`,

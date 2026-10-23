@@ -29,6 +29,11 @@ Un `ExpenseTemplate` representa la serie:
 - Regla de recurrencia.
 - `reminder`: recordatorio opcional antes del cobro, con `enabled` y
   `daysBeforeCharge` de 1 a 5.
+- Datos de contrato opcionales (`ExpenseDetails`, `src/domain/expense-details.ts`):
+  `notes`, `cancellationUrl` (solo http/https), `commitmentEndDate` (fin de la
+  permanencia; `commitmentStatus` avisa en los ultimos 30 dias),
+  `paymentMethod` (`card`, `direct_debit`, `transfer`, `cash`, `bizum`,
+  `paypal`, `other`) y `paymentMethodDetail`.
 - Estado `active`.
 - Timestamps de creacion y actualizacion.
 
@@ -64,12 +69,28 @@ ocurrencia crea o actualiza un override.
 
 ## Categorias
 
-Las categorias tienen `id`, `userId`, `name`, `icon` y `tone`. Los tonos validos
-son `blue`, `green`, `orange`, `rose`, `violet` y `slate`. El color real lo
-resuelve el design system mediante tokens de categoria.
+Las categorias tienen `id`, `userId`, `name`, `icon`, `tone` y `updatedAt`. Los
+tonos validos son `blue`, `green`, `orange`, `rose`, `violet` y `slate`. El
+color real lo resuelve el design system mediante tokens de categoria.
 
-Cuando se crea un gasto desde texto o formulario, la app reutiliza una categoria
-existente o crea una nueva segun el nombre normalizado.
+Hay quince preset (`PRESET_EXPENSE_CATEGORIES`) y el usuario puede crear las
+suyas (icono `Tag`), renombrarlas, cambiarles el color o borrarlas pasando sus
+gastos a otra. `buildCategoryOptions` da la lista que se elige: las preset con
+el color del usuario y despues las propias.
+
+Cuando se crea un gasto desde texto o formulario, la app reutiliza la
+categoria guardada con ese nombre (sin tildes ni mayusculas) o crea la preset
+equivalente (General si no hay ninguna).
+
+## Ordenes de la captura
+
+`src/domain/capture-commands.ts`: una `CaptureCommand` (`pay`, `skip` o
+`move`) se refiere a un gasto existente por su nombre. `resolveCaptureCommand`
+elige la serie mas parecida (`rankTemplatesForTarget`; si empatan, el usuario
+elige), el cobro del mes que se mira o del mes nombrado, y detecta lo que no se
+puede aplicar (ya pagado, ya saltado, sin fecha, a un mes cerrado). Mover toda
+la serie solo se ofrece en un mensual que se queda en su mes, como al
+arrastrar.
 
 ## Finanzas
 

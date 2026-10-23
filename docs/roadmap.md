@@ -55,6 +55,11 @@ Estado:
   - Atajos del manifest "Añadir gasto" y "Añadir por voz" (`/expenses/new?mode=voice`).
   - Atrás cierra la hoja abierta (`src/components/ui/sheet-history.ts`).
   - Pendiente de F2a: `OccurrenceActionSheet`, `ConfirmActionDialog` con `useDialogA11y` y M22.
+- **F3 (7, 9, 10 y 11): hecho.**
+  - Primeros pasos con la app vacía: chips de alta rápida (alquiler, luz, agua, internet, móvil, Netflix, Spotify, gimnasio y seguros) y checklist (primer gasto, sueldo, avisos e instalar). Por dispositivo (`expense-onboarding-v1`).
+  - Catálogo «Todos» desde la cabecera de Gastos: todas las series con búsqueda (también en notas) y filtros de estado, frecuencia y categoría. Sustituye a la hoja de recurrentes.
+  - Campos de contrato (notas, enlace de baja, permanencia con aviso a 30 días, método de pago) en el formulario, el detalle y la normalización; categorías propias con gestor en Ajustes (crear, renombrar, color y borrar pasando los gastos a otra).
+  - Órdenes en la captura («marca la luz pagada 71,20», «salta el gimnasio este mes», «mueve Netflix al 10») con `intent` en el esquema de Gemini y en el parser local, siempre confirmadas y con deshacer.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
@@ -393,11 +398,23 @@ Estado:
 4. **Provisión mensual para anuales** y "próximos recibos grandes (90 días)".
 5. **Cambios de precio programados** e historial de precio.
 6. **Coste por categoría y anualizado.**
-7. **Onboarding:** chips de alta rápida y checklist.
+7. **Onboarding:** chips de alta rápida y checklist. **Hecho.**
+   - `features/expenses/lib/onboarding.ts` (presets, checklist y visibilidad), `use-onboarding` (permiso de avisos, modo instalado y `beforeinstallprompt`) y `OnboardingCard`.
+   - El sueldo se configura con la misma hoja que Plan (`PlanSettingsSheet`); los avisos enlazan a Ajustes; instalar usa el aviso del navegador o una pista (iOS: Compartir › Añadir a pantalla de inicio).
+   - No incluye datos demo relativos a hoy (no se pidió en este bloque).
 8. **Pagas extra y "¿Has cobrado?"**; ámbito "solo este mes" al editar el sueldo (M16).
-9. **Catálogo "Todos"** con búsqueda y filtros.
-10. **Campos nuevos:** notas, URL de baja, permanencia, categorías propias y método de pago.
-11. **Comandos por voz o IA** ("marca la luz pagada 71,20").
+9. **Catálogo "Todos"** con búsqueda y filtros. **Hecho.**
+   - `lib/expense-catalog.ts` (próximo cobro, atrasado, coste de los próximos 12 meses, permanencia) y `catalog/ExpenseCatalogSheet`.
+   - El botón de la cabecera marca con un punto las permanencias que acaban. `buildRecurringOverview` queda sin uso en la UI; se conserva para la provisión de anuales (punto 4).
+10. **Campos nuevos:** notas, URL de baja, permanencia, categorías propias y método de pago. **Hecho.**
+    - `domain/expense-details.ts` (`sanitizeExpenseDetails`, `commitmentStatus`) y normalización en `normalizeTemplates` y `normalizeCategories`.
+    - Categorías con `updatedAt` y comandos en `stores/app/category-commands.ts`. Ajustes › Categorías y «Nueva categoría» en el formulario.
+    - Se escriben ya: van dentro de plantillas y categorías, que los builds anteriores guardan tal cual (ver `docs/state-persistence-sync.md`).
+11. **Comandos por voz o IA** ("marca la luz pagada 71,20"). **Hecho.**
+    - `intent` (create, pay, skip, move) en el esquema y el prompt, con los nombres de los gastos del usuario como contexto; la ruta devuelve `commands` aparte.
+    - `parseCaptureTextLocally` entiende las mismas órdenes (español e inglés) sin IA ni conexión.
+    - `domain/capture-commands.ts` resuelve serie y cobro; `CaptureCommandReview` las confirma; `capture-command-actions.ts` las aplica con los comandos de siempre (nuevo `payOccurrenceInStore`) y las deshace.
+    - Pendiente: medir las órdenes con la clave real en `scripts/eval-ai-parse.mjs` (sin clave en este entorno, como en F1b).
 12. **Resumen del mes** y **registro de saldo**.
 13. **Ciclo anclado al día de cobro** (opción).
 14. **Festivos** en `estimateChargeDate`.

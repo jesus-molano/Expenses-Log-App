@@ -45,10 +45,13 @@ Hay tests de:
 - Politica de sync y mensajes.
 - Comandos de store.
 - Rutas push, concurrencia y recuperacion de un lease abandonado.
-- Recurrencias, finanzas, parser, labels, timeline y DnD.
+- Recurrencias, finanzas, parser (altas y ordenes), labels, timeline y DnD.
+- Campos de contrato, categorias propias, catalogo, primeros pasos y ordenes de
+  la captura (resolucion, aplicar y deshacer).
 - Estilos del design system.
 - Flujos e2e de dashboard, tooltip de la grafica, menus sin recorte y
-  accesibilidad critica.
+  accesibilidad critica, y de F3 (`tests/e2e/f3-ux.spec.ts`): primeros pasos,
+  catalogo, datos de contrato, gestor de categorias y ordenes con deshacer.
 
 ## Cuando agregar tests
 

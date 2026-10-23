@@ -99,7 +99,9 @@ local sin romper la experiencia.
 La mezcla actual usa ids:
 
 - Entidades cloud como base.
-- Entidades locales como entrada con prioridad final.
+- Entidades locales como entrada con prioridad final, salvo que la de la nube
+  tenga un `updatedAt` mas reciente (plantillas, categorias, ingresos,
+  registros).
 - Tombstones combinados para filtrar elementos borrados.
 - Mapas mensuales de salario y ahorro: cloud + local, con local al final.
 - Sueldos borrados: `deleted.monthlySalary` guarda la hora del borrado
@@ -142,6 +144,35 @@ Reglas para campos nuevos:
   tambien. Si un build antiguo lo descarta, el mes activo vuelve a ser el
   natural. Se fusiona por mes con el `updatedAt` mas reciente; reabrir guarda
   `reopenedAt` en vez de borrar la entrada.
+- Campos de contrato de las plantillas (`notes`, `cancellationUrl`,
+  `commitmentEndDate`, `paymentMethod`, `paymentMethodDetail`) y `updatedAt` de
+  las categorias: viven dentro de entidades que todos los builds guardan tal
+  cual (las plantillas y categorias nunca se reconstruyen campo a campo), asi
+  que un build anterior los conserva al guardar y al fusionar. La
+  normalizacion (`sanitizeExpenseDetails`, `normalizeCategories`) descarta solo
+  lo ilegible: un enlace que no es http(s), una fecha imposible, un metodo de
+  pago desconocido; una categoria sin id. Un store sin estos campos carga
+  igual.
+
+## Categorias
+
+Las categorias son entidades del store (`id`, `name`, `icon`, `tone`,
+`updatedAt`). Las preset se crean al usarlas por primera vez; las propias, con
+`createCategoryInStore`. `findOrCreateCategory` reconoce cualquier categoria
+guardada por su nombre (sin tildes ni mayusculas) antes de recurrir a la preset
+equivalente. Renombrar o cambiar el color actualiza `updatedAt`; borrar
+(`deleteCategoryInStore`) pasa las plantillas, overrides y registros que la
+usan a otra categoria y deja su id como tombstone en `deleted.categories`.
+
+## Preferencias de dispositivo
+
+No se sincronizan y viven fuera del store:
+
+- `expense-view-month` (sessionStorage) y `plan-close-dismissed:YYYY-MM`.
+- `expense-onboarding-v1` (`src/data/persistence/onboarding-store.ts`):
+  `{startedAt, dismissedAt}` de la guia de primeros pasos. La guia se ve con el
+  store vacio (salvo mientras carga la nube) y, si el primer gasto se añadio
+  con ella a la vista, hasta ocultarla.
 
 ## Cola de guardado
 
