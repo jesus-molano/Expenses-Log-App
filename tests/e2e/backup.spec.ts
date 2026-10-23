@@ -59,6 +59,18 @@ function expenseRow(page: Page, name: string) {
   return page.locator('[data-expense-row="true"]').filter({ hasText: name });
 }
 
+// Se navega con los enlaces de la app: un page.goto mientras el service
+// worker recién registrado se activa puede abortarse.
+async function openExpenses(page: Page) {
+  await page.getByRole("link", { name: "Gastos" }).click();
+  await expect(page).toHaveURL(/\/$/);
+}
+
+async function openSettings(page: Page) {
+  await page.getByRole("link", { name: "Ajustes" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Ajustes" })).toBeVisible();
+}
+
 test("exports everything as JSON and the expenses as CSV", async ({ page }) => {
   await seed(page, rentStore);
   await page.goto("/settings");
@@ -107,11 +119,11 @@ test("replaces the data with a JSON backup and restores the previous copy", asyn
     page.getByRole("status").filter({ hasText: "Datos importados" }),
   ).toBeVisible();
 
-  await page.goto("/");
+  await openExpenses(page);
   await expect(expenseRow(page, "Netflix").first()).toBeVisible();
   await expect(expenseRow(page, "Alquiler")).toHaveCount(0);
 
-  await page.goto("/settings");
+  await openSettings(page);
   await page.getByRole("button", { name: "Ver" }).click();
   const copies = page.getByRole("dialog", { name: "Copias automáticas" });
   const beforeImport = copies.locator('[data-snapshot-reason="before-import"]');
@@ -122,7 +134,7 @@ test("replaces the data with a JSON backup and restores the previous copy", asyn
 
   await expect(copies).toBeHidden();
   await expect(page.getByRole("status").filter({ hasText: "Copia restaurada" })).toBeVisible();
-  await page.goto("/");
+  await openExpenses(page);
   await expect(expenseRow(page, "Alquiler").first()).toBeVisible();
   await expect(expenseRow(page, "Netflix")).toHaveCount(0);
 });
@@ -144,8 +156,9 @@ test("merges a CSV saved by a spreadsheet in Spanish", async ({ page }) => {
   await expect(preview.getByText("Quedarán 2 gastos · 0 pagos · 0 ingresos.")).toBeVisible();
   await preview.getByRole("button", { name: "Importar", exact: true }).click();
   await expect(preview).toBeHidden();
+  await expect(page.getByRole("status").filter({ hasText: "Datos importados" })).toBeVisible();
 
-  await page.goto("/");
+  await openExpenses(page);
   await expect(expenseRow(page, "Gimnasio").first()).toBeVisible();
   await expect(expenseRow(page, "Alquiler").first()).toBeVisible();
 });
