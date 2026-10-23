@@ -24,6 +24,7 @@ export const messages = {
       clear: "Limpiar",
       today: "Hoy",
       optional: "Opcional",
+      offline: "Sin conexión",
     },
     boot: {
       loading: "Cargando tus gastos...",
@@ -420,6 +421,7 @@ export const messages = {
       clear: "Clear",
       today: "Today",
       optional: "Optional",
+      offline: "Offline",
     },
     boot: {
       loading: "Loading your expenses...",

@@ -18,40 +18,90 @@ La app usa:
 
 ## Service worker
 
-Serwist genera `public/sw.js` desde `src/pwa/sw.ts` durante el build. El archivo
-generado no se versiona.
+`npm run build` ejecuta `serwist build serwist.config.mjs`, que compila
+`src/pwa/sw.ts` en `public/sw.js` e inyecta el manifiesto del precache. El
+archivo generado no se versiona. Las reglas puras (parametros ignorados, cortes
+de red, mensajes y caches obsoletas) viven en `src/pwa/cache-policy.ts`.
 
-La app precachea los recursos del build y las rutas prerenderizadas (`/`,
-`/money`, `/settings`, `/login`, `/expenses/new`).
+### Que se precachea
 
-Navegacion y red:
+`serwist.config.mjs` usa los valores por defecto de `@serwist/next`:
 
-- Las rutas precacheadas se sirven desde cache sin esperar a la red. El
-  navigation preload esta desactivado (`navigationPreload: false` mas
-  `disableNavigationPreload()`, porque la preferencia vive en el registro).
-  Con preload, una red que acepta la conexion pero no responde dejaba la app
-  colgada al abrirla sin cobertura real.
-- `ignoreURLParametersMatching` ignora `utm_*`, `fbclid`, `dpl` (Skew
-  Protection de Vercel), `from`, `mode` y `occurrence`. Asi
-  `/settings?from=money` usa `/settings`. Esos parametros se leen siempre en
-  cliente: una pagina que lea `searchParams` en servidor deja de ser estatica y
-  sale del precache.
-- El resto de navegaciones usan `NetworkFirst` (3 s) y caen a `/`.
-- Las estrategias con cache (`next-static`, `pages`, `app-assets`,
-  `same-origin`) abortan la peticion si no llegan cabeceras en 6 s. `pages-rsc`
-  corta a los 3 s: si el RSC de un cambio de pestaña no llega, Next recarga el
-  documento y lo sirve el precache al momento. `/api`, `/auth/` (callback de
-  OAuth con codigo de un solo uso) y los origenes externos usan solo red, sin
-  corte.
-- `next-static` y `app-assets` guardan los assets sin el parametro `dpl`.
-- Al activar una version nueva se borran las caches `pages`, `pages-rsc` y la
-  antigua `expense-reminders-*`.
-- `scripts/verify-sw.mjs` corre al final de `npm run build`. Falla si falta una
-  ruta principal, hay entradas duplicadas o con query, o no hay assets de
-  `/_next/static`.
-- Los enlaces entre Gastos, Plan y Ajustes hacen una navegacion de documento si
-  el navegador esta offline, por lo que no dependen de una respuesta RSC nueva.
-- API, origenes externos y peticiones no GET usan solo red.
+- Los assets del build en `.next/static/` con extension js, css, html, ico,
+  imagen, json o webmanifest. Llevan el hash en el nombre y entran sin
+  `__WB_REVISION__`.
+- Todo `public/`, salvo `public/app-icon-1024.png` (no se usa) y el propio
+  `sw.js`.
+- El HTML de las rutas prerenderizadas, con revision: `/`, `/money`,
+  `/settings`, `/login` y `/expenses/new`. No entran `_not-found`,
+  `_global-error` ni las rutas dinamicas (`/expenses/[id]`, `/auth/callback`,
+  `/api/*`).
+- Como mucho 5 MB por archivo. Hoy son unas 38 URLs (2,4 MB).
+
+No entran las fuentes de `next/font` (`.next/static/media/*.woff2`, fuera del
+glob), `/manifest.webmanifest` (lo genera una ruta, no es HTML) ni los iconos
+pedidos con `?v=5`. Se guardan en las caches de runtime la primera vez que se
+piden con el service worker al mando. Si se abre sin red antes de eso (justo
+tras la primera visita), la app carga igual, con la fuente del sistema y sin
+esos iconos.
+
+`scripts/verify-sw.mjs` corre al final de `npm run build` y falla si falta una
+ruta principal, hay entradas duplicadas o con query, o no hay assets de
+`/_next/static`.
+
+### Como responde
+
+Serwist prueba primero el precache y despues las reglas de `runtimeCaching` en
+orden; responde la primera que encaja. Solo intercepta GET: el resto va a la
+red sin pasar por el.
+
+| Peticion | Estrategia | Cache |
+| --- | --- | --- |
+| URL del precache | Cache, sin esperar a la red (solo pide a la red si falta la copia) | `serwist-precache-v2-*` |
+| `/api/*` | Solo red, sin corte | ninguna |
+| `/auth/*` (callback de OAuth, codigo de un solo uso) | Solo red, sin corte | ninguna |
+| Otro origen (Supabase) | Solo red, sin corte | ninguna |
+| `/_next/static/*` fuera del precache | `CacheFirst`, corte a 6 s | `next-static` (128, 30 dias) |
+| Navegacion | `NetworkFirst`: 3 s de red y luego la copia; corte a 6 s | `pages` (16, 7 dias) |
+| Fuente, imagen, script o estilo | `StaleWhileRevalidate`, corte a 6 s | `app-assets` (128, 30 dias) |
+| RSC (`?_rsc` o cabecera `RSC: 1`) | `NetworkFirst`: 3 s y corte a 3 s | `pages-rsc` (32, 1 dia) |
+| Resto del mismo origen | `NetworkFirst`: 3 s; corte a 6 s | `same-origin` (64, 1 dia) |
+
+Las caducidades cuentan desde el ultimo uso.
+
+- **Precache sin esperas.** El navigation preload esta desactivado
+  (`navigationPreload: false` mas `disableNavigationPreload()`, porque la
+  preferencia vive en el registro). Con preload, una ruta precacheada esperaba
+  la respuesta de red precargada y una red que acepta la conexion pero no
+  responde dejaba la app colgada.
+- **Parametros ignorados.** Al buscar en el precache se quitan `utm_*`,
+  `fbclid`, `dpl`, `from`, `mode` y `occurrence`. Asi `/settings?from=money`
+  usa `/settings` y `chunk.js?dpl=<id>` usa `chunk.js`. `from`, `mode` y
+  `occurrence` se leen siempre en cliente: una pagina que lea `searchParams` en
+  servidor deja de ser estatica y sale del precache.
+- **`dpl`.** Con Skew Protection, Vercel compila con `NEXT_DEPLOYMENT_ID` y Next
+  pide todos los assets (chunks, CSS y fuentes) con `?dpl=<id>`, mientras que
+  el precache los guarda sin el. Ademas de ignorarlo en el precache,
+  `next-static` y `app-assets` lo quitan de la clave con que guardan.
+- **Cortes.** `abortIfNoResponse` aborta la peticion si no llegan cabeceras a
+  tiempo; un cuerpo lento no se corta. En `NetworkFirst` sin copia en cache se
+  sigue esperando a la red tras los 3 s, hasta el corte. `pages-rsc` corta a
+  los 3 s: si el RSC de un cambio de pestaña no llega, Next recarga el
+  documento y lo sirve el precache al momento.
+- **Fallback a `/`.** Si una regla de runtime falla en una peticion de
+  documento (sin red y sin copia), responde el `/` precacheado. Serwist añade
+  el fallback a todas las reglas de runtime, tambien a `/auth/*`: un callback
+  de OAuth sin red abre la app en `/` sin iniciar sesion. Las peticiones de
+  datos (`/api`, RSC) no tienen fallback.
+- **Ciclo de vida.** `skipWaiting` y `clientsClaim`: una version nueva se activa
+  en cuanto termina de instalarse y toma el control de las pestañas abiertas.
+  Al activarse quita del precache las entradas que ya no estan en su manifiesto
+  (`cleanupOutdatedCaches` borra ademas las caches de formatos de precache
+  antiguos) y borra las caches `pages`, `pages-rsc` y la antigua
+  `expense-reminders-*`, que pueden apuntar a chunks de otro build.
+- Los enlaces entre Gastos, Plan y Ajustes (`OfflineLink`) hacen una
+  navegacion de documento si el navegador esta offline, por lo que no dependen
+  de una respuesta RSC nueva.
 
 El service worker tambien maneja:
 
@@ -124,6 +174,33 @@ y chunks. El script:
   el service worker y borra sus caches (nunca `localStorage`).
 
 `src/app/global-error.tsx` cubre los errores del layout raiz.
+
+### Aviso "Sin conexion"
+
+Las cabeceras de Gastos y Plan (`DashboardShell`) y de Ajustes muestran el chip
+"Sin conexion" (`src/components/ui/OfflineStatusChip.tsx`) mientras el
+navegador esta offline:
+
+- `useOnlineStatus` (`src/shared/hooks/use-online-status.ts`) escucha `online` y
+  `offline` con `useSyncExternalStore`. En el servidor y al hidratar devuelve
+  `true`, asi que el HTML prerenderizado nunca lleva el chip.
+- Es solo un aviso: `navigator.onLine` dice si hay red local, no si llega a
+  internet. En iOS, o en una red sin salida, puede seguir en `true` sin
+  conexion real; nada decide si guardar o sincronizar a partir de el.
+- La region `role="status"` existe siempre (vacia y sin ancho con conexion),
+  para que el lector de pantalla anuncie el chip al perder la conexion.
+- No mueve la cabecera: en Gastos y Plan va en la linea del titulo, de alto
+  fijo, y a 360 px recorta el titulo (el mes sigue en la barra de mes); en
+  Ajustes va junto al `h1`.
+
+### Pruebas del modo sin conexion
+
+`npm run e2e:offline` (ver `docs/testing-quality.md`) abre cada ruta principal
+en un arranque en frio contra un `next start` real: con el servidor parado, con
+un servidor que acepta conexiones y nunca responde, y desde un build con
+`NEXT_DEPLOYMENT_ID` cuyos assets llevan `?dpl=`. Antes de volver a abrir sin
+red vacia la cache HTTP de Chromium, como cuando iOS la libera: todo lo que
+carga tiene que salir de las caches del service worker.
 
 ## Supabase Auth
 

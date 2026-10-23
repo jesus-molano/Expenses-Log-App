@@ -48,6 +48,9 @@ Usar `src/components/ui` antes de crear controles nuevos:
 - `Field` y `DatePickerField`: campos de formulario.
 - `ConfirmActionDialog`: confirmaciones destructivas.
 - `ListItem`: filas genericas.
+- `OfflineLink`: enlace interno que navega por documento sin conexion.
+- `OfflineStatusChip`: chip "Sin conexion" (`app-chip app-chip-orange`) para
+  las cabeceras; solo aparece offline y no ocupa sitio con conexion.
 
 Los componentes especificos de gastos, dinero o ajustes deben vivir en su
 feature correspondiente.

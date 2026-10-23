@@ -3,6 +3,7 @@
 import { Landmark, Settings, WalletCards } from "lucide-react";
 import { useEffect } from "react";
 import { OfflineLink } from "@/components/ui/OfflineLink";
+import { OfflineStatusChip } from "@/components/ui/OfflineStatusChip";
 import type { AppLanguage } from "@/domain/types";
 import type { PanelChromeState } from "@/features/expenses/lib/scroll-chrome-state";
 import { t } from "@/shared/i18n";
@@ -49,9 +50,15 @@ export function DashboardShell({
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--app-text-subtle)]">
-                  {headlineTitle}
-                </p>
+                {/* Alto fijo de una línea: el chip sin conexión no empuja la
+                    cifra; si no cabe, se recorta el título (el mes sigue en la
+                    barra de mes). */}
+                <div className="flex h-4 min-w-0 items-center">
+                  <p className="truncate text-xs font-semibold uppercase tracking-wide text-[var(--app-text-subtle)]">
+                    {headlineTitle}
+                  </p>
+                  <OfflineStatusChip language={language} className="ml-2" />
+                </div>
                 <p className="app-money mt-1 text-[32px] font-semibold leading-none text-[var(--app-text)]">
                   {headlineLabel}
                 </p>

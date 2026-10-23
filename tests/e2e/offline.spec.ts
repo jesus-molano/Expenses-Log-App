@@ -1,7 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type BrowserContext } from "@playwright/test";
 import { demoStore } from "../../src/domain/seed";
 
 const storageKey = "expense-log-store-v1";
+
+async function seedDemoStore(context: BrowserContext) {
+  await context.addInitScript(
+    ({ key, store }) => {
+      if (!window.localStorage.getItem(key)) {
+        window.localStorage.setItem(key, JSON.stringify(store));
+      }
+    },
+    { key: storageKey, store: demoStore },
+  );
+}
 
 async function waitForServiceWorkerControl(page: import("@playwright/test").Page) {
   await page.waitForFunction(
@@ -16,14 +27,7 @@ test("loads and edits the main app routes after going offline", async ({
   context,
   page,
 }) => {
-  await context.addInitScript(
-    ({ key, store }) => {
-      if (!window.localStorage.getItem(key)) {
-        window.localStorage.setItem(key, JSON.stringify(store));
-      }
-    },
-    { key: storageKey, store: demoStore },
-  );
+  await seedDemoStore(context);
 
   await page.goto("/");
   await expect(page.getByText("Por pagar")).toBeVisible();
@@ -107,4 +111,52 @@ test("shows in Ajustes the precache URL that blocks offline use", async ({
       { timeout: 15_000 },
     )
     .toBe(false);
+});
+
+test("shows the offline chip in every main header without moving it", async ({
+  context,
+  page,
+}) => {
+  await seedDemoStore(context);
+  // El ancho más estrecho que cuida la app.
+  await page.setViewportSize({ width: 360, height: 760 });
+  const chip = page.getByRole("status").filter({ hasText: /^Sin conexión$/ });
+  const screens = [
+    {
+      path: "/",
+      header: page.locator("header[data-app-chrome]"),
+      ready: page.getByText("Por pagar"),
+    },
+    {
+      path: "/money",
+      header: page.locator("header[data-app-chrome]"),
+      ready: page.getByRole("heading", { level: 1, name: /Plan de/ }),
+    },
+    {
+      path: "/settings?from=expenses",
+      header: page.locator("main header").first(),
+      ready: page.getByRole("heading", { level: 1, name: "Ajustes" }),
+    },
+  ];
+
+  for (const { path, header, ready } of screens) {
+    await page.goto(path);
+    await expect(ready, path).toBeVisible();
+    await expect(chip, path).toHaveCount(0);
+    const onlineBox = await header.boundingBox();
+
+    await context.setOffline(true);
+    await expect(chip, path).toBeVisible();
+    await expect(chip, path).toBeInViewport({ ratio: 1 });
+    expect(await header.boundingBox(), path).toEqual(onlineBox);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+      path,
+    ).toBe(true);
+
+    await context.setOffline(false);
+    await expect(chip, path).toHaveCount(0);
+  }
 });

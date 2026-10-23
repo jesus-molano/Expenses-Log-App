@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { OfflineLink } from "@/components/ui/OfflineLink";
+import { OfflineStatusChip } from "@/components/ui/OfflineStatusChip";
 import { t } from "@/shared/i18n";
 import { useSettingsController } from "../hooks/use-settings-controller";
 import { SettingsDialogs } from "./SettingsDialogs";
@@ -33,9 +34,12 @@ export function SettingsView() {
 
         <Card variant="section" className="app-settings-card mt-4 p-4">
           <header>
-            <h1 className="text-2xl font-semibold text-[var(--app-text)]">
-              {t("settings.title")}
-            </h1>
+            <div className="flex items-center justify-between gap-3">
+              <h1 className="text-2xl font-semibold text-[var(--app-text)]">
+                {t("settings.title")}
+              </h1>
+              <OfflineStatusChip language={settings.currentLanguage} />
+            </div>
             <p className="mt-1 text-xs font-medium text-[var(--app-text-muted)]">
               {t("settings.subtitle")}
             </p>
