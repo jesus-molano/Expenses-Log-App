@@ -20,36 +20,6 @@ import type {
   RecurrenceFrequency,
 } from "@/domain/types";
 
-export const MONTHS_ES = [
-  "Ene",
-  "Feb",
-  "Mar",
-  "Abr",
-  "May",
-  "Jun",
-  "Jul",
-  "Ago",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dic",
-];
-
-export const MONTHS_EN = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
 export const RECURRENCE_OPTIONS: Array<{
   value: RecurrenceFrequency;
   labelKey: "once" | "monthly" | "quarterly" | "yearly" | "custom";

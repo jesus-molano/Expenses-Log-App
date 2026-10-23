@@ -45,11 +45,3 @@ export function Card({
     </section>
   );
 }
-
-export function SectionCard(props: Omit<CardProps, "variant">) {
-  return <Card {...props} variant="section" />;
-}
-
-export function StatCard(props: Omit<CardProps, "variant">) {
-  return <Card {...props} variant="stat" />;
-}
