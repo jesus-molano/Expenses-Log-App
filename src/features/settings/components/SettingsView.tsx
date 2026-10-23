@@ -10,9 +10,11 @@ import { SettingsDialogs } from "./SettingsDialogs";
 import {
   AccountRow,
   DangerRows,
+  InstallRow,
   LanguageRow,
   NotificationsRow,
   OfflineRow,
+  RemindersRow,
   ThemeRow,
 } from "./SettingsRows";
 
@@ -44,6 +46,8 @@ export function SettingsView() {
           <div className="mt-4 grid gap-2">
             <AccountRow settings={settings} />
             <NotificationsRow settings={settings} />
+            <RemindersRow settings={settings} />
+            <InstallRow language={settings.currentLanguage} />
             <OfflineRow language={settings.currentLanguage} />
             <ThemeRow settings={settings} />
             <LanguageRow settings={settings} />

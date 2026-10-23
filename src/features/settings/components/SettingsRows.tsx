@@ -1,6 +1,8 @@
 export { AccountRow } from "./rows/AccountRow";
 export { DangerRows } from "./rows/DangerRows";
+export { InstallRow } from "./rows/InstallRow";
 export { LanguageRow } from "./rows/LanguageRow";
 export { NotificationsRow } from "./rows/NotificationsRow";
 export { OfflineRow } from "./rows/OfflineRow";
+export { RemindersRow } from "./rows/RemindersRow";
 export { ThemeRow } from "./rows/ThemeRow";

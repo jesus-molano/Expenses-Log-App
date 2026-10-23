@@ -11,6 +11,7 @@ import { useSwipeAction } from "../hooks/use-swipe-action";
 import { expenseRowToneClass } from "../lib/expense-visual-state";
 import { DropIndicator } from "./row/DropIndicator";
 import { ExpenseRowContent } from "./row/ExpenseRowContent";
+import { ReminderBellButton } from "./row/ReminderBellButton";
 import { SwipeActionsLayer } from "./row/SwipeActionsLayer";
 
 type ExpenseRowProps = {
@@ -152,6 +153,9 @@ export function ExpenseRow({
           category={category}
           today={today}
           language={language}
+          statusAccessory={
+            <ReminderBellButton occurrence={occurrence} language={language} />
+          }
         />
         <div className="hidden shrink-0 items-center gap-1 sm:flex">
           <IconButton

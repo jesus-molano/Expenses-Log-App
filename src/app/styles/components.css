@@ -16,6 +16,7 @@
 .app-button:focus-visible,
 .app-icon-button:focus-visible,
 .app-control:focus-visible,
+.app-switch:focus-visible,
 .input-control:focus-visible {
   outline: none;
   box-shadow: var(--app-focus);
@@ -696,7 +697,8 @@
 
 .app-button:disabled,
 .app-icon-button:disabled,
-.app-control:disabled {
+.app-control:disabled,
+.app-switch:disabled {
   cursor: not-allowed;
   opacity: 0.48;
 }

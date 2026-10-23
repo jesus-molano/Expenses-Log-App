@@ -10,6 +10,8 @@ type ExpenseRowContentProps = {
   category?: ExpenseCategory;
   today: string;
   language: AppLanguage;
+  // Control junto al estado (la campana de aviso en la lista).
+  statusAccessory?: React.ReactNode;
 };
 
 export function ExpenseRowContent({
@@ -17,6 +19,7 @@ export function ExpenseRowContent({
   category,
   today,
   language,
+  statusAccessory,
 }: ExpenseRowContentProps) {
   const paid = occurrence.status === "paid";
   const statusToneClass = expenseStatusToneClass(occurrence, today);
@@ -55,11 +58,15 @@ export function ExpenseRowContent({
             {categoryLabel(category.name, language)}
           </span>
         ) : null}
-        <p
-          className={`ml-auto inline-flex shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusToneClass}`}
-        >
-          {statusLabel(occurrence, today, language)}
-        </p>
+        {/* La campana va pegada al estado y baja con él si no cabe. */}
+        <span className="ml-auto flex shrink-0 items-center gap-1.5">
+          {statusAccessory}
+          <p
+            className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusToneClass}`}
+          >
+            {statusLabel(occurrence, today, language)}
+          </p>
+        </span>
       </div>
     </div>
   );

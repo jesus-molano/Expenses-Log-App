@@ -47,6 +47,58 @@
   border-radius: var(--app-radius-sm);
 }
 
+/* Campana de aviso de la fila: 28 px visibles, 44 px de zona táctil. */
+.app-row-bell {
+  position: relative;
+  display: inline-grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: var(--app-radius-pill);
+  color: var(--app-text-subtle);
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+.app-row-bell::before {
+  content: "";
+  position: absolute;
+  inset: -0.5rem;
+}
+
+.app-row-bell:hover {
+  background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+  color: var(--app-accent);
+}
+
+.app-row-bell[aria-pressed="true"] {
+  color: var(--app-warning);
+}
+
+.app-row-bell:focus-visible {
+  outline: none;
+  box-shadow: var(--app-focus);
+}
+
+/* Cobro abierto desde una notificación (/?occurrence=). */
+[data-expense-row][data-highlighted="true"] .app-expense-row-card {
+  border-color: var(--app-accent);
+  animation: app-row-highlight 1.4s var(--ease-smooth) 2;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--app-accent) 70%, transparent),
+    var(--app-shadow-row);
+}
+
+@keyframes app-row-highlight {
+  50% {
+    box-shadow:
+      0 0 0 5px color-mix(in srgb, var(--app-accent) 28%, transparent),
+      var(--app-shadow-row);
+  }
+}
+
 /* Timeline */
 .app-timeline-dot {
   background: color-mix(in srgb, var(--app-accent) 82%, var(--app-accent-2));

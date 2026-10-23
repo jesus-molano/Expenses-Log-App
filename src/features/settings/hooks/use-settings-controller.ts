@@ -1,14 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { configuredPayday } from "@/domain/budget-month";
+import { toDateOnly } from "@/domain/calendar";
+import { resolveReminderPreferences } from "@/domain/reminder-schedule";
 import type { AppLanguage } from "@/domain/types";
 import { clearExpenseLocalData } from "@/data/persistence/local-store";
 import { t } from "@/shared/i18n";
 import { DEFAULT_THEME } from "@/shared/theme";
+import type { ReminderPreferencesInput } from "@/stores/app/store-commands";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { createClient } from "@/utils/supabase/client";
 import { useNotificationSettings } from "./use-notification-settings";
 import { useSettingsAuth } from "./use-settings-auth";
+import { deviceTimeZone } from "../lib/reminder-options";
 import { SETTINGS_LANGUAGES, SETTINGS_THEMES } from "../lib/settings-options";
 
 export function useSettingsController({
@@ -23,6 +28,7 @@ export function useSettingsController({
     syncMessage,
     updateTheme,
     updateLanguage,
+    updateReminderPreferences,
     clearExpenses,
     clearIncome,
   } = expenseStore;
@@ -61,6 +67,15 @@ export function useSettingsController({
   const backLabel =
     backTab === "money" ? t("common.plan") : t("common.expenses");
   const deleteAccountPhrase = t("settings.deleteAccountPhrase", currentLanguage);
+  const reminderPreferences = resolveReminderPreferences(store);
+  const hasPayday =
+    configuredPayday(store.finance, toDateOnly(new Date()).slice(0, 7)) !== null;
+
+  // La hora de los avisos se interpreta en la zona del dispositivo que la
+  // eligió: se guarda con cada cambio.
+  function saveReminderPreferences(changes: ReminderPreferencesInput) {
+    updateReminderPreferences({ ...changes, timeZone: deviceTimeZone() });
+  }
 
   async function handleClearExpenses() {
     setIsClearingExpenses(true);
@@ -145,6 +160,9 @@ export function useSettingsController({
     notificationsActive,
     isTestingNotification,
     lastTestSentAt,
+    reminderPreferences,
+    hasPayday,
+    updateReminderPreferences: saveReminderPreferences,
     setThemeOpen,
     setLanguageOpen,
     setClearExpensesOpen,

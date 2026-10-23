@@ -73,6 +73,8 @@ export function useActiveMonth({
       canSuggest && paymentSettlesMonth(context, occurrence),
     browse: (delta: number) =>
       setView(clampViewMonth(addMonthId(viewMonthId, delta), activeMonthId)),
+    // Mirar un mes concreto (el de un cobro abierto desde un aviso).
+    show: (monthId: string) => setView(clampViewMonth(monthId, activeMonthId)),
     reset: () => setView(null),
     advance: () => {
       closeMonth(calendarMonthId);

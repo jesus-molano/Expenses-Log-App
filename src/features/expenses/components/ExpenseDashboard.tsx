@@ -20,10 +20,13 @@ import {
 import { QuickCaptureReview } from "@/features/expenses/components/QuickCaptureReview";
 import { RecurringOverviewButton } from "@/features/expenses/components/RecurringOverviewButton";
 import { RecurringOverviewSheet } from "@/features/expenses/components/RecurringOverviewSheet";
+import { RowReminderProvider } from "@/features/expenses/components/row/RowReminderContext";
 import { useActionToast } from "@/features/expenses/hooks/use-action-toast";
 import { useActiveMonth } from "@/features/expenses/hooks/use-active-month";
 import { useExpenseCaptureFlow } from "@/features/expenses/hooks/use-expense-capture-flow";
 import { useExpenseFilters } from "@/features/expenses/hooks/use-expense-filters";
+import { useOccurrenceDeepLink } from "@/features/expenses/hooks/use-occurrence-deep-link";
+import { useReminderBell } from "@/features/expenses/hooks/use-reminder-bell";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { useQuickExpenseParser } from "@/features/expenses/hooks/use-quick-expense-parser";
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
@@ -57,6 +60,7 @@ export function ExpenseDashboard({
     dismissLastChanceReminder,
     moveOccurrenceOnly,
     moveOccurrenceSeries,
+    setTemplateReminder,
     closeMonth,
     reopenMonth,
   } = useExpenseStore();
@@ -65,6 +69,27 @@ export function ExpenseDashboard({
   const month = useActiveMonth({ store, language, now, closeMonth, reopenMonth });
   const filters = useExpenseFilters(store, language, now, month.viewMonthId);
   const actionToast = useActionToast();
+  const reminderBell = useReminderBell({
+    store,
+    language,
+    setTemplateReminder,
+    showToast: actionToast.show,
+    dismissToast: actionToast.dismiss,
+  });
+  // Cobro tocado en la lista: abre sus acciones.
+  const [selectedOccurrence, setSelectedOccurrence] = useState<ExpenseOccurrence | null>(null);
+  const deepLink = useOccurrenceDeepLink({
+    store,
+    language,
+    activeMonthId: month.activeMonthId,
+    viewMonthId: month.viewMonthId,
+    visibleOccurrences: filters.visibleOccurrences,
+    showMonth: month.show,
+    // El enlace de un aviso abre las acciones del cobro (pagar, mover...).
+    onOpen: (occurrence) => setSelectedOccurrence(occurrence),
+    onMissing: () =>
+      actionToast.show({ message: t("reminders.deepLinkMissing", language) }),
+  });
   const monthHeadingRef = useRef<HTMLHeadingElement>(null);
   const showCloseCard =
     month.suggestAdvance && month.viewMonthId === month.activeMonthId;
@@ -99,8 +124,6 @@ export function ExpenseDashboard({
   const runViewTransition = useViewTransitionAction();
   const router = useRouter();
   const [recurringOpen, setRecurringOpen] = useState(false);
-  // Cobro tocado en la lista: abre sus acciones.
-  const [selectedOccurrence, setSelectedOccurrence] = useState<ExpenseOccurrence | null>(null);
   const [hiddenReminderId, setHiddenReminderId] = useState<string | null>(null);
   const lastChanceReminder = buildLastChanceReminders(store, now).find(
     (reminder) => reminder.occurrence.id !== hiddenReminderId,
@@ -225,23 +248,25 @@ export function ExpenseDashboard({
         ) : null}
       </div>
 
-      <ExpenseList
-        sections={filters.timelineSections}
-        categories={store.categories}
-        today={filters.today}
-        monthId={month.viewMonthId}
-        openMonthId={month.calendarMonthId}
-        autoScroll={!showCloseCard}
-        language={language}
-        onTogglePaid={togglePaidWithMonthCheck}
-        onOpenOccurrence={setSelectedOccurrence}
-        onMoveOccurrenceOnly={(occurrence, dueDate, sortOrder) =>
-          runViewTransition(() => moveOccurrenceOnly(occurrence, dueDate, sortOrder))
-        }
-        onMoveOccurrenceSeries={(occurrence, dueDate) =>
-          runViewTransition(() => moveOccurrenceSeries(occurrence, dueDate))
-        }
-      />
+      <RowReminderProvider value={reminderBell}>
+        <ExpenseList
+          sections={filters.timelineSections}
+          categories={store.categories}
+          today={filters.today}
+          monthId={month.viewMonthId}
+          openMonthId={month.calendarMonthId}
+          autoScroll={!showCloseCard && !deepLink.openedFromLink}
+          language={language}
+          onTogglePaid={togglePaidWithMonthCheck}
+          onOpenOccurrence={setSelectedOccurrence}
+          onMoveOccurrenceOnly={(occurrence, dueDate, sortOrder) =>
+            runViewTransition(() => moveOccurrenceOnly(occurrence, dueDate, sortOrder))
+          }
+          onMoveOccurrenceSeries={(occurrence, dueDate) =>
+            runViewTransition(() => moveOccurrenceSeries(occurrence, dueDate))
+          }
+        />
+      </RowReminderProvider>
 
       {filters.nextMonthPreview && month.viewMonthId === month.activeMonthId && month.canBrowseForward ? (
         <NextMonthPreview
@@ -299,6 +324,7 @@ export function ExpenseDashboard({
         review={capture.draftReview}
         notice={capture.notice}
         language={language}
+        reminderPreferences={reminderBell.preferences}
         onClose={capture.closeForm}
         onSave={capture.saveForm}
       />
