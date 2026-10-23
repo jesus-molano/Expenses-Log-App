@@ -9,6 +9,7 @@ import { useSettingsController } from "../hooks/use-settings-controller";
 import { SettingsDialogs } from "./SettingsDialogs";
 import {
   AccountRow,
+  CategoriesRow,
   DangerRows,
   LanguageRow,
   NotificationsRow,
@@ -45,6 +46,7 @@ export function SettingsView() {
             <AccountRow settings={settings} />
             <NotificationsRow settings={settings} />
             <OfflineRow language={settings.currentLanguage} />
+            <CategoriesRow language={settings.currentLanguage} />
             <ThemeRow settings={settings} />
             <LanguageRow settings={settings} />
             <DangerRows settings={settings} />

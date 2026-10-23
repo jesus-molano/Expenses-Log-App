@@ -4,12 +4,14 @@ import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { toDateOnly } from "@/domain/calendar";
+import type { CategoryInput } from "@/domain/categories";
 import type { CapturedDraft } from "@/domain/expense-capture";
 import { firstChargeAlreadyPassed } from "@/domain/recurrence";
 import type {
   AppLanguage,
   CreateExpenseOptions,
   DraftExpense,
+  ExpenseCategory,
   OccurrenceStatus,
 } from "@/domain/types";
 import { t } from "@/shared/i18n";
@@ -26,6 +28,8 @@ type ExpenseFormSheetProps = {
   // Por qué el borrador viene del análisis local, si es el caso.
   notice?: CaptureReason | null;
   language?: AppLanguage;
+  categories?: ExpenseCategory[];
+  onCreateCategory?: (input: CategoryInput) => string | null;
   onClose: () => void;
   onSave: (draft: DraftExpense, options?: CreateExpenseOptions) => void;
 };
@@ -36,6 +40,8 @@ export function ExpenseFormSheet({
   review = null,
   notice = null,
   language = "es",
+  categories,
+  onCreateCategory,
   onClose,
   onSave,
 }: ExpenseFormSheetProps) {
@@ -116,6 +122,8 @@ export function ExpenseFormSheet({
             form={form}
             amountText={amountText}
             language={language}
+            categories={categories}
+            onCreateCategory={onCreateCategory}
             onFormChange={setForm}
             onAmountTextChange={setAmountText}
           />

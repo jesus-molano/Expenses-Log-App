@@ -1,6 +1,7 @@
 import { BellRing } from "lucide-react";
 import { Surface } from "@/components/ui/Surface";
-import type { AppLanguage, DraftExpense } from "@/domain/types";
+import type { CategoryInput } from "@/domain/categories";
+import type { AppLanguage, DraftExpense, ExpenseCategory } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { isValidPositiveMoneyInput } from "@/shared/money";
 import {
@@ -8,11 +9,15 @@ import {
   ExpenseField,
   ExpenseSchedulePicker,
 } from "./ExpenseFormControls";
+import { ExpenseDetailsFields } from "./form/ExpenseDetailsFields";
 
 type ExpenseFormProps = {
   form: DraftExpense;
   amountText: string;
   language: AppLanguage;
+  // Categorías guardadas (propias y colores) y alta de una nueva.
+  categories?: ExpenseCategory[];
+  onCreateCategory?: (input: CategoryInput) => string | null;
   onFormChange: (form: DraftExpense) => void;
   onAmountTextChange: (value: string) => void;
 };
@@ -21,6 +26,8 @@ export function ExpenseForm({
   form,
   amountText,
   language,
+  categories,
+  onCreateCategory,
   onFormChange,
   onAmountTextChange,
 }: ExpenseFormProps) {
@@ -74,6 +81,8 @@ export function ExpenseForm({
       <CategoryPicker
         value={form.categoryName}
         language={language}
+        categories={categories}
+        onCreateCategory={onCreateCategory}
         onChange={(categoryName) => onFormChange({ ...form, categoryName })}
       />
 
@@ -88,6 +97,8 @@ export function ExpenseForm({
         language={language}
         onChange={onFormChange}
       />
+
+      <ExpenseDetailsFields value={form} language={language} onChange={onFormChange} />
     </div>
   );
 }

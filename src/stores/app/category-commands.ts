@@ -3,18 +3,16 @@ import {
   CUSTOM_CATEGORY_ICON,
   findPresetCategory,
   validateCategoryName,
+  type CategoryInput,
 } from "@/domain/categories";
-import type { CategoryTone, ExpenseCategory, ExpenseStore } from "@/domain/types";
+import type { ExpenseCategory, ExpenseStore } from "@/domain/types";
 import {
   createId,
   findCategoryByName,
   findOrCreateCategory,
 } from "@/features/expenses/lib/expense-actions";
 
-export type CategoryInput = {
-  name: string;
-  tone: CategoryTone;
-};
+export type { CategoryInput };
 
 // Crea una categoría propia. Si ya hay una con ese nombre se reutiliza (sin
 // cambiarla): el formulario la selecciona igual.
@@ -88,7 +86,18 @@ export function deleteCategoryInStore(
   const withoutDeleted = {
     ...store,
     categories: store.categories.filter((category) => category.id !== categoryId),
+    deleted: {
+      ...store.deleted,
+      categories: Array.from(new Set([...(store.deleted?.categories ?? []), categoryId])),
+    },
   };
+  const inUse =
+    store.templates.some((template) => template.categoryId === categoryId) ||
+    store.overrides.some((override) => override.categoryId === categoryId) ||
+    (store.occurrenceRecords ?? []).some((record) => record.categoryId === categoryId);
+  // Sin nada que mover no se crea la categoría de destino.
+  if (!inUse) return withoutDeleted;
+
   const replacement = findOrCreateCategory(withoutDeleted, replacementName);
   const target = replacement.store.categories.find(
     (category) => category.id === replacement.categoryId,
@@ -112,11 +121,5 @@ export function deleteCategoryInStore(
         ? { ...record, categoryId: target.id, categoryName: target.name, updatedAt: now }
         : record,
     ),
-    deleted: {
-      ...replacement.store.deleted,
-      categories: Array.from(
-        new Set([...(replacement.store.deleted?.categories ?? []), categoryId]),
-      ),
-    },
   };
 }

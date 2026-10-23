@@ -173,4 +173,16 @@ describe("category commands", () => {
     expect(store.templates[0].categoryId).toBe(general?.id);
     expect(deleteCategoryInStore(base, "missing", "General")).toBe(base);
   });
+
+  it("deletes an unused category without creating the replacement", () => {
+    const base: ExpenseStore = {
+      ...emptyStore,
+      categories: [{ id: "viajes", userId: "demo", name: "Viajes", icon: "Tag", tone: "rose" }],
+    };
+
+    const store = deleteCategoryInStore(base, "viajes", "General", NOW);
+
+    expect(store.categories).toEqual([]);
+    expect(store.deleted?.categories).toEqual(["viajes"]);
+  });
 });

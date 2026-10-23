@@ -9,6 +9,7 @@ import {
   PawPrint,
   PiggyBank,
   Sparkles,
+  Tag,
   TrainFront,
   Utensils,
   User,
@@ -86,4 +87,5 @@ export const categoryIconMap: Record<string, LucideIcon> = {
   BriefcaseBusiness,
   PawPrint,
   PiggyBank,
+  Tag,
 };

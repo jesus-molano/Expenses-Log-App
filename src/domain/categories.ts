@@ -52,6 +52,12 @@ export function isCategoryTone(value: unknown): value is CategoryTone {
   return CATEGORY_TONES.includes(value as CategoryTone);
 }
 
+// Lo que el usuario decide de una categoría propia.
+export type CategoryInput = {
+  name: string;
+  tone: CategoryTone;
+};
+
 export type CategoryNameError = "empty" | "tooLong" | "duplicate";
 
 // Un nombre vacío, demasiado largo o que ya usa otra categoría del usuario no

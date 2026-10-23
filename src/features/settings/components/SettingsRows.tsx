@@ -1,4 +1,5 @@
 export { AccountRow } from "./rows/AccountRow";
+export { CategoriesRow } from "./rows/CategoriesRow";
 export { DangerRows } from "./rows/DangerRows";
 export { LanguageRow } from "./rows/LanguageRow";
 export { NotificationsRow } from "./rows/NotificationsRow";

@@ -50,6 +50,7 @@ export function ExpenseDashboard({
     moveOccurrenceSeries,
     closeMonth,
     reopenMonth,
+    createCategory,
   } = useExpenseStore();
   const language = store.preferences?.language ?? "es";
   const now = useCurrentDate();
@@ -244,6 +245,8 @@ export function ExpenseDashboard({
         review={capture.draftReview}
         notice={capture.notice}
         language={language}
+        categories={store.categories}
+        onCreateCategory={createCategory}
         onClose={capture.closeForm}
         onSave={capture.saveForm}
       />
