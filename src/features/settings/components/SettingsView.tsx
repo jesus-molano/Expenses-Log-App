@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { OfflineLink } from "@/components/ui/OfflineLink";
 import { t } from "@/shared/i18n";
@@ -15,7 +16,8 @@ import {
   ThemeRow,
 } from "./SettingsRows";
 
-export function SettingsView({ from }: { from?: "money" | "expenses" }) {
+export function SettingsView() {
+  const from = useSearchParams().get("from") === "money" ? "money" : "expenses";
   const settings = useSettingsController({ from });
 
   return (

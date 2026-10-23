@@ -173,10 +173,14 @@ test("shows a color marker for every annual chart series", async ({ page }) => {
   const chart = page.locator(".recharts-wrapper");
   await expect(chart).toBeVisible();
   await chart.scrollIntoViewIfNeeded();
-  await page.locator(".recharts-bar-rectangle").first().hover({ force: true });
 
   const tooltipRows = page.locator(".app-chart-tooltip-row");
-  await expect(tooltipRows).toHaveCount(3);
+  // La animación inicial de recharts vuelve a montar las barras: si el hover
+  // cae sobre una barra que se desmonta, se repite.
+  await expect(async () => {
+    await page.locator(".recharts-bar-rectangle").first().hover({ force: true });
+    await expect(tooltipRows).toHaveCount(3, { timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
   const markerColors = await tooltipRows.evaluateAll((rows) =>
     rows.map((row) => {
       const marker = row.querySelector<HTMLElement>('[aria-hidden="true"]');

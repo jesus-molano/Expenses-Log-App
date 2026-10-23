@@ -29,7 +29,12 @@ Estado:
   - Fila "Uso sin conexión" en Ajustes y diagnóstico de instalación del precache.
   - Hidratación resistente a fallos de Supabase y `global-error`.
   - Ver `docs/platform.md`.
-- **Siguiente puerta:** el dueño abre Ajustes con conexión en su Android y comparte el estado de la fila "Uso sin conexión". Decide PR 1b.
+- **PR 1b: hecho.**
+  - Navigation preload desactivado, cortes de red a los 6 s y `dpl` ignorado.
+  - `/settings` estática y limpieza de cachés obsoletas.
+  - `verify-sw.mjs` y harness `npm run e2e:offline`.
+  - El harness reproduce el cuelgue con una red que acepta conexiones y no responde (el caso de los datos móviles sin cobertura real): falla antes de 1b y pasa con 1b.
+- **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
 **Decisiones del dueño:**

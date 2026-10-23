@@ -21,12 +21,34 @@ La app usa:
 Serwist genera `public/sw.js` desde `src/pwa/sw.ts` durante el build. El archivo
 generado no se versiona.
 
-La app precachea los recursos del build y las variantes de Ajustes necesarias.
-Las navegaciones usan `NetworkFirst` y caen a la shell precacheada. Los enlaces
-entre Gastos, Plan y Ajustes hacen una navegación de documento si el navegador
-está offline, por lo que no dependen de una respuesta RSC nueva. Las respuestas
-RSC GET usan un cache separado y limitado. Los assets estáticos usan caches con
-caducidad. API, origenes externos y peticiones no GET usan solo red.
+La app precachea los recursos del build y las rutas prerenderizadas (`/`,
+`/money`, `/settings`, `/login`, `/expenses/new`).
+
+Navegacion y red:
+
+- Las rutas precacheadas se sirven desde cache sin esperar a la red. El
+  navigation preload esta desactivado (`navigationPreload: false` mas
+  `disableNavigationPreload()`, porque la preferencia vive en el registro).
+  Con preload, una red que acepta la conexion pero no responde dejaba la app
+  colgada al abrirla sin cobertura real.
+- `ignoreURLParametersMatching` ignora `utm_*`, `fbclid`, `dpl` (Skew
+  Protection de Vercel), `from`, `mode` y `occurrence`. Asi
+  `/settings?from=money` usa `/settings`. Esos parametros se leen siempre en
+  cliente: una pagina que lea `searchParams` en servidor deja de ser estatica y
+  sale del precache.
+- El resto de navegaciones usan `NetworkFirst` (3 s) y caen a `/`.
+- Las estrategias con cache (`next-static`, `pages`, `app-assets`, `pages-rsc`,
+  `same-origin`) abortan la peticion si no llegan cabeceras en 6 s. `/api` y
+  los origenes externos usan solo red, sin ese corte.
+- `next-static` y `app-assets` guardan los assets sin el parametro `dpl`.
+- Al activar una version nueva se borran las caches `pages`, `pages-rsc` y la
+  antigua `expense-reminders-*`.
+- `scripts/verify-sw.mjs` corre al final de `npm run build`. Falla si falta una
+  ruta principal, hay entradas duplicadas o con query, o no hay assets de
+  `/_next/static`.
+- Los enlaces entre Gastos, Plan y Ajustes hacen una navegacion de documento si
+  el navegador esta offline, por lo que no dependen de una respuesta RSC nueva.
+- API, origenes externos y peticiones no GET usan solo red.
 
 El service worker tambien maneja:
 

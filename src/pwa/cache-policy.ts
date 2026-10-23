@@ -10,6 +10,26 @@ export const LEGACY_CACHE_PREFIX = "expense-reminders-";
 // Esperas antes de cada reintento de una URL del precache con error temporal.
 export const PRECACHE_RETRY_DELAYS_MS = [1_000, 3_000] as const;
 
+// Parámetros que no cambian el documento: se ignoran al buscar en el precache.
+// `dpl` lo añade la Skew Protection de Vercel; `from`, `mode` y `occurrence`
+// se leen en cliente, así que /settings?from=money usa el /settings precacheado.
+export const PRECACHE_IGNORED_URL_PARAMS = [
+  /^utm_/,
+  /^fbclid$/,
+  /^dpl$/,
+  /^from$/,
+  /^mode$/,
+  /^occurrence$/,
+];
+
+// Tiempo máximo sin cabeceras de respuesta antes de abandonar la red y usar la
+// caché o el fallback: una red que no responde no debe colgar la app.
+export const NETWORK_RESPONSE_TIMEOUT_MS = 6_000;
+
+// Cachés en runtime que dependen de un build concreto: se vacían al activar
+// una versión nueva para no servir HTML que apunta a chunks borrados.
+export const PER_BUILD_RUNTIME_CACHES = ["pages", "pages-rsc"] as const;
+
 export type OfflineStatusResponse = {
   type: typeof OFFLINE_STATUS_RESPONSE;
   expected: number;
@@ -28,6 +48,20 @@ export function isTransientStatus(status: number) {
 
 export function isLegacyCacheName(cacheName: string) {
   return cacheName.startsWith(LEGACY_CACHE_PREFIX);
+}
+
+export function isObsoleteCacheName(cacheName: string) {
+  return (
+    isLegacyCacheName(cacheName) ||
+    (PER_BUILD_RUNTIME_CACHES as readonly string[]).includes(cacheName)
+  );
+}
+
+// Clave de caché de un asset sin el parámetro de despliegue de Vercel.
+export function stripDeploymentQuery(href: string) {
+  const url = new URL(href);
+  url.searchParams.delete("dpl");
+  return url.href;
 }
 
 // Ruta legible de una petición de precache, sin origen ni revisión de Serwist.
