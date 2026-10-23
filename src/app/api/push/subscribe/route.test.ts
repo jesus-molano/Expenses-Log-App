@@ -30,8 +30,17 @@ function mockSupabase(
     user?: User | null;
     stored?: Array<{ endpoint: string; updated_at: string }>;
     upsertError?: { code: string; message: string } | null;
+    // Sin la migración de F0c-2 el RPC no existe y se usa el upsert.
+    rpcError?: { code: string; message: string } | null;
   } = {},
 ) {
+  const rpc = vi.fn().mockResolvedValue({
+    data: null,
+    error:
+      options.rpcError === undefined
+        ? { code: "PGRST202", message: "Could not find the function public.claim_push_subscription" }
+        : options.rpcError,
+  });
   const upsert = vi
     .fn()
     .mockResolvedValue({ error: options.upsertError ?? null });
@@ -58,8 +67,9 @@ function mockSupabase(
       }),
     },
     from,
+    rpc,
   } as unknown as AppSupabaseClient);
-  return { upsert, deleteQuery, selectQuery };
+  return { upsert, deleteQuery, selectQuery, rpc };
 }
 
 afterEach(() => {
@@ -158,6 +168,32 @@ describe("/api/push/subscribe", () => {
     expect(await response.json()).toEqual({ code: "PUSH_SUBSCRIPTION_IN_USE" });
     // Sin guardar el nuevo no se borra ningún dispositivo.
     expect(deleteQuery.in).not.toHaveBeenCalled();
+  });
+
+  it("claims the endpoint through the RPC once the migration exists", async () => {
+    const { rpc, upsert } = mockSupabase({ rpcError: null });
+    const response = await POST(
+      request("POST", { endpoint, keys: { p256dh: "key", auth: "auth" } }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("claim_push_subscription", {
+      p_endpoint: endpoint,
+      p_p256dh: "key",
+      p_auth: "auth",
+    });
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed claim without falling back", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { upsert } = mockSupabase({ rpcError: { code: "42501", message: "permission denied" } });
+    const response = await POST(
+      request("POST", { endpoint, keys: { p256dh: "key", auth: "auth" } }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(upsert).not.toHaveBeenCalled();
   });
 
   it("removes only the authenticated user's endpoint", async () => {
