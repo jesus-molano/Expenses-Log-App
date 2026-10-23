@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { generateStoreOccurrences } from "@/domain/finance";
 import { emptyStore } from "@/domain/seed";
+import type { SeriesAmountPrompt } from "@/domain/series-lifecycle";
 import type { ExpenseStore } from "@/domain/types";
 import { OccurrenceActionSheet } from "./OccurrenceActionSheet";
 
@@ -26,9 +27,11 @@ const store: ExpenseStore = {
   ],
 };
 const occurrence = generateStoreOccurrences(store, "2026-10-01", "2026-10-31")[0];
-const prompt = { templateId: "luz", name: "Luz", from: 60, to: 74.3 };
+const prompt: SeriesAmountPrompt = { templateId: "luz", name: "Luz", from: 60, to: 74.3 };
 
-function renderSheet(seriesPromptFor = vi.fn(() => prompt)) {
+function renderSheet(
+  seriesPromptFor = vi.fn((): SeriesAmountPrompt | null => prompt),
+) {
   const handlers = {
     onClose: vi.fn(),
     onPayAmount: vi.fn(),
@@ -85,7 +88,7 @@ describe("OccurrenceActionSheet paying another amount", () => {
   });
 
   it("closes without asking when the planned amount is paid or there is nothing to update", () => {
-    const { sheet, onPayAmount, onClose, seriesPromptFor } = renderSheet(vi.fn(() => null));
+    const { sheet, onPayAmount, onClose, seriesPromptFor } = renderSheet(vi.fn((): SeriesAmountPrompt | null => null));
 
     fireEvent.change(within(sheet).getByLabelText("Importe cobrado"), {
       target: { value: "61" },
