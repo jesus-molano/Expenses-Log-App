@@ -153,7 +153,8 @@ Esto evita meter Supabase Auth en cada request API.
   En iOS y Safari falta o se cuelga en apps instaladas: alli se muestra una pista
   para usar el microfono del teclado.
 - Lo dictado se suma a lo ya escrito; mientras se dicta, el campo es de solo
-  lectura. El dictado termina al tocar de nuevo, a los 30 s, tras 2 s sin oir
+  lectura hasta que llega lo ultimo dictado (si lo escrito acaba en salto de
+  linea, lo dictado va en otra linea). El dictado termina al tocar de nuevo, a los 30 s, tras 2 s sin oir
   nada nuevo (tambien parcial) o al salir de la app: pide al reconocedor lo que
   aun procesa (`stop`, no `abort`) y lanza un unico analisis. Analizar mientras
   se dicta lo termina y analiza el texto completo.
@@ -174,7 +175,9 @@ Esto evita meter Supabase Auth en cada request API.
   `use-history-layer.ts`). Cada capa añade una entrada al historial con la
   misma URL; las que se cierran a la vez se deshacen con un solo
   `history.go(-n)`, una entrada sin dueño (tras recargar o navegar con una hoja
-  abierta) se salta y, mientras hay capas, el scroll no se restaura al volver.
+  abierta) se salta al llegar a ella o al arrancar la app en ella
+  (`OrphanLayerGuard`) y, mientras hay capas, el scroll no se restaura al
+  volver.
 
 ## APIs internas
 

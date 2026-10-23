@@ -119,7 +119,11 @@ describe("useExpenseCaptureFlow with dictation", () => {
     onerror: ((event: unknown) => void) | null = null;
     onend: (() => void) | null = null;
     start = vi.fn();
-    stop = vi.fn(() => this.onend?.());
+    // Por defecto, parar termina en el acto; `slowStop` lo deja pendiente.
+    static slowStop = false;
+    stop = vi.fn(() => {
+      if (!FakeRecognition.slowStop) this.onend?.();
+    });
     abort = vi.fn();
     constructor() {
       FakeRecognition.last = this;
@@ -137,8 +141,43 @@ describe("useExpenseCaptureFlow with dictation", () => {
   }
 
   afterEach(() => {
+    FakeRecognition.slowStop = false;
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it("ignores a second mic tap while the last words are still arriving", () => {
+    withRecognizer();
+    FakeRecognition.slowStop = true;
+    const { hook, parser } = setup(captured("Netflix 12,99"));
+
+    act(() => hook.result.current.dictation.toggle());
+    const recognition = FakeRecognition.last!;
+    act(() => recognition.say("Netflix doce"));
+    act(() => hook.result.current.dictation.toggle());
+    act(() => hook.result.current.dictation.toggle());
+    act(() => recognition.say("Netflix doce noventa y nueve"));
+    act(() => recognition.onend?.());
+
+    expect(parser.parse).toHaveBeenCalledTimes(1);
+    expect(parser.parse).toHaveBeenCalledWith("Netflix doce noventa y nueve");
+  });
+
+  it("analyzes once when Analizar is pressed while the dictation is ending", () => {
+    withRecognizer();
+    FakeRecognition.slowStop = true;
+    const { hook, parser } = setup(captured("Netflix 12,99"));
+
+    act(() => hook.result.current.dictation.toggle());
+    const recognition = FakeRecognition.last!;
+    act(() => recognition.say("Netflix doce"));
+    act(() => hook.result.current.dictation.toggle());
+    act(() => hook.result.current.analyze());
+    act(() => recognition.say("Netflix doce noventa y nueve"));
+    act(() => recognition.onend?.());
+
+    expect(parser.parse).toHaveBeenCalledTimes(1);
+    expect(parser.parse).toHaveBeenCalledWith("Netflix doce noventa y nueve");
   });
 
   it("adds what is dictated after what was typed", () => {

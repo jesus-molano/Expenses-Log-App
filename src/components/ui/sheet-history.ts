@@ -10,7 +10,7 @@
 // - Una capa que se abre mientras hay una vuelta atrás en curso espera a que
 //   termine antes de añadir su entrada, para que ese popstate no la cierre.
 // - Una entrada de capa que ya no tiene dueño (tras recargar o navegar con
-//   una hoja abierta) se salta.
+//   una hoja abierta) se salta, al llegar a ella o al arrancar la app en ella.
 
 type LayerEntry = { id: string; close: () => void; pushed: boolean };
 type LayerState = { __sheet?: string } | null;
@@ -19,15 +19,20 @@ const stack: LayerEntry[] = [];
 let removed: string[] = [];
 let flushScheduled = false;
 let pendingBacks = 0;
+let backToken = 0;
 let listening = false;
 let nextId = 0;
+// Si una vuelta atrás no llega a producirse (no había entrada anterior), se
+// deja de esperarla para que las capas nuevas puedan añadir su entrada.
+const BACK_TIMEOUT_MS = 1_500;
 
 function currentLayerId() {
   return (window.history.state as LayerState)?.__sheet;
 }
 
 // Mientras hay capas, el scroll de la página no se restaura al ir atrás: la
-// página no ha cambiado, solo se ha cerrado la capa.
+// página no ha cambiado, solo se ha cerrado la capa. El modo es de cada
+// entrada; al volver a una entrada sin capa se deja en "auto".
 function setScrollRestoration(mode: ScrollRestoration) {
   try {
     window.history.scrollRestoration = mode;
@@ -51,7 +56,20 @@ function pushWaitingEntries() {
 
 function goBack(steps: number) {
   pendingBacks += 1;
+  backToken += 1;
+  const token = backToken;
   window.history.go(-steps);
+  window.setTimeout(() => {
+    if (token !== backToken || pendingBacks === 0) return;
+    pendingBacks = 0;
+    pushWaitingEntries();
+  }, BACK_TIMEOUT_MS);
+}
+
+function ensureListening() {
+  if (listening) return;
+  window.addEventListener("popstate", handlePopState);
+  listening = true;
 }
 
 function flushRemovals() {
@@ -71,6 +89,12 @@ function flushRemovals() {
 function handlePopState(event: PopStateEvent) {
   if (pendingBacks > 0) {
     pendingBacks -= 1;
+    // Varias entradas sin dueño seguidas (hoja y selector abiertos al
+    // recargar): se siguen saltando.
+    if (pendingBacks === 0 && stack.length === 0 && removed.length === 0 && currentLayerId()) {
+      goBack(1);
+      return;
+    }
     pushWaitingEntries();
     return;
   }
@@ -85,14 +109,23 @@ function handlePopState(event: PopStateEvent) {
   }
   // Entrada de una capa que ya no existe: se salta para que Atrás no parezca
   // no hacer nada.
-  if ((event.state as LayerState)?.__sheet) goBack(1);
+  if ((event.state as LayerState)?.__sheet) {
+    goBack(1);
+    return;
+  }
+  setScrollRestoration("auto");
+}
+
+// Al arrancar en una entrada de capa sin dueño (recarga, o Android que
+// restaura la app con una hoja abierta), se vuelve a la entrada de debajo.
+export function skipOrphanLayerEntry() {
+  if (stack.length > 0 || pendingBacks > 0 || removed.length > 0 || !currentLayerId()) return;
+  ensureListening();
+  goBack(1);
 }
 
 export function registerHistoryLayer(close: () => void): () => void {
-  if (!listening) {
-    window.addEventListener("popstate", handlePopState);
-    listening = true;
-  }
+  ensureListening();
   nextId += 1;
   const entry: LayerEntry = { id: `sheet-${nextId}`, close, pushed: false };
   const orphan = stack.length === 0 && pendingBacks === 0 && removed.length === 0

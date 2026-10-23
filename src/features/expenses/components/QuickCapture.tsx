@@ -19,6 +19,7 @@ type QuickCaptureProps = {
   dictation: {
     supported: boolean;
     listening: boolean;
+    busy: boolean;
     error: DictationError | null;
     toggle: () => void;
   };
@@ -166,7 +167,7 @@ export function QuickCapture({
               }}
               // Mientras se dicta, el texto lo escribe el dictado: lo tecleado
               // se perdería con el siguiente resultado.
-              readOnly={dictation.listening}
+              readOnly={dictation.busy}
               placeholder={t("expenses.quickPlaceholder", language)}
               className={cn(
                 "input-control h-auto min-h-24 w-full resize-none py-3 leading-relaxed",
@@ -179,7 +180,7 @@ export function QuickCapture({
                 size="touch"
                 variant={dictation.listening ? "default" : "ghost"}
                 onClick={dictation.toggle}
-                disabled={isParsing}
+                disabled={isParsing || (dictation.busy && !dictation.listening)}
                 aria-label={
                   dictation.listening
                     ? t("expenses.dictationStop", language)
@@ -211,7 +212,7 @@ export function QuickCapture({
                 key={example}
                 type="button"
                 className="app-chip app-focus-ring min-h-9 px-3 py-1.5 text-left text-xs font-medium disabled:opacity-50"
-                disabled={dictation.listening}
+                disabled={dictation.busy}
                 onClick={() => onValueChange(example)}
               >
                 {example}

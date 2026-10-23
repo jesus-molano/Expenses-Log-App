@@ -184,4 +184,49 @@ describe("sheet history", () => {
     await settle();
     expect(close).toHaveBeenCalledTimes(1);
   });
+
+  it("steps off orphan layer entries when the app starts on one", async () => {
+    fake = installFakeHistory([
+      { state: null },
+      { state: { __sheet: "sheet-3" } },
+      { state: { __sheet: "sheet-4" } },
+    ]);
+    const { skipOrphanLayerEntry } = await load();
+
+    skipOrphanLayerEntry();
+    await settle();
+
+    expect(fake.index).toBe(0);
+    expect(fake.scrollRestoration).toBe("auto");
+  });
+
+  it("stops waiting for a step back that never happens", async () => {
+    vi.useFakeTimers();
+    fake = installFakeHistory([{ state: { __sheet: "sheet-1" } }], 0);
+    const { registerHistoryLayer, skipOrphanLayerEntry } = await load();
+
+    skipOrphanLayerEntry();
+    registerHistoryLayer(vi.fn());
+    expect(fake.entries).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(fake.entries).toHaveLength(2);
+    vi.useRealTimers();
+  });
+
+  it("restores scroll on the page entry after leaving with a sheet open", async () => {
+    const { registerHistoryLayer } = await load();
+
+    const unregister = registerHistoryLayer(vi.fn());
+    fake.replaceState({ page: "/login" });
+    unregister();
+    await settle();
+    fake.scrollRestoration = "manual";
+
+    fake.back();
+    await settle();
+    expect(fake.index).toBe(0);
+    expect(fake.scrollRestoration).toBe("auto");
+  });
 });
+

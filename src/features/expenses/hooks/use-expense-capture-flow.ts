@@ -9,7 +9,7 @@ import type {
 } from "@/domain/types";
 import { createEmptyDraft } from "../lib/dashboard-config";
 import type { CaptureReason } from "../lib/capture-labels";
-import { joinWords } from "../lib/voice-support";
+import { appendDictated } from "../lib/voice-support";
 import type { useQuickExpenseParser } from "./use-quick-expense-parser";
 import { useSpeechDictation } from "./use-speech-dictation";
 
@@ -82,12 +82,12 @@ export function useExpenseCaptureFlow({
   const analyzeAfterDictationRef = useRef(false);
   const dictation = useSpeechDictation({
     language,
-    onTranscript: (text) => parser.setQuickText(joinWords(dictationPrefixRef.current, text)),
+    onTranscript: (text) => parser.setQuickText(appendDictated(dictationPrefixRef.current, text)),
     onFinish: (text) => {
       const requested = analyzeAfterDictationRef.current;
       analyzeAfterDictationRef.current = false;
       if (!text && !requested) return;
-      const full = joinWords(dictationPrefixRef.current, text);
+      const full = appendDictated(dictationPrefixRef.current, text);
       parser.setQuickText(full);
       if (full) void analyze(full);
     },
@@ -98,6 +98,8 @@ export function useExpenseCaptureFlow({
       dictation.stop();
       return;
     }
+    // Mientras termina de entregar el dictado anterior no se empieza otro.
+    if (dictation.busy) return;
     dictationPrefixRef.current = parser.quickText;
     analyzeAfterDictationRef.current = false;
     dictation.start();
@@ -181,10 +183,12 @@ export function useExpenseCaptureFlow({
       setNotice(null);
       openForm(createEmptyDraft());
     },
+    // Analizar mientras se dicta (o mientras termina) lo deja terminar y
+    // analiza una sola vez el texto completo.
     analyze: () => {
-      if (dictation.listening) {
+      if (dictation.busy) {
         analyzeAfterDictationRef.current = true;
-        dictation.stop();
+        if (dictation.listening) dictation.stop();
         return;
       }
       void analyze();

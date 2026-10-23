@@ -64,6 +64,8 @@ export function useSpeechDictation({
     () => typeof window !== "undefined" && getDictationSupport(window),
   );
   const [listening, setListening] = useState(false);
+  // Escuchando o terminando de entregar lo dictado.
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<DictationError | null>(null);
   // Si el navegador no permite el servicio (p. ej. Brave) no tiene sentido
   // seguir ofreciéndolo en esta sesión.
@@ -102,6 +104,7 @@ export function useSpeechDictation({
     const recognition = recognitionRef.current;
     recognitionRef.current = null;
     phaseRef.current = "idle";
+    setBusy(false);
     if (!recognition) return;
     recognition.onresult = null;
     recognition.onerror = null;
@@ -166,6 +169,7 @@ export function useSpeechDictation({
     phaseRef.current = "listening";
     setError(null);
     setListening(true);
+    setBusy(true);
 
     const recognition = new Constructor();
     recognition.lang = dictationLanguage(language);
@@ -257,6 +261,7 @@ export function useSpeechDictation({
   return {
     supported: supported && !unavailable,
     listening,
+    busy,
     error,
     start,
     stop: () => finish(),

@@ -47,6 +47,13 @@ export function toDictationError(code: string): DictationError | null {
   }
 }
 
+// Lo dictado tras lo escrito: si lo escrito acaba en salto de línea (otro
+// gasto), lo dictado va en su propia línea.
+export function appendDictated(typed: string, dictated: string) {
+  if (/\n\s*$/.test(typed) && dictated.trim()) return `${typed.trimEnd()}\n${dictated.trim()}`;
+  return joinWords(typed, dictated);
+}
+
 // Une trozos de texto con un solo espacio, sin huecos de los vacíos.
 export function joinWords(...parts: string[]) {
   return parts
@@ -57,8 +64,14 @@ export function joinWords(...parts: string[]) {
 
 type RecognitionResultLike = { isFinal: boolean; 0: { transcript: string } };
 
-const startsWithFolded = (text: string, prefix: string) =>
-  text.toLocaleLowerCase().startsWith(prefix.toLocaleLowerCase());
+// "doscientos" no empieza por la palabra "dos": el prefijo tiene que acabar
+// en un límite de palabra.
+function startsWithWords(text: string, prefix: string) {
+  const folded = text.toLocaleLowerCase();
+  const foldedPrefix = prefix.toLocaleLowerCase();
+  if (!folded.startsWith(foldedPrefix)) return false;
+  return folded.length === foldedPrefix.length || /[\s.,;:!?]/.test(folded[foldedPrefix.length]);
+}
 
 // Texto de una sesión de reconocimiento a partir de todos sus resultados.
 // Chrome en Android puede repetir en cada resultado lo ya dicho ("café",
@@ -76,15 +89,15 @@ export function sessionTranscript(results: ArrayLike<RecognitionResultLike>) {
       continue;
     }
     const last = finals.at(-1);
-    if (last && startsWithFolded(text, last)) {
+    if (last && startsWithWords(text, last)) {
       finals[finals.length - 1] = text;
-    } else if (!last || !startsWithFolded(last, text)) {
+    } else if (!last || !startsWithWords(last, text)) {
       finals.push(text);
     }
   }
   const final = finals.join(" ");
   const lastFinal = finals.at(-1);
-  if (lastFinal && startsWithFolded(interim, lastFinal)) {
+  if (lastFinal && startsWithWords(interim, lastFinal)) {
     interim = interim.slice(lastFinal.length).trim();
   }
   return { final, interim };

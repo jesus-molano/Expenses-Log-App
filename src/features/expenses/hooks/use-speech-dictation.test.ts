@@ -119,6 +119,19 @@ describe("useSpeechDictation", () => {
     expect(onFinish).toHaveBeenCalledWith("Netflix doce noventa y nueve");
   });
 
+  it("stays busy until what was dictated is delivered", () => {
+    const { result } = setup();
+
+    act(() => result.current.start());
+    expect(result.current.busy).toBe(true);
+    act(() => FakeRecognition.instances[0].say("Luz", false));
+    act(() => result.current.stop());
+    expect(result.current.listening).toBe(false);
+    expect(result.current.busy).toBe(true);
+    act(() => FakeRecognition.instances[0].end());
+    expect(result.current.busy).toBe(false);
+  });
+
   it("delivers what it has if the recognizer never ends after stopping", () => {
     const { result, onFinish } = setup();
 

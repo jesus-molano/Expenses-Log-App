@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendDictated,
   getDictationSupport,
   joinWords,
   sessionTranscript,
@@ -82,5 +83,24 @@ describe("joinWords", () => {
   it("joins with single spaces and skips empty parts", () => {
     expect(joinWords(" Seguro del coche ", "", "420 al año")).toBe("Seguro del coche 420 al año");
     expect(joinWords("", " ")).toBe("");
+  });
+});
+
+describe("word boundaries and typed text", () => {
+  const result = (transcript: string, isFinal: boolean) => ({ isFinal, 0: { transcript } });
+
+  it("only treats whole words as repeated", () => {
+    expect(sessionTranscript([result("dos", true), result("doscientos euros", true)]).final).toBe(
+      "dos doscientos euros",
+    );
+    expect(sessionTranscript([result("dos", true), result("doscientos", false)]).interim).toBe(
+      "doscientos",
+    );
+  });
+
+  it("keeps a typed line break before what is dictated", () => {
+    expect(appendDictated("Netflix 12,99\n", "Spotify 10,99")).toBe("Netflix 12,99\nSpotify 10,99");
+    expect(appendDictated("Seguro del coche", "420 al año")).toBe("Seguro del coche 420 al año");
+    expect(appendDictated("Netflix\n", "")).toBe("Netflix");
   });
 });
