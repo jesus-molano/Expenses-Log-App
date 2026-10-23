@@ -91,7 +91,7 @@ function ChargeRow({
     <li className="app-list-item grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 py-1.5 pl-3 pr-1">
       <div className="min-w-0">
         <p className="text-sm font-semibold text-[var(--app-text)]">{date}</p>
-        <p className="app-money truncate text-xs text-[var(--app-text-muted)]">{detail}</p>
+        <p className="app-money break-words text-xs text-[var(--app-text-muted)]">{detail}</p>
       </div>
       <div className="text-right">
         <p

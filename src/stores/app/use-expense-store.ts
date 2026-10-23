@@ -20,6 +20,8 @@ import type {
 } from "@/domain/types";
 import { emptyStore } from "@/domain/seed";
 import { materializeClosedOccurrenceRecords } from "@/domain/finance";
+import type { SnapshotReason } from "@/data/persistence/snapshot-policy";
+import { normalizeExpenseStore } from "@/data/persistence/store-normalization";
 import { persistLanguagePreference, t } from "@/shared/i18n";
 import { applyAppTheme } from "@/shared/theme";
 import {
@@ -33,6 +35,8 @@ import {
   deleteIncomeEventFromStore,
   dismissLastChanceReminderInStore,
   endSeriesInStore,
+  importStoreInStore,
+  markOccurrencesPaidInStore,
   moveOccurrenceInStore,
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
@@ -61,6 +65,7 @@ import {
   updateThemeInStore,
   type SeriesAmountScope,
 } from "./store-commands";
+import type { ImportMode, ImportScope } from "./backup-commands";
 import type {
   IncomeEventInput,
   MoneySettingsInput,
@@ -73,6 +78,7 @@ import type {
 } from "./store-types";
 import { preserveClosedOccurrenceRecords } from "./store-history";
 import { useStorePersistence } from "./use-store-persistence";
+import { useStoreSnapshots } from "./use-store-snapshots";
 
 type ExpenseStoreContextValue = ReturnType<typeof useExpenseStoreValue>;
 
@@ -121,6 +127,11 @@ function useExpenseStoreValue() {
     setStore(nextStore);
   }, []);
   const persistence = useStorePersistence({ onHydrate: commitStore });
+  const getStore = useCallback(() => storeRef.current, []);
+  const { captureSnapshot } = useStoreSnapshots({
+    isHydrated: persistence.isHydrated,
+    getStore,
+  });
 
   function current() {
     return storeRef.current;
@@ -151,6 +162,7 @@ function useExpenseStoreValue() {
   }
 
   async function clearExpenses() {
+    await captureSnapshot(current(), "before-clear");
     const occurrenceRecordIds = (current().occurrenceRecords ?? []).map(
       (record) => record.id,
     );
@@ -176,6 +188,7 @@ function useExpenseStoreValue() {
   }
 
   async function clearIncome() {
+    await captureSnapshot(current(), "before-clear");
     await persistence.persistImmediately(
       clearIncomeFromStore(current()),
       commitStore,
@@ -197,6 +210,10 @@ function useExpenseStoreValue() {
 
   function restoreOccurrence(occurrence: ExpenseOccurrence) {
     persist(restoreOccurrenceInStore(current(), occurrence));
+  }
+
+  function markOccurrencesPaid(occurrences: ExpenseOccurrence[]) {
+    persist(markOccurrencesPaidInStore(current(), occurrences));
   }
 
   function dismissLastChanceReminder(occurrence: ExpenseOccurrence) {
@@ -313,6 +330,36 @@ function useExpenseStoreValue() {
     persist(reopenMonthInStore(current(), monthId));
   }
 
+  // Importar y restaurar guardan antes una copia de lo actual, que se puede
+  // restaurar desde Ajustes si el resultado no es el esperado.
+  async function importStore(
+    imported: ExpenseStore,
+    options: { mode: ImportMode; scope: ImportScope },
+  ) {
+    await captureSnapshot(current(), "before-import");
+    await persistence.persistImmediately(
+      importStoreInStore(current(), imported, options),
+      commitStore,
+      t("backup.importing"),
+    );
+  }
+
+  async function restoreSnapshot(snapshotStore: ExpenseStore) {
+    await captureSnapshot(current(), "before-restore");
+    await persistence.persistImmediately(
+      importStoreInStore(current(), normalizeExpenseStore(snapshotStore), {
+        mode: "replace",
+        scope: "all",
+      }),
+      commitStore,
+      t("backup.restoring"),
+    );
+  }
+
+  function takeSnapshot(reason: SnapshotReason = "manual") {
+    return captureSnapshot(current(), reason);
+  }
+
   function updateTheme(theme: AppTheme) {
     applyAppTheme(theme);
     persist(updateThemeInStore(current(), theme));
@@ -335,6 +382,7 @@ function useExpenseStoreValue() {
     payOccurrence,
     skipOccurrence,
     restoreOccurrence,
+    markOccurrencesPaid,
     dismissLastChanceReminder,
     moveOccurrence,
     moveOccurrenceSeries,
@@ -360,6 +408,9 @@ function useExpenseStoreValue() {
     undoSalaryReceipt,
     closeMonth,
     reopenMonth,
+    importStore,
+    restoreSnapshot,
+    takeSnapshot,
     updateTheme,
     updateLanguage,
     syncStatus: persistence.syncStatus,

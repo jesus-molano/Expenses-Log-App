@@ -104,7 +104,7 @@ describe("salary hooks", () => {
           language: "es",
           monthId,
           monthLabel: "mes",
-          currentMonthId: "2026-10",
+          activeMonthId: "2026-10",
           onSave,
         }),
       );

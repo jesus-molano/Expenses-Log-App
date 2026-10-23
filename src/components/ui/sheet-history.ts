@@ -11,6 +11,10 @@
 //   termine antes de añadir su entrada, para que ese popstate no la cierre.
 // - Una entrada de capa que ya no tiene dueño (tras recargar o navegar con
 //   una hoja abierta) se salta, al llegar a ella o al arrancar la app en ella.
+// - Para navegar justo después de cerrar capas (salir del detalle tras
+//   confirmar un diálogo) se espera a que hayan quitado su entrada
+//   (`afterLayerHistorySettles`): si no, esa vuelta atrás desharía la
+//   navegación.
 
 type LayerEntry = { id: string; close: () => void; pushed: boolean };
 type LayerState = { __sheet?: string } | null;
@@ -22,6 +26,8 @@ let pendingBacks = 0;
 let backToken = 0;
 let listening = false;
 let nextId = 0;
+let settledCallbacks: Array<() => void> = [];
+let settledTimer: number | null = null;
 // Si una vuelta atrás no llega a producirse (no había entrada anterior), se
 // deja de esperarla para que las capas nuevas puedan añadir su entrada.
 const BACK_TIMEOUT_MS = 1_500;
@@ -48,10 +54,29 @@ function pushEntry(entry: LayerEntry) {
   entry.pushed = true;
 }
 
+function isSettled() {
+  return pendingBacks === 0 && removed.length === 0 && !flushScheduled;
+}
+
+// En otro tick: así ya han corrido todos los oyentes de popstate (también el
+// del router) antes de navegar.
+function scheduleSettledCallbacks() {
+  if (settledTimer !== null || settledCallbacks.length === 0) return;
+  settledTimer = window.setTimeout(() => {
+    settledTimer = null;
+    // Si entretanto empezó otra vuelta atrás, se reprograma al terminar.
+    if (!isSettled()) return;
+    const callbacks = settledCallbacks;
+    settledCallbacks = [];
+    callbacks.forEach((callback) => callback());
+  }, 0);
+}
+
 function pushWaitingEntries() {
   if (pendingBacks > 0 || removed.length > 0) return;
   stack.filter((entry) => !entry.pushed).forEach(pushEntry);
   if (stack.length === 0) setScrollRestoration("auto");
+  scheduleSettledCallbacks();
 }
 
 function goBack(steps: number) {
@@ -156,5 +181,16 @@ export function registerHistoryLayer(close: () => void): () => void {
       flushScheduled = true;
       queueMicrotask(flushRemovals);
     }
+  };
+}
+
+// Llama a `callback` cuando las capas ya cerradas hayan quitado su entrada del
+// historial. Hay que llamarla después de cerrarlas (en un efecto del mismo
+// render, que corre tras las limpiezas). Devuelve una función para anularla.
+export function afterLayerHistorySettles(callback: () => void): () => void {
+  settledCallbacks.push(callback);
+  scheduleSettledCallbacks();
+  return () => {
+    settledCallbacks = settledCallbacks.filter((item) => item !== callback);
   };
 }

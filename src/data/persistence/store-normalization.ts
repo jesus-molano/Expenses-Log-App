@@ -3,15 +3,15 @@ import {
   toMonthId,
 } from "@/domain/finance";
 import { dedupeOverrides } from "@/domain/overrides";
+import { normalizeAmountChanges, normalizePauses } from "@/domain/recurrence";
 import {
   buildDateWithDay,
   normalizeDateOnly,
   toDateOnly,
 } from "@/domain/calendar";
 import type {
-  ExpenseAmountChange,
+  ExpenseCategory,
   ExpenseOccurrenceOverride,
-  ExpensePause,
   ExpenseStore,
   ExpenseTemplate,
   FinanceStore,
@@ -371,9 +371,7 @@ export function normalizeExpenseStore(
   const base: ExpenseStore = {
     ...(keepUnknownKeys ? unknownEntries(store, STORE_KEYS) : {}),
     schemaVersion: 3,
-    categories: Array.isArray(store.categories)
-      ? (store.categories as ExpenseStore["categories"])
-      : [],
+    categories: normalizeCategories(store.categories),
     templates: Array.isArray(store.templates)
       ? normalizeTemplates(store.templates, today)
       : [],
@@ -404,6 +402,22 @@ export function normalizeExpenseStore(
   return materializeClosedOccurrenceRecords(normalized, {
     today,
     source: schemaVersion < 3 ? "legacy-derived" : "native",
+  });
+}
+
+// Las categorías llevan `updatedAt` para fusionarse por entidad; las de
+// stores antiguos no lo tienen y cargan igual. Uno ilegible se quita: sin él
+// gana la copia local, como antes.
+function normalizeCategories(value: unknown): ExpenseCategory[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord).map((raw) => {
+    const category = raw as ExpenseCategory;
+    if (category.updatedAt === undefined || isTimestamp(category.updatedAt)) {
+      return category;
+    }
+    const withoutTimestamp = { ...category };
+    delete withoutTimestamp.updatedAt;
+    return withoutTimestamp;
   });
 }
 
@@ -446,43 +460,6 @@ function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
   });
 }
 
-// Cambios de precio legibles, uno por fecha (gana el último) y en orden. Uno
-// con fecha o importe imposible se descarta.
-function normalizeAmountChanges(value: unknown): ExpenseAmountChange[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const byDate = new Map<string, ExpenseAmountChange>();
-  for (const entry of value) {
-    if (!isRecord(entry)) continue;
-    const from = normalizeDateOnly(entry.from);
-    const amount = Number(entry.amount);
-    if (!from || !Number.isFinite(amount) || amount <= 0) continue;
-    byDate.set(from, { from, amount });
-  }
-  const changes = [...byDate.values()].sort((a, b) => a.from.localeCompare(b.from));
-  return changes.length ? changes : undefined;
-}
-
-// Pausas legibles y en orden. Una con un fin ilegible o anterior al inicio se
-// descarta: mejor volver a ver los cobros que esconderlos para siempre.
-function normalizePauses(value: unknown): ExpensePause[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const byStart = new Map<string, ExpensePause>();
-  for (const entry of value) {
-    if (!isRecord(entry)) continue;
-    const from = normalizeDateOnly(entry.from);
-    if (!from) continue;
-    if (entry.to === undefined || entry.to === null) {
-      byStart.set(from, { from });
-      continue;
-    }
-    const to = normalizeDateOnly(entry.to);
-    if (!to || to < from) continue;
-    byStart.set(from, { from, to });
-  }
-  const pauses = [...byStart.values()].sort((a, b) => a.from.localeCompare(b.from));
-  return pauses.length ? pauses : undefined;
-}
-
 function sameJson(a: unknown, b: unknown) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -505,7 +482,106 @@ export function normalizeImportedExpenseStore(value: unknown): ExpenseStore {
     throw new Error("Invalid expense store export.");
   }
 
-  return normalizeExpenseStore(value);
+  return normalizeExpenseStore(sanitizeImportedEntities(value));
+}
+
+const RECURRENCE_FREQUENCIES = ["once", "monthly", "quarterly", "yearly", "custom", "rrule"];
+const OCCURRENCE_STATUSES = ["due", "paid", "skipped"];
+
+// Un archivo importado puede venir editado a mano o de otra app: se quitan
+// las entidades a las que les falta lo imprescindible para pintarlas (id,
+// nombre, importe, fechas válidas), que de otro modo romperían la app al
+// generar ocurrencias o formatear fechas. Lo que sí se puede leer pasa tal
+// cual a la normalización de siempre.
+function sanitizeImportedEntities(store: Record<string, unknown>) {
+  const sanitized: Record<string, unknown> = { ...store };
+  if (Array.isArray(store.categories)) {
+    sanitized.categories = store.categories.filter(
+      (category) => isRecord(category) && isText(category.id) && isText(category.name),
+    );
+  }
+  if (Array.isArray(store.templates)) {
+    sanitized.templates = store.templates
+      .filter(
+        (template) =>
+          isRecord(template) &&
+          isText(template.id) &&
+          typeof template.name === "string" &&
+          isAmount(template.amount),
+      )
+      .map((template) => {
+        const recurrence = (template as Record<string, unknown>).recurrence;
+        return isRecord(recurrence) &&
+          RECURRENCE_FREQUENCIES.includes(String(recurrence.frequency))
+          ? template
+          : { ...(template as Record<string, unknown>), recurrence: { frequency: "monthly" } };
+      });
+  }
+  if (Array.isArray(store.overrides)) {
+    sanitized.overrides = store.overrides.filter(
+      (override) =>
+        isRecord(override) &&
+        isText(override.templateId) &&
+        normalizeDateOnly(override.occurrenceDate) === override.occurrenceDate &&
+        (override.dueDate === undefined ||
+          normalizeDateOnly(override.dueDate) === override.dueDate) &&
+        OCCURRENCE_STATUSES.includes(String(override.status)),
+    );
+  }
+  if (Array.isArray(store.occurrenceRecords)) {
+    sanitized.occurrenceRecords = store.occurrenceRecords.filter(
+      (record) =>
+        isRecord(record) &&
+        isText(record.id) &&
+        isText(record.templateId) &&
+        normalizeDateOnly(record.occurrenceDate) === record.occurrenceDate &&
+        normalizeDateOnly(record.dueDate) === record.dueDate &&
+        isAmount(record.plannedAmount) &&
+        OCCURRENCE_STATUSES.includes(String(record.status)),
+    );
+  }
+  if (isRecord(store.finance) && Array.isArray(store.finance.incomeEvents)) {
+    sanitized.finance = {
+      ...store.finance,
+      incomeEvents: store.finance.incomeEvents.filter(
+        (event) =>
+          isRecord(event) &&
+          isText(event.id) &&
+          isAmount(event.amount) &&
+          normalizeDateOnly(event.receivedAt) === event.receivedAt,
+      ),
+    };
+  }
+  return sanitized;
+}
+
+function isText(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+function isAmount(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+// Usuario provisional de lo creado sin sesión.
+const ANONYMOUS_USER_ID = "demo";
+
+// Cuenta a la que pertenecen unos datos locales según los ids que les puso
+// `assignExpenseStoreOwner` al sincronizar; null si todo se creó sin sesión.
+export function inferStoreOwnerId(store: ExpenseStore): string | null {
+  const owners = [
+    ...store.templates,
+    ...store.overrides,
+    ...store.categories,
+    ...store.finance.incomeEvents,
+  ].map((entity) => entity.userId);
+
+  return (
+    owners.find(
+      (userId): userId is string =>
+        typeof userId === "string" && userId !== "" && userId !== ANONYMOUS_USER_ID,
+    ) ?? null
+  );
 }
 
 export function assignExpenseStoreOwner(

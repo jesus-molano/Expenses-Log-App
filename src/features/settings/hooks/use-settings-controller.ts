@@ -3,12 +3,14 @@
 import { useMemo, useState } from "react";
 import type { AppLanguage } from "@/domain/types";
 import { clearExpenseLocalData } from "@/data/persistence/local-store";
+import { readSyncMeta } from "@/data/persistence/sync-meta-store";
 import { t } from "@/shared/i18n";
 import { DEFAULT_THEME } from "@/shared/theme";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { createClient } from "@/utils/supabase/client";
 import { useNotificationSettings } from "./use-notification-settings";
-import { useSettingsAuth } from "./use-settings-auth";
+import { useSettingsAuth, type SignOutOptions } from "./use-settings-auth";
+import { releasePushSubscription } from "../lib/push-notifications";
 import { SETTINGS_LANGUAGES, SETTINGS_THEMES } from "../lib/settings-options";
 
 export function useSettingsController({
@@ -35,8 +37,13 @@ export function useSettingsController({
   const [isClearingIncome, setIsClearingIncome] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const [signOutHasPendingChanges, setSignOutHasPendingChanges] = useState(false);
   const supabase = useMemo(() => createClient(), []);
-  const { user, setUser, signOut } = useSettingsAuth(supabase, setMessage);
+  const { user, setUser, isSigningOut, signOut } = useSettingsAuth(
+    supabase,
+    setMessage,
+  );
   const {
     notificationState,
     notificationHealth,
@@ -46,6 +53,7 @@ export function useSettingsController({
     enableNotifications,
     disableNotifications,
     sendTestNotification,
+    refreshNotificationState,
   } = useNotificationSettings(setMessage);
 
   const currentTheme = store.preferences?.theme ?? DEFAULT_THEME;
@@ -94,6 +102,25 @@ export function useSettingsController({
     }
   }
 
+  // Al abrir se mira si quedan cambios sin subir: si se borran los datos del
+  // dispositivo, se perderían.
+  function openSignOutDialog() {
+    setSignOutHasPendingChanges(readSyncMeta().dirty);
+    setSignOutOpen(true);
+  }
+
+  function closeSignOutDialog() {
+    if (isSigningOut) return;
+    setSignOutOpen(false);
+  }
+
+  async function handleSignOut(options: SignOutOptions) {
+    const signedOut = await signOut(options);
+    if (!signedOut) return;
+    setSignOutOpen(false);
+    void refreshNotificationState();
+  }
+
   async function handleDeleteAccount() {
     setIsDeletingAccount(true);
     try {
@@ -103,6 +130,9 @@ export function useSettingsController({
         throw new Error(t("settings.deleteAccountError"));
       }
 
+      // Las filas push ya se borraron en cascada; queda anular la
+      // suscripción del navegador para que la siguiente cuenta no la herede.
+      await releasePushSubscription();
       await supabase?.auth.signOut();
       clearExpenseLocalData();
       setUser(null);
@@ -133,6 +163,9 @@ export function useSettingsController({
     isClearingIncome,
     deleteAccountOpen,
     isDeletingAccount,
+    signOutOpen,
+    signOutHasPendingChanges,
+    isSigningOut,
     currentTheme,
     currentLanguage: currentLanguage as AppLanguage,
     selectedTheme,
@@ -155,7 +188,9 @@ export function useSettingsController({
     enableNotifications,
     disableNotifications,
     sendTestNotification,
-    signOut,
+    openSignOutDialog,
+    closeSignOutDialog,
+    handleSignOut,
     handleClearExpenses,
     handleClearIncome,
     handleDeleteAccount,

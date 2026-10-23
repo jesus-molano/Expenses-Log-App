@@ -11,9 +11,13 @@ import {
   reopenMonthInStore,
 } from "@/stores/app/finance-commands";
 import {
+  EXPENSE_STORE_KEY,
   clearExpenseLocalData,
   loadExpenseStore,
+  markExpenseStoreSeen,
   mergeExpenseStores,
+  readExpenseStoreFromOtherTab,
+  saveExpenseStore,
 } from "./local-store";
 
 function template(id: string): ExpenseTemplate {
@@ -312,10 +316,14 @@ describe("loadExpenseStore", () => {
     window.localStorage.clear();
   });
 
-  it("removes corrupt-store copies together with the local data", () => {
+  it("removes corrupt-store copies and sync metadata together with the local data", () => {
     window.localStorage.setItem("expense-log-store-v1", "{}");
     window.localStorage.setItem("expense-log-store-v1.corrupt", "{a");
     window.localStorage.setItem("expense-log-store-v1.corrupt-1760000000000", "{b");
+    window.localStorage.setItem(
+      "expense-log-sync-v1",
+      JSON.stringify({ ownerId: "user-a", dirty: true, updatedAt: "" }),
+    );
     window.localStorage.setItem("expense-theme", "nord");
 
     clearExpenseLocalData();
@@ -323,5 +331,66 @@ describe("loadExpenseStore", () => {
     expect(window.localStorage.length).toBe(1);
     expect(window.localStorage.getItem("expense-theme")).toBe("nord");
     window.localStorage.clear();
+  });
+});
+
+describe("readExpenseStoreFromOtherTab", () => {
+  it("returns only what another tab wrote after this one", () => {
+    saveExpenseStore(storeWithTemplate("mine"));
+    expect(readExpenseStoreFromOtherTab()).toBeNull();
+
+    const raw = JSON.stringify(storeWithTemplate("other-tab"));
+    window.localStorage.setItem(EXPENSE_STORE_KEY, raw);
+    const other = readExpenseStoreFromOtherTab();
+    expect(other?.raw).toBe(raw);
+    expect(other?.store.templates.map((item) => item.id)).toEqual(["other-tab"]);
+
+    // Ya incorporado por esta pestaña: no vuelve a contar como ajeno.
+    markExpenseStoreSeen(raw);
+    expect(readExpenseStoreFromOtherTab()).toBeNull();
+    window.localStorage.clear();
+  });
+
+  it("ignores missing or unreadable stores", () => {
+    window.localStorage.removeItem(EXPENSE_STORE_KEY);
+    expect(readExpenseStoreFromOtherTab()).toBeNull();
+    window.localStorage.setItem(EXPENSE_STORE_KEY, "{not json");
+    expect(readExpenseStoreFromOtherTab()).toBeNull();
+    window.localStorage.clear();
+  });
+});
+
+describe("mergeExpenseStores categories", () => {
+  const category = {
+    id: "cat-1",
+    userId: "user",
+    name: "Casa",
+    icon: "Home",
+    tone: "green" as const,
+  };
+
+  it("keeps the most recently updated category", () => {
+    const newer = { ...category, icon: "House", updatedAt: "2026-10-23T11:00:00.000Z" };
+    const older = { ...category, icon: "Home", updatedAt: "2026-10-23T10:00:00.000Z" };
+
+    for (const [local, cloud] of [
+      [newer, older],
+      [older, newer],
+    ]) {
+      const merged = mergeExpenseStores(
+        { ...emptyStore, categories: [local] },
+        { ...emptyStore, categories: [cloud] },
+      );
+      expect(merged.categories).toEqual([newer]);
+    }
+  });
+
+  it("lets the local copy win for categories without a timestamp", () => {
+    const merged = mergeExpenseStores(
+      { ...emptyStore, categories: [{ ...category, icon: "Local" }] },
+      { ...emptyStore, categories: [{ ...category, icon: "Cloud", updatedAt: "2026-10-23T10:00:00.000Z" }] },
+    );
+
+    expect(merged.categories[0].icon).toBe("Local");
   });
 });

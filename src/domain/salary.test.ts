@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { configuredPayday, salaryPromptFor } from "./budget-month";
+import { configuredPayday, isSalaryPromptVisible, salaryPromptFor } from "./budget-month";
 import {
   buildMonthlyMoneyPlan,
   emptyFinanceStore,
@@ -185,5 +185,17 @@ describe("'¿Has cobrado?' prompt", () => {
 
   it("never asks without a configured salary", () => {
     expect(salaryPromptFor(emptyFinanceStore, "2026-10-28")).toBeNull();
+  });
+
+  it("shows in its month and in the active month, not when browsing others", () => {
+    const prompt = salaryPromptFor(configured, "2026-10-28");
+
+    expect(isSalaryPromptVisible(prompt, "2026-10", "2026-10")).toBe(true);
+    // Octubre ya cerrado: el activo es noviembre y la nómina sigue sin confirmar.
+    expect(isSalaryPromptVisible(prompt, "2026-11", "2026-11")).toBe(true);
+    expect(isSalaryPromptVisible(prompt, "2026-10", "2026-11")).toBe(true);
+    expect(isSalaryPromptVisible(prompt, "2026-09", "2026-10")).toBe(false);
+    expect(isSalaryPromptVisible(prompt, "2026-11", "2026-10")).toBe(false);
+    expect(isSalaryPromptVisible(null, "2026-10", "2026-10")).toBe(false);
   });
 });

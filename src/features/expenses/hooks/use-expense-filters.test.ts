@@ -228,6 +228,29 @@ describe("viewed month", () => {
       result.current.timelineSections.some((section) => section.id === "today"),
     ).toBe(false);
   });
+
+  it("leaves next month's charges, also the ones paid ahead, to next month", () => {
+    const store: ExpenseStore = {
+      ...emptyStore,
+      templates: [
+        monthlyTemplate("rent", "2026-10-01", 1),
+        monthlyTemplate("insurance", "2026-10-15", 15),
+      ],
+      overrides: [
+        paidOverride("rent", "2026-10-01"),
+        paidOverride("insurance", "2026-10-15"),
+        paidOverride("rent", "2026-11-01"),
+      ],
+    };
+
+    const { result } = renderHook(() =>
+      useExpenseFilters(store, "es", new Date(2026, 9, 28, 10), "2026-10"),
+    );
+
+    expect(
+      result.current.visibleOccurrences.some((item) => item.dueDate >= "2026-11-01"),
+    ).toBe(false);
+  });
 });
 
 function monthlyTemplate(

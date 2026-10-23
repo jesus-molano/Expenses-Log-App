@@ -1,3 +1,4 @@
+import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { PaidAmountAverage } from "@/domain/amount-history";
 import { formatCurrency } from "@/domain/calendar";
@@ -12,14 +13,13 @@ import type {
   IncomeEventInput,
   MonthlyExpenseOverrideInput,
 } from "@/stores/app/store-types";
-import { phaseLabel, planCopy } from "../lib/plan-dashboard";
+import { phaseLabel } from "../lib/plan-dashboard";
 import type { MoneySeriesItem } from "../types";
 import { MonthlyExpenseBreakdown } from "./MonthlyExpenseBreakdown";
 import { MonthlyIncomeEventsList } from "./MonthlyIncomeEventsList";
 
 export function MonthlyReviewSection({
   language,
-  copy,
   reviewYear,
   availableYears,
   selectedSummary,
@@ -40,11 +40,11 @@ export function MonthlyReviewSection({
   onUpdateIncomeEvent,
   onToggleExpanded,
   onSkipOccurrence,
+  onTogglePaid,
   onUpdateMonthlyExpense,
   suggestPaidAmount,
 }: {
   language: AppLanguage;
-  copy: ReturnType<typeof planCopy>;
   reviewYear: number;
   availableYears: number[];
   selectedSummary: MoneySeriesItem;
@@ -65,9 +65,17 @@ export function MonthlyReviewSection({
   onUpdateIncomeEvent: (id: string, input: IncomeEventInput) => void;
   onToggleExpanded: () => void;
   onSkipOccurrence: (occurrence: ExpenseOccurrence) => void;
+  onTogglePaid: (occurrence: ExpenseOccurrence) => void;
   onUpdateMonthlyExpense: (input: MonthlyExpenseOverrideInput) => void;
   suggestPaidAmount?: (occurrence: ExpenseOccurrence) => PaidAmountAverage | null;
 }) {
+  // M17: en un mes registrado el libre solo resta el ahorro real; si había
+  // objetivo y no se apuntó nada, se avisa y se ofrece registrarlo.
+  const goalNotRegistered =
+    selectedSummary.phase === "registered" &&
+    (selectedSummary.savingsGoal ?? 0) > 0 &&
+    selectedSummary.savings === 0;
+
   return (
     <section className="min-w-0" aria-labelledby="monthly-review-title">
       <header className="px-1">
@@ -75,10 +83,10 @@ export function MonthlyReviewSection({
           id="monthly-review-title"
           className="app-plan-section-title text-[var(--app-text)]"
         >
-          {copy.monthlyReview}
+          {t("plan.monthlyReview", language)}
         </h2>
         <p className="mt-1 text-sm text-[var(--app-text-muted)]">
-          {copy.comparedWithPrevious}
+          {t("plan.comparedWithPrevious", language)}
         </p>
       </header>
       <div className="mt-4 grid grid-cols-[0.8fr_1.2fr] gap-3">
@@ -110,44 +118,67 @@ export function MonthlyReviewSection({
 
       <div className="mt-4 flex flex-wrap items-center gap-2 px-1 text-xs font-semibold">
         <span className="rounded-full bg-[var(--app-panel-soft-alpha)] px-2.5 py-1 text-[var(--app-text-muted)]">
-          {phaseLabel(selectedSummary.phase, copy)}
+          {phaseLabel(selectedSummary.phase, language)}
         </span>
         {selectedHasLegacyHistory ? (
           <span className="rounded-full bg-[color-mix(in_srgb,var(--app-warning)_12%,transparent)] px-2.5 py-1 text-[var(--app-warning)]">
-            {copy.legacyDerived}
+            {t("plan.legacyDerived", language)}
           </span>
         ) : null}
       </div>
 
       <dl className="app-plan-review-summary mt-5 grid gap-1 rounded-[var(--app-radius-lg)] p-2">
         <ReviewDelta
-          label={copy.recurringExpenses}
+          label={t("plan.recurringExpenses", language)}
           value={selectedSummary.expenses}
           previous={previousSummary.expenses}
         />
         <ReviewDelta
-          label={copy.paid}
+          label={t("plan.paid", language)}
           value={selectedSummary.paid ?? 0}
           previous={previousSummary.paid ?? 0}
         />
         <ReviewDelta
-          label={copy.actualSavings}
+          label={t("plan.actualSavings", language)}
           value={selectedSummary.savings}
           previous={previousSummary.savings}
         />
         <ReviewDelta
-          label={copy.freeAccordingToPlan}
+          label={t("plan.freeAccordingToPlan", language)}
           value={selectedSummary.remaining}
           previous={previousSummary.remaining}
         />
       </dl>
 
+      {goalNotRegistered ? (
+        <div className="mt-3 grid gap-2 rounded-[var(--app-radius-md)] bg-[color-mix(in_srgb,var(--app-warning)_10%,transparent)] px-3 py-3">
+          <div className="flex items-start gap-2">
+            <TriangleAlert
+              size={16}
+              aria-hidden="true"
+              className="mt-0.5 shrink-0 text-[var(--app-warning)]"
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--app-warning)]">
+                {t("monthClose.goalNotRegistered", language)}
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-[var(--app-text-muted)]">
+                {t("monthClose.goalNotRegisteredBody", language)}
+              </p>
+            </div>
+          </div>
+          <Button size="sm" variant="secondary" className="justify-self-start" onClick={onEditSavings}>
+            {t("monthClose.registerSavings", language)}
+          </Button>
+        </div>
+      ) : null}
+
       <div className="mt-3 flex justify-end gap-2">
         <Button size="sm" variant="ghost" onClick={onEditSalary}>
-          {copy.editFixedIncome}
+          {t("plan.editFixedIncome", language)}
         </Button>
         <Button size="sm" variant="ghost" onClick={onEditSavings}>
-          {copy.editSavings}
+          {t("plan.editSavings", language)}
         </Button>
       </div>
 
@@ -167,6 +198,7 @@ export function MonthlyReviewSection({
           expanded={expandedReview}
           onToggleExpanded={onToggleExpanded}
           onSkipOccurrence={onSkipOccurrence}
+          onTogglePaid={onTogglePaid}
           onUpdateMonthlyExpense={onUpdateMonthlyExpense}
           suggestPaidAmount={suggestPaidAmount}
         />

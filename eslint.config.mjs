@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "public/sw.js",
     "next-env.d.ts",
+    // Builds del harness sin conexión.
+    ".e2e-builds/**",
   ]),
 ]);
 

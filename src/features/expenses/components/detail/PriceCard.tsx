@@ -87,7 +87,7 @@ export function PriceCard({
                 key={entry.from}
                 className="flex items-baseline justify-between gap-3 text-sm"
               >
-                <span className="min-w-0 truncate capitalize text-[var(--app-text-muted)]">
+                <span className="min-w-0 break-words capitalize text-[var(--app-text-muted)]">
                   {priceRangeLabel(entry, language, index === 0)}
                 </span>
                 <span className="app-money shrink-0 font-semibold text-[var(--app-text)]">

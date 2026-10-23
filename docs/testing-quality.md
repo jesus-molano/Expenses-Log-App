@@ -20,10 +20,21 @@ npm run e2e:offline
 - `e2e`: Playwright para flujos de navegador.
 - `e2e:offline`: arranques en frio sin conexion (`tests/e2e-offline`). Necesita
   un `npm run build` previo, porque cada test arranca y para su propio
-  `next start` en el puerto 3200.
-  - Prepara el service worker con conexion y cierra el navegador.
+  `next start` en el puerto 3200 (`E2E_OFFLINE_PORT` lo cambia).
+  - Prepara el service worker con conexion, vacia la cache HTTP de Chromium
+    (como cuando iOS la libera) y cierra el navegador.
   - Vuelve a abrir cada ruta principal con el servidor caido (`dead`) y con un
     servidor que acepta conexiones y nunca responde (`blackhole`).
+  - `deployment-id.spec.ts` repite el arranque (`dead`) con un build hecho con
+    `NEXT_DEPLOYMENT_ID`, como el de Vercel con Skew Protection: comprueba que
+    el HTML pide los assets con `?dpl=` y que salen del precache. Ese build se
+    compila en la raiz (el base se aparta mientras tanto y vuelve a su sitio
+    aunque la ejecucion se corte) y se guarda en `.e2e-builds/dpl/`, que se
+    reutiliza mientras el build base no cambie. La primera vez suma lo que
+    tarda un `npm run build`.
+  - Proyectos: `chromium-pixel7` corre todo; `webkit-iphone` solo los cortes
+    `dead` y `blackhole`, y se salta con el motivo si Playwright es anterior a
+    1.64 o WebKit no esta instalado (el harness nunca instala navegadores).
   - Si el Chromium instalado no coincide con el de Playwright, usa
     `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/ruta/a/chromium`.
 
@@ -39,6 +50,8 @@ Hay tests de:
 - Service worker y fallback offline.
 - Navegacion interna entre Gastos, Plan y Ajustes sin red, incluidas las dos
   procedencias de Ajustes.
+- Chip "Sin conexion" en las cabeceras: aparece con `setOffline(true)`,
+  desaparece al volver la red y no mueve la cabecera a 360 px.
 - Persistencia local y normalizacion de store.
 - Migracion v3, incluida la prioridad de pagos corregidos sobre movimientos
   bancarios legacy.
@@ -46,9 +59,21 @@ Hay tests de:
 - Comandos de store.
 - Rutas push, concurrencia y recuperacion de un lease abandonado.
 - Recurrencias, finanzas, parser, labels, timeline y DnD.
+- Mes activo y cierre de mes: sugerencias, restos, "Hasta el cobro", fases del
+  plan, cobros anteriores de un gasto nuevo y la hoja de cierre (hook y
+  componente), mas e2e con `page.clock` el 28-oct y el 1-nov.
+- Exportar e importar JSON y CSV (ida y vuelta, CSV de Excel en espanol,
+  errores), combinar o sustituir (incluida la fusion posterior con los datos
+  antiguos) y la politica de copias automaticas.
 - Estilos del design system.
+- Contraste AA de `--app-text-subtle` en todos los temas
+  (`src/shared/theme-contrast.test.ts`) y ausencia de ternarios de texto por
+  idioma en la interfaz (`src/shared/i18n-audit.test.ts`).
 - Flujos e2e de dashboard, tooltip de la grafica, menus sin recorte y
   accesibilidad critica.
+- Flujos e2e de copias (`tests/e2e/backup.spec.ts`): exportar JSON y CSV,
+  sustituir con una copia y restaurar la anterior, combinar un CSV de Excel,
+  errores de importacion y copia diaria.
 
 ## Cuando agregar tests
 
@@ -96,6 +121,8 @@ Cambios PWA:
 
 - Validar carga inicial.
 - Validar reload offline y navegacion interna entre las rutas principales.
+- Pasar `npm run e2e:offline` si cambian `sw.ts`, `serwist.config.mjs`, las
+  rutas precacheadas o como Next pide los assets.
 - Revisar cache name y assets precacheados si cambian iconos o shell.
 - Confirmar que API, origenes externos y peticiones no GET siguen fuera del
   cache.

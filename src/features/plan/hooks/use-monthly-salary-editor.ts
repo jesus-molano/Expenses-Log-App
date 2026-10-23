@@ -12,8 +12,9 @@ type UseMonthlySalaryEditorOptions = {
   language: AppLanguage;
   monthId: string;
   monthLabel: string;
-  // Mes natural de hoy: editar un mes pasado propone "Solo este mes".
-  currentMonthId: string;
+  // Mes activo (el natural, o el siguiente si el natural está cerrado):
+  // editar un mes ya registrado propone "Solo este mes".
+  activeMonthId: string;
   onSave: (input: MonthlySalaryInput) => void;
 };
 
@@ -22,7 +23,7 @@ export function useMonthlySalaryEditor({
   language,
   monthId,
   monthLabel,
-  currentMonthId,
+  activeMonthId,
   onSave,
 }: UseMonthlySalaryEditorOptions) {
   const [open, setOpen] = useState(false);
@@ -37,7 +38,7 @@ export function useMonthlySalaryEditor({
     const salary = getMonthlySalarySettings(finance, monthId);
     setAmount(formatMoneyInput(salary.amount, language));
     setSalaryDay(salary.dayOfMonth);
-    setScope(toMonthId(monthId) < currentMonthId ? "month" : "fromMonth");
+    setScope(toMonthId(monthId) < activeMonthId ? "month" : "fromMonth");
     setDayPickerOpen(false);
     setOpen(true);
   }

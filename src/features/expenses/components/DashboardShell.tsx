@@ -3,6 +3,7 @@
 import { Landmark, Settings, WalletCards } from "lucide-react";
 import { useEffect } from "react";
 import { OfflineLink } from "@/components/ui/OfflineLink";
+import { OfflineStatusChip } from "@/components/ui/OfflineStatusChip";
 import type { AppLanguage } from "@/domain/types";
 import type { PanelChromeState } from "@/features/expenses/lib/scroll-chrome-state";
 import { t } from "@/shared/i18n";
@@ -49,9 +50,14 @@ export function DashboardShell({
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--app-text-subtle)]">
-                  {headlineTitle}
-                </p>
+                {/* El título nunca se recorta: si el chip sin conexión no cabe
+                    a su lado, pasa a la línea siguiente. */}
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <p className="break-words text-xs font-semibold uppercase tracking-wide text-[var(--app-text-subtle)]">
+                    {headlineTitle}
+                  </p>
+                  <OfflineStatusChip language={language} />
+                </div>
                 <p className="app-money mt-1 text-[32px] font-semibold leading-none text-[var(--app-text)]">
                   {headlineLabel}
                 </p>
@@ -76,7 +82,7 @@ export function DashboardShell({
       </div>
 
       <nav
-        aria-label={language === "es" ? "Secciones" : "Sections"}
+        aria-label={t("common.sections", language)}
         className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2"
       >
         <div className="app-bottom-nav mx-auto grid max-w-md grid-cols-2 gap-2 p-1.5 text-sm font-semibold">

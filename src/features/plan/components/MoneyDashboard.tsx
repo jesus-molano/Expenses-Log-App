@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { type FormEvent, useCallback, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useMemo, useRef, useState } from "react";
 import { format, parseISO, subMonths } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import { ActionToast } from "@/components/ui/ActionToast";
@@ -16,11 +16,17 @@ import {
   isEventInMonth,
   toMonthId,
 } from "@/domain/finance";
-import { resolveActiveMonth } from "@/domain/budget-month";
+import {
+  buildPaydayOutlook,
+  defaultDateInMonth,
+  isSalaryPromptVisible,
+} from "@/domain/budget-month";
 import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
+import { MonthBar } from "@/features/expenses/components/MonthBar";
 import { SeriesAmountPromptSheet } from "@/features/expenses/components/SeriesAmountQuestion";
 import { useActionToast } from "@/features/expenses/hooks/use-action-toast";
+import { useActiveMonth } from "@/features/expenses/hooks/use-active-month";
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
 import { useSeriesAmountPrompt } from "@/features/expenses/hooks/use-series-amount-prompt";
 import { capitalize, formatMonthName } from "@/features/expenses/lib/month-view";
@@ -32,6 +38,7 @@ import { useMonthlySalaryEditor } from "../hooks/use-monthly-salary-editor";
 import { useCompactChart } from "../hooks/use-compact-chart";
 import { useOneOffIncomeForm } from "../hooks/use-one-off-income-form";
 import { usePlanSettingsForm } from "../hooks/use-plan-settings-form";
+import { useIncomeRemovalConfirmation } from "../hooks/use-income-removal-confirmation";
 import { useSalaryPrompt } from "../hooks/use-salary-prompt";
 import { useSkipOccurrenceConfirmation } from "../hooks/use-skip-occurrence-confirmation";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
@@ -39,7 +46,7 @@ import {
   buildSeriesItem,
   getAvailableYears,
   occurrencesForMonth,
-  planCopy,
+  phaseLabel,
 } from "../lib/plan-dashboard";
 import { AnnualPlanSection } from "./AnnualPlanSection";
 import { CurrentMonthPlanSection } from "./CurrentMonthPlanSection";
@@ -47,6 +54,7 @@ import { MonthlyReviewSection } from "./MonthlyReviewSection";
 import { MonthlySalaryDialog } from "./MonthlySalaryDialog";
 import { OneOffIncomePanel } from "./OneOffIncomePanel";
 import { PlanSettingsSheet } from "./PlanSettingsSheet";
+import { RemoveIncomeDialog } from "./RemoveIncomeDialog";
 import { SalaryPromptCard } from "./SalaryPromptCard";
 import { SkipOccurrenceDialog } from "./SkipOccurrenceDialog";
 
@@ -67,23 +75,27 @@ export function MoneyDashboard() {
     updateSalaryExtraPay,
     recordSalaryReceipt,
     undoSalaryReceipt,
+    closeMonth,
+    reopenMonth,
   } = expenseStore;
   const chrome = useScrollChrome();
   const isCompactChart = useCompactChart();
   const language = store.preferences?.language ?? "es";
-  const copy = planCopy(language);
   const locale = language === "en" ? enUS : es;
   const today = useCurrentDate();
-  const currentYear = today.getFullYear();
   const todayDateOnly = toDateOnly(today);
-  // "Este mes" es el mes activo: tras pasar a noviembre, Plan y Gastos
-  // cuentan lo mismo.
-  const activeMonth = useMemo(() => {
-    const id = resolveActiveMonth(todayDateOnly, store.finance.monthClosures);
-    return { id, date: parseISO(`${id}-01`), year: Number(id.slice(0, 4)) };
-  }, [store.finance.monthClosures, todayDateOnly]);
-  const currentMonthId = activeMonth.id;
-  const currentMonthDate = activeMonth.date;
+  // Plan sigue al mes que se mira en Gastos (compartido por pestaña). El mes
+  // activo es la fase "actual": tras pasar a noviembre, Plan y Gastos cuentan
+  // lo mismo.
+  const month = useActiveMonth({ store, language, now: today, closeMonth, reopenMonth });
+  const monthHeadingRef = useRef<HTMLHeadingElement>(null);
+  const activeMonthId = month.activeMonthId;
+  const currentMonthId = month.viewMonthId;
+  const currentMonthDate = useMemo(
+    () => parseISO(`${currentMonthId}-01`),
+    [currentMonthId],
+  );
+  const viewYear = currentMonthDate.getFullYear();
   const currentOccurrences = useMemo(
     () => occurrencesForMonth(store, currentMonthDate, language),
     [currentMonthDate, language, store],
@@ -95,8 +107,16 @@ export function MoneyDashboard() {
         finance: store.finance,
         occurrences: currentOccurrences,
         today,
+        activeMonthId,
       }),
-    [currentMonthDate, currentOccurrences, store.finance, today],
+    [activeMonthId, currentMonthDate, currentOccurrences, store.finance, today],
+  );
+  const paydayOutlook = useMemo(
+    () =>
+      currentMonthId === activeMonthId
+        ? buildPaydayOutlook(store, todayDateOnly, language)
+        : null,
+    [activeMonthId, currentMonthId, language, store, todayDateOnly],
   );
   const pendingOccurrences = currentOccurrences.filter(
     (occurrence) => occurrence.status === "due",
@@ -105,6 +125,15 @@ export function MoneyDashboard() {
     isEventInMonth(event, currentMonthDate),
   );
   const monthLabel = format(currentMonthDate, "MMMM yyyy", { locale });
+  const savingsLabel =
+    currentMonthId === activeMonthId
+      ? t("plan.savingsThisMonth", language)
+      : capitalize(
+          t("monthClose.savingsForMonth", language).replace(
+            "{month}",
+            formatMonthName(currentMonthId, language),
+          ),
+        );
   const paidProgress = plan.plannedExpenseCount
     ? Math.round((plan.paidExpenseCount / plan.plannedExpenseCount) * 100)
     : 0;
@@ -118,7 +147,7 @@ export function MoneyDashboard() {
   const [extraSheetOpen, setExtraSheetOpen] = useState(false);
   const [savingsMonthId, setSavingsMonthId] = useState<string | null>(null);
   const [savingsActualText, setSavingsActualText] = useState("");
-  const annualYear = annualYearOverride ?? currentYear;
+  const annualYear = annualYearOverride ?? viewYear;
   const selectedMonthId =
     selectedMonthIdOverride ?? toDateOnly(currentMonthDate);
   const reviewYear =
@@ -132,9 +161,10 @@ export function MoneyDashboard() {
           new Date(annualYear, index, 1),
           today,
           language,
+          activeMonthId,
         ),
       ),
-    [annualYear, language, store, today],
+    [activeMonthId, annualYear, language, store, today],
   );
   const reviewMoneySeries = useMemo(
     () =>
@@ -144,18 +174,19 @@ export function MoneyDashboard() {
           new Date(reviewYear, index, 1),
           today,
           language,
+          activeMonthId,
         ),
       ),
-    [language, reviewYear, store, today],
+    [activeMonthId, language, reviewYear, store, today],
   );
-  // Al pasar de diciembre a enero, el año activo también se puede elegir.
-  const activeYear = activeMonth.year;
+  // Al pasar de diciembre a enero, el año activo y el que se mira también se
+  // pueden elegir.
   const availableYears = useMemo(
     () =>
-      Array.from(new Set([...getAvailableYears(store, today), activeYear])).sort(
+      getAvailableYears(store, today, [activeMonthId, currentMonthId]).sort(
         (a, b) => a - b,
       ),
-    [activeYear, store, today],
+    [activeMonthId, currentMonthId, store, today],
   );
   const selectedSummary =
     reviewMoneySeries.find((item) => item.id === selectedMonthId) ??
@@ -166,6 +197,7 @@ export function MoneyDashboard() {
     subMonths(selectedMonthDate, 1),
     today,
     language,
+    activeMonthId,
   );
   const selectedOccurrences = occurrencesForMonth(
     store,
@@ -199,10 +231,12 @@ export function MoneyDashboard() {
     0,
   );
 
+  // La base del plan (sueldo, día de cobro, objetivo) rige desde el mes
+  // activo aunque se esté mirando otro.
   const settingsForm = usePlanSettingsForm({
     finance: store.finance,
     language,
-    savingsMonthId: currentMonthId,
+    savingsMonthId: activeMonthId,
     onSave: updateMoneySettings,
     onSaveExtraPay: updateSalaryExtraPay,
   });
@@ -245,34 +279,68 @@ export function MoneyDashboard() {
         },
       }),
   });
-  // Un ingreso extra cuenta en el mes que se está viendo: con el mes
-  // siguiente ya activo, se fecha el día 1 de ese mes.
-  const incomeDate =
-    todayDateOnly.slice(0, 7) >= currentMonthId ? todayDateOnly : `${currentMonthId}-01`;
+  // Como en Gastos, solo al mirar el mes natural o el activo.
+  const salaryPromptCard = isSalaryPromptVisible(
+    salaryPrompt.prompt,
+    currentMonthId,
+    activeMonthId,
+  ) ? (
+    <SalaryPromptCard
+      prompt={salaryPrompt.prompt}
+      editing={salaryPrompt.editing}
+      amountText={salaryPrompt.amountText}
+      language={language}
+      onConfirm={salaryPrompt.confirm}
+      onStartOther={salaryPrompt.startOther}
+      onCancelOther={salaryPrompt.cancelOther}
+      onAmountTextChange={salaryPrompt.setAmountText}
+      onSaveOther={salaryPrompt.saveOther}
+      onDismiss={salaryPrompt.dismiss}
+    />
+  ) : null;
+  // Un ingreso extra cuenta en el mes que se está viendo: hoy si es el
+  // natural, su día 1 si es posterior y su último día si ya pasó.
+  const incomeDate = defaultDateInMonth(currentMonthId, todayDateOnly);
   const oneOffIncome = useOneOffIncomeForm({
     today: incomeDate,
     onAddIncome: addIncomeEvent,
   });
   const skipDialog = useSkipOccurrenceConfirmation(skipOccurrence);
+  const incomeRemoval = useIncomeRemovalConfirmation(
+    store.finance.incomeEvents,
+    deleteIncomeEvent,
+  );
   const salaryEditor = useMonthlySalaryEditor({
     finance: store.finance,
     language,
     monthId: selectedSummary.id,
     monthLabel: selectedSummary.monthLong,
-    currentMonthId: todayDateOnly.slice(0, 7),
+    activeMonthId,
     onSave: updateMonthlySalary,
   });
 
   function selectReviewYear(year: number) {
-    setReviewYearOverride(year === activeYear ? null : year);
+    setReviewYearOverride(year === viewYear ? null : year);
     setSelectedMonthIdOverride(
-      year === activeYear ? null : `${year}-01-01`,
+      year === viewYear ? null : `${year}-01-01`,
     );
     setExpandedReview(false);
   }
 
   function selectAnnualYear(year: number) {
-    setAnnualYearOverride(year === currentYear ? null : year);
+    setAnnualYearOverride(year === viewYear ? null : year);
+  }
+
+  // Al cambiar de mes, la revisión y el año del gráfico vuelven a seguirlo.
+  function followViewMonth() {
+    setAnnualYearOverride(null);
+    setReviewYearOverride(null);
+    setSelectedMonthIdOverride(null);
+    setExpandedReview(false);
+  }
+
+  function focusMonthHeading() {
+    window.requestAnimationFrame(() => monthHeadingRef.current?.focus());
   }
 
   function openSavings(monthId: string) {
@@ -304,49 +372,61 @@ export function MoneyDashboard() {
   return (
     <DashboardShell
       headlineLabel={formatCurrency(plan.pendingExpensesTotal)}
-      headlineTitle={copy.toPay}
+      headlineTitle={`${t("common.due", language)} · ${formatMonthName(currentMonthId, language)}`}
       activeTab="money"
       language={language}
       panelChrome={chrome.panelChrome}
     >
       <div className="grid w-full min-w-0 gap-16 overflow-hidden pb-8 pt-1 sm:gap-20">
-        <CurrentMonthPlanSection
-          language={language}
-          copy={copy}
-          monthLabel={monthLabel}
-          plan={plan}
-          paidProgress={paidProgress}
-          pendingOccurrences={pendingOccurrences}
-          categories={store.categories}
-          todayDateOnly={todayDateOnly}
-          onOpenSettings={settingsForm.openSettings}
-          onOpenSavings={() => openSavings(currentMonthId)}
-          onOpenExtraIncome={() => setExtraSheetOpen(true)}
-          onSkipOccurrence={skipDialog.requestSkipOccurrence}
-          onTogglePaid={togglePaid}
-          onUpdateMonthlyExpense={updateMonthlyExpense}
-          suggestPaidAmount={suggestPaidAmount}
-          notice={
-            salaryPrompt.prompt ? (
-              <SalaryPromptCard
-                prompt={salaryPrompt.prompt}
-                editing={salaryPrompt.editing}
-                amountText={salaryPrompt.amountText}
-                language={language}
-                onConfirm={salaryPrompt.confirm}
-                onStartOther={salaryPrompt.startOther}
-                onCancelOther={salaryPrompt.cancelOther}
-                onAmountTextChange={salaryPrompt.setAmountText}
-                onSaveOther={salaryPrompt.saveOther}
-                onDismiss={salaryPrompt.dismiss}
-              />
-            ) : null
-          }
-        />
+        <div className="grid min-w-0 gap-5">
+          <MonthBar
+            monthId={currentMonthId}
+            activeMonthId={activeMonthId}
+            calendarMonthId={month.calendarMonthId}
+            language={language}
+            canBrowseBack={month.canBrowseBack}
+            canBrowseForward={month.canBrowseForward}
+            onBrowse={(delta) => {
+              month.browse(delta);
+              followViewMonth();
+            }}
+            onReset={() => {
+              month.reset();
+              followViewMonth();
+              focusMonthHeading();
+            }}
+            onReopen={() => {
+              month.reopen();
+              followViewMonth();
+              focusMonthHeading();
+            }}
+            headingRef={monthHeadingRef}
+            titleAs="p"
+          />
+          <CurrentMonthPlanSection
+            language={language}
+            monthLabel={monthLabel}
+            phaseLabel={plan.phase === "current" ? null : phaseLabel(plan.phase, language)}
+            savingsLabel={savingsLabel}
+            paydayOutlook={paydayOutlook}
+            plan={plan}
+            paidProgress={paidProgress}
+            pendingOccurrences={pendingOccurrences}
+            categories={store.categories}
+            todayDateOnly={todayDateOnly}
+            onOpenSettings={settingsForm.openSettings}
+            onOpenSavings={() => openSavings(currentMonthId)}
+            onOpenExtraIncome={() => setExtraSheetOpen(true)}
+            onSkipOccurrence={skipDialog.requestSkipOccurrence}
+            onTogglePaid={togglePaid}
+            onUpdateMonthlyExpense={updateMonthlyExpense}
+            suggestPaidAmount={suggestPaidAmount}
+            notice={salaryPromptCard}
+          />
+        </div>
 
         <AnnualPlanSection
           language={language}
-          copy={copy}
           year={annualYear}
           availableYears={availableYears}
           moneySeries={annualMoneySeries}
@@ -360,7 +440,6 @@ export function MoneyDashboard() {
 
         <MonthlyReviewSection
           language={language}
-          copy={copy}
           reviewYear={reviewYear}
           availableYears={availableYears}
           selectedSummary={selectedSummary}
@@ -382,10 +461,11 @@ export function MoneyDashboard() {
           }}
           onEditSalary={salaryEditor.openEditor}
           onEditSavings={() => openSavings(selectedSummary.id)}
-          onDeleteIncomeEvent={deleteIncomeEvent}
+          onDeleteIncomeEvent={incomeRemoval.requestRemoval}
           onUpdateIncomeEvent={updateIncomeEvent}
           onToggleExpanded={() => setExpandedReview((value) => !value)}
           onSkipOccurrence={skipDialog.requestSkipOccurrence}
+          onTogglePaid={togglePaid}
           onUpdateMonthlyExpense={updateMonthlyExpense}
           suggestPaidAmount={suggestPaidAmount}
         />
@@ -412,9 +492,9 @@ export function MoneyDashboard() {
       ) : null}
 
       {extraSheetOpen ? (
-        <Sheet ariaLabel={copy.extraIncome} onBackdropClick={() => setExtraSheetOpen(false)}>
+        <Sheet ariaLabel={t("plan.extraIncome", language)} onBackdropClick={() => setExtraSheetOpen(false)}>
           <div className="p-5">
-            <SheetHeader title={copy.extraIncome} onClose={() => setExtraSheetOpen(false)} language={language} />
+            <SheetHeader title={t("plan.extraIncome", language)} onClose={() => setExtraSheetOpen(false)} language={language} />
             <div className="mt-5">
               <OneOffIncomePanel
                 language={language}
@@ -425,7 +505,7 @@ export function MoneyDashboard() {
                 onExtraNameChange={oneOffIncome.setExtraName}
                 onExtraAmountChange={oneOffIncome.setExtraAmount}
                 onSubmit={oneOffIncome.saveExtra}
-                onDeleteIncomeEvent={deleteIncomeEvent}
+                onDeleteIncomeEvent={incomeRemoval.requestRemoval}
                 onUpdateIncomeEvent={updateIncomeEvent}
               />
             </div>
@@ -434,19 +514,19 @@ export function MoneyDashboard() {
       ) : null}
 
       {savingsMonthId ? (
-        <Sheet ariaLabel={copy.editSavings} onBackdropClick={() => setSavingsMonthId(null)} contentClassName="sm:max-w-sm">
+        <Sheet ariaLabel={t("plan.editSavings", language)} onBackdropClick={() => setSavingsMonthId(null)} contentClassName="sm:max-w-sm">
           <form onSubmit={saveSavings} className="p-5">
             <SheetHeader
-              title={copy.editSavings}
+              title={t("plan.editSavings", language)}
               subtitle={format(new Date(`${savingsMonthId}-01T00:00:00`), "MMMM yyyy", { locale })}
               onClose={() => setSavingsMonthId(null)}
               language={language}
             />
             <p className="mt-5 text-sm text-[var(--app-text-muted)]">
-              {copy.monthlyGoal}: <span className="app-money font-semibold text-[var(--app-text)]">{formatCurrency(getMonthlySavingsTarget(store.finance, savingsMonthId))}</span>
+              {t("plan.monthlyGoal", language)}: <span className="app-money font-semibold text-[var(--app-text)]">{formatCurrency(getMonthlySavingsTarget(store.finance, savingsMonthId))}</span>
             </p>
             <label className="mt-4 grid gap-1.5 text-sm font-semibold text-[var(--app-text-muted)]">
-              {copy.actualTransfer}
+              {t("plan.actualTransfer", language)}
               <MoneyInput
                 value={savingsActualText}
                 allowZero
@@ -455,11 +535,11 @@ export function MoneyDashboard() {
               />
             </label>
             {activeSavingsContribution?.source === "legacy" && !activeSavingsContribution.transferredAt ? (
-              <p className="mt-3 text-xs text-[var(--app-warning)]">{copy.legacySavingDate}</p>
+              <p className="mt-3 text-xs text-[var(--app-warning)]">{t("plan.legacySavingDate", language)}</p>
             ) : null}
-            <p className="mt-3 text-xs leading-relaxed text-[var(--app-text-muted)]">{copy.singleContribution}</p>
+            <p className="mt-3 text-xs leading-relaxed text-[var(--app-text-muted)]">{t("plan.singleContribution", language)}</p>
             <Button type="submit" variant="primary" className="mt-5 w-full">
-              {copy.saveSavings}
+              {t("plan.saveSavings", language)}
             </Button>
           </form>
         </Sheet>
@@ -487,6 +567,13 @@ export function MoneyDashboard() {
         language={language}
         onCancel={skipDialog.cancelSkipOccurrence}
         onConfirm={skipDialog.confirmSkipOccurrence}
+      />
+
+      <RemoveIncomeDialog
+        incomeEvent={incomeRemoval.incomeToRemove}
+        language={language}
+        onCancel={incomeRemoval.cancelRemoval}
+        onConfirm={incomeRemoval.confirmRemoval}
       />
 
       {seriesPrompt.prompt ? (

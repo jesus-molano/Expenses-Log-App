@@ -214,6 +214,37 @@ describe("sheet history", () => {
     vi.useRealTimers();
   });
 
+  it("runs a navigation only after closed layers have left the history", async () => {
+    const { afterLayerHistorySettles, registerHistoryLayer } = await load();
+    const unregisterGuard = registerHistoryLayer(vi.fn());
+    const unregisterDialog = registerHistoryLayer(vi.fn());
+    const indexWhenCalled: number[] = [];
+
+    // Como en un efecto: las capas se quitan primero y luego se pide navegar.
+    unregisterDialog();
+    unregisterGuard();
+    afterLayerHistorySettles(() => indexWhenCalled.push(fake.index));
+    expect(indexWhenCalled).toEqual([]);
+
+    await settle();
+    expect(indexWhenCalled).toEqual([0]);
+  });
+
+  it("runs on the next tick when no layer is closing, and can be cancelled", async () => {
+    const { afterLayerHistorySettles } = await load();
+    const navigate = vi.fn();
+    const cancelled = vi.fn();
+
+    afterLayerHistorySettles(navigate);
+    const cancel = afterLayerHistorySettles(cancelled);
+    cancel();
+    expect(navigate).not.toHaveBeenCalled();
+
+    await settle();
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(cancelled).not.toHaveBeenCalled();
+  });
+
   it("restores scroll on the page entry after leaving with a sheet open", async () => {
     const { registerHistoryLayer } = await load();
 

@@ -1,5 +1,16 @@
-import { toDateOnly } from "@/domain/calendar";
-import type { ExpenseOccurrence, ExpenseStore } from "@/domain/types";
+import { isValidDateOnly, toDateOnly } from "@/domain/calendar";
+import { normalizeAmountChanges, normalizePauses } from "@/domain/recurrence";
+import type {
+  ExpenseOccurrence,
+  ExpenseOccurrenceOverride,
+  ExpenseStore,
+  ExpenseTemplate,
+  OccurrenceStatus,
+  RecurrenceFrequency,
+  RecurrenceRule,
+} from "@/domain/types";
+import { normalizeAppLanguage } from "@/shared/i18n";
+import { DEFAULT_THEME } from "@/shared/theme";
 import { buildPushDueReminders } from "./last-chance-reminders";
 
 export type DailyReminder = {
@@ -46,14 +57,117 @@ export function dailyReminderTitle(reminder: DailyReminder) {
     : `${reminder.occurrences.length} cobros por revisar`;
 }
 
-export function isExpenseStore(value: unknown): value is ExpenseStore {
-  if (!value || typeof value !== "object") return false;
-  const store = value as Partial<ExpenseStore>;
+const RECURRENCE_FREQUENCIES: readonly RecurrenceFrequency[] = [
+  "once",
+  "monthly",
+  "quarterly",
+  "yearly",
+  "custom",
+  "rrule",
+];
+const OCCURRENCE_STATUSES: readonly OccurrenceStatus[] = ["due", "paid", "skipped"];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isOptional(value: unknown, check: (value: unknown) => boolean) {
+  return value === undefined || value === null || check(value);
+}
+
+const isString = (value: unknown) => typeof value === "string";
+const isFiniteNumber = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value);
+
+function isRecurrenceRule(value: unknown): value is RecurrenceRule {
+  return (
+    isRecord(value) &&
+    RECURRENCE_FREQUENCIES.includes(value.frequency as RecurrenceFrequency) &&
+    isOptional(value.interval, isFiniteNumber) &&
+    isOptional(value.unit, isString) &&
+    isOptional(value.rrule, isString) &&
+    isOptional(value.annualMonth, isFiniteNumber)
+  );
+}
+
+// Solo cuentan los gastos activos con aviso y con todo lo que el aviso usa
+// bien formado.
+function isRemindableTemplate(value: unknown): value is ExpenseTemplate {
+  if (!isRecord(value)) return false;
+  const reminder = value.reminder;
 
   return (
-    Array.isArray(store.templates) &&
-    Array.isArray(store.overrides) &&
-    Array.isArray(store.categories) &&
-    Boolean(store.finance)
+    isString(value.id) &&
+    isString(value.name) &&
+    value.active === true &&
+    isValidDateOnly(value.startDate) &&
+    isOptional(value.endDate, isValidDateOnly) &&
+    isFiniteNumber(value.dueDay) &&
+    isRecurrenceRule(value.recurrence) &&
+    isRecord(reminder) &&
+    reminder.enabled === true &&
+    isFiniteNumber(reminder.daysBeforeCharge)
   );
+}
+
+// Las pausas y los cambios de precio deciden qué cobros hay y cuánto cuestan:
+// uno roto se descarta en lugar de lanzar al generar las ocurrencias.
+function toReminderTemplate(template: ExpenseTemplate): ExpenseTemplate {
+  const sanitized: ExpenseTemplate = { ...template };
+  delete sanitized.pauses;
+  delete sanitized.amountChanges;
+  const pauses = normalizePauses(template.pauses);
+  const amountChanges = normalizeAmountChanges(template.amountChanges);
+  if (pauses) sanitized.pauses = pauses;
+  if (amountChanges) sanitized.amountChanges = amountChanges;
+  return sanitized;
+}
+
+function toReminderOverride(value: unknown): ExpenseOccurrenceOverride[] {
+  if (
+    !isRecord(value) ||
+    !isString(value.templateId) ||
+    !isValidDateOnly(value.occurrenceDate) ||
+    !OCCURRENCE_STATUSES.includes(value.status as OccurrenceStatus)
+  ) {
+    return [];
+  }
+
+  const override = { ...value } as ExpenseOccurrenceOverride;
+  // Sin una fecha movida legible se usa la original: descartar el override
+  // entero volvería a avisar de un recibo ya pagado.
+  if (!isOptional(value.dueDate, isValidDateOnly)) delete override.dueDate;
+  if (!isOptional(value.name, isString)) delete override.name;
+  return [override];
+}
+
+// El cron lee el jsonb tal y como lo subió cada cliente: puede venir de un
+// build antiguo o estar corrupto. Se queda solo con lo que el aviso necesita y
+// con la forma esperada, en lugar de dejar que una pieza rota lance al
+// generar las ocurrencias. Devuelve null si no parece un store.
+export function toReminderStore(value: unknown): ExpenseStore | null {
+  if (
+    !isRecord(value) ||
+    !Array.isArray(value.templates) ||
+    !Array.isArray(value.overrides)
+  ) {
+    return null;
+  }
+
+  const preferences = isRecord(value.preferences) ? value.preferences : {};
+
+  return {
+    categories: [],
+    templates: value.templates.filter(isRemindableTemplate).map(toReminderTemplate),
+    overrides: value.overrides.flatMap(toReminderOverride),
+    finance: {
+      incomeEvents: [],
+      monthlySalary: {},
+      monthlySavingsTargets: {},
+    },
+    preferences: {
+      theme: DEFAULT_THEME,
+      language: normalizeAppLanguage(preferences.language),
+    },
+  };
 }
