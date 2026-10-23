@@ -485,4 +485,22 @@ describe("normalizeExpenseStore", () => {
       { id: "ended", startDate: "2026-06-01", endDate: "2026-06-01" },
     ]);
   });
+
+  it("keeps category timestamps and still loads categories written without them", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      categories: [
+        { id: "new", name: "Casa", icon: "Home", tone: "green", updatedAt: "2026-10-23T10:00:00.000Z" },
+        { id: "old", name: "Ocio", icon: "Gamepad2", tone: "violet" },
+        { id: "broken", name: "Salud", icon: "HeartPulse", tone: "rose", updatedAt: "ayer" },
+        null,
+      ],
+    });
+
+    expect(store.categories).toEqual([
+      { id: "new", name: "Casa", icon: "Home", tone: "green", updatedAt: "2026-10-23T10:00:00.000Z" },
+      { id: "old", name: "Ocio", icon: "Gamepad2", tone: "violet" },
+      { id: "broken", name: "Salud", icon: "HeartPulse", tone: "rose" },
+    ]);
+  });
 });

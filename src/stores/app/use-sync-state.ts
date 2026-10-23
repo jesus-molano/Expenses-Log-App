@@ -19,9 +19,9 @@ export function useSyncState() {
     setSyncMessage(message);
   }, []);
 
-  const markSynced = useCallback((mode: "table" | "unavailable") => {
+  const markSynced = useCallback((mode: "table" | "unavailable", message?: string) => {
     setSyncStatus("synced");
-    setSyncMessage(syncedMessage(mode));
+    setSyncMessage(message ?? syncedMessage(mode));
   }, []);
 
   const markSaved = useCallback((mode: "table" | "unavailable") => {

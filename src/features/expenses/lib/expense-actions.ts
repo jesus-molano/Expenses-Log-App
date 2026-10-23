@@ -34,6 +34,7 @@ export function findOrCreateCategory(
     name: normalizedName,
     icon: presetCategory.icon,
     tone: presetCategory.tone,
+    updatedAt: new Date().toISOString(),
   };
 
   return {

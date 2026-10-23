@@ -17,6 +17,8 @@ export type Database = {
         Row: {
           user_id: UUID;
           store: Json;
+          // Solo existe con la migración 20261023120000 aplicada.
+          revision?: number;
           created_at: string;
           updated_at: string;
         };
@@ -138,6 +140,21 @@ export type Database = {
           p_lease_seconds?: number;
         };
         Returns: UUID | null;
+      };
+      save_app_store: {
+        Args: {
+          p_store: Json;
+          p_expected_revision: number | null;
+        };
+        Returns: Json;
+      };
+      claim_push_subscription: {
+        Args: {
+          p_endpoint: string;
+          p_p256dh: string;
+          p_auth: string;
+        };
+        Returns: UUID;
       };
     };
     Enums: Record<string, never>;

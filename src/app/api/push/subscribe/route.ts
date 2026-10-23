@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { savePushSubscription } from "@/data/push/push-subscriptions";
 import { toDatabaseUuid } from "@/data/supabase/database.types";
 import { createClient } from "@/utils/supabase/server";
 
@@ -61,18 +62,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error } = await supabase.from("push_subscriptions").upsert(
-    {
-      user_id: toDatabaseUuid(user.id),
-      endpoint: parsed.data.endpoint,
-      p256dh: parsed.data.keys.p256dh,
-      auth: parsed.data.keys.auth,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "endpoint" },
-  );
-
-  if (error) {
+  try {
+    await savePushSubscription(supabase, user.id, parsed.data);
+  } catch (error) {
     console.error("Could not save push subscription", error);
     return NextResponse.json(
       { code: "PUSH_SUBSCRIPTION_SAVE_FAILED" },

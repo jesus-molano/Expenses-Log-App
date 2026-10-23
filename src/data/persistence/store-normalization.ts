@@ -9,6 +9,7 @@ import {
   toDateOnly,
 } from "@/domain/calendar";
 import type {
+  ExpenseCategory,
   ExpenseOccurrenceOverride,
   ExpenseStore,
   ExpenseTemplate,
@@ -308,9 +309,7 @@ export function normalizeExpenseStore(
   const base: ExpenseStore = {
     ...(keepUnknownKeys ? unknownEntries(store, STORE_KEYS) : {}),
     schemaVersion: 3,
-    categories: Array.isArray(store.categories)
-      ? (store.categories as ExpenseStore["categories"])
-      : [],
+    categories: normalizeCategories(store.categories),
     templates: Array.isArray(store.templates)
       ? normalizeTemplates(store.templates, today)
       : [],
@@ -341,6 +340,22 @@ export function normalizeExpenseStore(
   return materializeClosedOccurrenceRecords(normalized, {
     today,
     source: schemaVersion < 3 ? "legacy-derived" : "native",
+  });
+}
+
+// Las categorías llevan `updatedAt` para fusionarse por entidad; las de
+// stores antiguos no lo tienen y cargan igual. Uno ilegible se quita: sin él
+// gana la copia local, como antes.
+function normalizeCategories(value: unknown): ExpenseCategory[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord).map((raw) => {
+    const category = raw as ExpenseCategory;
+    if (category.updatedAt === undefined || isTimestamp(category.updatedAt)) {
+      return category;
+    }
+    const withoutTimestamp = { ...category };
+    delete withoutTimestamp.updatedAt;
+    return withoutTimestamp;
   });
 }
 

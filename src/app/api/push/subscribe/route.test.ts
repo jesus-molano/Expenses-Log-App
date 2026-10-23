@@ -17,8 +17,12 @@ function request(method: "POST" | "DELETE", body: unknown) {
   });
 }
 
-function mockSupabase(currentUser: User | null = user) {
+function mockSupabase(
+  currentUser: User | null = user,
+  rpcError: { code: string; message: string } | null = null,
+) {
   const upsert = vi.fn().mockResolvedValue({ error: null });
+  const rpc = vi.fn().mockResolvedValue({ data: null, error: rpcError });
   const deleteQuery = { eq: vi.fn() };
   deleteQuery.eq.mockReturnValue(deleteQuery);
   const from = vi.fn().mockReturnValue({
@@ -33,11 +37,13 @@ function mockSupabase(currentUser: User | null = user) {
       }),
     },
     from,
+    rpc,
   } as unknown as AppSupabaseClient);
-  return { upsert, deleteQuery };
+  return { upsert, rpc, deleteQuery };
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.clearAllMocks();
   vi.unstubAllEnvs();
 });
@@ -69,8 +75,26 @@ describe("/api/push/subscribe", () => {
     expect(await response.json()).toMatchObject({ mode: "demo" });
   });
 
-  it("stores an authenticated device under its user", async () => {
-    const { upsert } = mockSupabase();
+  it("claims the endpoint for the authenticated user", async () => {
+    const { rpc, upsert } = mockSupabase();
+    const response = await POST(
+      request("POST", { endpoint, keys: { p256dh: "key", auth: "auth" } }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("claim_push_subscription", {
+      p_endpoint: endpoint,
+      p_p256dh: "key",
+      p_auth: "auth",
+    });
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the direct upsert before the migration is applied", async () => {
+    const { upsert } = mockSupabase(user, {
+      code: "PGRST202",
+      message: "Could not find the function public.claim_push_subscription",
+    });
     const response = await POST(
       request("POST", { endpoint, keys: { p256dh: "key", auth: "auth" } }),
     );
@@ -85,6 +109,21 @@ describe("/api/push/subscribe", () => {
       }),
       { onConflict: "endpoint" },
     );
+  });
+
+  it("reports a failed claim without falling back", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { upsert } = mockSupabase(user, {
+      code: "42501",
+      message: "permission denied",
+    });
+    const response = await POST(
+      request("POST", { endpoint, keys: { p256dh: "key", auth: "auth" } }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ code: "PUSH_SUBSCRIPTION_SAVE_FAILED" });
+    expect(upsert).not.toHaveBeenCalled();
   });
 
   it("removes only the authenticated user's endpoint", async () => {

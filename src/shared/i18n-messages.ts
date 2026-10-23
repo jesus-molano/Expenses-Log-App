@@ -371,6 +371,9 @@ export const messages = {
       personal: "Personal",
       general: "General",
     },
+    sync: {
+      remoteChangesApplied: "Sincronizado · con cambios de otro dispositivo",
+    },
   },
   en: {
     common: {
@@ -741,6 +744,9 @@ export const messages = {
       mascotas: "Pets",
       personal: "Personal",
       general: "General",
+    },
+    sync: {
+      remoteChangesApplied: "Synced · includes changes from another device",
     },
   },
 } as const;
