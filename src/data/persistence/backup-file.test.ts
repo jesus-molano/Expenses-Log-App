@@ -75,6 +75,58 @@ describe("backup file", () => {
     expect(parsed.store.finance.monthlySalary["2026-10"]).toMatchObject({ amount: 2200 });
   });
 
+  it("round-trips pauses, price changes, extra pays, salary answers and one-month salaries", () => {
+    const withMoney: ExpenseStore = {
+      ...store,
+      templates: [
+        {
+          ...store.templates[0],
+          amountChanges: [{ from: "2027-01-01", amount: 720 }],
+          pauses: [{ from: "2026-12-01", to: "2026-12-31" }, { from: "2027-06-01" }],
+        },
+      ],
+      finance: {
+        ...store.finance,
+        monthlySalary: {
+          ...store.finance.monthlySalary,
+          "2026-11": {
+            amount: 4000,
+            dayOfMonth: 28,
+            updatedAt: "2026-10-20T00:00:00.000Z",
+            onlyThisMonth: true,
+          },
+        },
+        salaryExtraPays: {
+          "2026-10": { months: [6, 12], amount: 1500, updatedAt: "2026-10-01T00:00:00.000Z" },
+        },
+        salaryReceipts: {
+          "2026-09": {
+            amount: 2150,
+            receivedOn: "2026-09-28",
+            updatedAt: "2026-09-28T10:00:00.000Z",
+          },
+          "2026-08": {
+            amount: 2200,
+            receivedOn: "2026-08-28",
+            updatedAt: "2026-08-29T10:00:00.000Z",
+            undone: true,
+          },
+        },
+      },
+    };
+    const parsed = parseBackupFile({ name: "copia.json", text: buildJsonBackup(withMoney, now) });
+
+    expect(parsed.store.templates[0]).toMatchObject({
+      amountChanges: withMoney.templates[0].amountChanges,
+      pauses: withMoney.templates[0].pauses,
+    });
+    expect(parsed.store.finance.monthlySalary["2026-11"]).toEqual(
+      withMoney.finance.monthlySalary["2026-11"],
+    );
+    expect(parsed.store.finance.salaryExtraPays).toEqual(withMoney.finance.salaryExtraPays);
+    expect(parsed.store.finance.salaryReceipts).toEqual(withMoney.finance.salaryReceipts);
+  });
+
   it("also accepts a bare store, as older exports and localStorage dumps have", () => {
     const parsed = parseBackupFile({ name: "store.txt", text: JSON.stringify(store) });
 

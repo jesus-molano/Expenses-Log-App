@@ -220,17 +220,6 @@ Reglas para campos nuevos:
   con `monthlySavingsContributions` y el paso de mes con `monthClosures`. Los
   cobros anteriores de un gasto nuevo (M18) tambien son overrides; los pagos se
   fechan el dia de su cargo.
-
-## Vista del mes
-
-No se sincroniza:
-
-- El mes que se mira vive en `sessionStorage['expense-view-month']`, por
-  pestaña y compartido entre Gastos y Plan: al cambiar de mes en una pestaña,
-  la otra lo sigue. Sin valor se ve el mes activo.
-- El "Ahora no" a pasar o cerrar el mes se guarda por dispositivo y por mes en
-  `localStorage['plan-close-dismissed:YYYY-MM']`.
-
 - Excepcion: los campos de F3 de dinero tambien se escriben ya, porque cada uno
   degrada a un comportamiento anterior y no a perder datos:
   - `templates[].amountChanges` y `templates[].pauses`: los builds con
@@ -244,8 +233,19 @@ No se sincroniza:
   - `finance.salaryExtraPays` y `finance.salaryReceipts`: claves nuevas de
     `finance`, que los builds con passthrough conservan y fusionan por mes; un
     build anterior no cuenta la paga extra ni lo cobrado.
-- "Aun no" a "¿Has cobrado?" se guarda por dispositivo y no se sincroniza
-  (`salary-prompt-dismissed:<mes>` en localStorage, con el dia).
+
+## Vista del mes
+
+No se sincroniza:
+
+- El mes que se mira vive en `sessionStorage['expense-view-month']`, por
+  pestaña y compartido entre Gastos y Plan: al cambiar de mes en una pestaña,
+  la otra lo sigue. Sin valor se ve el mes activo.
+- El "Ahora no" a pasar o cerrar el mes se guarda por dispositivo y por mes en
+  `localStorage['plan-close-dismissed:YYYY-MM']`.
+- El "Aun no" a "¿Has cobrado?" se guarda por dispositivo y por mes, con el
+  dia, en `localStorage['salary-prompt-dismissed:YYYY-MM']`: vuelve a preguntar
+  al dia siguiente.
 
 ## Cola de guardado
 
@@ -325,11 +325,12 @@ Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/Ba
      ingresos, aportaciones, historico de gastos que desaparecen) o queda en
      estado neutro si es determinista (cobros `ovr:*` en estado pendiente,
      cierres de mes reabiertos, respuestas a "¿Has cobrado?" deshechas,
-     sueldos con tombstone por mes), porque un
+     sueldos con tombstone por mes, pagas extra reescritas con las que el
+     archivo tiene vigentes ese mes), porque un
      tombstone de un id determinista impediria volver a usarlo. Un id que el
      archivo trae se quita de los tombstones. Limite conocido: los objetivos de
-     ahorro y las pagas extra no tienen tombstone, asi que un mes que solo
-     estaba en los datos actuales puede volver en esa fusion.
+     ahorro no tienen tombstone, asi que un mes que solo estaba en los datos
+     actuales puede volver en esa fusion.
    - El CSV solo trae gastos, cobros e historico: sustituir no toca Plan,
      ingresos ni preferencias. Los meses cerrados vuelven como historico
      (`occurrenceRecords`) y los abiertos como overrides de su gasto.
