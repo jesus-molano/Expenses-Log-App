@@ -12,6 +12,7 @@ import {
   buildMonthContext,
   paymentSettlesMonth,
   shouldSuggestAdvance,
+  shouldSuggestCloseWithLeftovers,
 } from "@/domain/budget-month";
 import { toDateOnly } from "@/domain/calendar";
 import type { AppLanguage, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
@@ -26,7 +27,8 @@ type UseActiveMonthOptions = {
 };
 
 // Mes activo (el natural, o el siguiente si el natural está cerrado), mes que
-// se mira y propuesta de pasar de mes cuando el natural ya está al día.
+// se mira y propuesta de pasar de mes: directa cuando el natural ya está al
+// día, o con la hoja de cierre si tras el cobro quedan recibos.
 export function useActiveMonth({
   store,
   language,
@@ -65,6 +67,13 @@ export function useActiveMonth({
     suggestAdvance:
       canSuggest &&
       shouldSuggestAdvance({
+        status: context.closeStatus,
+        today: context.today,
+        payday: context.payday,
+      }),
+    suggestCloseWithLeftovers:
+      canSuggest &&
+      shouldSuggestCloseWithLeftovers({
         status: context.closeStatus,
         today: context.today,
         payday: context.payday,
