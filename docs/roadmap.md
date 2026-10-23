@@ -60,11 +60,17 @@ Estado:
   - Hoja de acciones revisada: "Editar la serie" navega (sustituye la entrada de la hoja en el historial), "Pagado con otro importe" solo apunta lo pagado (la fila pagada muestra lo pagado), mover solo toca el cobro y no se ofrece para lo pagado de un mes cerrado ni más allá del mes siguiente, Intro la abre desde el teclado y los clicks de lector de pantalla cuentan.
   - Cada mes del listado muestra solo sus cobros (más lo pendiente que arrastra); al final, "Noviembre empieza con N cobros en sus primeros días" con "Ver noviembre".
   - Pendiente de F2a: `ConfirmActionDialog` con `useDialogA11y` y M22.
+- **F3 (4, 6, 12, 13 y 14): hecho.**
+  - Plan: "Próximos recibos grandes" (no mensuales y pagos únicos desde 50 € en 90 días), "Provisión para recibos no mensuales" ("Aparta X al mes" y cuánto apartar hasta cada cobro) y "Coste por categoría" (€/mes y €/año de los próximos 12 meses, por categoría y por gasto).
+  - Resumen del mes (previsto, pagado, pendiente, ahorrado y mayores cambios frente al mes anterior) desde "Octubre al día", desde la revisión mensual y ofrecido por Plan al cerrar o cambiar de mes. Registro de saldo con tendencia.
+  - Ajustes › "Mes del presupuesto": mes natural (por defecto) o desde el día de cobro, respetado por el mes activo, Gastos y Plan.
+  - Festivos bancarios en `estimateChargeDate` (nacionales, Jueves y Viernes Santo y cierres de TARGET2).
+  - Diferido: "te quedan ~X € hasta el cobro (≈ €/día)" a partir del saldo, que necesita el "Hasta el cobro" de F1a-3.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
 **Decisiones del dueño:**
-- **Mes:** mes activo con aviso "¿Pasamos a noviembre?" y selector de mes compartido por Gastos y Plan. El ciclo anclado al cobro queda como opción futura.
+- **Mes:** mes activo con aviso "¿Pasamos a noviembre?" y selector de mes compartido por Gastos y Plan. El ciclo anclado al cobro es una opción de Ajustes (F3-13), desactivada por defecto.
 - **Voz:** dictado del navegador (Web Speech API). Escribe en el textarea y luego se analiza como texto.
 - **Entrega:** por fases, un PR por bloque, cada uno con tests.
 - **Gemini:** nivel gratuito, modelo barato y sin enviar audio a Gemini.
@@ -395,17 +401,26 @@ Estado:
 1. **Exportar e importar JSON/CSV**, snapshots locales y `storage.persist()`. Reutiliza `normalizeImportedExpenseStore` y `mergeExpenseStores`.
 2. **Recibos variables:** previsto frente a real, sugerencia con la media de los 3 últimos y "¿Actualizar el importe desde ahora?".
 3. **Finalizar o pausar una suscripción:** `endDate`; las pausas como rangos.
-4. **Provisión mensual para anuales** y "próximos recibos grandes (90 días)".
+4. **Provisión mensual para anuales** y "próximos recibos grandes (90 días)". **Hecho.**
+   - `features/plan/lib/bill-forecast.ts`: la provisión es el coste de los próximos 12 meses de lo que se repite con menos frecuencia que mensual, repartido en 12, y por recibo lo que hay que apartar al mes hasta su próximo cobro.
+   - Recibos grandes: no mensuales y pagos únicos de al menos 50 €, sin pagar, que vencen en los próximos 90 días, por día de cargo.
 5. **Cambios de precio programados** e historial de precio.
-6. **Coste por categoría y anualizado.**
+6. **Coste por categoría y anualizado.** **Hecho.**
+   - `features/plan/lib/recurring-costs.ts`: los próximos 12 meses de presupuesto desde el mes activo, sin pagos únicos ni lo quitado del mes; lo pagado cuenta por lo pagado. Media al mes, parte del sueldo y desglose por gasto.
 7. **Onboarding:** chips de alta rápida y checklist.
 8. **Pagas extra y "¿Has cobrado?"**; ámbito "solo este mes" al editar el sueldo (M16).
 9. **Catálogo "Todos"** con búsqueda y filtros.
 10. **Campos nuevos:** notas, URL de baja, permanencia, categorías propias y método de pago.
 11. **Comandos por voz o IA** ("marca la luz pagada 71,20").
-12. **Resumen del mes** y **registro de saldo**.
-13. **Ciclo anclado al día de cobro** (opción).
-14. **Festivos** en `estimateChargeDate`.
+12. **Resumen del mes** y **registro de saldo**. **Hecho.**
+    - `features/plan/lib/month-summary.ts` y `MonthSummarySheet`. Plan lo ofrece al cerrar un mes, en la primera semana del siguiente y en los tres últimos días del propio.
+    - `finance.balanceCheckins` por fecha, con borrado por `deletedAt` (ver `docs/state-persistence-sync.md`).
+    - Diferido: el saldo disponible hasta el cobro (≈ €/día), pendiente de "Hasta el cobro" (F1a-3).
+13. **Ciclo anclado al día de cobro** (opción). **Hecho.**
+    - `src/domain/budget-cycle.ts` y `finance.budgetCycle`; el ciclo lleva el nombre del mes con más días (cobro ≥ 16: empieza el mes anterior). Ver `docs/domain-model.md`.
+    - Sin modelar: adelantar el inicio cuando el sueldo llega antes por caer el cobro en fin de semana. Al arrastrar, la expansión por días sigue el mes natural.
+14. **Festivos** en `estimateChargeDate`. **Hecho.**
+    - `src/domain/holidays.ts`: festivos nacionales fijos, Jueves y Viernes Santo y cierres de TARGET2. Sin festivos autonómicos ni locales ni traslados al lunes.
 15. **Deuda técnica:**
     - Borrar el código muerto (`use-current-month-plan.ts`, `annual-plan-summary.ts`, `timelineHorizons`).
     - Pasar `planCopy` y los ternarios a i18n.

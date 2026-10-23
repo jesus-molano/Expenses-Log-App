@@ -45,6 +45,14 @@ Una `ExpenseOccurrence` no es una entidad persistida por si misma. Se deriva de
 un template, una fecha de ocurrencia y sus overrides. Incluye fecha estimada de
 cobro, estado y orden visual.
 
+La fecha estimada de cobro (`estimateChargeDate`) es el vencimiento o, si cae
+en fin de semana o festivo bancario, el siguiente dia habil. Los festivos salen
+de `src/domain/holidays.ts`, una tabla pura: los nueve nacionales de fecha fija,
+Jueves y Viernes Santo (desde el domingo de Pascua) y los cierres de TARGET2
+(Lunes de Pascua y 26 de diciembre), que liquida los adeudos SEPA. No incluye
+festivos autonomicos ni locales ni traslados al lunes. "Atrasado" se mide
+contra esta fecha.
+
 ## Overrides
 
 `ExpenseOccurrenceOverride` guarda excepciones para una ocurrencia concreta:
@@ -79,6 +87,11 @@ existente o crea una nueva segun el nombre normalizado.
 - `monthlySalary`: salario por mes, indexado por `YYYY-MM`.
 - `monthlySavingsTargets`: objetivo habitual efectivo desde un mes.
 - `monthlySavingsContributions`: transferencia real registrada para cada mes.
+- `monthClosures`: meses dados por terminados para pasar al siguiente.
+- `budgetCycle`: `{anchor, updatedAt}`, mes natural (`calendar`, por defecto)
+  o desde el dia de cobro (`payday`). Se elige en Ajustes.
+- `balanceCheckins`: saldo de la cuenta anotado por fecha
+  (`{amount, updatedAt, deletedAt?}`).
 
 La pantalla `/money` calcula un `MonthlyMoneyPlan` con ingresos, gastos
 planificados, ahorro reservado, capacidad, restante y faltantes.
@@ -98,6 +111,28 @@ legacy convierte conciliaciones explícitas en overrides pagados. Si ya existe
 un pago persistido para la misma ocurrencia, conserva su correccion manual y no
 la reemplaza con el movimiento antiguo. No conserva movimientos, alias ni
 cuentas que la app ya no usa.
+
+## Mes del presupuesto
+
+Gastos y Plan reparten los recibos por meses de presupuesto con id `YYYY-MM`
+(`src/domain/budget-cycle.ts`). Por defecto son meses naturales. Con el ciclo
+anclado al cobro, cada mes empieza el dia de cobro configurado para ese mes y
+termina el dia antes del siguiente inicio, y lleva el nombre del mes que tiene
+la mayor parte de sus dias:
+
+- Cobro del 16 al 31: "noviembre" empieza el dia de cobro de octubre (cobro el
+  28: del 28 de octubre al 27 de noviembre).
+- Cobro del 1 al 15: "noviembre" empieza el dia de cobro de noviembre (cobro el
+  5: del 5 de noviembre al 4 de diciembre).
+- Un cobro el 29, 30 o 31 cae el ultimo dia de los meses mas cortos.
+- Un mes sin sueldo configurado es natural, pero termina donde empieza el
+  siguiente: los meses se encadenan sin huecos ni solapes aunque cambie el dia
+  de cobro.
+
+El mes activo, los cierres, el "Por pagar", la timeline, el plan del mes, el
+anual y la revision usan esos dias. El sueldo, el ahorro y los cierres siguen
+indexados por el id del mes. El historial que se congela en
+`occurrenceRecords` se cierra siempre por mes natural.
 
 ## Preferencias
 

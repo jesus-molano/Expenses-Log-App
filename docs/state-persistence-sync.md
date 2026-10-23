@@ -108,6 +108,13 @@ La mezcla actual usa ids:
   hasta esa hora, tambien copias antiguas de otro dispositivo; uno editado
   despues se conserva.
 - Preferencias: local, luego cloud, luego defaults.
+- `finance.budgetCycle` (mes natural o desde el dia de cobro): gana el de
+  `updatedAt` mas reciente; si solo uno de los dos stores lo tiene, se
+  conserva.
+- `finance.balanceCheckins` (saldo por fecha): por dia, la version con el
+  `updatedAt` mas reciente. Borrar guarda `deletedAt` en vez de quitar la
+  entrada, asi que un borrado gana a una copia vieja y volver a anotar ese dia
+  gana al borrado.
 
 La politica de hidratacion (`resolveHydratedStore`) protege los cambios hechos
 mientras llegaba el cloud store y los que quedaron sin subir en una sesion
@@ -142,6 +149,18 @@ Reglas para campos nuevos:
   tambien. Si un build antiguo lo descarta, el mes activo vuelve a ser el
   natural. Se fusiona por mes con el `updatedAt` mas reciente; reabrir guarda
   `reopenedAt` en vez de borrar la entrada.
+- Excepcion: `finance.budgetCycle` tambien. Si un build antiguo lo descarta,
+  Gastos y Plan vuelven al mes natural, que es el valor por defecto. Un build
+  con passthrough lo conserva; al fusionar dos copias gana la local, porque no
+  conoce su `updatedAt`.
+- `finance.balanceCheckins` se escribe en cuanto se anota un saldo. Los builds
+  con passthrough (desde PR 0) lo conservan y lo fusionan por fecha con el
+  `updatedAt` mas reciente, igual que este build. Solo un build anterior a PR 0
+  lo descartaria: antes de anotar saldos hay que abrir la app actualizada en
+  todos los dispositivos.
+- Los stores anteriores a estos campos cargan igual: sin `budgetCycle` el mes
+  es natural y sin `balanceCheckins` el registro de saldo esta vacio. Un valor
+  ilegible se descarta en la normalizacion sin tocar el resto.
 
 ## Cola de guardado
 

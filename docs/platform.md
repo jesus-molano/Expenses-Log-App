@@ -271,12 +271,16 @@ El cron envia recordatorios pendientes cuando:
 - El gasto tiene `reminder.enabled`.
 - La ocurrencia sigue `due`.
 - Faltan entre 0 y `daysBeforeCharge` dias para `estimatedChargeDate`; esta
-  ventana permite recuperar una ejecucion diaria perdida.
+  ventana permite recuperar una ejecucion diaria perdida. `estimatedChargeDate`
+  salta fines de semana y festivos bancarios (`src/domain/holidays.ts`): un
+  recibo del lunes 12 de octubre se avisa contando hasta el martes 13.
 - El usuario no descarto el aviso para esa `estimatedChargeDate`.
 - Hay al menos una suscripcion push guardada para el usuario.
 
 El endpoint reclama cada ocurrencia en `push_reminder_deliveries` con una clave
-por usuario, template y fechas. La reclamacion es un lease atomico de 15 minutos:
+por usuario, template y fechas (incluida `estimatedChargeDate`: al desplegar
+los festivos, un recibo que ya se avisó y cuya fecha de cargo pasa a otro día
+puede avisarse una vez más). La reclamacion es un lease atomico de 15 minutos:
 otra ejecucion no puede enviar a la vez, pero puede recuperar el trabajo si el
 proceso anterior cae. La fila solo pasa a `delivered` cuando al menos un
 dispositivo acepta el push. Si todos fallan, se libera inmediatamente. Esta
