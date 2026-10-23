@@ -1,9 +1,12 @@
 import { endOfMonth, parseISO, startOfMonth } from "date-fns";
 import { toDateOnly } from "@/domain/calendar";
 import {
+  isNeutralOverride,
+  NO_STATUS_DECISION,
   occurrenceKeyOf,
   overrideIdFor,
   pickWinningOverride,
+  statusChangedBetween,
   type OccurrenceKey,
 } from "@/domain/overrides";
 import { generateTemplateDates } from "@/domain/recurrence";
@@ -41,16 +44,17 @@ export function upsertOccurrenceOverride(
       winner ? pickWinningOverride(winner, override) : override,
     undefined,
   );
+  const fields = { status: "due" as const, ...defaults, ...existing, ...patch };
   const next: ExpenseOccurrenceOverride = {
-    status: "due",
-    ...defaults,
-    ...existing,
-    ...patch,
+    ...fields,
     id,
     userId: existing?.userId ?? "demo",
     templateId: key.templateId,
     occurrenceDate: key.occurrenceDate,
     updatedAt: now,
+    statusUpdatedAt: statusChangedBetween(existing, fields)
+      ? now
+      : existing?.statusUpdatedAt ?? existing?.updatedAt ?? NO_STATUS_DECISION,
   };
 
   return {
@@ -93,7 +97,11 @@ export function rekeyOverridesForTemplateChange(
   let result = store;
 
   for (const override of store.overrides) {
-    if (override.templateId !== next.id || override.occurrenceDate < openFrom) {
+    if (
+      override.templateId !== next.id ||
+      override.occurrenceDate < openFrom ||
+      isNeutralOverride(override)
+    ) {
       continue;
     }
     const month = parseISO(override.occurrenceDate);
@@ -108,8 +116,12 @@ export function rekeyOverridesForTemplateChange(
       (candidate) =>
         candidate.templateId === next.id && candidate.occurrenceDate === target,
     );
+    // Un placeholder neutro en el destino no protege nada: el contenido de la
+    // clave antigua pasa a la nueva salvo que el destino tenga un estado más
+    // definitivo.
     if (
       !targetExisting ||
+      isNeutralOverride(targetExisting) ||
       STATUS_RANK[override.status] > STATUS_RANK[targetExisting.status]
     ) {
       const { dueDate, ...fields } = override;
@@ -146,6 +158,7 @@ function neutralizeOverride(
         occurrenceDate: key.occurrenceDate,
         status: "due",
         updatedAt: now,
+        statusUpdatedAt: now,
       },
     ],
   };

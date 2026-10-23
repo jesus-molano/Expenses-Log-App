@@ -103,6 +103,10 @@ textarea {
   box-shadow: var(--app-focus);
 }
 
+.input-control[aria-invalid="true"] {
+  border-color: var(--app-danger);
+}
+
 @media (max-width: 767px) {
   input,
   select,

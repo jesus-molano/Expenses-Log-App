@@ -1,11 +1,10 @@
 import { startOfMonth } from "date-fns";
 import {
   buildDateWithDay,
-  estimateChargeDate,
   normalizeDateOnly,
   toDateOnly,
 } from "@/domain/calendar";
-import { overrideIdFor } from "@/domain/overrides";
+import { occurrenceKeyOf, overrideIdFor } from "@/domain/overrides";
 import type {
   CreateExpenseOptions,
   DraftExpense,
@@ -37,6 +36,7 @@ export function addExpenseToStore(
     startDate,
   );
   const occurrenceDate = getInitialOccurrenceDate(draft, startDate);
+  const now = new Date().toISOString();
   const initialOverrides =
     options.initialStatus === "paid"
       ? [
@@ -46,8 +46,10 @@ export function addExpenseToStore(
             templateId: template.id,
             occurrenceDate,
             status: "paid" as const,
-            paidAt: new Date().toISOString(),
+            paidAt: now,
             amountPaid: template.amount,
+            updatedAt: now,
+            statusUpdatedAt: now,
           },
         ]
       : [];
@@ -165,7 +167,6 @@ export function togglePaidInStore(
     store,
     keyOf(occurrence),
     {
-      dueDate: persistableDueDate(occurrence.occurrenceDate, occurrence.dueDate),
       status: "paid",
       paidAt: now,
       amountPaid: occurrence.template.amount,
@@ -186,7 +187,6 @@ export function skipOccurrenceInStore(
   occurrence: ExpenseOccurrence,
 ): ExpenseStore {
   return upsertOccurrenceOverride(store, keyOf(occurrence), {
-    dueDate: persistableDueDate(occurrence.occurrenceDate, occurrence.dueDate),
     status: "skipped",
   });
 }
@@ -227,18 +227,13 @@ export function moveOccurrenceOnlyInStore(
     return moveOccurrenceInStore(store, occurrence, dueDate, sortOrder);
   }
 
-  const restoredSeriesStore = {
-    ...store,
-    templates: store.templates.map((template) =>
-      template.id === occurrence.template.id
-        ? {
-            ...template,
-            dueDay: occurrence.template.dueDay,
-            updatedAt: new Date().toISOString(),
-          }
-        : template,
-    ),
-  };
+  // Tras arrastrar se aplica el cambio de serie y se pregunta: "solo este mes"
+  // lo deshace con el mismo rekey, para devolver pagos y ediciones a su fecha.
+  const restoredSeriesStore = updateExpenseTemplateInStore(
+    store,
+    occurrence.template.id,
+    { dueDay: occurrence.template.dueDay },
+  );
 
   return moveOccurrenceInStore(restoredSeriesStore, occurrence, dueDate, sortOrder);
 }
@@ -249,9 +244,19 @@ export function moveOccurrenceSeriesInStore(
   dueDate: string,
 ): ExpenseStore {
   const day = new Date(`${dueDate}T00:00:00`).getDate();
-  return updateExpenseTemplateInStore(store, occurrence.template.id, {
+  const key = { templateId: occurrence.template.id, occurrenceDate: dueDate };
+  const moved = updateExpenseTemplateInStore(store, key.templateId, {
     dueDay: day,
   });
+
+  // Si este cobro ya estaba movido, el rekey le conserva la fecha anterior:
+  // tiene que caer donde se soltó.
+  const landed = moved.overrides.find(
+    (override) => occurrenceKeyOf(override) === occurrenceKeyOf(key),
+  );
+  return landed?.dueDate
+    ? upsertOccurrenceOverride(moved, key, { dueDate: undefined })
+    : moved;
 }
 
 // Cambia la serie y recoloca los overrides de los meses abiertos si cambia su
@@ -297,13 +302,14 @@ export function updateMonthlyExpenseOccurrenceInStore(
       override.occurrenceDate === input.occurrenceDate,
   );
   const now = new Date().toISOString();
-  const amount = Math.max(Number(input.amount), 0.01);
+  const amount = Number(input.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return store;
 
   return upsertOccurrenceOverride(
     categoryResult.store,
     { templateId: input.templateId, occurrenceDate: input.occurrenceDate },
     {
-      dueDate: persistableDueDate(input.occurrenceDate, input.dueDate),
+      dueDate: input.dueDate === input.occurrenceDate ? undefined : input.dueDate,
       status: input.status,
       name: input.name.trim(),
       amount,
@@ -320,21 +326,4 @@ function keyOf(occurrence: ExpenseOccurrence) {
     templateId: occurrence.template.id,
     occurrenceDate: occurrence.occurrenceDate,
   };
-}
-
-function persistableDueDate(
-  occurrenceDate: string,
-  dueDate: string,
-): string | undefined {
-  if (dueDate === occurrenceDate) return undefined;
-
-  const estimatedChargeDate = estimateChargeDate(occurrenceDate).date;
-  if (
-    estimatedChargeDate !== occurrenceDate &&
-    dueDate === estimatedChargeDate
-  ) {
-    return undefined;
-  }
-
-  return dueDate;
 }

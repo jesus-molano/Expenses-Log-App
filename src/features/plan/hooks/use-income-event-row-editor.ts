@@ -35,9 +35,11 @@ export function useIncomeEventRowEditor({
   }
 
   function save() {
+    const parsedAmount = parseMoneyInput(amount);
+    if (parsedAmount === null || parsedAmount <= 0) return;
     onUpdate({
       name,
-      amount: parseMoneyInput(amount) ?? 0,
+      amount: parsedAmount,
       receivedAt,
       note: event.note,
     });

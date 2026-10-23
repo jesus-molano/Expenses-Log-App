@@ -60,11 +60,14 @@ export function usePlanSettingsForm({
 
   function submitSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const salary = parseMoneyInput(salaryAmount);
+    const target = parseMoneyInput(savingsTarget);
+    if (salary === null || target === null) return;
     onSave({
-      salaryAmount: parseMoneyInput(salaryAmount) ?? 0,
+      salaryAmount: salary,
       salaryDay,
       savingsMonthId,
-      savingsTarget: parseMoneyInput(savingsTarget) ?? 0,
+      savingsTarget: target,
     });
     closeSettings();
   }

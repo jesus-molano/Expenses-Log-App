@@ -21,8 +21,8 @@ export function useOneOffIncomeForm({
 
   function saveExtra(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const amount = parseMoneyInput(extraAmount) ?? 0;
-    if (amount <= 0) return;
+    const amount = parseMoneyInput(extraAmount);
+    if (amount === null || amount <= 0) return;
 
     onAddIncome({
       name: extraName,

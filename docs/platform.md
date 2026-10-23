@@ -37,9 +37,12 @@ Navegacion y red:
   cliente: una pagina que lea `searchParams` en servidor deja de ser estatica y
   sale del precache.
 - El resto de navegaciones usan `NetworkFirst` (3 s) y caen a `/`.
-- Las estrategias con cache (`next-static`, `pages`, `app-assets`, `pages-rsc`,
-  `same-origin`) abortan la peticion si no llegan cabeceras en 6 s. `/api` y
-  los origenes externos usan solo red, sin ese corte.
+- Las estrategias con cache (`next-static`, `pages`, `app-assets`,
+  `same-origin`) abortan la peticion si no llegan cabeceras en 6 s. `pages-rsc`
+  corta a los 3 s: si el RSC de un cambio de pestaña no llega, Next recarga el
+  documento y lo sirve el precache al momento. `/api`, `/auth/` (callback de
+  OAuth con codigo de un solo uso) y los origenes externos usan solo red, sin
+  corte.
 - `next-static` y `app-assets` guardan los assets sin el parametro `dpl`.
 - Al activar una version nueva se borran las caches `pages`, `pages-rsc` y la
   antigua `expense-reminders-*`.
@@ -85,6 +88,10 @@ reparar:
   - No preparada / no soportado.
 - `PwaRegister` llama a `registration.update()` al volver a primer plano (como
   mucho una vez por minuto) y pide `navigator.storage.persist()`.
+- Sin navigation preload, abrir la app con conexion arranca el build que ya
+  estaba en cache; el nuevo se instala y activa en segundo plano. Cuando cambia
+  el controlador, `PwaRegister` recarga la pagina la siguiente vez que pasa a
+  segundo plano, salvo que haya una hoja abierta o un campo con foco.
 
 La logica pura comun vive en `src/pwa/cache-policy.ts` y
 `src/features/settings/lib/offline-readiness.ts`. El diagnostico guardado vive

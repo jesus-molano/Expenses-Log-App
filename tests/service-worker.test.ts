@@ -16,7 +16,8 @@ describe("service worker offline shell", () => {
     expect(source).toContain("precacheEntries: self.__SW_MANIFEST");
     expect(source).toContain('url.pathname.startsWith("/api/")');
     expect(source).toContain("matcher: ({ sameOrigin }) => !sameOrigin");
-    expect(source.match(/handler: new NetworkOnly\(\)/g)).toHaveLength(2);
+    expect(source.match(/handler: new NetworkOnly\(\)/g)).toHaveLength(3);
+    expect(source).toContain('url.pathname.startsWith("/auth/")');
     expect(source).toContain('request.method === "GET"');
     expect(source).toContain('url.searchParams.has("_rsc")');
     expect(source).toContain('cacheName: "pages-rsc"');
@@ -41,7 +42,10 @@ describe("service worker offline shell", () => {
       "ignoreURLParametersMatching: PRECACHE_IGNORED_URL_PARAMS",
     );
     expect(source.match(/abortIfNoResponse\(NETWORK_RESPONSE_TIMEOUT_MS\)/g))
-      .toHaveLength(5);
+      .toHaveLength(4);
+    // Navegación entre pestañas: si el RSC no llega, Next recarga el documento
+    // y lo sirve el precache.
+    expect(source).toContain("abortIfNoResponse(RSC_RESPONSE_TIMEOUT_MS)");
     // /api y peticiones externas: solo red, sin cortar respuestas lentas.
     expect(source).not.toMatch(/new NetworkOnly\(\{/);
     expect(source).toContain(".filter(isObsoleteCacheName)");

@@ -5,7 +5,11 @@ import type {
   ExpenseStore,
   ExpenseTemplate,
 } from "@/domain/types";
-import { loadExpenseStore, mergeExpenseStores } from "./local-store";
+import {
+  clearExpenseLocalData,
+  loadExpenseStore,
+  mergeExpenseStores,
+} from "./local-store";
 
 function template(id: string): ExpenseTemplate {
   return {
@@ -222,12 +226,25 @@ describe("loadExpenseStore", () => {
     window.localStorage.setItem("expense-log-store-v1", "{not json");
 
     expect(loadExpenseStore()).toBe(emptyStore);
+    window.localStorage.setItem("expense-log-store-v1", "{still not json");
+    expect(loadExpenseStore()).toBe(emptyStore);
 
-    const backups = Object.keys(window.localStorage).filter((key) =>
-      key.startsWith("expense-log-store-v1.corrupt-"),
+    expect(window.localStorage.getItem("expense-log-store-v1.corrupt")).toBe(
+      "{still not json",
     );
-    expect(backups).toHaveLength(1);
-    expect(window.localStorage.getItem(backups[0])).toBe("{not json");
+    window.localStorage.clear();
+  });
+
+  it("removes corrupt-store copies together with the local data", () => {
+    window.localStorage.setItem("expense-log-store-v1", "{}");
+    window.localStorage.setItem("expense-log-store-v1.corrupt", "{a");
+    window.localStorage.setItem("expense-log-store-v1.corrupt-1760000000000", "{b");
+    window.localStorage.setItem("expense-theme", "nord");
+
+    clearExpenseLocalData();
+
+    expect(window.localStorage.length).toBe(1);
+    expect(window.localStorage.getItem("expense-theme")).toBe("nord");
     window.localStorage.clear();
   });
 });

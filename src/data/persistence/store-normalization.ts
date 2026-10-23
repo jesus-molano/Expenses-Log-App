@@ -318,7 +318,11 @@ function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
       normalizeDateOnly(template.startDate) ??
       normalizeDateOnly(String(template.createdAt ?? "").slice(0, 10)) ??
       toDateOnly(today);
-    const endDate = normalizeDateOnly(template.endDate);
+    // Un fin ilegible se ajusta al inicio en lugar de quitar el límite: sin
+    // él, un gasto ya terminado volvería a generar recibos.
+    const endDate = template.endDate
+      ? normalizeDateOnly(template.endDate) ?? startDate
+      : undefined;
     const dueDay = Number.isInteger(Number(template.dueDay))
       ? Math.min(Math.max(Number(template.dueDay), 1), 31)
       : Number(startDate.slice(8, 10));

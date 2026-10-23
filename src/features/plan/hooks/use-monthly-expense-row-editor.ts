@@ -54,12 +54,14 @@ export function useMonthlyExpenseRowEditor({
   }
 
   function save() {
+    const parsedAmount = parseMoneyInput(amount);
+    if (parsedAmount === null || parsedAmount <= 0) return;
     onUpdate({
       templateId: occurrence.template.id,
       occurrenceDate: occurrence.occurrenceDate,
       dueDate,
       name,
-      amount: parseMoneyInput(amount) ?? 0,
+      amount: parsedAmount,
       categoryName,
       status,
     });

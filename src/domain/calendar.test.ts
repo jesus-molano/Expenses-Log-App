@@ -41,6 +41,13 @@ describe("normalizeDateOnly", () => {
     }
   });
 
+  it("reads the calendar day of ISO date-times as written", () => {
+    expect(normalizeDateOnly("2026-11-15T00:00:00Z")).toBe("2026-11-15");
+    expect(normalizeDateOnly("2026-11-15T23:30:00.000+05:00")).toBe("2026-11-15");
+    expect(normalizeDateOnly("2026-11-15Tnope")).toBeUndefined();
+    expect(isValidDateOnly("2026-11-15T00:00:00Z")).toBe(false);
+  });
+
   it("only accepts real dates as valid", () => {
     expect(isValidDateOnly("2026-11-30")).toBe(true);
     expect(isValidDateOnly("2026-11-31")).toBe(false);

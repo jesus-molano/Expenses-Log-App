@@ -444,6 +444,7 @@ describe("normalizeExpenseStore", () => {
       templates: [
         { id: "clamped", startDate: "2026-11-31", dueDay: 31, createdAt: "2026-10-01T00:00:00.000Z" },
         { id: "garbage", startDate: "soon", endDate: "", dueDay: "x", createdAt: "2026-10-05T00:00:00.000Z" },
+        { id: "ended", startDate: "2026-06-01", endDate: "someday", dueDay: 1 },
         "not a template",
       ],
     });
@@ -451,6 +452,7 @@ describe("normalizeExpenseStore", () => {
     expect(store.templates).toMatchObject([
       { id: "clamped", startDate: "2026-11-30", dueDay: 31 },
       { id: "garbage", startDate: "2026-10-05", endDate: undefined, dueDay: 5 },
+      { id: "ended", startDate: "2026-06-01", endDate: "2026-06-01" },
     ]);
   });
 });

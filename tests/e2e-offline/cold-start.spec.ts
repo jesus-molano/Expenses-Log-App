@@ -12,6 +12,7 @@ import {
   type Page,
 } from "@playwright/test";
 import { demoStore } from "../../src/domain/seed";
+import { NETWORK_RESPONSE_TIMEOUT_MS } from "../../src/pwa/cache-policy";
 
 const PORT = 3200;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
@@ -32,54 +33,88 @@ const ROUTES: Array<[string, (page: Page) => ReturnType<Page["getByText"]>]> = [
   ["/login", (page) => page.getByRole("heading", { name: "Entrar con Google" })],
 ];
 
+// Recursos de cada test: se liberan en afterEach, que también corre cuando el
+// test agota su tiempo.
+let server: ChildProcess | null = null;
+let blackhole: Server | null = null;
+let context: BrowserContext | null = null;
+let userDataDir: string | null = null;
+
+test.afterEach(async () => {
+  await context?.close().catch(() => undefined);
+  if (server) await stopNextServer(server);
+  blackhole?.close();
+  if (userDataDir) rmSync(userDataDir, { recursive: true, force: true });
+  server = blackhole = context = userDataDir = null;
+});
+
 for (const mode of ["dead", "blackhole"] as const) {
   test(`opens every main route on an offline cold start (${mode} network)`, async () => {
-    const userDataDir = mkdtempSync(join(tmpdir(), "expenses-offline-"));
-    const server = await startNextServer();
-    let blackhole: Server | null = null;
-    let context: BrowserContext | null = null;
+    userDataDir = mkdtempSync(join(tmpdir(), "expenses-offline-"));
+    server = await startNextServer();
 
-    try {
-      context = await launch(userDataDir);
-      const page = await context.newPage();
-      await page.goto(`${ORIGIN}/`);
-      await expect(page.getByText("Por pagar")).toBeVisible();
-      await waitForOfflineReady(page);
-      // Chromium guarda el registro del service worker de forma asíncrona:
-      // cerrar justo tras activarlo lo pierde. Se exige una navegación servida
-      // por el service worker y un margen antes de cerrar.
-      const reload = await page.reload();
-      expect(reload?.fromServiceWorker()).toBe(true);
-      await page.waitForTimeout(3_000);
-      await context.close();
+    context = await launch(userDataDir);
+    const page = await context.newPage();
+    await page.goto(`${ORIGIN}/`);
+    await expect(page.getByText("Por pagar")).toBeVisible();
+    await waitForOfflineReady(page);
+    // Chromium guarda el registro del service worker de forma asíncrona:
+    // cerrar justo tras activarlo lo pierde. Se exige una navegación servida
+    // por el service worker y un margen antes de cerrar.
+    const reload = await page.reload();
+    expect(reload?.fromServiceWorker()).toBe(true);
+    await page.waitForTimeout(3_000);
+    await context.close();
 
-      await stopNextServer(server);
-      if (mode === "blackhole") blackhole = await startBlackhole();
+    await stopNextServer(server);
+    server = null;
+    if (mode === "blackhole") blackhole = await startBlackhole();
 
-      context = await launch(userDataDir);
-      for (const [path, locator] of ROUTES) {
-        const routePage = await context.newPage();
-        const failedAssets: string[] = [];
-        routePage.on("requestfailed", (request) => {
-          if (request.url().includes("/_next/static/")) {
-            failedAssets.push(request.url());
-          }
-        });
-        await routePage.goto(`${ORIGIN}${path}`, {
-          waitUntil: "commit",
-          timeout: 10_000,
-        });
-        await expect(locator(routePage), path).toBeVisible({ timeout: 5_000 });
-        expect(failedAssets, path).toEqual([]);
-        await routePage.close();
-      }
-    } finally {
-      await context?.close().catch(() => undefined);
-      await stopNextServer(server);
-      blackhole?.close();
-      rmSync(userDataDir, { recursive: true, force: true });
+    context = await launch(userDataDir);
+    for (const [path, locator] of ROUTES) {
+      const routePage = await context.newPage();
+      const staticRequests = trackStaticRequests(routePage);
+      await routePage.goto(`${ORIGIN}${path}`, {
+        waitUntil: "commit",
+        timeout: 10_000,
+      });
+      await expect(locator(routePage), path).toBeVisible({ timeout: 5_000 });
+      // Un chunk fuera del precache colgaría hasta el corte de red: se espera
+      // a que no quede ninguno pendiente antes de dar la ruta por buena.
+      await waitFor(
+        async () => staticRequests.pending.size === 0,
+        NETWORK_RESPONSE_TIMEOUT_MS + 2_000,
+      );
+      expect(staticRequests.failed, path).toEqual([]);
+      await routePage.close();
     }
+
+    // Una ruta fuera del precache espera a la red hasta el corte y cae en el
+    // fallback "/" en lugar de colgarse.
+    const fallbackPage = await context.newPage();
+    await fallbackPage.goto(`${ORIGIN}/expenses/${demoStore.templates[0].id}`, {
+      waitUntil: "commit",
+      timeout: NETWORK_RESPONSE_TIMEOUT_MS + 6_000,
+    });
+    await expect(fallbackPage.getByText("Por pagar")).toBeVisible({
+      timeout: 5_000,
+    });
   });
+}
+
+function trackStaticRequests(page: Page) {
+  const pending = new Set<string>();
+  const failed: string[] = [];
+  const isStatic = (url: string) => url.includes("/_next/static/");
+  page.on("request", (request) => {
+    if (isStatic(request.url())) pending.add(request.url());
+  });
+  page.on("requestfinished", (request) => pending.delete(request.url()));
+  page.on("requestfailed", (request) => {
+    pending.delete(request.url());
+    if (isStatic(request.url())) failed.push(request.url());
+  });
+  return { pending, failed };
 }
 
 async function launch(userDataDir: string) {
@@ -129,21 +164,38 @@ async function waitForOfflineReady(page: Page) {
   );
 }
 
-function startNextServer(): Promise<ChildProcess> {
+async function startNextServer(): Promise<ChildProcess> {
+  // Un servidor que ya ocupa el puerto (de otro test o de un build viejo)
+  // haría pasar el test contra algo que no es este build.
+  if (await fetch(ORIGIN).catch(() => null)) {
+    throw new Error(`Port ${PORT} is already in use`);
+  }
+
   const child = spawn(
     process.execPath,
     ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", String(PORT)],
     { stdio: "ignore", detached: true },
   );
 
-  return waitFor(async () => {
-    const response = await fetch(ORIGIN).catch(() => null);
-    return response?.ok ?? false;
-  }, 30_000).then(() => child);
+  try {
+    await waitFor(async () => {
+      if (hasExited(child)) throw new Error("next start exited early");
+      const response = await fetch(ORIGIN).catch(() => null);
+      return response?.ok ?? false;
+    }, 30_000);
+  } catch (error) {
+    await stopNextServer(child);
+    throw error;
+  }
+  return child;
+}
+
+function hasExited(child: ChildProcess) {
+  return child.exitCode !== null || child.signalCode !== null;
 }
 
 async function stopNextServer(child: ChildProcess) {
-  if (child.exitCode !== null || child.pid === undefined) return;
+  if (hasExited(child) || child.pid === undefined) return;
   try {
     process.kill(-child.pid, "SIGTERM");
   } catch {
@@ -154,8 +206,9 @@ async function stopNextServer(child: ChildProcess) {
 
 // Acepta conexiones y nunca responde: como una red móvil sin cobertura real.
 function startBlackhole(): Promise<Server> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const server = createServer(() => undefined);
+    server.once("error", reject);
     server.listen(PORT, "127.0.0.1", () => resolve(server));
   });
 }

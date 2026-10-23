@@ -17,6 +17,7 @@ import {
 } from "serwist";
 import {
   NETWORK_RESPONSE_TIMEOUT_MS,
+  RSC_RESPONSE_TIMEOUT_MS,
   OFFLINE_STATUS_REQUEST,
   OFFLINE_STATUS_RESPONSE,
   PRECACHE_FAILED_MESSAGE,
@@ -70,6 +71,13 @@ const runtimeCaching: RuntimeCaching[] = [
   {
     matcher: ({ sameOrigin, url }) =>
       sameOrigin && url.pathname.startsWith("/api/"),
+    handler: new NetworkOnly(),
+  },
+  // El callback de OAuth lleva un código de un solo uso: sin caché, sin corte
+  // por tiempo y sin el fallback a "/".
+  {
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && url.pathname.startsWith("/auth/"),
     handler: new NetworkOnly(),
   },
   {
@@ -135,9 +143,9 @@ const runtimeCaching: RuntimeCaching[] = [
       (url.searchParams.has("_rsc") || request.headers.get("RSC") === "1"),
     handler: new NetworkFirst({
       cacheName: "pages-rsc",
-      networkTimeoutSeconds: 3,
+      networkTimeoutSeconds: RSC_RESPONSE_TIMEOUT_MS / 1000,
       plugins: [
-        abortIfNoResponse(NETWORK_RESPONSE_TIMEOUT_MS),
+        abortIfNoResponse(RSC_RESPONSE_TIMEOUT_MS),
         new ExpirationPlugin({
           maxEntries: 32,
           maxAgeSeconds: 24 * 60 * 60,

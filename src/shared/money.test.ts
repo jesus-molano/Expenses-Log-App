@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatMoneyInput,
+  isValidMoneyInput,
   isValidPositiveMoneyInput,
   parseMoneyInput,
 } from "./money";
@@ -25,11 +26,16 @@ describe("parseMoneyInput", () => {
     ["10,005", 10005],
     ["0,999", 1],
     ["0", 0],
+    ["12,", 12],
+    ["12.", 12],
+    ["1.234,", 1234],
+    [",5", 0.5],
+    [".5", 0.5],
   ])("reads %s as %d", (input, expected) => {
     expect(parseMoneyInput(input)).toBe(expected);
   });
 
-  it.each(["", "abc", "-5", "1,2,3", "12..5", "1.23.4", "1.234,5,6", "€"])(
+  it.each(["", "abc", "-5", "1,2,3", "12..5", "1.23.4", "1.234,5,6", "€", ",", ".", "12,,"])(
     "rejects %j",
     (input) => {
       expect(parseMoneyInput(input)).toBeNull();
@@ -59,5 +65,14 @@ describe("isValidPositiveMoneyInput", () => {
     expect(isValidPositiveMoneyInput("12,99")).toBe(true);
     expect(isValidPositiveMoneyInput("0")).toBe(false);
     expect(isValidPositiveMoneyInput("abc")).toBe(false);
+  });
+});
+
+describe("isValidMoneyInput", () => {
+  it("accepts zero only where it is a real value", () => {
+    expect(isValidMoneyInput("0", { allowZero: true })).toBe(true);
+    expect(isValidMoneyInput("0")).toBe(false);
+    expect(isValidMoneyInput("", { allowZero: true })).toBe(false);
+    expect(isValidMoneyInput("abc", { allowZero: true })).toBe(false);
   });
 });

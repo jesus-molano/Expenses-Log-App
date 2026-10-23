@@ -47,9 +47,11 @@ export function useMonthlySalaryEditor({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const salaryAmount = parseMoneyInput(amount);
+    if (salaryAmount === null) return;
     onSave({
       monthId,
-      salaryAmount: parseMoneyInput(amount) ?? 0,
+      salaryAmount,
       salaryDay,
     });
     closeEditor();

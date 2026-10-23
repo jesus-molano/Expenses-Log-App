@@ -26,6 +26,11 @@ export const PRECACHE_IGNORED_URL_PARAMS = [
 // caché o el fallback: una red que no responde no debe colgar la app.
 export const NETWORK_RESPONSE_TIMEOUT_MS = 6_000;
 
+// Las peticiones RSC de la navegación entre pestañas se cortan antes: si
+// fallan, Next recarga el documento y el precache lo sirve al momento, en lugar
+// de esperar a una red que no contesta.
+export const RSC_RESPONSE_TIMEOUT_MS = 3_000;
+
 // Cachés en runtime que dependen de un build concreto: se vacían al activar
 // una versión nueva para no servir HTML que apunta a chunks borrados.
 export const PER_BUILD_RUNTIME_CACHES = ["pages", "pages-rsc"] as const;

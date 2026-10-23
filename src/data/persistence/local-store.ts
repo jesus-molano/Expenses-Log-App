@@ -1,5 +1,6 @@
 "use client";
 
+import { dedupeOverrides } from "@/domain/overrides";
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore } from "@/domain/types";
 import { latestUpdated, mergeLatestById } from "./merge-by-id";
@@ -31,9 +32,12 @@ export function loadExpenseStore(): ExpenseStore {
   }
 }
 
+const CORRUPT_BACKUP_KEY = `${STORAGE_KEY}.corrupt`;
+
+// Una sola copia (la última): varias acabarían llenando localStorage.
 function backupCorruptStore(raw: string) {
   try {
-    window.localStorage.setItem(`${STORAGE_KEY}.corrupt-${Date.now()}`, raw);
+    window.localStorage.setItem(CORRUPT_BACKUP_KEY, raw);
   } catch {
     // Sin espacio para la copia no hay nada más que hacer sin bloquear la app.
   }
@@ -53,6 +57,11 @@ export function clearExpenseLocalData(): void {
   try {
     if (typeof window === "undefined" || !window.localStorage) return;
     window.localStorage.removeItem(STORAGE_KEY);
+    // También las copias con fecha que guardaban builds anteriores.
+    const storage = window.localStorage;
+    Array.from({ length: storage.length }, (_, index) => storage.key(index))
+      .filter((key): key is string => Boolean(key?.startsWith(CORRUPT_BACKUP_KEY)))
+      .forEach((key) => storage.removeItem(key));
     window.dispatchEvent(new Event("expense-store-updated"));
   } catch {
     window.dispatchEvent(new Event("expense-store-updated"));
@@ -84,9 +93,10 @@ export function mergeExpenseStores(
       normalizedLocalStore.templates,
       deleted.templates,
     ),
-    overrides: mergeLatestById(
-      normalizedCloudStore.overrides,
-      normalizedLocalStore.overrides,
+    // Por ocurrencia: el estado de la versión que lo cambió más tarde y el
+    // resto de la última edición (`pickWinningOverride`).
+    overrides: dedupeOverrides(
+      [...normalizedCloudStore.overrides, ...normalizedLocalStore.overrides],
       deleted.overrides,
     ),
     occurrenceRecords: mergeLatestById(

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mergeExpenseStores } from "@/data/persistence/local-store";
 import { generateStoreOccurrences } from "@/domain/finance";
 import { emptyStore } from "@/domain/seed";
@@ -9,7 +9,10 @@ import type {
   ExpenseTemplate,
 } from "@/domain/types";
 import {
+  dismissLastChanceReminderInStore,
   moveOccurrenceInStore,
+  moveOccurrenceOnlyInStore,
+  moveOccurrenceSeriesInStore,
   restoreOccurrenceInStore,
   skipOccurrenceInStore,
   togglePaidInStore,
@@ -190,5 +193,131 @@ describe("occurrence overrides", () => {
 
     expect(renamed.overrides).toEqual(paid.overrides);
     expect(renamed.templates[0].name).toBe("Electricidad");
+  });
+
+  describe("after review", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function at(iso: string) {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(iso));
+    }
+
+    function editAmount(store: ExpenseStore, occurrenceDate: string, amount: number) {
+      return updateMonthlyExpenseOccurrenceInStore(store, {
+        templateId: "luz",
+        occurrenceDate,
+        dueDate: occurrenceDate,
+        status: "due",
+        name: "Luz",
+        amount,
+        categoryId: "cat-casa",
+      });
+    }
+
+    it("keeps an unpaid occurrence's edits when the due day changes and back", () => {
+      const today = new Date(2026, 10, 2, 12);
+      at("2026-11-02T10:00:00.000Z");
+      const edited = editAmount(storeWith(), "2026-11-05", 74.3);
+
+      vi.setSystemTime(new Date("2026-11-02T10:01:00.000Z"));
+      const toTenth = updateExpenseTemplateInStore(edited, "luz", { dueDay: 10 }, today);
+      expect(occurrenceOn(toTenth, "2026-11-10").template.amount).toBe(74.3);
+
+      vi.setSystemTime(new Date("2026-11-02T10:02:00.000Z"));
+      const backToFifth = updateExpenseTemplateInStore(toTenth, "luz", { dueDay: 5 }, today);
+      expect(occurrenceOn(backToFifth, "2026-11-05").template.amount).toBe(74.3);
+
+      const merged = mergeExpenseStores(
+        { ...backToFifth, schemaVersion: 3 },
+        { ...toTenth, schemaVersion: 3, templates: backToFifth.templates },
+      );
+      expect(occurrenceOn(merged, "2026-11-05").template.amount).toBe(74.3);
+    });
+
+    it("undoes a series drag completely when only this month should move", () => {
+      at("2026-11-02T10:00:00.000Z");
+      const edited = editAmount(storeWith(), "2026-11-05", 74.3);
+      const skipped = skipOccurrenceInStore(edited, occurrenceOn(edited, "2026-12-05"));
+      const dragged = occurrenceOn(skipped, "2026-11-05");
+
+      vi.setSystemTime(new Date("2026-11-02T10:01:00.000Z"));
+      const series = moveOccurrenceSeriesInStore(skipped, dragged, "2026-11-15");
+      expect(occurrenceOn(series, "2026-12-15").status).toBe("skipped");
+
+      vi.setSystemTime(new Date("2026-11-02T10:02:00.000Z"));
+      const onlyThisMonth = moveOccurrenceOnlyInStore(series, dragged, "2026-11-15");
+
+      expect(onlyThisMonth.templates[0].dueDay).toBe(5);
+      expect(occurrenceOn(onlyThisMonth, "2026-11-05")).toMatchObject({
+        dueDate: "2026-11-15",
+        template: expect.objectContaining({ amount: 74.3 }),
+      });
+      expect(occurrenceOn(onlyThisMonth, "2026-12-05").status).toBe("skipped");
+    });
+
+    it("drops an already moved occurrence where the series drag left it", () => {
+      at("2026-11-02T10:00:00.000Z");
+      const moved = moveOccurrenceInStore(
+        storeWith(),
+        occurrenceOn(storeWith(), "2026-11-05"),
+        "2026-11-08",
+      );
+
+      vi.setSystemTime(new Date("2026-11-02T10:01:00.000Z"));
+      const series = moveOccurrenceSeriesInStore(
+        moved,
+        occurrenceOn(moved, "2026-11-05"),
+        "2026-11-15",
+      );
+
+      expect(occurrenceOn(series, "2026-11-15").dueDate).toBe("2026-11-15");
+    });
+
+    it("does not let a stale device's reminder dismissal undo a payment", () => {
+      at("2026-11-04T10:00:00.000Z");
+      const base = storeWith();
+      const paidOnPhone = togglePaidInStore(base, occurrenceOn(base, "2026-11-05"));
+
+      vi.setSystemTime(new Date("2026-11-04T11:00:00.000Z"));
+      const dismissedOnLaptop = dismissLastChanceReminderInStore(
+        base,
+        occurrenceOn(base, "2026-11-05"),
+      );
+
+      for (const merged of [
+        mergeExpenseStores(
+          { ...dismissedOnLaptop, schemaVersion: 3 },
+          { ...paidOnPhone, schemaVersion: 3 },
+        ),
+        mergeExpenseStores(
+          { ...paidOnPhone, schemaVersion: 3 },
+          { ...dismissedOnLaptop, schemaVersion: 3 },
+        ),
+      ]) {
+        expect(merged.overrides).toEqual([
+          expect.objectContaining({
+            status: "paid",
+            reminderDismissedAt: "2026-11-04T11:00:00.000Z",
+          }),
+        ]);
+      }
+    });
+
+    it("lets a later unpay win over an earlier payment from another device", () => {
+      at("2026-11-04T10:00:00.000Z");
+      const paid = togglePaidInStore(storeWith(), occurrenceOn(storeWith(), "2026-11-05"));
+
+      vi.setSystemTime(new Date("2026-11-04T11:00:00.000Z"));
+      const unpaid = togglePaidInStore(paid, occurrenceOn(paid, "2026-11-05"));
+
+      const merged = mergeExpenseStores(
+        { ...paid, schemaVersion: 3 },
+        { ...unpaid, schemaVersion: 3 },
+      );
+      expect(occurrenceOn(merged, "2026-11-05").status).toBe("due");
+    });
   });
 });

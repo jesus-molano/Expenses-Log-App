@@ -16,7 +16,9 @@ export function toDateOnly(date: Date): string {
   return format(date, "yyyy-MM-dd");
 }
 
-const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+// Admite fechas con hora ISO ("2026-11-15T00:00:00Z"): cuenta el día tal cual
+// está escrito, que es el que ve el usuario.
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:[T ][\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)?$/;
 
 export function isValidDateOnly(value: unknown): value is string {
   return normalizeDateOnly(value) === value;

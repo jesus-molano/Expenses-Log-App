@@ -212,6 +212,7 @@ Estado:
    - Si el RPC no existe (PGRST202), caer a `upsert` y registrarlo. `isMissingAppStoresError` deja de tratar ese error como "sin nube".
    - Pull al volver a primer plano (throttle de 30-60 s) y `storage`/BroadcastChannel entre pestañas.
    - `updatedAt` en el resto de entidades fusionables.
+   - Reconciliar overrides huérfanos tras fusionar: el rekey de un cambio de día solo corre en el dispositivo que edita, así que un pago hecho en otro con la fecha antigua queda en una clave que la plantilla ya no genera. Repetir el rekey de los meses abiertos contra las plantillas actuales después de `mergeExpenseStores`.
 3. Aplicar la migración en producción **antes** de mergear: las previews comparten la base de datos.
 4. **Contract** (revocar la escritura directa en `app_stores`) en un PR posterior. Revertir el cliente es seguro.
 
