@@ -473,7 +473,9 @@ function occurrenceFromRecord(
   };
 }
 
-function earliestOccurrenceDate(store: ExpenseStore): string | null {
+// Primera fecha con algo en el store: el inicio de un gasto, un override o un
+// registro del histórico.
+export function earliestOccurrenceDate(store: ExpenseStore): string | null {
   const dates = [
     ...store.templates.map((template) => template.startDate),
     ...store.overrides.map((override) => override.occurrenceDate),

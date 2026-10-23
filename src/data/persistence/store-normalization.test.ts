@@ -153,6 +153,77 @@ describe("normalizeExpenseStore", () => {
     );
   });
 
+  it("drops imported entities that would break the app and keeps the rest", () => {
+    const store = normalizeImportedExpenseStore({
+      schemaVersion: 3,
+      categories: [{ id: "cat", name: "Casa" }, { name: "Sin id" }],
+      templates: [
+        {
+          id: "rent",
+          name: "Alquiler",
+          amount: 700,
+          startDate: "2026-10-01",
+          dueDay: 1,
+          recurrence: { frequency: "monthly" },
+        },
+        { id: "no-rule", name: "Sin regla", amount: 10, startDate: "2026-10-01", dueDay: 1 },
+        { id: "bad-amount", name: "Importe", amount: "mucho" },
+        { name: "Sin id", amount: 5 },
+        "texto",
+      ],
+      overrides: [
+        { id: "ok", templateId: "rent", occurrenceDate: "2026-10-01", status: "paid" },
+        { id: "bad-date", templateId: "rent", occurrenceDate: "2026-13-45", status: "paid" },
+        { id: "bad-status", templateId: "rent", occurrenceDate: "2026-10-01", status: "lost" },
+      ],
+      occurrenceRecords: [{ id: "record:x", templateId: "x", occurrenceDate: "nunca" }],
+      finance: {
+        incomeEvents: [
+          { id: "evt", name: "Extra", amount: 40, receivedAt: "2026-10-10" },
+          { id: "evt-bad", name: "Extra", amount: 40, receivedAt: "ayer" },
+        ],
+      },
+    });
+
+    expect(store.categories.map((category) => category.id)).toEqual(["cat"]);
+    expect(store.templates.map((template) => template.id)).toEqual(["rent", "no-rule"]);
+    expect(store.templates[1].recurrence).toEqual({ frequency: "monthly" });
+    expect(store.overrides.map((override) => override.templateId)).toEqual(["rent"]);
+    expect(store.overrides[0].status).toBe("paid");
+    expect(store.occurrenceRecords?.some((record) => record.id === "record:x")).toBe(false);
+    expect(store.finance.incomeEvents.map((event) => event.id)).toEqual(["evt"]);
+  });
+
+  it("loads a valid store the same way through import and normal load", () => {
+    const value = {
+      schemaVersion: 3,
+      categories: [{ id: "cat", userId: "demo", name: "Casa", icon: "Home", tone: "green" }],
+      templates: [
+        {
+          id: "rent",
+          userId: "demo",
+          name: "Alquiler",
+          description: "",
+          amount: 700,
+          currency: "EUR",
+          categoryId: "cat",
+          startDate: "2026-10-01",
+          dueDay: 1,
+          recurrence: { frequency: "monthly" },
+          active: true,
+          createdAt: "2026-10-01T00:00:00.000Z",
+          updatedAt: "2026-10-01T00:00:00.000Z",
+        },
+      ],
+      overrides: [],
+      finance: { incomeEvents: [], monthlySalary: {}, monthlySavingsTargets: {} },
+      futureField: { kept: true },
+    };
+    const today = new Date();
+
+    expect(normalizeImportedExpenseStore(value)).toEqual(normalizeExpenseStore(value, today));
+  });
+
   it("assigns the authenticated user id to nested store entities", () => {
     const store = normalizeExpenseStore({
       categories: [{ id: "cat", userId: "demo" }],

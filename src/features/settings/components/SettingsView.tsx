@@ -9,6 +9,7 @@ import { useSettingsController } from "../hooks/use-settings-controller";
 import { SettingsDialogs } from "./SettingsDialogs";
 import {
   AccountRow,
+  BackupRows,
   DangerRows,
   LanguageRow,
   NotificationsRow,
@@ -47,14 +48,17 @@ export function SettingsView() {
             <OfflineRow language={settings.currentLanguage} />
             <ThemeRow settings={settings} />
             <LanguageRow settings={settings} />
+            <BackupRows language={settings.currentLanguage} />
             <DangerRows settings={settings} />
           </div>
 
-          {settings.message ? (
-            <p className="mt-3 rounded-2xl bg-[var(--app-panel-soft-alpha)] p-3 text-sm leading-relaxed text-[var(--app-text)] ring-1 ring-[var(--app-border)]">
-              {settings.message}
-            </p>
-          ) : null}
+          <div role="status" aria-live="polite">
+            {settings.message ? (
+              <p className="mt-3 rounded-2xl bg-[var(--app-panel-soft-alpha)] p-3 text-sm leading-relaxed text-[var(--app-text)] ring-1 ring-[var(--app-border)]">
+                {settings.message}
+              </p>
+            ) : null}
+          </div>
         </Card>
       </div>
 

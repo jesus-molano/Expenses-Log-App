@@ -55,6 +55,10 @@ Estado:
   - Atajos del manifest "Añadir gasto" y "Añadir por voz" (`/expenses/new?mode=voice`).
   - Atrás cierra la hoja abierta (`src/components/ui/sheet-history.ts`).
   - Pendiente de F2a: `OccurrenceActionSheet`, `ConfirmActionDialog` con `useDialogA11y` y M22.
+- **F3-1 (copias) y F3-15 (deuda técnica): hechos.**
+  - Ajustes › Copias y datos: exportar JSON (store completo) y CSV (gastos, cobros e histórico), importar con vista previa y elección entre combinar y sustituir, copias automáticas en IndexedDB (7 diarias y 5 de seguridad) con restaurar, y estado de `storage.persist()` con botón para pedirlo. Ver `docs/state-persistence-sync.md`.
+  - Sustituir aguanta una fusión posterior con la nube; los objetivos de ahorro, que no tienen tombstone, son el único dato que podría volver.
+  - Código muerto borrado, `planCopy` y los ternarios de idioma en i18n, tildes en los textos y en las categorías (sin cambiar el nombre guardado) y `--app-text-subtle` con contraste AA en los ocho temas, con tests que lo vigilan.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
@@ -387,7 +391,7 @@ Estado:
 - **PWA:** shortcuts (Añadir gasto, Añadir por voz, Plan), `setAppBadge` con los vencidos y los de hoy, `theme-color` por tema, maskable con margen y guía de instalación en iOS.
 
 ### F3 — Backlog de valor (por impacto × esfuerzo)
-1. **Exportar e importar JSON/CSV**, snapshots locales y `storage.persist()`. Reutiliza `normalizeImportedExpenseStore` y `mergeExpenseStores`.
+1. **Exportar e importar JSON/CSV**, snapshots locales y `storage.persist()`. Reutiliza `normalizeImportedExpenseStore` y `mergeExpenseStores`. **Hecho.**
 2. **Recibos variables:** previsto frente a real, sugerencia con la media de los 3 últimos y "¿Actualizar el importe desde ahora?".
 3. **Finalizar o pausar una suscripción:** `endDate`; las pausas como rangos.
 4. **Provisión mensual para anuales** y "próximos recibos grandes (90 días)".
@@ -401,11 +405,12 @@ Estado:
 12. **Resumen del mes** y **registro de saldo**.
 13. **Ciclo anclado al día de cobro** (opción).
 14. **Festivos** en `estimateChargeDate`.
-15. **Deuda técnica:**
+15. **Deuda técnica (hecho):**
     - Borrar el código muerto (`use-current-month-plan.ts`, `annual-plan-summary.ts`, `timelineHorizons`).
     - Pasar `planCopy` y los ternarios a i18n.
     - Tildes.
     - Contraste de `--app-text-subtle`.
+    - Además: los campos de compatibilidad de `MonthlyMoneyPlan`, `SectionCard`/`StatCard`, `createSupabaseBrowserClient`, `getMonthlySavingsTargetEntry`, `MONTHS_ES/EN`, `PlanEmptyLine` y el `recurrenceLabel` del dominio (solo en español). Quedan los ternarios del dominio (`estimateChargeDate`) y del prompt de la IA, que no son texto de la interfaz.
 
 **Diferido conscientemente** (ver [el informe](./research/2026-10-informe.md) §2 "Baja" y §3):
 - Navegación de Plan (selects y gráfico, §3.14).
