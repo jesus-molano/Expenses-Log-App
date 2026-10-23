@@ -20,7 +20,7 @@ export function CaptureNotice({
     >
       <p>{captureReasonLabel(reason, language)}</p>
       {reason === "unauthenticated" ? (
-        <Link href="/login" className="app-button app-button-secondary">
+        <Link href="/login" replace className="app-button app-button-secondary">
           <LogIn size={16} />
           {t("expenses.captureLogin", language)}
         </Link>

@@ -2,10 +2,16 @@
 
 import { useRef, useState } from "react";
 import type { CapturedDraft } from "@/domain/expense-capture";
-import type { CreateExpenseOptions, DraftExpense } from "@/domain/types";
+import type {
+  AppLanguage,
+  CreateExpenseOptions,
+  DraftExpense,
+} from "@/domain/types";
 import { createEmptyDraft } from "../lib/dashboard-config";
 import type { CaptureReason } from "../lib/capture-labels";
+import { appendDictated } from "../lib/voice-support";
 import type { useQuickExpenseParser } from "./use-quick-expense-parser";
+import { useSpeechDictation } from "./use-speech-dictation";
 
 type Review = Pick<CapturedDraft, "missingFields" | "inferredFields">;
 // Un id estable por borrador: la selección no depende de la posición, que
@@ -17,16 +23,21 @@ type InitialStatus = NonNullable<CreateExpenseOptions["initialStatus"]>;
 // y revisión de varios. El dashboard solo compone.
 export function useExpenseCaptureFlow({
   parser,
+  language,
   initialFormOpen,
+  initialCaptureOpen = false,
   addExpense,
   addExpenses,
 }: {
   parser: ReturnType<typeof useQuickExpenseParser>;
+  language: AppLanguage;
   initialFormOpen: boolean;
+  // Atajo "Añadir por voz": abre la captura; dictar exige un toque.
+  initialCaptureOpen?: boolean;
   addExpense: (draft: DraftExpense, options?: CreateExpenseOptions) => void;
   addExpenses: (drafts: DraftExpense[], options?: CreateExpenseOptions) => void;
 }) {
-  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureOpen, setCaptureOpen] = useState(initialCaptureOpen);
   const [formOpen, setFormOpen] = useState(initialFormOpen);
   const [draft, setDraft] = useState<DraftExpense>(() => createEmptyDraft());
   const [draftReview, setDraftReview] = useState<Review | null>(null);
@@ -63,9 +74,40 @@ export function useExpenseCaptureFlow({
     setEditingId(null);
   }
 
-  async function analyze() {
+  // Lo dictado se suma a lo ya escrito, se analiza una sola vez al terminar
+  // y siempre pasa por revisión (formulario o lista).
+  const dictationPrefixRef = useRef("");
+  // Analizar durante el dictado lo termina y analiza el texto completo,
+  // aunque no se haya oído nada.
+  const analyzeAfterDictationRef = useRef(false);
+  const dictation = useSpeechDictation({
+    language,
+    onTranscript: (text) => parser.setQuickText(appendDictated(dictationPrefixRef.current, text)),
+    onFinish: (text) => {
+      const requested = analyzeAfterDictationRef.current;
+      analyzeAfterDictationRef.current = false;
+      if (!text && !requested) return;
+      const full = appendDictated(dictationPrefixRef.current, text);
+      parser.setQuickText(full);
+      if (full) void analyze(full);
+    },
+  });
+
+  function toggleDictation() {
+    if (dictation.listening) {
+      dictation.stop();
+      return;
+    }
+    // Mientras termina de entregar el dictado anterior no se empieza otro.
+    if (dictation.busy) return;
+    dictationPrefixRef.current = parser.quickText;
+    analyzeAfterDictationRef.current = false;
+    dictation.start();
+  }
+
+  async function analyze(textOverride?: string) {
     const request = ++requestRef.current;
-    const result = await parser.parse();
+    const result = await parser.parse(textOverride);
     if (request !== requestRef.current) return;
     if (!result || result.drafts.length === 0) return;
 
@@ -121,19 +163,36 @@ export function useExpenseCaptureFlow({
     excludedIds,
     reviewStatus,
     isIdle: !captureOpen && !formOpen && !reviewItems,
-    openCapture: () => setCaptureOpen(true),
+    dictation: { ...dictation, toggle: toggleDictation },
+    openCapture: () => {
+      dictation.reset();
+      setCaptureOpen(true);
+    },
     closeCapture: () => {
+      dictation.cancel();
+      dictation.reset();
       supersede();
       setCaptureOpen(false);
     },
     cancelAnalysis: supersede,
     openManualForm: () => {
+      dictation.cancel();
+      dictation.reset();
       supersede();
       setCaptureOpen(false);
       setNotice(null);
       openForm(createEmptyDraft());
     },
-    analyze,
+    // Analizar mientras se dicta (o mientras termina) lo deja terminar y
+    // analiza una sola vez el texto completo.
+    analyze: () => {
+      if (dictation.busy) {
+        analyzeAfterDictationRef.current = true;
+        if (dictation.listening) dictation.stop();
+        return;
+      }
+      void analyze();
+    },
     closeForm: () => {
       setFormOpen(false);
       setEditingId(null);

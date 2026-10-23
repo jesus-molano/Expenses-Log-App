@@ -1115,3 +1115,33 @@
 .app-expense-row-paid {
   opacity: 0.82;
 }
+
+/* Micrófono mientras se dicta: un halo que late, sin movimiento si se pide. */
+.app-dictation-active {
+  border-color: color-mix(in srgb, var(--app-accent) 60%, transparent);
+  background: color-mix(in srgb, var(--app-accent) 22%, var(--app-control));
+  color: var(--app-text);
+  animation: app-dictation-pulse 1.4s ease-in-out infinite;
+}
+
+/* El pulso anima box-shadow y taparía el anillo de foco. */
+.app-dictation-active:focus-visible {
+  animation: none;
+  box-shadow: var(--app-focus);
+}
+
+@keyframes app-dictation-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--app-accent) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 0.45rem color-mix(in srgb, var(--app-accent) 0%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-dictation-active {
+    animation: none;
+  }
+}

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import { AppBootShell } from "@/app/providers/AppBootShell";
 import { BOOT_GUARD_SCRIPT } from "@/app/providers/boot-guard-script";
+import { OrphanLayerGuard } from "@/app/providers/OrphanLayerGuard";
 import { PwaRegister } from "@/app/providers/PwaRegister";
 import { ThemeApplier } from "@/app/providers/ThemeApplier";
 import { ExpenseStoreProvider } from "@/stores/app/use-expense-store";
@@ -76,6 +77,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ThemeApplier />
         <PwaRegister />
+        <OrphanLayerGuard />
         <ExpenseStoreProvider fallback={<AppBootShell />}>
           {children}
         </ExpenseStoreProvider>

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ActionToast } from "@/components/ui/ActionToast";
 import type { ExpenseOccurrence } from "@/domain/types";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
@@ -26,6 +26,10 @@ import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
 import { useViewTransitionAction } from "@/features/expenses/hooks/use-view-transition-action";
 import { buildLastChanceReminders } from "@/features/expenses/lib/last-chance-reminders";
 import { capitalize, formatMonthName } from "@/features/expenses/lib/month-view";
+import {
+  markNewExpenseIntentHandled,
+  readNewExpenseIntent,
+} from "@/features/expenses/lib/new-expense-intent";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
 
@@ -66,9 +70,19 @@ export function ExpenseDashboard({
     [store.categories],
   );
   const quickParser = useQuickExpenseParser({ language, categories: categoryNames });
+  // `?mode=voice` (atajo "Añadir por voz") se lee en el cliente para que la
+  // página siga siendo estática y precacheada.
+  const [newExpenseIntent] = useState(() => readNewExpenseIntent(initialNewExpense));
+  // Se marca antes de que las hojas añadan su entrada al historial (que lo
+  // hacen en efectos normales).
+  useLayoutEffect(() => {
+    if (newExpenseIntent) markNewExpenseIntentHandled();
+  }, [newExpenseIntent]);
   const capture = useExpenseCaptureFlow({
     parser: quickParser,
-    initialFormOpen: initialNewExpense,
+    language,
+    initialFormOpen: newExpenseIntent === "form",
+    initialCaptureOpen: newExpenseIntent === "voice",
     addExpense,
     addExpenses,
   });
@@ -198,6 +212,7 @@ export function ExpenseDashboard({
         statusTone={quickParser.statusTone}
         isParsing={quickParser.status === "loading"}
         needsLogin={quickParser.needsLogin}
+        dictation={capture.dictation}
         language={language}
         onClose={capture.closeCapture}
         onValueChange={quickParser.setQuickText}

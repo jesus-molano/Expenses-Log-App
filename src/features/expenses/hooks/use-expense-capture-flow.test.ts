@@ -1,12 +1,12 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseExpenseTextLocally } from "@/domain/parser";
 import { useExpenseCaptureFlow } from "./use-expense-capture-flow";
 import type { CaptureResult, useQuickExpenseParser } from "./use-quick-expense-parser";
 
 const today = "2026-10-23";
 
-function setup(result: CaptureResult) {
+function setup(result: CaptureResult, quickText = "") {
   let resolveParse: (value: CaptureResult) => void = () => undefined;
   const parser = {
     parse: vi.fn(
@@ -17,11 +17,13 @@ function setup(result: CaptureResult) {
     ),
     cancel: vi.fn(),
     reset: vi.fn(),
+    setQuickText: vi.fn(),
+    quickText,
   } as unknown as ReturnType<typeof useQuickExpenseParser>;
   const addExpense = vi.fn();
   const addExpenses = vi.fn();
   const hook = renderHook(() =>
-    useExpenseCaptureFlow({ parser, initialFormOpen: false, addExpense, addExpenses }),
+    useExpenseCaptureFlow({ parser, language: "es", initialFormOpen: false, addExpense, addExpenses }),
   );
   return {
     hook,
@@ -103,5 +105,109 @@ describe("useExpenseCaptureFlow", () => {
 
     expect(hook.result.current.formOpen).toBe(true);
     expect(hook.result.current.notice).toBe("unauthenticated");
+  });
+});
+
+describe("useExpenseCaptureFlow with dictation", () => {
+  class FakeRecognition {
+    static last: FakeRecognition | null = null;
+    lang = "";
+    continuous = false;
+    interimResults = false;
+    maxAlternatives = 1;
+    onresult: ((event: unknown) => void) | null = null;
+    onerror: ((event: unknown) => void) | null = null;
+    onend: (() => void) | null = null;
+    start = vi.fn();
+    // Por defecto, parar termina en el acto; `slowStop` lo deja pendiente.
+    static slowStop = false;
+    stop = vi.fn(() => {
+      if (!FakeRecognition.slowStop) this.onend?.();
+    });
+    abort = vi.fn();
+    constructor() {
+      FakeRecognition.last = this;
+    }
+    say(transcript: string) {
+      this.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript } }] });
+    }
+  }
+
+  function withRecognizer() {
+    vi.stubGlobal("webkitSpeechRecognition", FakeRecognition);
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (Linux; Android 15; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+    );
+  }
+
+  afterEach(() => {
+    FakeRecognition.slowStop = false;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("ignores a second mic tap while the last words are still arriving", () => {
+    withRecognizer();
+    FakeRecognition.slowStop = true;
+    const { hook, parser } = setup(captured("Netflix 12,99"));
+
+    act(() => hook.result.current.dictation.toggle());
+    const recognition = FakeRecognition.last!;
+    act(() => recognition.say("Netflix doce"));
+    act(() => hook.result.current.dictation.toggle());
+    act(() => hook.result.current.dictation.toggle());
+    act(() => recognition.say("Netflix doce noventa y nueve"));
+    act(() => recognition.onend?.());
+
+    expect(parser.parse).toHaveBeenCalledTimes(1);
+    expect(parser.parse).toHaveBeenCalledWith("Netflix doce noventa y nueve");
+  });
+
+  it("analyzes once when Analizar is pressed while the dictation is ending", () => {
+    withRecognizer();
+    FakeRecognition.slowStop = true;
+    const { hook, parser } = setup(captured("Netflix 12,99"));
+
+    act(() => hook.result.current.dictation.toggle());
+    const recognition = FakeRecognition.last!;
+    act(() => recognition.say("Netflix doce"));
+    act(() => hook.result.current.dictation.toggle());
+    act(() => hook.result.current.analyze());
+    act(() => recognition.say("Netflix doce noventa y nueve"));
+    act(() => recognition.onend?.());
+
+    expect(parser.parse).toHaveBeenCalledTimes(1);
+    expect(parser.parse).toHaveBeenCalledWith("Netflix doce noventa y nueve");
+  });
+
+  it("adds what is dictated after what was typed", () => {
+    withRecognizer();
+    const { hook, parser } = setup(captured("Seguro del coche 420"), "Seguro del coche");
+
+    act(() => hook.result.current.dictation.toggle());
+    act(() => FakeRecognition.last!.say("420 al año"));
+
+    expect(parser.setQuickText).toHaveBeenLastCalledWith("Seguro del coche 420 al año");
+  });
+
+  it("analyzes the typed text when Analizar ends a dictation that heard nothing", () => {
+    withRecognizer();
+    const { hook, parser } = setup(captured("Netflix 12,99"), "Netflix 12,99");
+
+    act(() => hook.result.current.dictation.toggle());
+    act(() => hook.result.current.analyze());
+
+    expect(parser.parse).toHaveBeenCalledTimes(1);
+    expect(parser.parse).toHaveBeenCalledWith("Netflix 12,99");
+  });
+
+  it("does not analyze when the dictation is stopped with nothing heard", () => {
+    withRecognizer();
+    const { hook, parser } = setup(captured("Netflix 12,99"), "Netflix 12,99");
+
+    act(() => hook.result.current.dictation.toggle());
+    act(() => hook.result.current.dictation.toggle());
+
+    expect(parser.parse).not.toHaveBeenCalled();
   });
 });

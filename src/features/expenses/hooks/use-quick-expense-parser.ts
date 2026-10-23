@@ -53,10 +53,12 @@ export function useQuickExpenseParser({
     return next;
   }
 
-  async function parse(): Promise<CaptureResult | null> {
+  // `textOverride` para analizar justo lo que acaba de dictarse, sin esperar a
+  // que el estado del texto se actualice.
+  async function parse(textOverride?: string): Promise<CaptureResult | null> {
     // Un texto más largo que lo que acepta el servidor se recorta aquí en vez
     // de fallar con un 400 que parecería "IA no disponible".
-    const text = quickText.trim().slice(0, CAPTURE_TEXT_MAX_LENGTH);
+    const text = (textOverride ?? quickText).trim().slice(0, CAPTURE_TEXT_MAX_LENGTH);
     if (!text) return null;
 
     const today = toDateOnly(new Date());
