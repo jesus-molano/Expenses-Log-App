@@ -183,6 +183,12 @@ export function useExpenseCaptureFlow({
       setNotice(null);
       openForm(createEmptyDraft());
     },
+    // Formulario con un borrador ya preparado (alta rápida de la guía).
+    openDraftForm: (nextDraft: DraftExpense) => {
+      supersede();
+      setNotice(null);
+      openForm(nextDraft);
+    },
     // Analizar mientras se dicta (o mientras termina) lo deja terminar y
     // analiza una sola vez el texto completo.
     analyze: () => {

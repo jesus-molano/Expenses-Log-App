@@ -14,6 +14,7 @@ import {
   QuickCapture,
 } from "@/features/expenses/components/QuickCapture";
 import { QuickCaptureReview } from "@/features/expenses/components/QuickCaptureReview";
+import { OnboardingCard } from "@/features/expenses/components/onboarding/OnboardingCard";
 import { CatalogButton } from "@/features/expenses/components/catalog/CatalogButton";
 import { ExpenseCatalogSheet } from "@/features/expenses/components/catalog/ExpenseCatalogSheet";
 import { useActionToast } from "@/features/expenses/hooks/use-action-toast";
@@ -21,16 +22,20 @@ import { useActiveMonth } from "@/features/expenses/hooks/use-active-month";
 import { useExpenseCaptureFlow } from "@/features/expenses/hooks/use-expense-capture-flow";
 import { useExpenseCatalog } from "@/features/expenses/hooks/use-expense-catalog";
 import { useExpenseFilters } from "@/features/expenses/hooks/use-expense-filters";
+import { useOnboarding } from "@/features/expenses/hooks/use-onboarding";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { useQuickExpenseParser } from "@/features/expenses/hooks/use-quick-expense-parser";
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
 import { useViewTransitionAction } from "@/features/expenses/hooks/use-view-transition-action";
 import { buildLastChanceReminders } from "@/features/expenses/lib/last-chance-reminders";
+import { buildQuickAddDraft } from "@/features/expenses/lib/onboarding";
 import { capitalize, formatMonthName } from "@/features/expenses/lib/month-view";
 import {
   markNewExpenseIntentHandled,
   readNewExpenseIntent,
 } from "@/features/expenses/lib/new-expense-intent";
+import { PlanSettingsSheet } from "@/features/plan/components/PlanSettingsSheet";
+import { usePlanSettingsForm } from "@/features/plan/hooks/use-plan-settings-form";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
 
@@ -52,6 +57,8 @@ export function ExpenseDashboard({
     closeMonth,
     reopenMonth,
     createCategory,
+    updateMoneySettings,
+    syncStatus,
   } = useExpenseStore();
   const language = store.preferences?.language ?? "es";
   const now = useCurrentDate();
@@ -80,13 +87,36 @@ export function ExpenseDashboard({
   useLayoutEffect(() => {
     if (newExpenseIntent) markNewExpenseIntentHandled();
   }, [newExpenseIntent]);
+  const onboarding = useOnboarding({
+    store,
+    monthId: month.activeMonthId,
+    syncing: syncStatus === "syncing",
+  });
+  // Sueldo y día de cobro desde la guía, con la misma hoja que Plan.
+  const salaryForm = usePlanSettingsForm({
+    finance: store.finance,
+    language,
+    savingsMonthId: month.activeMonthId,
+    onSave: updateMoneySettings,
+  });
+  // El primer gasto añadido con la guía a la vista la mantiene hasta
+  // completarla u ocultarla.
+  function trackFirstExpense() {
+    if (store.templates.length === 0 && onboarding.visible) onboarding.markStarted();
+  }
   const capture = useExpenseCaptureFlow({
     parser: quickParser,
     language,
     initialFormOpen: newExpenseIntent === "form",
     initialCaptureOpen: newExpenseIntent === "voice",
-    addExpense,
-    addExpenses,
+    addExpense: (draft, options) => {
+      trackFirstExpense();
+      addExpense(draft, options);
+    },
+    addExpenses: (drafts, options) => {
+      trackFirstExpense();
+      addExpenses(drafts, options);
+    },
   });
   const chrome = useScrollChrome();
   const runViewTransition = useViewTransitionAction();
@@ -171,6 +201,25 @@ export function ExpenseDashboard({
           }}
           headingRef={monthHeadingRef}
         />
+        {onboarding.visible ? (
+          <OnboardingCard
+            checklist={onboarding.checklist}
+            quickAdds={onboarding.quickAdds}
+            canPromptInstall={onboarding.canPromptInstall}
+            appleMobile={onboarding.appleMobile}
+            language={language}
+            onQuickAdd={(preset) =>
+              capture.openDraftForm(buildQuickAddDraft(preset, language, now))
+            }
+            onAddExpense={capture.openCapture}
+            onConfigureSalary={salaryForm.openSettings}
+            onInstall={() => void onboarding.promptInstall()}
+            onDismiss={() => {
+              onboarding.dismiss();
+              focusMonthHeading();
+            }}
+          />
+        ) : null}
         {showCloseCard ? (
           <MonthCloseCard
             status={month.closeStatus}
@@ -192,7 +241,7 @@ export function ExpenseDashboard({
         today={filters.today}
         monthId={month.viewMonthId}
         openMonthId={month.calendarMonthId}
-        autoScroll={!showCloseCard}
+        autoScroll={!showCloseCard && !onboarding.visible}
         language={language}
         onTogglePaid={togglePaidWithMonthCheck}
         onMoveOccurrenceOnly={(occurrence, dueDate, sortOrder) =>
@@ -253,6 +302,22 @@ export function ExpenseDashboard({
         onClose={capture.closeForm}
         onSave={capture.saveForm}
       />
+
+      {salaryForm.settingsOpen ? (
+        <PlanSettingsSheet
+          language={language}
+          salaryAmount={salaryForm.salaryAmount}
+          salaryDay={salaryForm.salaryDay}
+          savingsTarget={salaryForm.savingsTarget}
+          dayPickerOpen={salaryForm.dayPickerOpen}
+          onSalaryAmountChange={salaryForm.setSalaryAmount}
+          onSalaryDayChange={salaryForm.setSalaryDay}
+          onSavingsTargetChange={salaryForm.setSavingsTarget}
+          onDayPickerOpenChange={salaryForm.setDayPickerOpen}
+          onClose={salaryForm.closeSettings}
+          onSubmit={salaryForm.submitSettings}
+        />
+      ) : null}
 
       {catalogOpen ? (
         <ExpenseCatalogSheet

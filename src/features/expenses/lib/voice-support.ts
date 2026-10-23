@@ -1,4 +1,5 @@
 import type { AppLanguage } from "@/domain/types";
+import { isAppleMobile } from "@/shared/platform";
 
 type SpeechRecognitionHost = {
   SpeechRecognition?: unknown;
@@ -11,12 +12,8 @@ type SpeechRecognitionHost = {
 // se oculta y se sugiere el micrófono del teclado.
 export function getDictationSupport(host: SpeechRecognitionHost) {
   if (!host.SpeechRecognition && !host.webkitSpeechRecognition) return false;
-  const userAgent = host.navigator.userAgent;
-  const isAppleTouch =
-    /iPad|iPhone|iPod/.test(userAgent) ||
-    (/Macintosh/.test(userAgent) && host.navigator.maxTouchPoints > 1);
-  if (isAppleTouch) return false;
-  return /Chrome\/|Chromium\/|Edg\//.test(userAgent);
+  if (isAppleMobile(host.navigator)) return false;
+  return /Chrome\/|Chromium\/|Edg\//.test(host.navigator.userAgent);
 }
 
 export function dictationLanguage(language: AppLanguage) {
