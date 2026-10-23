@@ -20,6 +20,8 @@ type MonthBarProps = {
   onReopen: () => void;
   // Destino del foco cuando desaparece o se desactiva el botón usado.
   headingRef: RefObject<HTMLHeadingElement | null>;
+  // En Plan el título de la página es otro: el mes no es un encabezado.
+  titleAs?: "h2" | "p";
 };
 
 // Selector del mes que se mira. Debajo ofrece volver al mes activo, o al
@@ -35,6 +37,7 @@ export function MonthBar({
   onReset,
   onReopen,
   headingRef,
+  titleAs: Title = "h2",
 }: MonthBarProps) {
   const name = (id: string) => formatMonthName(id, language);
   const backRef = useRef<HTMLButtonElement>(null);
@@ -67,14 +70,14 @@ export function MonthBar({
       </IconButton>
 
       <div className="grid min-w-0 justify-items-center gap-0.5 text-center">
-        <h2
+        <Title
           ref={headingRef}
           tabIndex={-1}
           className="app-focus-ring rounded-[var(--app-radius-sm)] text-base font-semibold text-[var(--app-text)]"
           aria-live="polite"
         >
           {capitalize(formatMonthName(monthId, language, { withYear: true }))}
-        </h2>
+        </Title>
         {monthId !== activeMonthId ? (
           <Button variant="ghost" size="sm" onClick={onReset}>
             {t("expenses.goToMonth", language).replace("{month}", name(activeMonthId))}

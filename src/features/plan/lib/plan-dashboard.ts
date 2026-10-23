@@ -27,6 +27,7 @@ export function buildSeriesItem(
   monthDate: Date,
   today: Date,
   language: AppLanguage,
+  activeMonthId: string = toMonthId(today),
 ): MoneySeriesItem {
   const locale = language === "en" ? enUS : es;
   const monthId = toDateOnly(startOfMonth(monthDate));
@@ -35,7 +36,9 @@ export function buildSeriesItem(
     finance: store.finance,
     occurrences: occurrencesForMonth(store, monthDate, language),
     today,
-    includeExtraIncome: toMonthId(monthDate) <= toMonthId(today),
+    activeMonthId,
+    // Los ingresos extra de meses posteriores al activo aún no han llegado.
+    includeExtraIncome: toMonthId(monthDate) <= activeMonthId,
   });
 
   return {
@@ -57,8 +60,17 @@ export function buildSeriesItem(
   };
 }
 
-export function getAvailableYears(store: ExpenseStore, today: Date) {
+// Años que se pueden elegir: los que tienen datos, el actual, el siguiente
+// desde diciembre (para planificar enero) y los de los meses indicados (el
+// activo y el que se mira).
+export function getAvailableYears(
+  store: ExpenseStore,
+  today: Date,
+  monthIds: string[] = [],
+) {
   const years = new Set<number>([today.getFullYear()]);
+  if (today.getMonth() === 11) years.add(today.getFullYear() + 1);
+  monthIds.forEach((monthId) => years.add(Number(monthId.slice(0, 4))));
   store.templates.forEach((template) => years.add(Number(template.startDate.slice(0, 4))));
   store.finance.incomeEvents.forEach((event) => years.add(Number(event.receivedAt.slice(0, 4))));
   (store.occurrenceRecords ?? []).forEach((record) => years.add(Number(record.dueDate.slice(0, 4))));

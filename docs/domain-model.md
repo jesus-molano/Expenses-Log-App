@@ -92,6 +92,17 @@ Semantica de producto:
   incluye los gastos pequeños del dia a dia.
 - La capacidad maxima es ingreso previsto menos gasto recurrente previsto; no
   presupone que todo ese importe vaya a ahorrarse.
+- Cada cobro cuenta en el mes de su `dueDate`. La fase de un mes se mide contra
+  el mes activo (el natural, o el siguiente si el natural esta cerrado en
+  `monthClosures`): el activo es `current`, lo anterior `registered` y lo
+  posterior `projected`.
+- En un mes `registered` el ahorro reservado es solo la aportacion real: un
+  objetivo que no se cumplio no resta del libre (M17).
+- El dia de cobro solo cuenta con un sueldo configurado y se acota al ultimo
+  dia del mes. "Hasta el cobro" (`buildPaydayOutlook`) suma lo pendiente que se
+  carga antes del proximo cobro, atrasos incluidos.
+- Un gasto creado con inicio en un mes pasado puede marcar sus cobros
+  anteriores como pagados o saltados (`previousMonthsChargeDates`, M18).
 
 La normalizacion v3 acepta stores antiguos. Antes de descartar datos bancarios
 legacy convierte conciliaciones explícitas en overrides pagados. Si ya existe

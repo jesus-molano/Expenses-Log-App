@@ -59,6 +59,9 @@ Hay tests de:
 - Comandos de store.
 - Rutas push, concurrencia y recuperacion de un lease abandonado.
 - Recurrencias, finanzas, parser, labels, timeline y DnD.
+- Mes activo y cierre de mes: sugerencias, restos, "Hasta el cobro", fases del
+  plan, cobros anteriores de un gasto nuevo y la hoja de cierre (hook y
+  componente), mas e2e con `page.clock` el 28-oct y el 1-nov.
 - Estilos del design system.
 - Flujos e2e de dashboard, tooltip de la grafica, menus sin recorte y
   accesibilidad critica.

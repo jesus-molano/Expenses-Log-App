@@ -142,22 +142,37 @@ function latestRecordValue<T>(
   return candidates[0]?.[1] ?? fallback;
 }
 
+// Fase de un mes respecto al activo (el natural, o el siguiente si el natural
+// está cerrado): el activo es el "actual", lo anterior queda registrado y lo
+// posterior es proyección.
+export function planPhaseFor(
+  monthId: string,
+  activeMonthId: string,
+): MonthlyMoneyPlan["phase"] {
+  if (monthId === activeMonthId) return "current";
+  return monthId < activeMonthId ? "registered" : "projected";
+}
+
 export function buildMonthlyMoneyPlan({
   monthDate,
   finance,
   occurrences,
   today = new Date(),
+  activeMonthId = toMonthId(today),
   includeExtraIncome = true,
 }: {
   monthDate: Date;
   finance: FinanceStore;
   occurrences: ExpenseOccurrence[];
   today?: Date;
+  // Mes activo; por defecto, el natural de `today`.
+  activeMonthId?: string;
   includeExtraIncome?: boolean;
 }): MonthlyMoneyPlan {
   const monthStart = toDateOnly(startOfMonth(monthDate));
   const monthEnd = toDateOnly(endOfMonth(monthDate));
   const month = monthStart.slice(0, 7);
+  const phase = planPhaseFor(month, activeMonthId);
   const salarySettings = getMonthlySalarySettings(finance, month);
   const salaryIncomeTotal = Math.max(Number(salarySettings.amount), 0);
   const monthlySavingsTarget = getMonthlySavingsTarget(finance, month);
@@ -194,7 +209,12 @@ export function buildMonthlyMoneyPlan({
   const expectedExpensesTotal = paidExpensesTotal + pendingExpensesTotal;
   const contribution = getMonthlySavingsContribution(finance, month);
   const savingsActual = Math.max(Number(contribution?.amount ?? 0), 0);
-  const savingsReserved = Math.max(monthlySavingsTarget, savingsActual);
+  // Un mes ya registrado reserva lo que de verdad se ahorró: un objetivo que no
+  // se cumplió no puede restar del libre de ese mes.
+  const savingsReserved =
+    phase === "registered"
+      ? savingsActual
+      : Math.max(monthlySavingsTarget, savingsActual);
   const maxSavingsCapacity = Math.max(incomeTotal - expectedExpensesTotal, 0);
   const freeAccordingToPlan = Math.max(
     incomeTotal - expectedExpensesTotal - savingsReserved,
@@ -205,13 +225,6 @@ export function buildMonthlyMoneyPlan({
     monthlySavingsTarget - maxSavingsCapacity,
     0,
   );
-  const currentMonthId = toMonthId(today);
-  const phase =
-    month < currentMonthId
-      ? "registered"
-      : month > currentMonthId
-        ? "projected"
-        : "current";
   const todayDateOnly = toDateOnly(today);
   const nextOccurrence = [...pendingOccurrences].sort((a, b) =>
     a.dueDate.localeCompare(b.dueDate),
