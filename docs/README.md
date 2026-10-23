@@ -18,6 +18,9 @@ que hay que validar antes de tocar piezas sensibles.
   notificaciones, cron y seguridad.
 - [Testing y calidad](./testing-quality.md): comandos, cobertura existente y
   checklists por tipo de cambio.
+- [Roadmap 2026-10](./roadmap.md): plan por fases (offline, cambio de mes, IA,
+  voz, integridad de datos) y la investigacion que lo respalda en
+  [`research/`](./research/).
 
 ## Principios de mantenimiento
 
