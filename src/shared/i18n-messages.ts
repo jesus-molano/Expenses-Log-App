@@ -1,4 +1,4 @@
-/* Dictionaries are grouped by namespace: common, settings, login, expenses, money and categories. */
+/* Dictionaries are grouped by namespace: common, boot, settings, login, expenses, money and categories. */
 export const messages = {
   es: {
     common: {
@@ -24,6 +24,14 @@ export const messages = {
       today: "Hoy",
       optional: "Opcional",
     },
+    boot: {
+      loading: "Cargando tus gastos...",
+      help: "Si no carga, abre la app una vez con conexión para prepararla sin conexión.",
+      retry: "Reintentar",
+      repair: "Reparar (con conexión)",
+      errorTitle: "No se pudo abrir la app",
+      errorBody: "Inténtalo de nuevo. Tus datos guardados en este dispositivo no se han borrado.",
+    },
     settings: {
       title: "Ajustes",
       subtitle: "EUR · Atlantic/Canary · sync automático",
@@ -35,6 +43,18 @@ export const messages = {
       notificationsPwa: "Avisos push",
       notificationsReady: "Registrado. Aún no hay envíos programados.",
       notificationsHelp: "Recibe el aviso los días que elijas en cada recibo.",
+      offlineTitle: "Uso sin conexión",
+      offlineReady: "Lista para abrir sin conexión ({cached}/{expected} archivos).",
+      offlinePreparing: "Preparando el uso sin conexión. Mantén la app abierta con conexión unos segundos.",
+      offlineFailed: "No se pudo preparar: falló {url} ({status}). Ábrela con conexión y vuelve a comprobar.",
+      offlineFailedGeneric: "No se pudo preparar el uso sin conexión. Ábrela con conexión y vuelve a comprobar.",
+      offlineLegacy: "Hay una versión antigua activa que no abre sin conexión. Ábrela con conexión y vuelve a comprobar.",
+      offlineMissing: "Aún no está preparada. Ábrela con conexión unos segundos.",
+      offlineUnsupported: "Este navegador no permite usar la app sin conexión.",
+      offlineNoResponse: "sin respuesta",
+      offlineCheck: "Comprobar",
+      offlineCheckingShort: "Comprobando",
+      offlineChecking: "Comprobando el uso sin conexión...",
       activate: "Activar",
       deactivate: "Desactivar",
       active: "Activo",
@@ -313,6 +333,14 @@ export const messages = {
       today: "Today",
       optional: "Optional",
     },
+    boot: {
+      loading: "Loading your expenses...",
+      help: "If it does not load, open the app once while online so it works offline.",
+      retry: "Retry",
+      repair: "Repair (online)",
+      errorTitle: "The app could not open",
+      errorBody: "Try again. Data saved on this device has not been deleted.",
+    },
     settings: {
       title: "Settings",
       subtitle: "EUR · Atlantic/Canary · automatic sync",
@@ -324,6 +352,18 @@ export const messages = {
       notificationsPwa: "Push notifications",
       notificationsReady: "Registered. No scheduled deliveries yet.",
       notificationsHelp: "Get notified on the day selected for each bill.",
+      offlineTitle: "Offline use",
+      offlineReady: "Ready to open offline ({cached}/{expected} files).",
+      offlinePreparing: "Preparing offline use. Keep the app open while online for a few seconds.",
+      offlineFailed: "Could not prepare: {url} failed ({status}). Open it while online and check again.",
+      offlineFailedGeneric: "Could not prepare offline use. Open it while online and check again.",
+      offlineLegacy: "An old version that cannot open offline is active. Open it while online and check again.",
+      offlineMissing: "Not prepared yet. Open it while online for a few seconds.",
+      offlineUnsupported: "This browser cannot use the app offline.",
+      offlineNoResponse: "no response",
+      offlineCheck: "Check",
+      offlineCheckingShort: "Checking",
+      offlineChecking: "Checking offline use...",
       activate: "Enable",
       deactivate: "Disable",
       active: "On",

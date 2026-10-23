@@ -4,6 +4,7 @@ import type {
   PrecacheEntry,
   RuntimeCaching,
   SerwistGlobalConfig,
+  SerwistPlugin,
 } from "serwist";
 import {
   CacheFirst,
@@ -13,6 +14,17 @@ import {
   Serwist,
   StaleWhileRevalidate,
 } from "serwist";
+import {
+  OFFLINE_STATUS_REQUEST,
+  OFFLINE_STATUS_RESPONSE,
+  PRECACHE_FAILED_MESSAGE,
+  PRECACHE_RETRY_DELAYS_MS,
+  countCachedPrecacheKeys,
+  describePrecacheUrl,
+  isTransientStatus,
+  type OfflineStatusResponse,
+  type PrecacheFailedMessage,
+} from "./cache-policy";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -113,10 +125,38 @@ const runtimeCaching: RuntimeCaching[] = [
   },
 ];
 
+// La instalación del precache es todo o nada: una sola URL con error deja
+// activo el service worker anterior. Reintenta los errores temporales y avisa a
+// la app de la URL que falla para poder diagnosticarlo desde Ajustes.
+const precacheDiagnosticsPlugin: SerwistPlugin = {
+  fetchDidSucceed: async ({ event, request, response }) => {
+    if (event?.type !== "install") return response;
+    let current = response;
+    for (const delay of PRECACHE_RETRY_DELAYS_MS) {
+      if (!isTransientStatus(current.status)) break;
+      await wait(delay);
+      try {
+        current = await fetch(request.clone());
+      } catch {
+        break;
+      }
+    }
+    if (current.status >= 400) {
+      await reportPrecacheFailure(request.url, current.status);
+    }
+    return current;
+  },
+  fetchDidFail: async ({ event, request }) => {
+    if (event?.type === "install") await reportPrecacheFailure(request.url, 0);
+  },
+};
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   precacheOptions: {
     cleanupOutdatedCaches: true,
+    concurrency: 4,
+    plugins: [precacheDiagnosticsPlugin],
   },
   skipWaiting: true,
   clientsClaim: true,
@@ -133,6 +173,46 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function reportPrecacheFailure(url: string, status: number) {
+  const message: PrecacheFailedMessage = {
+    type: PRECACHE_FAILED_MESSAGE,
+    url: describePrecacheUrl(url),
+    status,
+  };
+  const windowClients = await self.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  windowClients.forEach((client) => client.postMessage(message));
+}
+
+async function readOfflineStatus(): Promise<OfflineStatusResponse> {
+  const expectedKeys = Array.from(serwist.getUrlsToPrecacheKeys().values());
+  const cache = await caches.open(serwist.precacheStrategy.cacheName);
+  const cachedUrls = (await cache.keys()).map((request) => request.url);
+
+  return {
+    type: OFFLINE_STATUS_RESPONSE,
+    expected: new Set(expectedKeys).size,
+    cached: countCachedPrecacheKeys(expectedKeys, cachedUrls),
+  };
+}
+
+self.addEventListener("message", (event) => {
+  const [port] = event.ports;
+  if (event.data?.type !== OFFLINE_STATUS_REQUEST || !port) return;
+
+  event.waitUntil(
+    readOfflineStatus()
+      .then((status) => port.postMessage(status))
+      .catch(() => port.postMessage(null)),
+  );
+});
 
 function readPushPayload(event: PushEvent) {
   try {

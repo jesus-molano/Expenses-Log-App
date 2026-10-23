@@ -20,6 +20,16 @@ Investigación de soporte, en `docs/research/`:
 
 Estado:
 - **PR 0: hecho.** Hotfix del cambio de hora y passthrough de campos desconocidos (ver `docs/state-persistence-sync.md`).
+- **PR 0b: hecho.**
+  - `occurrencesDueBetween` y `monthPendingSummary`, compartidos por Gastos y Plan.
+  - Sección "Pendiente de <mes>" (excluye los gastos borrados).
+  - Refresco a medianoche.
+- **PR 1a: hecho.**
+  - Pantalla de arranque con ayuda y script `boot-guard`.
+  - Fila "Uso sin conexión" en Ajustes y diagnóstico de instalación del precache.
+  - Hidratación resistente a fallos de Supabase y `global-error`.
+  - Ver `docs/platform.md`.
+- **Siguiente puerta:** el dueño abre Ajustes con conexión en su Android y comparte el estado de la fila "Uso sin conexión". Decide PR 1b.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
 **Decisiones del dueño:**

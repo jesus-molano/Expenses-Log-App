@@ -32,6 +32,54 @@ El service worker tambien maneja:
 
 - `push`: muestra notificacion con titulo, cuerpo, icono y URL.
 - `notificationclick`: cierra la notificacion y abre la URL asociada.
+- `message` `GET_OFFLINE_STATUS`: responde por `MessageChannel` cuantas
+  entradas del precache espera y cuantas tiene ya en cache.
+
+### Instalacion del precache y diagnostico
+
+La instalacion del precache es todo o nada: una sola URL que responde con
+error deja activo el service worker anterior. Para que ese caso se pueda ver y
+reparar:
+
+- El precache usa `concurrency: 4`. Durante `install`, los 429 y 5xx se
+  reintentan dos veces (a 1 s y a 3 s).
+- Si una URL sigue fallando, el service worker envia `PRECACHE_FAILED` con la
+  ruta y el status a todas las ventanas. `PwaRegister` lo guarda en
+  `localStorage['offline-diag-v1']`, igual que una instalacion que acaba en
+  `redundant`.
+- Ajustes muestra la fila "Uso sin conexion" con estos estados:
+  - Lista: todo el precache esta en cache.
+  - Preparando: el worker se esta instalando o la cache aun esta incompleta.
+  - Fallo: muestra la URL y el status del ultimo error.
+  - Version antigua: hay un worker activo que no responde al estado, como el
+    `sw.js` escrito a mano anterior a Serwist (cache `expense-reminders-*`).
+  - No preparada / no soportado.
+- `PwaRegister` llama a `registration.update()` al volver a primer plano (como
+  mucho una vez por minuto) y pide `navigator.storage.persist()`.
+
+La logica pura comun vive en `src/pwa/cache-policy.ts` y
+`src/features/settings/lib/offline-readiness.ts`.
+
+### Arranque sin pantalla vacia
+
+`ExpenseStoreProvider` pinta un `fallback` hasta hidratar el store local. El
+layout le pasa `AppBootShell`, un componente de servidor sin hooks que queda en
+el HTML prerenderizado:
+
+- Muestra un skeleton y, a los 6 s (por CSS, tambien sin JavaScript), un bloque
+  de ayuda con "Reintentar" y "Reparar (con conexion)".
+- Lista los recursos que no cargaron, si los hay.
+
+El script inline `boot-guard` del `<head>` (`src/app/providers/boot-guard-script.ts`)
+no depende del runtime de Next. `next/script` con `beforeInteractive` no sirve
+aqui, porque lo ejecuta el propio runtime. El script:
+
+- Aplica idioma y tema desde cookies.
+- Recoge los errores de carga de recursos para esa lista.
+- Con `?sw-reset=1` y conexion, desregistra el service worker y borra sus
+  caches (nunca `localStorage`).
+
+`src/app/global-error.tsx` cubre los errores del layout raiz.
 
 ## Supabase Auth
 

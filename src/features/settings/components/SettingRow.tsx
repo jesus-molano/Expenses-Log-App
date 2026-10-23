@@ -5,6 +5,7 @@ type SettingRowProps = {
   title: string;
   description: string;
   action?: React.ReactNode;
+  wrapDescription?: boolean;
 };
 
 export function SettingRow({
@@ -12,6 +13,7 @@ export function SettingRow({
   title,
   description,
   action,
+  wrapDescription,
 }: SettingRowProps) {
   return (
     <ListItem
@@ -19,6 +21,7 @@ export function SettingRow({
       title={title}
       description={description}
       action={action}
+      wrapDescription={wrapDescription}
     />
   );
 }

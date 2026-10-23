@@ -21,6 +21,11 @@ describe("service worker offline shell", () => {
     expect(source).toContain('url.searchParams.has("_rsc")');
     expect(source).toContain('cacheName: "pages-rsc"');
     expect(source).toContain('url: "/"');
+    expect(source).toContain("concurrency: 4");
+    expect(source).toContain("plugins: [precacheDiagnosticsPlugin]");
+    expect(source).toContain('event?.type !== "install"');
+    expect(source).toContain("OFFLINE_STATUS_REQUEST");
+    expect(source).toContain("serwist.getUrlsToPrecacheKeys()");
     expect(config).not.toContain("precachePrerendered: false");
     expect(config).toContain('{ url: "/settings", revision: buildRevision }');
     expect(config).toContain(

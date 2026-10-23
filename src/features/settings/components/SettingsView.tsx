@@ -11,6 +11,7 @@ import {
   DangerRows,
   LanguageRow,
   NotificationsRow,
+  OfflineRow,
   ThemeRow,
 } from "./SettingsRows";
 
@@ -41,6 +42,7 @@ export function SettingsView({ from }: { from?: "money" | "expenses" }) {
           <div className="mt-4 grid gap-2">
             <AccountRow settings={settings} />
             <NotificationsRow settings={settings} />
+            <OfflineRow language={settings.currentLanguage} />
             <ThemeRow settings={settings} />
             <LanguageRow settings={settings} />
             <DangerRows settings={settings} />
