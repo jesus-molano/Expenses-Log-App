@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { toDatabaseUuid } from "@/data/supabase/database.types";
+import { REMINDER_DELIVERY_KINDS } from "@/features/expenses/lib/reminder-notifications";
 import { createClient } from "@/utils/supabase/server";
 
 const statusSchema = z.object({
   endpoint: z.string().url(),
 });
-
-const REMINDER_KIND = "last_chance";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -37,9 +36,10 @@ export async function POST(request: Request) {
   }
 
   const userId = toDatabaseUuid(user.id);
+  // "*": el contador de fallos solo existe con la migración aplicada.
   const { data: subscription, error: subscriptionError } = await supabase
     .from("push_subscriptions")
-    .select("updated_at")
+    .select("*")
     .eq("user_id", userId)
     .eq("endpoint", parsed.data.endpoint)
     .maybeSingle();
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     .from("push_reminder_deliveries")
     .select("delivered_at")
     .eq("user_id", userId)
-    .eq("kind", REMINDER_KIND)
+    .in("kind", [...REMINDER_DELIVERY_KINDS])
     .eq("status", "delivered")
     .order("delivered_at", { ascending: false })
     .limit(1)
@@ -79,5 +79,6 @@ export async function POST(request: Request) {
     registered: true,
     subscriptionUpdatedAt: subscription.updated_at,
     lastScheduledDeliveryAt: delivery?.delivered_at ?? null,
+    failureCount: subscription.failure_count ?? 0,
   });
 }

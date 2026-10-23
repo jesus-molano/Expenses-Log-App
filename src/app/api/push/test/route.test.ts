@@ -140,7 +140,21 @@ describe("/api/push/test", () => {
         keys: { p256dh: "stored-p256dh", auth: "stored-auth" },
       },
       expect.any(String),
+      expect.objectContaining({ TTL: 300, timeout: 5_000 }),
     );
+  });
+
+  it("writes the test notification in the user's language", async () => {
+    vi.stubEnv("VAPID_PUBLIC_KEY", "public-key");
+    vi.stubEnv("VAPID_PRIVATE_KEY", "private-key");
+    mockSupabase();
+
+    await POST(pushTestRequest({ endpoint, language: "en" }));
+
+    const payload = JSON.parse(
+      String(vi.mocked(webpush.sendNotification).mock.calls[0][1]),
+    );
+    expect(payload).toMatchObject({ title: "Notifications ready", url: "/", lang: "en" });
   });
 
   it("removes an expired stored subscription", async () => {

@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_REMINDER_PREFERENCES } from "@/domain/reminder-schedule";
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore, ExpenseTemplate } from "@/domain/types";
-import {
-  buildLastChanceReminders,
-  buildPushDueReminders,
-} from "./last-chance-reminders";
+import { buildLastChanceReminders } from "./last-chance-reminders";
 
 function template(overrides: Partial<ExpenseTemplate>): ExpenseTemplate {
   return {
@@ -135,41 +133,47 @@ describe("last chance reminders", () => {
     expect(reminders).toEqual([]);
   });
 
-  it("push reminders use the configured window and allow catch-up", () => {
-    const reminders = buildPushDueReminders(
-      store([
-        template({
-          id: "tomorrow",
-          name: "Tomorrow",
-          dueDay: 15,
-          reminder: { enabled: true, daysBeforeCharge: 1 },
-        }),
-        template({
-          id: "configured-five",
-          name: "Configured five",
-          dueDay: 19,
-          reminder: { enabled: true, daysBeforeCharge: 5 },
-        }),
-        template({
-          id: "catch-up",
-          name: "Catch up",
-          dueDay: 17,
-          reminder: { enabled: true, daysBeforeCharge: 5 },
-        }),
-        template({
-          id: "too-far",
-          name: "Too far",
-          dueDay: 20,
-          reminder: { enabled: true, daysBeforeCharge: 5 },
-        }),
-      ]),
+  it("follows the default setting for expenses without their own reminder", () => {
+    const reminders = buildLastChanceReminders(
+      {
+        ...store([
+          { ...template({ id: "default", name: "Default", dueDay: 16 }), reminder: undefined },
+          template({
+            id: "own-off",
+            name: "Own off",
+            dueDay: 16,
+            reminder: { enabled: false, daysBeforeCharge: 3 },
+          }),
+        ]),
+        preferences: {
+          theme: "vice-afterglow",
+          language: "es",
+          reminders: {
+            ...DEFAULT_REMINDER_PREFERENCES,
+            defaultEnabled: true,
+            defaultDaysBefore: 2,
+          },
+        },
+      },
       new Date("2026-06-14T09:00:00"),
     );
 
     expect(reminders.map((reminder) => reminder.occurrence.template.name)).toEqual([
-      "Tomorrow",
-      "Catch up",
-      "Configured five",
+      "Default",
+    ]);
+  });
+
+  it("keeps the charge day but not the overdue question", () => {
+    const reminders = buildLastChanceReminders(
+      store([
+        template({ id: "today", name: "Today", dueDay: 15 }),
+        template({ id: "yesterday", name: "Yesterday", dueDay: 12 }),
+      ]),
+      new Date("2026-06-15T09:00:00"),
+    );
+
+    expect(reminders.map((reminder) => reminder.occurrence.template.name)).toEqual([
+      "Today",
     ]);
   });
 });

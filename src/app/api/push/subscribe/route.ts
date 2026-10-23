@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { upsertPushSubscription } from "@/data/push/push-subscriptions";
 import { toDatabaseUuid } from "@/data/supabase/database.types";
 import { createClient } from "@/utils/supabase/server";
 
@@ -9,6 +10,9 @@ const subscriptionSchema = z.object({
     p256dh: z.string().min(1),
     auth: z.string().min(1),
   }),
+  // El navegador renovó la suscripción (`pushsubscriptionchange` o clave VAPID
+  // nueva): la anterior ya no sirve y se borra.
+  previousEndpoint: z.string().url().optional(),
 });
 
 const unsubscribeSchema = z.object({
@@ -61,15 +65,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error } = await supabase.from("push_subscriptions").upsert(
+  const userId = toDatabaseUuid(user.id);
+  // También es el latido del dispositivo: renueva updated_at y olvida fallos.
+  const error = await upsertPushSubscription(
+    supabase,
     {
-      user_id: toDatabaseUuid(user.id),
+      userId,
       endpoint: parsed.data.endpoint,
       p256dh: parsed.data.keys.p256dh,
       auth: parsed.data.keys.auth,
-      updated_at: new Date().toISOString(),
     },
-    { onConflict: "endpoint" },
+    new Date(),
   );
 
   if (error) {
@@ -78,6 +84,19 @@ export async function POST(request: Request) {
       { code: "PUSH_SUBSCRIPTION_SAVE_FAILED" },
       { status: 500 },
     );
+  }
+
+  const { previousEndpoint } = parsed.data;
+  if (previousEndpoint && previousEndpoint !== parsed.data.endpoint) {
+    const { error: cleanupError } = await supabase
+      .from("push_subscriptions")
+      .delete()
+      .eq("user_id", userId)
+      .eq("endpoint", previousEndpoint);
+    // La nueva ya está guardada; la antigua acabará podada por el cron.
+    if (cleanupError) {
+      console.error("Could not remove replaced push subscription", cleanupError);
+    }
   }
 
   return NextResponse.json({ ok: true });

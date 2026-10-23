@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { t } from "@/shared/i18n";
+import { readActiveLanguage, t } from "@/shared/i18n";
 import {
   createPushSubscription,
   deletePushSubscription,
@@ -223,7 +223,7 @@ export function useNotificationSettings(setMessage: (message: string) => void) {
         return;
       }
 
-      const result = await sendPushTest(subscription);
+      const result = await sendPushTest(subscription, readActiveLanguage());
       setLastTestSentAt(result.sentAt);
       setMessage(t("settings.notificationsTestSent"));
     } catch (error) {

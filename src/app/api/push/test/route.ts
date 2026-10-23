@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
-import webpush from "web-push";
 import { z } from "zod";
+import {
+  configureWebPush,
+  isExpiredPushSubscription,
+  sendWebPush,
+} from "@/data/push/web-push-client";
 import { toDatabaseUuid } from "@/data/supabase/database.types";
+import { t } from "@/shared/i18n";
 import { createClient } from "@/utils/supabase/server";
 
 const subscriptionSchema = z.object({
   endpoint: z.string().url(),
+  language: z.enum(["es", "en"]).optional(),
 });
 
-function isExpiredPushSubscription(error: unknown) {
-  const statusCode = (error as { statusCode?: number }).statusCode;
-  return statusCode === 404 || statusCode === 410;
-}
+// Una prueba que no llega en 5 minutos ya no sirve.
+const TEST_PUSH_TTL_SECONDS = 5 * 60;
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -63,36 +67,25 @@ export async function POST(request: Request) {
     );
   }
 
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-
-  if (!publicKey || !privateKey) {
+  if (!configureWebPush()) {
     return NextResponse.json(
       { code: "PUSH_NOT_CONFIGURED" },
       { status: 503 },
     );
   }
 
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT ?? "mailto:expense-reminders@example.com",
-    publicKey,
-    privateKey,
-  );
-
+  const language = parsed.data.language ?? "es";
   try {
-    await webpush.sendNotification(
+    await sendWebPush(
+      subscription,
       {
-        endpoint: subscription.endpoint,
-        keys: {
-          p256dh: subscription.p256dh,
-          auth: subscription.auth,
-        },
-      },
-      JSON.stringify({
-        title: "Expense Reminders",
-        body: "Notificación de prueba lista.",
+        title: t("reminders.pushTestTitle", language),
+        body: t("reminders.pushTestBody", language),
         url: "/",
-      }),
+        tag: "push-test",
+        lang: language,
+      },
+      { ttlSeconds: TEST_PUSH_TTL_SECONDS },
     );
   } catch (error) {
     if (isExpiredPushSubscription(error)) {

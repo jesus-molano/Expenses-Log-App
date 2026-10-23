@@ -17,8 +17,10 @@ function request(method: "POST" | "DELETE", body: unknown) {
   });
 }
 
-function mockSupabase(currentUser: User | null = user) {
-  const upsert = vi.fn().mockResolvedValue({ error: null });
+function mockSupabase(
+  currentUser: User | null = user,
+  upsert = vi.fn().mockResolvedValue({ error: null }),
+) {
   const deleteQuery = { eq: vi.fn() };
   deleteQuery.eq.mockReturnValue(deleteQuery);
   const from = vi.fn().mockReturnValue({
@@ -69,7 +71,7 @@ describe("/api/push/subscribe", () => {
     expect(await response.json()).toMatchObject({ mode: "demo" });
   });
 
-  it("stores an authenticated device under its user", async () => {
+  it("stores an authenticated device under its user and forgets past failures", async () => {
     const { upsert } = mockSupabase();
     const response = await POST(
       request("POST", { endpoint, keys: { p256dh: "key", auth: "auth" } }),
@@ -82,8 +84,42 @@ describe("/api/push/subscribe", () => {
         endpoint,
         p256dh: "key",
         auth: "auth",
+        failure_count: 0,
       }),
       { onConflict: "endpoint" },
+    );
+  });
+
+  it("still saves the device before the health migration is applied", async () => {
+    const upsert = vi
+      .fn()
+      .mockResolvedValueOnce({ error: { code: "PGRST204" } })
+      .mockResolvedValueOnce({ error: null });
+    mockSupabase(user, upsert);
+    const response = await POST(
+      request("POST", { endpoint, keys: { p256dh: "key", auth: "auth" } }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(upsert).toHaveBeenCalledTimes(2);
+    expect(upsert.mock.calls[1][0]).not.toHaveProperty("failure_count");
+  });
+
+  it("replaces the previous endpoint of a renewed subscription", async () => {
+    const { deleteQuery } = mockSupabase();
+    const response = await POST(
+      request("POST", {
+        endpoint,
+        keys: { p256dh: "key", auth: "auth" },
+        previousEndpoint: "https://push.example.test/old-device",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(deleteQuery.eq).toHaveBeenCalledWith("user_id", user.id);
+    expect(deleteQuery.eq).toHaveBeenCalledWith(
+      "endpoint",
+      "https://push.example.test/old-device",
     );
   });
 
