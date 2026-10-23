@@ -58,8 +58,9 @@ Al guardar:
 `expense-log-sync-v1` guarda `{ownerId, dirty, updatedAt}` fuera del store
 (`src/data/persistence/sync-meta-store.ts`). `ownerId` es la cuenta a la que
 pertenecen los datos locales: la del usuario actual o, sin sesion (por ejemplo
-sin red), la ultima sincronizada. `dirty` vuelve a `false` solo cuando la nube
-confirma una version que incluye la ultima edicion local.
+sin red), la ultima sincronizada. `dirty` vuelve a `false` solo cuando la tabla
+confirma una version que incluye la ultima edicion local (un guardado en modo
+"sin nube" no cuenta).
 
 Si localStorage falla, la app intenta seguir viva y emite igualmente el evento
 de actualizacion.
@@ -71,7 +72,9 @@ usuario. Al hidratar con sesion:
 
 1. Se carga el store local inicial.
 2. Se pide el usuario con `supabase.auth.getUser()`. Un fallo de red
-   (`AuthRetryableFetchError`) no se trata como cierre de sesion.
+   (`AuthRetryableFetchError`) no se trata como cierre de sesion, tampoco la
+   sesion inicial vacia que auth-js emite sin red (`INITIAL_SESSION` sin
+   sesion se comprueba con `getUser`).
 3. Se carga el store cloud desde `app_stores`.
 4. Gana la nube, salvo que haya cambios locales sin subir de esa misma cuenta o
    ediciones hechas mientras cargaba: entonces se fusionan local y cloud.
@@ -79,8 +82,14 @@ usuario. Al hidratar con sesion:
 6. Se guarda local y se hidrata React con el resultado.
 7. Si hubo fusion (o la cuenta no tenia store cloud), se sube el resultado.
 
-Los cambios sin subir de otra cuenta no se fusionan nunca: al entrar con otra
-cuenta, su nube gana.
+Los datos de otra cuenta (`ownerId` distinto) no se fusionan ni se suben nunca:
+al entrar con otra cuenta gana su nube y, si no tiene, se empieza vacio. Los
+cambios sin cuenta (uso sin sesion, o sin red antes de resolverla) se fusionan
+con la primera cuenta que entra.
+
+Solo la tabla inexistente (`PGRST205`, `42P01`) cuenta como "sin nube". Un
+fallo temporal de PostgREST o de permisos es un error a reintentar. Las
+peticiones a `app_stores` se cortan a los 20 s.
 
 Si la tabla `app_stores` no existe o no esta disponible, la app degrada a modo
 local sin romper la experiencia.
@@ -93,9 +102,11 @@ La mezcla actual usa ids:
 - Entidades locales como entrada con prioridad final.
 - Tombstones combinados para filtrar elementos borrados.
 - Mapas mensuales de salario y ahorro: cloud + local, con local al final.
-- Sueldos borrados: `deleted.monthlySalary` guarda la version borrada
-  (`<mes>@<updatedAt>`, ver `monthlySalaryVersionId`). Un sueldo editado despues
-  en otro dispositivo tiene otra version y se conserva.
+- Sueldos borrados: `deleted.monthlySalary` guarda la hora del borrado
+  (`*@<hora>` para todos los meses o `<mes>@<hora>`, ver
+  `salaryClearedTombstone`). Al fusionar desaparece cualquier sueldo editado
+  hasta esa hora, tambien copias antiguas de otro dispositivo; uno editado
+  despues se conserva.
 - Preferencias: local, luego cloud, luego defaults.
 
 La politica de hidratacion (`resolveHydratedStore`) protege los cambios hechos
@@ -139,16 +150,21 @@ La cola:
 
 - Sube siempre la ultima version y nunca dos a la vez, para que una respuesta
   lenta no pise otra mas nueva.
-- Si falla, reintenta a los 2, 5, 15, 30 y 60 s. Al recuperar la red (`online`)
-  o volver a la app, reintenta de inmediato; si la nube no llego a cargar,
-  vuelve a sincronizar.
+- Si falla, no repite la misma copia: la nube puede haber cambiado. Marca la
+  nube como no lista y vuelve a sincronizar (cargar, fusionar con los cambios
+  pendientes y subir) a los 2, 5, 15, 30 y 60 s, y de inmediato al recuperar la
+  red (`online`) o volver a la app.
+- `persistImmediately` (borrar o vaciar) espera a que su version llegue a la
+  nube o falle, aunque haya otro guardado en curso.
 - Al ocultar o cerrar la app (`visibilitychange:hidden`, `pagehide`) sube ya lo
   que esperaba al debounce.
 - Descarta lo encolado sin sesion o mientras la nube recarga: los cambios siguen
   marcados como pendientes y la siguiente sincronizacion los fusiona.
 
 El estado de sync comunica preparando cloud, guardando, guardado, pendiente de
-subir, local o error. Los mensajes se traducen con `src/shared/i18n`.
+subir, local o error. "Pendiente" solo se muestra para fallos temporales (sin
+red, cortes, servidor reiniciando) con cambios sin subir; el resto se muestra
+como error. Los mensajes se traducen con `src/shared/i18n`.
 
 ## Reglas actuales y limites
 

@@ -17,7 +17,6 @@ function setup(
     onSaved: vi.fn(),
     onFailed: vi.fn(),
     debounceMs: 350,
-    retryDelaysMs: [2_000, 5_000],
     ...overrides,
   };
   return { deps, queue: createCloudSaveQueue(deps) };
@@ -51,31 +50,16 @@ describe("createCloudSaveQueue", () => {
     expect(queue.hasPending()).toBe(false);
   });
 
-  it("retries with backoff and keeps the store pending after the last retry", async () => {
+  it("never replays the same copy after a failure", async () => {
     const save = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
     const { deps, queue } = setup(save);
 
     queue.enqueue(storeNamed("a"), 1);
     await vi.advanceTimersByTimeAsync(350);
-    expect(deps.onFailed).toHaveBeenLastCalledWith(expect.any(TypeError), {
-      willRetry: true,
-    });
+    await vi.advanceTimersByTimeAsync(120_000);
 
-    await vi.advanceTimersByTimeAsync(2_000);
-    await vi.advanceTimersByTimeAsync(5_000);
-    expect(save).toHaveBeenCalledTimes(3);
-    expect(deps.onFailed).toHaveBeenLastCalledWith(expect.any(TypeError), {
-      willRetry: false,
-    });
-
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(save).toHaveBeenCalledTimes(3);
-    expect(queue.hasPending()).toBe(true);
-
-    save.mockResolvedValue({ mode: "table" });
-    queue.retryNow();
-    await vi.runAllTimersAsync();
-    expect(save).toHaveBeenCalledTimes(4);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(deps.onFailed).toHaveBeenCalledWith(expect.any(TypeError));
     expect(queue.hasPending()).toBe(false);
   });
 
@@ -113,14 +97,41 @@ describe("createCloudSaveQueue", () => {
     }));
   });
 
-  it("flushes a debounced save right away", async () => {
-    const save = vi.fn().mockResolvedValue({ mode: "table" });
-    const { queue } = setup(save);
+  it("waits for its own revision when saving now behind a running save", async () => {
+    let finishFirst!: () => void;
+    const save = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishFirst = () => resolve({ mode: "table" });
+          }),
+      )
+      .mockResolvedValue({ mode: "table" });
+    const { deps, queue } = setup(save);
 
     queue.enqueue(storeNamed("a"), 1);
-    await queue.flush();
+    await vi.advanceTimersByTimeAsync(350);
+    let settled: boolean | null = null;
+    void queue.saveNow(storeNamed("cleared"), 2, "Vaciando").then((saved) => {
+      settled = saved;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBeNull();
 
-    expect(save).toHaveBeenCalledTimes(1);
+    finishFirst();
+    await vi.runAllTimersAsync();
+
+    expect(settled).toBe(true);
+    expect(save.mock.calls[1][0].categories[0].name).toBe("cleared");
+    expect(deps.onSaving).toHaveBeenLastCalledWith("Vaciando");
+  });
+
+  it("resolves a pending save-now as not saved when the upload fails", async () => {
+    const save = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    const { queue } = setup(save);
+
+    await expect(queue.saveNow(storeNamed("a"), 1)).resolves.toBe(false);
   });
 
   it("drops saves when there is no cloud session to save to", async () => {
@@ -130,6 +141,7 @@ describe("createCloudSaveQueue", () => {
 
     queue.enqueue(storeNamed("a"), 1);
     expect(queue.hasPending()).toBe(false);
+    await expect(queue.saveNow(storeNamed("a"), 1)).resolves.toBe(false);
 
     target = { userId: "user", save };
     queue.enqueue(storeNamed("b"), 2);

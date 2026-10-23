@@ -5,7 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import type { AppSupabaseClient } from "@/data/supabase/database.types";
 import type { ExpenseStore } from "@/domain/types";
 import { saveCloudStore } from "@/data/persistence/cloud-store";
-import { t, type TranslationKey } from "@/shared/i18n";
+import { t } from "@/shared/i18n";
 import { createCloudSaveQueue, type CloudSaveQueue } from "./cloud-save-queue";
 import { shouldQueueCloudSave } from "./sync-policy";
 
@@ -15,9 +15,12 @@ type CloudSaveQueueOptions = {
   cloudReadyRef: RefObject<boolean>;
   markSyncing: (message: string) => void;
   markSaved: (mode: "table" | "unavailable") => void;
-  markPending: () => void;
-  markError: (error: unknown, fallbackKey: TranslationKey) => void;
-  onCloudSaved: (revision: number, userId: string) => void;
+  onCloudSaved: (
+    revision: number,
+    userId: string,
+    mode: "table" | "unavailable",
+  ) => void;
+  onCloudSaveFailed: (error: unknown) => void;
 };
 
 export function useCloudSaveQueue({
@@ -26,11 +29,9 @@ export function useCloudSaveQueue({
   cloudReadyRef,
   markSyncing,
   markSaved,
-  markPending,
-  markError,
   onCloudSaved,
+  onCloudSaveFailed,
 }: CloudSaveQueueOptions) {
-  const syncingMessageRef = useRef<string | null>(null);
   const queueRef = useRef<CloudSaveQueue | null>(null);
 
   // Se crea al primer uso (fuera del render) y vive lo que el provider.
@@ -55,29 +56,19 @@ export function useCloudSaveQueue({
           save: (store) => saveCloudStore(supabase, user, store),
         };
       },
-      onSaving: () => {
-        markSyncing(syncingMessageRef.current ?? t("settings.savingChanges"));
-        syncingMessageRef.current = null;
-      },
+      onSaving: (message) => markSyncing(message ?? t("settings.savingChanges")),
       onSaved: ({ mode, revision, userId, hasNewerChanges }) => {
-        onCloudSaved(revision, userId);
+        onCloudSaved(revision, userId, mode);
         if (!hasNewerChanges) markSaved(mode);
       },
-      onFailed: (error, { willRetry }) => {
-        if (willRetry || !navigator.onLine) {
-          markPending();
-        } else {
-          markError(error, "settings.cloudSaveError");
-        }
-      },
+      onFailed: onCloudSaveFailed,
     });
     return queueRef.current;
   }, [
     cloudReadyRef,
-    markError,
-    markPending,
     markSaved,
     markSyncing,
+    onCloudSaveFailed,
     onCloudSaved,
     supabaseRef,
     userRef,
@@ -91,28 +82,18 @@ export function useCloudSaveQueue({
   );
 
   const saveImmediately = useCallback(
-    async (nextStore: ExpenseStore, revision: number, syncingMessage: string) => {
-      const queue = getQueue();
-      queue.enqueue(nextStore, revision);
-      syncingMessageRef.current = syncingMessage;
-      try {
-        await queue.flush();
-      } finally {
-        syncingMessageRef.current = null;
-      }
-    },
+    (nextStore: ExpenseStore, revision: number, syncingMessage: string) =>
+      getQueue().saveNow(nextStore, revision, syncingMessage),
     [getQueue],
   );
 
   const clearQueuedSave = useCallback(() => queueRef.current?.clear(), []);
   const flushQueuedSave = useCallback(() => getQueue().flush(), [getQueue]);
-  const retryQueuedSave = useCallback(() => getQueue().retryNow(), [getQueue]);
 
   return {
     queueCloudSave,
     saveImmediately,
     clearQueuedSave,
     flushQueuedSave,
-    retryQueuedSave,
   };
 }

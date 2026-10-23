@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  hasUnsyncedChangesFor,
+  localChangesFor,
   readSyncMeta,
   SYNC_META_KEY,
   writeSyncMeta,
@@ -36,11 +36,19 @@ describe("sync meta store", () => {
     ).toMatchObject({ ownerId: null, dirty: false });
   });
 
-  it("only reports unsynced changes for the account that made them", () => {
+  it("tells unsynced changes of this account from another account's data", () => {
     const meta = { ownerId: "user-1", dirty: true, updatedAt: "" };
 
-    expect(hasUnsyncedChangesFor(meta, "user-1")).toBe(true);
-    expect(hasUnsyncedChangesFor(meta, "user-2")).toBe(false);
-    expect(hasUnsyncedChangesFor({ ...meta, dirty: false }, "user-1")).toBe(false);
+    expect(localChangesFor(meta, "user-1")).toEqual({ dirty: true, foreign: false });
+    expect(localChangesFor(meta, "user-2")).toEqual({ dirty: false, foreign: true });
+    expect(localChangesFor({ ...meta, dirty: false }, "user-1")).toEqual({
+      dirty: false,
+      foreign: false,
+    });
+    // Sin cuenta: son de la primera que entra.
+    expect(localChangesFor({ ...meta, ownerId: null }, "user-2")).toEqual({
+      dirty: true,
+      foreign: false,
+    });
   });
 });

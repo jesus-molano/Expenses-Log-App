@@ -1,6 +1,6 @@
 "use client";
 
-import { monthlySalaryVersionId } from "@/domain/finance";
+import { isSalaryCleared } from "@/domain/finance";
 import { dedupeOverrides } from "@/domain/overrides";
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore } from "@/domain/types";
@@ -225,13 +225,12 @@ function mergeMonthlyRecord<T>(
 function mergeSalaryRecord(
   cloud: ExpenseStore["finance"]["monthlySalary"] | undefined,
   local: ExpenseStore["finance"]["monthlySalary"] | undefined,
-  deletedVersions: string[] = [],
+  tombstones: string[] = [],
 ) {
-  const deleted = new Set(deletedVersions);
   return Object.fromEntries(
     Object.entries(mergeMonthlyRecord(cloud, local)).filter(
       ([monthId, salary]) =>
-        !deleted.has(monthlySalaryVersionId(monthId, salary.updatedAt ?? "")),
+        !isSalaryCleared(tombstones, monthId, salary.updatedAt ?? ""),
     ),
   );
 }

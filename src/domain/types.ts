@@ -236,7 +236,7 @@ export type ExpenseStore = {
     incomeEvents?: string[];
     occurrenceRecords?: string[];
     savingsContributions?: string[];
-    // Versiones de sueldo borradas (`monthlySalaryVersionId`).
+    // Borrados de sueldo por hora (`salaryClearedTombstone`).
     monthlySalary?: string[];
   };
   preferences?: {

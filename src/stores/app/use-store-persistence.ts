@@ -12,20 +12,24 @@ import {
 } from "@/data/persistence/local-store";
 import { assignExpenseStoreOwner } from "@/data/persistence/store-normalization";
 import {
-  hasUnsyncedChangesFor,
+  localChangesFor,
   readSyncMeta,
   writeSyncMeta,
 } from "@/data/persistence/sync-meta-store";
 import { t } from "@/shared/i18n";
 import { createClient } from "@/utils/supabase/client";
 import { applyRuntimePreferences } from "./runtime-preferences";
-import { resolveHydratedStore } from "./sync-policy";
+import { isTransientSyncError, resolveHydratedStore } from "./sync-policy";
 import { useCloudSaveQueue } from "./use-cloud-save-queue";
 import { useSyncState } from "./use-sync-state";
 
 type UseStorePersistenceOptions = {
   onHydrate: (store: ExpenseStore) => void;
 };
+
+// Tras un fallo se vuelve a sincronizar (cargar, fusionar y subir) con estas
+// esperas; después, al recuperar la red, volver a la app o navegar.
+export const RESYNC_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
 
 export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
   const [isHydrated, setIsHydrated] = useState(false);
@@ -39,6 +43,8 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
   const syncedUserIdRef = useRef<string | null>(null);
   const syncingUserIdRef = useRef<string | null>(null);
   const syncRunRef = useRef(0);
+  const resyncAttemptRef = useRef(0);
+  const resyncTimerRef = useRef<number | null>(null);
   const {
     syncStatus,
     syncMessage,
@@ -49,26 +55,63 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
     markPending,
     markError,
   } = useSyncState();
-  // Solo se da por subido si nadie ha editado desde que salió esa versión.
-  const markCloudSaved = useCallback((revision: number, userId: string) => {
-    if (revision !== localRevisionRef.current) return;
-    writeSyncMeta({ ownerId: userId, dirty: false });
+  // Solo se da por subido si llegó a la tabla y nadie ha editado desde que
+  // salió esa versión.
+  const markCloudSaved = useCallback(
+    (revision: number, userId: string, mode: "table" | "unavailable") => {
+      if (mode !== "table" || revision !== localRevisionRef.current) return;
+      writeSyncMeta({ ownerId: userId, dirty: false });
+    },
+    [],
+  );
+  const cancelResync = useCallback(() => {
+    if (resyncTimerRef.current !== null) window.clearTimeout(resyncTimerRef.current);
+    resyncTimerRef.current = null;
   }, []);
+  const scheduleResync = useCallback(() => {
+    if (resyncTimerRef.current !== null) return;
+    const delay = RESYNC_DELAYS_MS[resyncAttemptRef.current];
+    if (delay === undefined) return;
+    resyncAttemptRef.current += 1;
+    resyncTimerRef.current = window.setTimeout(() => {
+      resyncTimerRef.current = null;
+      refreshAuthRef.current();
+    }, delay);
+  }, []);
+  const reportSyncFailure = useCallback(
+    (error: unknown, fallbackKey: "settings.cloudSaveError" | "settings.cloudSyncError") => {
+      const transient = !navigator.onLine || isTransientSyncError(error);
+      if (transient && readSyncMeta().dirty) {
+        markPending();
+      } else {
+        markError(error, fallbackKey);
+      }
+      if (transient) scheduleResync();
+    },
+    [markError, markPending, scheduleResync],
+  );
+  // Un guardado que falla no se repite con la misma copia: la nube puede haber
+  // cambiado. Se vuelve a sincronizar, que fusiona los cambios pendientes.
+  const handleCloudSaveFailed = useCallback(
+    (error: unknown) => {
+      cloudReadyRef.current = false;
+      reportSyncFailure(error, "settings.cloudSaveError");
+    },
+    [reportSyncFailure],
+  );
   const {
     queueCloudSave,
     saveImmediately,
     clearQueuedSave,
     flushQueuedSave,
-    retryQueuedSave,
   } = useCloudSaveQueue({
     supabaseRef,
     userRef,
     cloudReadyRef,
     markSyncing,
     markSaved,
-    markPending,
-    markError,
     onCloudSaved: markCloudSaved,
+    onCloudSaveFailed: handleCloudSaveFailed,
   });
 
   useEffect(() => {
@@ -133,7 +176,7 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
 
       const revisionBeforeCloudHydration = localRevisionRef.current;
       const initialLocalStore = applyRuntimePreferences(loadExpenseStore());
-      const localDirty = hasUnsyncedChangesFor(readSyncMeta(), user.id);
+      const localChanges = localChangesFor(readSyncMeta(), user.id);
       const syncRun = syncRunRef.current + 1;
       syncRunRef.current = syncRun;
       syncingUserIdRef.current = user.id;
@@ -153,7 +196,8 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
           cloudStore: cloud.store,
           revisionAtCloudLoad: revisionBeforeCloudHydration,
           currentRevision: localRevisionRef.current,
-          localDirty,
+          localDirty: localChanges.dirty,
+          localIsForeign: localChanges.foreign,
         });
         const ownedStore = assignExpenseStoreOwner(mergedStore, user.id);
         // La fusión incluye las ediciones hechas mientras cargaba la nube:
@@ -163,14 +207,17 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
         if (active) onHydrate(ownedStore);
         markHydrated();
         syncedUserIdRef.current = user.id;
-        syncingUserIdRef.current = null;
+        // syncingUserIdRef sigue puesto hasta subir la fusión: volver a la
+        // app o navegar no debe lanzar otra sincronización a la vez.
 
         if (shouldSaveCloud) {
           const revisionAtSave = localRevisionRef.current;
           const saved = await saveCloudStore(supabase, user, ownedStore);
           if (!active || syncRunRef.current !== syncRun) return;
+          syncingUserIdRef.current = null;
           cloudReadyRef.current = saved.mode === "table";
-          markCloudSaved(revisionAtSave, user.id);
+          resyncAttemptRef.current = 0;
+          markCloudSaved(revisionAtSave, user.id, saved.mode);
           markSynced(saved.mode);
           // Lo editado mientras subía la fusión no pudo encolarse aún.
           if (localRevisionRef.current !== revisionAtSave) {
@@ -182,18 +229,20 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
           return;
         }
 
+        // Sin subida: o la nube ganó (nada pendiente) o los datos locales
+        // eran de otra cuenta y se han sustituido.
+        syncingUserIdRef.current = null;
         writeSyncMeta({ ownerId: user.id, dirty: false });
         cloudReadyRef.current = cloud.mode === "table";
+        resyncAttemptRef.current = 0;
         markSynced(cloud.mode);
       } catch (error) {
+        // Una sincronización ya sustituida por otra no toca su estado.
+        if (!active || syncRunRef.current !== syncRun) return;
         syncingUserIdRef.current = null;
         cloudReadyRef.current = false;
         markHydrated();
-        if (hasUnsyncedChangesFor(readSyncMeta(), user.id)) {
-          markPending();
-        } else {
-          markError(error, "settings.cloudSyncError");
-        }
+        reportSyncFailure(error, "settings.cloudSyncError");
       }
     }
 
@@ -207,7 +256,10 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
         .getUser()
         .then(({ data, error }) => {
           // Sin red la sesión sigue siendo válida: no es un cierre de sesión.
-          if (!data.user && isAuthRetryableFetchError(error)) return;
+          if (!data.user && isAuthRetryableFetchError(error)) {
+            if (!cloudReadyRef.current) scheduleResync();
+            return;
+          }
           return syncAuthenticatedUser(data.user ?? null);
         })
         .catch((error: unknown) => {
@@ -218,17 +270,27 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
 
     const {
       data: { subscription },
-    } = supabase?.auth.onAuthStateChange((_event, session) => {
+    } = supabase?.auth.onAuthStateChange((event, session) => {
+      // Sin red, auth-js emite la sesión inicial vacía aunque siga abierta:
+      // getUser distingue un fallo de red de un cierre de sesión real.
+      if (event === "INITIAL_SESSION" && !session) {
+        refreshAuthRef.current();
+        return;
+      }
       void syncAuthenticatedUser(session?.user ?? null);
     }) ?? { data: { subscription: null } };
 
     const frame = window.requestAnimationFrame(() => refreshAuthRef.current());
 
-    // Al recuperar la red o volver a la app se reintenta lo pendiente; si la
-    // nube no llegó a cargar, se vuelve a sincronizar (y a fusionar).
+    // Al recuperar la red o volver a la app se sube lo pendiente; si la nube
+    // no está lista (no cargó o falló un guardado), se vuelve a sincronizar,
+    // con una ronda nueva de reintentos.
     function resumeSync() {
-      retryQueuedSave();
-      if (!cloudReadyRef.current) refreshAuthRef.current();
+      void flushQueuedSave();
+      if (cloudReadyRef.current) return;
+      cancelResync();
+      resyncAttemptRef.current = 0;
+      refreshAuthRef.current();
     }
 
     // Al salir de la app se sube ya lo que esperaba al debounce.
@@ -255,20 +317,22 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
       window.removeEventListener("online", resumeSync);
       window.removeEventListener("pagehide", flushBeforeLeaving);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      cancelResync();
       clearQueuedSave();
     };
   }, [
+    cancelResync,
     clearQueuedSave,
     flushQueuedSave,
     markCloudSaved,
     markError,
     markLocal,
-    markPending,
     markSynced,
     markSyncing,
     onHydrate,
     queueCloudSave,
-    retryQueuedSave,
+    reportSyncFailure,
+    scheduleResync,
   ]);
 
   useEffect(() => {

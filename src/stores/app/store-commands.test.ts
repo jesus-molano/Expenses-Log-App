@@ -156,7 +156,7 @@ describe("store commands", () => {
     expect(cleared.overrides).toEqual(incomeStore.overrides);
     expect(cleared.deleted?.incomeEvents).toContain("income-1");
     expect(cleared.deleted?.monthlySalary).toEqual([
-      "2026-06@2026-06-01T00:00:00.000Z",
+      expect.stringMatching(/^\*@\d{4}-\d{2}-\d{2}T/),
     ]);
   });
 

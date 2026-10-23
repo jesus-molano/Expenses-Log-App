@@ -45,9 +45,14 @@ export function writeSyncMeta(
   }
 }
 
-// Cambios locales de esta cuenta que aún no están en la nube.
-export function hasUnsyncedChangesFor(meta: SyncMeta, userId: string) {
-  return meta.dirty && meta.ownerId === userId;
+// Relación de los datos locales con la cuenta que entra:
+// - `foreign`: son de otra cuenta y no deben fusionarse ni subirse a esta;
+// - `dirty`: tienen cambios sin subir que hay que fusionar. Los cambios sin
+//   cuenta (uso sin sesión, o sin red antes de resolverla) son de la primera
+//   que entra.
+export function localChangesFor(meta: SyncMeta, userId: string) {
+  const foreign = meta.ownerId !== null && meta.ownerId !== userId;
+  return { foreign, dirty: meta.dirty && !foreign };
 }
 
 function safeLocalStorage(): Storage | undefined {

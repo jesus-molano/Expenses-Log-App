@@ -10,6 +10,14 @@ import {
 const METADATA_STORE_KEY = "expense_store";
 const METADATA_SYNCED_AT_KEY = "expense_store_synced_at";
 
+// Una petición a la nube que no contesta (red que acepta conexiones y no
+// responde) debe fallar para que la sincronización pueda reintentar.
+export const CLOUD_REQUEST_TIMEOUT_MS = 20_000;
+
+function requestTimeout() {
+  return AbortSignal.timeout(CLOUD_REQUEST_TIMEOUT_MS);
+}
+
 export type CloudStoreResult = {
   store: ExpenseStore | null;
   mode: "table" | "unavailable";
@@ -27,6 +35,7 @@ export async function loadCloudStore(
     .from("app_stores")
     .select("store")
     .eq("user_id", toDatabaseUuid(user.id))
+    .abortSignal(requestTimeout())
     .maybeSingle();
 
   if (!error) {
@@ -38,7 +47,7 @@ export async function loadCloudStore(
     };
   }
 
-  if (!isMissingAppStoresError(error.message)) {
+  if (!isMissingAppStoresError(error)) {
     throw error;
   }
 
@@ -53,15 +62,18 @@ export async function saveCloudStore(
   user: User,
   store: ExpenseStore,
 ): Promise<CloudStoreSaveResult> {
-  const { error } = await supabase.from("app_stores").upsert({
-    user_id: toDatabaseUuid(user.id),
-    store: assignExpenseStoreOwner(store, user.id) as unknown as Json,
-    updated_at: new Date().toISOString(),
-  });
+  const { error } = await supabase
+    .from("app_stores")
+    .upsert({
+      user_id: toDatabaseUuid(user.id),
+      store: assignExpenseStoreOwner(store, user.id) as unknown as Json,
+      updated_at: new Date().toISOString(),
+    })
+    .abortSignal(requestTimeout());
 
   if (!error) return { mode: "table" };
 
-  if (!isMissingAppStoresError(error.message)) {
+  if (!isMissingAppStoresError(error)) {
     throw error;
   }
 
@@ -79,10 +91,14 @@ export async function clearOversizedMetadata(supabase: AppSupabaseClient) {
   if (error) throw error;
 }
 
-export function isMissingAppStoresError(message: string) {
+// Solo la tabla inexistente cuenta como "sin nube". Un fallo temporal de
+// PostgREST (PGRST002, "schema cache") o de permisos es un error a reintentar:
+// tratarlo como "sin nube" daría por guardados cambios que no han subido.
+export function isMissingAppStoresError(error: { code?: string; message?: string }) {
+  if (error.code) return error.code === "PGRST205" || error.code === "42P01";
+  const message = error.message ?? "";
   return (
-    message.includes("app_stores") ||
-    message.includes("schema cache") ||
-    message.includes("PGRST205")
+    message.includes("PGRST205") ||
+    /relation "(public\.)?app_stores" does not exist/.test(message)
   );
 }

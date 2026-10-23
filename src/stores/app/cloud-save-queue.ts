@@ -3,11 +3,6 @@ import type { ExpenseStore } from "@/domain/types";
 
 export const CLOUD_SAVE_DEBOUNCE_MS = 350;
 
-// Tras agotar los reintentos se espera a recuperar la conexión, a volver a la
-// app o a un cambio nuevo. Los cambios siguen marcados como pendientes en el
-// dispositivo, así que no se pierden aunque se cierre la app.
-export const CLOUD_SAVE_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
-
 export type CloudSaveTarget = {
   userId: string;
   save: (store: ExpenseStore) => Promise<CloudStoreSaveResult>;
@@ -16,19 +11,22 @@ export type CloudSaveTarget = {
 export type CloudSaveQueueDeps = {
   // null sin sesión o mientras la nube no está lista.
   resolveTarget: () => CloudSaveTarget | null;
-  onSaving: () => void;
+  onSaving: (message?: string) => void;
   onSaved: (saved: {
     mode: CloudStoreSaveResult["mode"];
     revision: number;
     userId: string;
     hasNewerChanges: boolean;
   }) => void;
-  onFailed: (error: unknown, failure: { willRetry: boolean }) => void;
+  // Tras un fallo la cola no reintenta subiendo la misma copia: la nube puede
+  // haber cambiado mientras tanto. Quien la usa vuelve a sincronizar
+  // fusionando (los cambios siguen marcados como pendientes).
+  onFailed: (error: unknown) => void;
   debounceMs?: number;
-  retryDelaysMs?: readonly number[];
 };
 
-type PendingSave = { store: ExpenseStore; revision: number };
+type PendingSave = { store: ExpenseStore; revision: number; message?: string };
+type Waiter = { revision: number; resolve: (saved: boolean) => void };
 
 // Guarda en la nube siempre la última versión del store, de una en una para
 // que una respuesta lenta no pise otra más nueva.
@@ -38,12 +36,11 @@ export function createCloudSaveQueue({
   onSaved,
   onFailed,
   debounceMs = CLOUD_SAVE_DEBOUNCE_MS,
-  retryDelaysMs = CLOUD_SAVE_RETRY_DELAYS_MS,
 }: CloudSaveQueueDeps) {
   let pending: PendingSave | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let running = false;
-  let attempt = 0;
+  let waiters: Waiter[] = [];
 
   function clearTimer() {
     if (timer === null) return;
@@ -51,19 +48,20 @@ export function createCloudSaveQueue({
     timer = null;
   }
 
-  function schedule(delayMs: number) {
+  function settleWaiters(saved: boolean, upToRevision = Infinity) {
+    const settled = waiters.filter((waiter) => waiter.revision <= upToRevision);
+    waiters = waiters.filter((waiter) => waiter.revision > upToRevision);
+    settled.forEach((waiter) => waiter.resolve(saved));
+  }
+
+  function enqueue(store: ExpenseStore, revision: number, message?: string) {
+    if (!resolveTarget()) return;
+    pending = { store, revision, message };
     clearTimer();
     timer = setTimeout(() => {
       timer = null;
       void flush();
-    }, delayMs);
-  }
-
-  function enqueue(store: ExpenseStore, revision: number) {
-    if (!resolveTarget()) return;
-    pending = { store, revision };
-    attempt = 0;
-    schedule(debounceMs);
+    }, debounceMs);
   }
 
   async function flush(): Promise<void> {
@@ -73,20 +71,17 @@ export function createCloudSaveQueue({
     if (!target) {
       // Sin sesión o con la nube recargando, esa versión ya no debe subirse:
       // la siguiente sincronización fusiona los cambios pendientes.
-      pending = null;
-      attempt = 0;
+      clear();
       return;
     }
 
     const current = pending;
     running = true;
-    onSaving();
+    onSaving(current.message);
     try {
       const result = await target.save(current.store);
-      if (pending === current) {
-        pending = null;
-        attempt = 0;
-      }
+      if (pending === current) pending = null;
+      settleWaiters(true, current.revision);
       onSaved({
         mode: result.mode,
         revision: current.revision,
@@ -94,12 +89,9 @@ export function createCloudSaveQueue({
         hasNewerChanges: pending !== null,
       });
     } catch (error) {
-      if (pending === current) {
-        const delay = retryDelaysMs[attempt];
-        attempt += 1;
-        if (delay !== undefined) schedule(delay);
-        onFailed(error, { willRetry: delay !== undefined });
-      }
+      pending = null;
+      settleWaiters(false);
+      onFailed(error);
     } finally {
       running = false;
     }
@@ -107,24 +99,28 @@ export function createCloudSaveQueue({
     if (pending && pending !== current) await flush();
   }
 
-  // Al recuperar la conexión o volver a la app: reintento inmediato y, si
-  // vuelve a fallar, otra ronda completa de reintentos.
-  function retryNow() {
-    if (!pending) return;
-    attempt = 0;
+  // Sube ya esta versión y espera a que llegue a la nube (true) o falle o se
+  // descarte (false). Si hay otro guardado en curso, esta va justo después.
+  function saveNow(store: ExpenseStore, revision: number, message?: string) {
+    if (!resolveTarget()) return Promise.resolve(false);
+    const saved = new Promise<boolean>((resolve) => {
+      waiters.push({ revision, resolve });
+    });
+    pending = { store, revision, message };
     void flush();
+    return saved;
   }
 
   function clear() {
     clearTimer();
     pending = null;
-    attempt = 0;
+    settleWaiters(false);
   }
 
   return {
     enqueue,
     flush,
-    retryNow,
+    saveNow,
     clear,
     hasPending: () => pending !== null,
   };
