@@ -12,10 +12,12 @@ settings y detail comparten una unica instancia del store.
 El hook expone:
 
 - `store`: datos normalizados de la app.
-- Comandos de gastos: add, delete, clear, toggle paid, skip, move occurrence y
-  move series.
-- Comandos financieros: salario, objetivo de ahorro, aportacion real, ingresos
-  y overrides mensuales.
+- Comandos de gastos: add (con los cobros de meses anteriores pagados o
+  saltados si el gasto empezo antes de este mes), delete, clear, toggle paid,
+  skip, restore, pagar varios a la vez (`markOccurrencesPaid`), move occurrence
+  y move series.
+- Comandos financieros: salario, objetivo de ahorro, aportacion real, ingresos,
+  overrides mensuales y cerrar o reabrir un mes.
 - Comandos de preferencias: tema e idioma.
 - Estado de sync: `syncStatus`, `syncMessage`, `isHydrated`.
 
@@ -27,7 +29,9 @@ pantallas con stores paralelos o rehidrataciones accidentales.
 Los comandos se dividen por responsabilidad:
 
 - `expense-commands`: crea templates, categorias y overrides; paga, salta,
-  mueve o borra gastos.
+  restaura, mueve o borra gastos. Las operaciones en bloque
+  (`markOccurrencesPaidInStore`, `skipOccurrencesInStore`) pliegan
+  `upsertOccurrenceOverride` y se guardan con un solo persist.
 - `finance-commands`: modifica salario mensual, objetivos, aportaciones reales
   e ingresos.
 - `preference-commands`: actualiza tema e idioma en el store.
@@ -142,6 +146,21 @@ Reglas para campos nuevos:
   tambien. Si un build antiguo lo descarta, el mes activo vuelve a ser el
   natural. Se fusiona por mes con el `updatedAt` mas reciente; reabrir guarda
   `reopenedAt` en vez de borrar la entrada.
+- El cierre con restos (F1a-3) no añade campos: cada resto se resuelve con
+  overrides (pagado, saltado o movido al dia 1 del mes siguiente), el ahorro
+  con `monthlySavingsContributions` y el paso de mes con `monthClosures`. Los
+  cobros anteriores de un gasto nuevo (M18) tambien son overrides; los pagos se
+  fechan el dia de su cargo.
+
+## Vista del mes
+
+No se sincroniza:
+
+- El mes que se mira vive en `sessionStorage['expense-view-month']`, por
+  pestaña y compartido entre Gastos y Plan: al cambiar de mes en una pestaña,
+  la otra lo sigue. Sin valor se ve el mes activo.
+- El "Ahora no" a pasar o cerrar el mes se guarda por dispositivo y por mes en
+  `localStorage['plan-close-dismissed:YYYY-MM']`.
 
 ## Cola de guardado
 

@@ -42,8 +42,13 @@ Estado:
   - "Atrasado" según el día de cargo estimado.
   - `ActionToast` con deshacer, por encima del FAB.
   - Mes activo con `monthClosures`, tarjeta "Octubre al día · Pasar a noviembre", aviso al pagar el último recibo y "Volver a octubre".
-  - Selector de mes en Gastos (un año atrás y el mes siguiente). Plan sigue al mes activo.
+  - Selector de mes en Gastos (un año atrás y el mes siguiente). Plan sigue al mes activo (desde F1a-3, al mes visto).
   - `monthClosures` se escribe sin esperar la semana de passthrough: si un build antiguo lo descarta, el mes activo vuelve al natural y no se pierde ningún dato.
+- **F1a-3: hecho.**
+  - `MonthCloseSheet`: tarjeta "Cierre de octubre · Quedan 2 recibos" tras el cobro (o en los 3 últimos días sin cobro) con resumen frente al plan, Pagado/Saltar/Mover por resto (con deshacer), ahorro real y "Empezar noviembre".
+  - Timeline con mes en los días de otro mes, "Ya pagado de noviembre" al final y "Hoy" solo en el mes natural.
+  - Plan sigue al mes visto, con su selector; la fase "actual" es el mes activo. Año siguiente en diciembre, pagar desde Revisión y "Hasta el cobro".
+  - M17 (en meses registrados el libre resta el ahorro real, aviso "Objetivo de ahorro no registrado") y M18 (cobros anteriores de un gasto nuevo: pagados, saltados o pendientes).
 - **F1b: hecho.**
   - Cliente Gemini con cabecera, esquema, thinking por modelo, respaldo y plazo de 10 s.
   - Normalizador común con el parser local, que se reescribe (NFD, día antes que importe, frecuencias y meses).
@@ -276,7 +281,17 @@ Estado:
   - Sin sueldo configurado: CTA "Configura tu día de cobro" → `PlanSettingsSheet`.
 - **Tests:** store vacío; sin sueldo; cerrar → deshacer; caducidad; merge de `monthClosures`.
 
-### F1a-3 — Cierre con restos, timeline y Plan
+### F1a-3 — Cierre con restos, timeline y Plan (hecho)
+- **Cómo quedó:**
+  - La tarjeta de cierre con restos sale el día de cobro si cae en los últimos 10 días del mes (quien cobra a primeros financia ese mes) o, sin sueldo configurado, en los 3 últimos días (`shouldSuggestCloseWithLeftovers`). Comparte el "Ahora no" por mes con la de "al día".
+  - La hoja muestra los cuatro pasos a la vez. Cada resto se guarda al momento (Pagado = `togglePaidInStore`, Saltar = `skipOccurrenceInStore`, Mover = al día 1 del mes siguiente) y se deshace en su fila; "Pagar todo" usa `markOccurrencesPaidInStore`. La lista y el mes se fijan al abrir: si pasa la medianoche con la hoja abierta no se cierra el mes nuevo.
+  - Fila propia (`MonthCloseLeftoverRow`) con botones con texto en lugar de `MonthlyExpenseRow`: sus cuatro iconos no caben a 360 px dentro de la hoja.
+  - El día de cobro se acota al último día del mes (un 31 cae el 30 en noviembre) también en `shouldSuggestAdvance`.
+  - "Ya pagado de noviembre" incluye todo lo pagado del mes siguiente, no solo su primera semana.
+  - "Hasta el cobro" cuenta lo pendiente que se carga antes del próximo sueldo (el día de cobro ya cuenta como cobrado), atrasos incluidos, solo en el mes activo y con sueldo configurado.
+  - En Plan la base (sueldo, día de cobro, objetivo) se sigue guardando desde el mes activo; el ahorro real y los ingresos extra van al mes visto.
+  - M18 pregunta también en la revisión de varios gastos y, por defecto, da los cobros anteriores por pagados (fechados el día de su cargo). El cobro de este mes que ya pasó se pregunta aunque el gasto empezara meses atrás.
+  - El foco inicial del timeline no se mueve al cambiar de mes, para no desplazar la barra de mes bajo el dedo.
 - `MonthCloseSheet`, cuando quedan restos tras el cobro:
   1. Resumen frente al plan.
   2. Restos con Pagado/Saltar/Mover (reutiliza `MonthlyExpenseRow`).
@@ -460,6 +475,7 @@ Estado:
   - Tests de preservación de campos, dinero es/en, fechas inválidas, merge con ids deterministas y rekey 5→10→5, y sync dirty/CAS.
   - Migración en un proyecto Supabase de prueba, más el fallback PGRST202.
 - **F1a:** tests de dominio y e2e con `page.clock`. Flujo: pagar el último de octubre → tarjeta → "Pasar a noviembre" → deshacer → los totales cuadran entre pestañas → recargar mantiene el mes → caducidad.
+- **F1a-3:** `tests/e2e/month-close-leftovers.spec.ts` con el reloj el 28-oct a las 10:00 y el 1-nov a las 00:05: cerrar con restos (pagar, mover, ahorro, empezar), resto sin resolver como "Pendiente de octubre", Plan siguiendo al mes visto, pagar desde Revisión, año siguiente en diciembre y cobros anteriores de un gasto nuevo.
 - **F1b:** tests de la ruta; `scripts/eval-ai-parse.mjs` con los umbrales indicados. En el navegador: "Netflix 12,99 el 5 y gimnasio 35 al mes" → 2 tarjetas → guardar.
 - **F2a:** en Chrome Android, dictar → texto en vivo → análisis → revisión. Probar también en modo avión, con el permiso denegado y en Brave. En iOS, el micrófono está oculto. Tests con `SpeechRecognition` mockeado.
 - **F2b:** push de prueba y deep link a la ocurrencia.
