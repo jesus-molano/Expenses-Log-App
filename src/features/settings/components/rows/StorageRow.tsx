@@ -15,7 +15,8 @@ function storageDescription(state: StoragePersistence | null, language: AppLangu
     state.persisted ? "backup.storagePersisted" : "backup.storageNotPersisted",
     language,
   );
-  return state.usage === null
+  // Un uso de 0 (la estimación aún no cuenta nada) no aporta nada.
+  return !state.usage
     ? status
     : `${status} ${formatMessage(
         "backup.storageUsage",

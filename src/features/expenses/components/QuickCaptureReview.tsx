@@ -8,6 +8,7 @@ import { formatCurrency, toDateOnly } from "@/domain/calendar";
 import { firstChargeAlreadyPassed } from "@/domain/recurrence";
 import { foldText } from "@/domain/text";
 import type { AppLanguage, CreateExpenseOptions } from "@/domain/types";
+import { categoryLabel } from "@/shared/category-labels";
 import { t } from "@/shared/i18n";
 import type { ReviewItem } from "../hooks/use-expense-capture-flow";
 import { inferredFieldsLabel, type CaptureReason } from "../lib/capture-labels";
@@ -114,7 +115,7 @@ export function QuickCaptureReview({
                       {[
                         localizedRecurrenceLabel(draft.recurrence, language),
                         t("expenses.captureDay", language).replace("{day}", String(draft.dueDay)),
-                        draft.categoryName,
+                        categoryLabel(draft.categoryName, language),
                       ].join(" · ")}
                     </span>
                   </label>
