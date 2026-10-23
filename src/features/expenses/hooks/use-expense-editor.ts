@@ -1,8 +1,6 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-import { resolvePresetCategory } from "@/domain/categories";
 import type {
   AppLanguage,
   DraftExpense,
@@ -11,10 +9,16 @@ import type {
 import {
   findOrCreateCategory,
 } from "@/features/expenses/lib/expense-actions";
+import {
+  expenseEditorValues,
+  hasUnsavedExpenseChanges,
+  normalizeEditorDraft,
+} from "@/features/expenses/lib/expense-editor";
 import { t } from "@/shared/i18n";
-import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
+import { parseMoneyInput } from "@/shared/money";
 import { updateExpenseTemplateInStore } from "@/stores/app/store-commands";
 import type { useExpenseStore } from "@/stores/app/use-expense-store";
+import { useLeaveGuard } from "./use-leave-guard";
 
 type UseExpenseEditorOptions = {
   template: ExpenseTemplate;
@@ -27,24 +31,24 @@ export function useExpenseEditor({
   expenseStore,
   language,
 }: UseExpenseEditorOptions) {
-  const router = useRouter();
   const { store, persist, deleteExpense } = expenseStore;
-  const category = store.categories.find((item) => item.id === template.categoryId);
-  const [amountText, setAmountText] = useState(() =>
-    formatMoneyInput(template.amount, language),
+  // Valores al abrir: los cambios sin guardar se miden contra ellos.
+  const [initialValues] = useState(() =>
+    expenseEditorValues(
+      template,
+      store.categories.find((item) => item.id === template.categoryId)?.name,
+      language,
+    ),
   );
+  const [amountText, setAmountText] = useState(initialValues.amountText);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [form, setForm] = useState<DraftExpense>(() => ({
-    name: template.name,
-    description: template.description,
-    amount: template.amount,
-    categoryName: resolvePresetCategory(category?.name ?? "General").name,
-    startDate: template.startDate,
-    dueDay: template.dueDay,
-    endDate: template.endDate,
-    recurrence: template.recurrence,
-    reminder: template.reminder,
-  }));
+  const [form, setForm] = useState<DraftExpense>(initialValues.form);
+  const dirty = hasUnsavedExpenseChanges(
+    initialValues,
+    { form, amountText },
+    template.startDate,
+  );
+  const leaveGuard = useLeaveGuard(dirty);
 
   const previewAmount = parseMoneyInput(amountText) ?? 0;
 
@@ -55,28 +59,29 @@ export function useExpenseEditor({
     // El campo valida antes de enviar; esto solo protege de un importe vacío.
     if (amount === null || amount <= 0) return;
     const categoryResult = findOrCreateCategory(store, form.categoryName);
+    const draft = normalizeEditorDraft(form, template.startDate);
 
     persist(
       updateExpenseTemplateInStore(categoryResult.store, template.id, {
-        name: form.name.trim() || t("expenses.newExpense", language),
-        description: form.description.trim(),
+        name: draft.name || t("expenses.newExpense", language),
+        description: draft.description,
         amount,
         categoryId: categoryResult.categoryId,
-        startDate: form.startDate || template.startDate,
-        dueDay: Math.min(Math.max(Number(form.dueDay), 1), 31),
-        endDate: form.endDate || undefined,
-        recurrence: form.recurrence,
-        reminder: form.reminder,
+        startDate: draft.startDate,
+        dueDay: draft.dueDay,
+        endDate: draft.endDate,
+        recurrence: draft.recurrence,
+        reminder: draft.reminder,
       }),
     );
     // replace: volver atrás desde el listado no debe reabrir el editor.
-    router.replace("/");
+    leaveGuard.leaveToList();
   }
 
-  async function removeExpense() {
-    await deleteExpense(template.id);
+  function removeExpense() {
     setDeleteOpen(false);
-    router.replace("/");
+    // Se borra al salir: la nube se sincroniza sin esperar en esta pantalla.
+    leaveGuard.leaveToList(() => void deleteExpense(template.id));
   }
 
   return {
@@ -84,10 +89,14 @@ export function useExpenseEditor({
     amountText,
     previewAmount,
     deleteOpen,
+    discardPromptOpen: leaveGuard.discardPromptOpen,
     setForm,
     setAmountText,
     setDeleteOpen,
     saveExpense,
     removeExpense,
+    requestLeave: leaveGuard.requestLeave,
+    discardChanges: leaveGuard.discardChanges,
+    keepEditing: leaveGuard.keepEditing,
   };
 }

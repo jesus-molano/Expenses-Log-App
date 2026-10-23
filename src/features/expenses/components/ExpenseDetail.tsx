@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { formatCurrency } from "@/domain/calendar";
 import type {
   AppLanguage,
@@ -14,6 +13,7 @@ import { localizedRecurrenceLabel } from "@/features/expenses/lib/recurrence-lab
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { t } from "@/shared/i18n";
 import { ExpenseForm } from "@/features/expenses/components/ExpenseForm";
+import { ExpenseDetailDialogs } from "@/features/expenses/components/ExpenseDetailDialogs";
 
 export function ExpenseDetail({ id }: { id: string }) {
   const expenseStore = useExpenseStore();
@@ -74,8 +74,16 @@ function ExpenseDetailForm({
   return (
     <main className="app-page app-page-safe min-h-dvh px-4">
       <div className="mx-auto max-w-2xl">
+        {/* Vuelve atrás en el historial (a la lista); con cambios sin guardar,
+            pregunta antes. */}
         <Link
           href="/"
+          onClick={(event) => {
+            // Con Ctrl/Cmd/Mayús, el navegador abre la lista en otra pestaña.
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            editor.requestLeave();
+          }}
           className="app-button app-button-secondary app-button-sm inline-flex"
         >
           <ArrowLeft size={18} />
@@ -126,17 +134,16 @@ function ExpenseDetailForm({
         </form>
       </div>
 
-      {editor.deleteOpen ? (
-        <ConfirmActionDialog
-          icon={<Trash2 size={18} />}
-          title={t("expenses.delete", language)}
-          body={`${t("expenses.deleteConfirm", language)} ${template.name}`}
-          cancelLabel={t("common.back", language)}
-          confirmLabel={t("expenses.delete", language)}
-          onCancel={() => editor.setDeleteOpen(false)}
-          onConfirm={editor.removeExpense}
-        />
-      ) : null}
+      <ExpenseDetailDialogs
+        expenseName={template.name}
+        language={language}
+        deleteOpen={editor.deleteOpen}
+        discardOpen={editor.discardPromptOpen}
+        onCancelDelete={() => editor.setDeleteOpen(false)}
+        onConfirmDelete={editor.removeExpense}
+        onKeepEditing={editor.keepEditing}
+        onDiscardChanges={editor.discardChanges}
+      />
     </main>
   );
 }

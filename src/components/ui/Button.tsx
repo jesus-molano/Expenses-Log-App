@@ -1,6 +1,8 @@
 ﻿import { cn } from "@/shared/ui";
 
-type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+// Incluye `ref` (React 19 lo pasa como prop): el diálogo de confirmación enfoca
+// Cancelar al abrir.
+type ButtonProps = React.ComponentProps<"button"> & {
   variant?: "primary" | "secondary" | "danger" | "ghost" | "soft";
   size?: "sm" | "md" | "lg" | "icon" | "fab";
   leadingIcon?: React.ReactNode;

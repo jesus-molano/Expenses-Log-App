@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { cn } from "@/shared/ui";
-import { useBodyScrollLock } from "./use-body-scroll-lock";
+import { useDialogA11y } from "./use-dialog-a11y";
 import { useHistoryLayer } from "./use-history-layer";
 
 type SheetProps = {
@@ -14,28 +14,6 @@ type SheetProps = {
   onBackdropClick?: () => void;
 };
 
-const focusableSelector = [
-  "button:not(:disabled)",
-  "[href]",
-  "input:not(:disabled)",
-  "select:not(:disabled)",
-  "textarea:not(:disabled)",
-  "summary",
-  "[tabindex]:not([tabindex='-1'])",
-].join(",");
-
-function getFocusableElements(panel: HTMLElement): HTMLElement[] {
-  return Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector))
-    .filter((element) => {
-      const hidden = element.getAttribute("aria-hidden") === "true";
-      const closedDetails = element.closest("details:not([open])");
-      const hiddenByClosedDetails =
-        closedDetails !== null &&
-        element !== closedDetails.querySelector(":scope > summary");
-      return !hidden && !hiddenByClosedDetails && element.tabIndex >= 0;
-    });
-}
-
 export function Sheet({
   children,
   className,
@@ -45,77 +23,10 @@ export function Sheet({
   onBackdropClick,
 }: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  useBodyScrollLock(true);
+  useDialogA11y({ panelRef, onEscape: onBackdropClick });
 
   // Atrás cierra la hoja (solo si tiene forma de cerrarse).
   useHistoryLayer(Boolean(onBackdropClick), onBackdropClick);
-
-  useEffect(() => {
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    const panel = panelRef.current;
-    const focusFrame = window.requestAnimationFrame(() => {
-      const first = panel ? getFocusableElements(panel)[0] : null;
-      (first ?? panel)?.focus({ preventScroll: true });
-    });
-
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      if (previouslyFocused?.isConnected) {
-        previouslyFocused.focus({ preventScroll: true });
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onBackdropClick?.();
-        return;
-      }
-
-      if (event.key !== "Tab") return;
-
-      const panel = panelRef.current;
-      if (!panel) return;
-
-      const focusableElements = getFocusableElements(panel);
-      if (!focusableElements.length) {
-        event.preventDefault();
-        panel.focus({ preventScroll: true });
-        return;
-      }
-
-      const first = focusableElements[0];
-      const last = focusableElements.at(-1);
-      const active = document.activeElement;
-
-      if (!panel.contains(active)) {
-        event.preventDefault();
-        first?.focus({ preventScroll: true });
-        return;
-      }
-
-      if (event.shiftKey && active === first) {
-        event.preventDefault();
-        last?.focus({ preventScroll: true });
-        return;
-      }
-
-      if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first?.focus({ preventScroll: true });
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onBackdropClick]);
 
   return (
     <div

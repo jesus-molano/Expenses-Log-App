@@ -54,7 +54,15 @@ Estado:
   - Errores y sin conexión con pista para usar el micrófono del teclado; en iOS/Safari solo la pista.
   - Atajos del manifest "Añadir gasto" y "Añadir por voz" (`/expenses/new?mode=voice`).
   - Atrás cierra la hoja abierta (`src/components/ui/sheet-history.ts`).
-  - Pendiente de F2a: `OccurrenceActionSheet`, `ConfirmActionDialog` con `useDialogA11y` y M22.
+  - Pendiente de F2a: `OccurrenceActionSheet` (va en su propio PR).
+- **F2a (diálogos y M22): hecho.**
+  - `useDialogA11y` (`src/components/ui/use-dialog-a11y.ts`), extraído de `Sheet`: foco inicial, Tab atrapado, foco devuelto al cerrar, Escape y bloqueo del scroll. Solo la capa de encima atiende el teclado (una confirmación sobre una hoja no cierra también la hoja).
+  - `ConfirmActionDialog` (M21): centrado también en móvil, `alertdialog` con título y descripción, portal sobre `body`, foco en Cancelar, y Escape, Atrás o tocar fuera cancelan (nunca con la acción en curso). Tono `danger` con `app-button-danger`.
+  - Todas las confirmaciones dicen "Cancelar" en lugar de "Volver", y borrar un gasto nombra el gasto en el título. Quitar un ingreso puntual (antes, un toque sin confirmación ni deshacer) también pregunta.
+  - M22: el detalle cuenta los cambios sin guardar (`features/expenses/lib/expense-editor.ts`). Con cambios, Atrás y el control "Gastos" preguntan "¿Descartar los cambios en «Game Pass»?"; guardar, borrar o descartar salen sin preguntar. El control "Gastos" vuelve atrás en el historial en lugar de apilar otra vez la lista.
+  - Salir justo después de cerrar un diálogo espera a que las capas quiten su entrada del historial (`afterLayerHistorySettles`); si no, esa vuelta atrás desharía la navegación.
+  - Diferido: los selectores de fecha y de día de cobro siguen sin `useDialogA11y` (Escape con un selector abierto dentro de una hoja cierra la hoja, y el foco no queda atrapado en el selector). Se dejó fuera para no cambiar su comportamiento en este PR.
+  - Diferido: al borrar, durante un instante se ve "Gasto no encontrado" antes de llegar a la lista, como antes de este PR.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 

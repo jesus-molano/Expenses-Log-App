@@ -25,6 +25,7 @@ import { useMonthlySalaryEditor } from "../hooks/use-monthly-salary-editor";
 import { useCompactChart } from "../hooks/use-compact-chart";
 import { useOneOffIncomeForm } from "../hooks/use-one-off-income-form";
 import { usePlanSettingsForm } from "../hooks/use-plan-settings-form";
+import { useIncomeRemovalConfirmation } from "../hooks/use-income-removal-confirmation";
 import { useSkipOccurrenceConfirmation } from "../hooks/use-skip-occurrence-confirmation";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 import {
@@ -39,6 +40,7 @@ import { MonthlyReviewSection } from "./MonthlyReviewSection";
 import { MonthlySalaryDialog } from "./MonthlySalaryDialog";
 import { OneOffIncomePanel } from "./OneOffIncomePanel";
 import { PlanSettingsSheet } from "./PlanSettingsSheet";
+import { RemoveIncomeDialog } from "./RemoveIncomeDialog";
 import { SkipOccurrenceDialog } from "./SkipOccurrenceDialog";
 
 export function MoneyDashboard() {
@@ -201,6 +203,10 @@ export function MoneyDashboard() {
     onAddIncome: addIncomeEvent,
   });
   const skipDialog = useSkipOccurrenceConfirmation(skipOccurrence);
+  const incomeRemoval = useIncomeRemovalConfirmation(
+    store.finance.incomeEvents,
+    deleteIncomeEvent,
+  );
   const salaryEditor = useMonthlySalaryEditor({
     finance: store.finance,
     language,
@@ -311,7 +317,7 @@ export function MoneyDashboard() {
           }}
           onEditSalary={salaryEditor.openEditor}
           onEditSavings={() => openSavings(selectedSummary.id)}
-          onDeleteIncomeEvent={deleteIncomeEvent}
+          onDeleteIncomeEvent={incomeRemoval.requestRemoval}
           onUpdateIncomeEvent={updateIncomeEvent}
           onToggleExpanded={() => setExpandedReview((value) => !value)}
           onSkipOccurrence={skipDialog.requestSkipOccurrence}
@@ -349,7 +355,7 @@ export function MoneyDashboard() {
                 onExtraNameChange={oneOffIncome.setExtraName}
                 onExtraAmountChange={oneOffIncome.setExtraAmount}
                 onSubmit={oneOffIncome.saveExtra}
-                onDeleteIncomeEvent={deleteIncomeEvent}
+                onDeleteIncomeEvent={incomeRemoval.requestRemoval}
                 onUpdateIncomeEvent={updateIncomeEvent}
               />
             </div>
@@ -409,6 +415,13 @@ export function MoneyDashboard() {
         language={language}
         onCancel={skipDialog.cancelSkipOccurrence}
         onConfirm={skipDialog.confirmSkipOccurrence}
+      />
+
+      <RemoveIncomeDialog
+        incomeEvent={incomeRemoval.incomeToRemove}
+        language={language}
+        onCancel={incomeRemoval.cancelRemoval}
+        onConfirm={incomeRemoval.confirmRemoval}
       />
     </DashboardShell>
   );
