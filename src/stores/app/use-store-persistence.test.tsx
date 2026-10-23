@@ -1,9 +1,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { User } from "@supabase/supabase-js";
+import { AuthRetryableFetchError, type User } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppSupabaseClient } from "@/data/supabase/database.types";
 import { saveExpenseStore } from "@/data/persistence/local-store";
 import { loadCloudStore, saveCloudStore } from "@/data/persistence/cloud-store";
+import { readSyncMeta, writeSyncMeta } from "@/data/persistence/sync-meta-store";
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore } from "@/domain/types";
 import { createClient } from "@/utils/supabase/client";
@@ -43,6 +44,23 @@ function storeWithTemplate(id: string): ExpenseStore {
       },
     ],
   };
+}
+
+function signedInClient(user: User) {
+  return {
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }),
+      onAuthStateChange: vi.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      }),
+    },
+  } as unknown as AppSupabaseClient;
+}
+
+const stableOnHydrate = vi.fn();
+
+function templateIds(store: ExpenseStore) {
+  return store.templates.map((item) => item.id);
 }
 
 function deferred<T>() {
@@ -117,7 +135,7 @@ describe("useStorePersistence", () => {
     expect(result.current.syncStatus).toBe("local");
   });
 
-  it("does not rehydrate stale initial state over local edits made while cloud loads", async () => {
+  it("hydrates cloud data merged with local edits made while cloud loads", async () => {
     const initialStore = storeWithTemplate("initial");
     const latestStore = storeWithTemplate("latest");
     const cloudStore = storeWithTemplate("cloud");
@@ -160,13 +178,16 @@ describe("useStorePersistence", () => {
 
     await waitFor(() => expect(saveCloudStore).toHaveBeenCalled());
 
-    expect(onHydrate).toHaveBeenCalledTimes(1);
-    expect(onHydrate).toHaveBeenCalledWith(
+    expect(onHydrate).toHaveBeenCalledTimes(2);
+    expect(onHydrate).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
         schemaVersion: 3,
         templates: [expect.objectContaining({ id: "initial" })],
       }),
     );
+    expect(onHydrate.mock.calls[1][0].templates.map((item: { id: string }) => item.id))
+      .toEqual(["cloud", "latest"]);
     expect(onPersist.mock.calls[0][0].templates.map((item: { id: string }) => item.id))
       .toEqual(["latest"]);
     expect(vi.mocked(saveCloudStore).mock.calls[0][2].templates.map((item) => item.id))
@@ -236,5 +257,178 @@ describe("useStorePersistence", () => {
     );
 
     expect(saveCloudStore).not.toHaveBeenCalled();
+  });
+  it("merges changes left unsynced by a previous session of the same account", async () => {
+    const user = { id: "00000000-0000-4000-8000-000000000003" } as User;
+    saveExpenseStore(storeWithTemplate("paid-offline"));
+    writeSyncMeta({ ownerId: user.id, dirty: true });
+    vi.mocked(createClient).mockReturnValue(signedInClient(user));
+    vi.mocked(loadCloudStore).mockResolvedValue({
+      store: storeWithTemplate("cloud"),
+      mode: "table",
+    });
+    vi.mocked(saveCloudStore).mockResolvedValue({ mode: "table" });
+    const onHydrate = vi.fn();
+
+    const { result } = renderHook(() => useStorePersistence({ onHydrate }));
+
+    await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+    expect(templateIds(vi.mocked(saveCloudStore).mock.calls[0][2]))
+      .toEqual(["cloud", "paid-offline"]);
+    expect(templateIds(onHydrate.mock.lastCall?.[0])).toEqual([
+      "cloud",
+      "paid-offline",
+    ]);
+    expect(readSyncMeta()).toMatchObject({ ownerId: user.id, dirty: false });
+  });
+
+  it("does not merge unsynced changes that belong to another account", async () => {
+    const user = { id: "00000000-0000-4000-8000-000000000004" } as User;
+    saveExpenseStore(storeWithTemplate("someone-else"));
+    writeSyncMeta({ ownerId: "00000000-0000-4000-8000-000000000099", dirty: true });
+    vi.mocked(createClient).mockReturnValue(signedInClient(user));
+    vi.mocked(loadCloudStore).mockResolvedValue({
+      store: storeWithTemplate("cloud"),
+      mode: "table",
+    });
+    const onHydrate = vi.fn();
+
+    const { result } = renderHook(() => useStorePersistence({ onHydrate }));
+
+    await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+    expect(saveCloudStore).not.toHaveBeenCalled();
+    expect(templateIds(onHydrate.mock.lastCall?.[0])).toEqual(["cloud"]);
+    expect(readSyncMeta()).toMatchObject({ ownerId: user.id, dirty: false });
+  });
+
+  it("after a failed save, merges with the cloud again instead of replaying the old copy", async () => {
+    const user = { id: "00000000-0000-4000-8000-000000000005" } as User;
+    vi.mocked(createClient).mockReturnValue(signedInClient(user));
+    vi.mocked(loadCloudStore).mockResolvedValue({
+      store: storeWithTemplate("cloud"),
+      mode: "table",
+    });
+    const onHydrate = vi.fn();
+    const { result } = renderHook(() => useStorePersistence({ onHydrate }));
+    await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+    vi.mocked(saveCloudStore).mockRejectedValue(new TypeError("Failed to fetch"));
+    act(() => {
+      result.current.persist(storeWithTemplate("paid"), vi.fn());
+    });
+    expect(readSyncMeta()).toMatchObject({ ownerId: user.id, dirty: true });
+
+    // Al ocultar la app se sube sin esperar al debounce.
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+    await waitFor(() => expect(result.current.syncStatus).toBe("pending"));
+    expect(saveCloudStore).toHaveBeenCalledTimes(1);
+    expect(readSyncMeta().dirty).toBe(true);
+
+    // Mientras tanto otro dispositivo añadió algo a la nube.
+    vi.mocked(loadCloudStore).mockResolvedValue({
+      store: {
+        ...storeWithTemplate("cloud"),
+        templates: [
+          ...storeWithTemplate("cloud").templates,
+          ...storeWithTemplate("laptop").templates,
+        ],
+      },
+      mode: "table",
+    });
+    vi.mocked(saveCloudStore).mockResolvedValue({ mode: "table" });
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+    expect(loadCloudStore).toHaveBeenCalledTimes(2);
+    expect(templateIds(vi.mocked(saveCloudStore).mock.lastCall![2])).toEqual([
+      "cloud",
+      "laptop",
+      "paid",
+    ]);
+    expect(readSyncMeta()).toMatchObject({ ownerId: user.id, dirty: false });
+  });
+
+  it("keeps changes pending when the cloud answers without the table", async () => {
+    const user = { id: "00000000-0000-4000-8000-000000000006" } as User;
+    saveExpenseStore(storeWithTemplate("offline-edit"));
+    writeSyncMeta({ ownerId: user.id, dirty: true });
+    vi.mocked(createClient).mockReturnValue(signedInClient(user));
+    vi.mocked(loadCloudStore).mockResolvedValue({ store: null, mode: "unavailable" });
+    vi.mocked(saveCloudStore).mockResolvedValue({ mode: "unavailable" });
+
+    const { result } = renderHook(() =>
+      useStorePersistence({ onHydrate: stableOnHydrate }),
+    );
+
+    await waitFor(() => expect(saveCloudStore).toHaveBeenCalled());
+    await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+    expect(readSyncMeta().dirty).toBe(true);
+  });
+
+  it("never uploads another account's local data into a new account", async () => {
+    const user = { id: "00000000-0000-4000-8000-000000000007" } as User;
+    saveExpenseStore(storeWithTemplate("previous-account"));
+    writeSyncMeta({ ownerId: "00000000-0000-4000-8000-000000000098", dirty: true });
+    vi.mocked(createClient).mockReturnValue(signedInClient(user));
+    vi.mocked(loadCloudStore).mockResolvedValue({ store: null, mode: "table" });
+    const onHydrate = vi.fn();
+
+    const { result } = renderHook(() => useStorePersistence({ onHydrate }));
+
+    await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+    expect(saveCloudStore).not.toHaveBeenCalled();
+    expect(templateIds(onHydrate.mock.lastCall?.[0])).toEqual([]);
+    expect(readSyncMeta()).toMatchObject({ ownerId: user.id, dirty: false });
+  });
+
+  it("does not sign out when the initial session is empty because there is no network", async () => {
+    const user = { id: "00000000-0000-4000-8000-000000000008" } as User;
+    let authHandler: ((event: string, session: { user: User } | null) => void) | null =
+      null;
+    const getUser = vi.fn().mockResolvedValue({
+      data: { user: null },
+      error: new AuthRetryableFetchError("Failed to fetch", 0),
+    });
+    vi.mocked(createClient).mockReturnValue({
+      auth: {
+        getUser,
+        onAuthStateChange: vi.fn().mockImplementation((handler) => {
+          authHandler = handler;
+          return { data: { subscription: { unsubscribe: vi.fn() } } };
+        }),
+      },
+    } as unknown as AppSupabaseClient);
+
+    const { result } = renderHook(() =>
+      useStorePersistence({ onHydrate: stableOnHydrate }),
+    );
+    await waitFor(() => expect(result.current.isHydrated).toBe(true));
+    act(() => authHandler?.("INITIAL_SESSION", null));
+    act(() => {
+      result.current.persist(storeWithTemplate("offline-edit"), vi.fn());
+    });
+
+    // Sin cuenta conocida, el cambio queda pendiente para la primera que entre.
+    expect(readSyncMeta()).toMatchObject({ ownerId: null, dirty: true });
+
+    getUser.mockResolvedValue({ data: { user }, error: null });
+    vi.mocked(loadCloudStore).mockResolvedValue({
+      store: storeWithTemplate("cloud"),
+      mode: "table",
+    });
+    vi.mocked(saveCloudStore).mockResolvedValue({ mode: "table" });
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    await waitFor(() => expect(saveCloudStore).toHaveBeenCalled());
+    expect(templateIds(vi.mocked(saveCloudStore).mock.lastCall![2])).toEqual([
+      "cloud",
+      "offline-edit",
+    ]);
   });
 });

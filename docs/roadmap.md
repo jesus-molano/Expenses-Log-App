@@ -34,6 +34,10 @@ Estado:
   - `/settings` estática y limpieza de cachés obsoletas.
   - `verify-sw.mjs` y harness `npm run e2e:offline`.
   - El harness reproduce el cuelgue con una red que acepta conexiones y no responde (el caso de los datos móviles sin cobertura real): falla antes de 1b y pasa con 1b.
+- **F0b-1, F0b-2 y F0b-3: hechos.**
+  - Parser de importes y fechas imposibles (F0b-1).
+  - Overrides con id determinista, upsert y rekey (F0b-2).
+  - Sync duradero (F0b-3): cambios pendientes persistidos, fusión al hidratar, reintentos, flush al salir y tombstones de sueldo por versión.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
@@ -192,7 +196,7 @@ Estado:
 - Metadatos `expense-log-sync-v1` = {ownerId, dirty, revision}. Si el local está sucio, `resolveHydratedStore` fusiona con `mergeExpenseStores` y guarda.
 - Retry con backoff, reintento en `online` y flush en `visibilitychange:hidden`/`pagehide`.
 - Estado "pendiente de sincronizar" visible.
-- Tombstones de sueldo (`deleted.monthlySalary: Record<monthId, deletedAt>`): sin ellos el merge resucita datos.
+- Tombstones de sueldo: sin ellos el merge resucita datos. Implementados como lista de versiones borradas (`deleted.monthlySalary: string[]` con `<mes>@<updatedAt>`), que los builds con passthrough fusionan por unión.
 - Revertir es seguro: los builds anteriores ignoran los metadatos.
 
 ### F0c-1 — Seguridad (sin migración)

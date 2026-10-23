@@ -52,7 +52,15 @@ Al guardar:
 2. Se incrementa la revision local.
 3. Se escribe localStorage.
 4. Se emite `expense-store-updated`.
-5. Se encola guardado cloud si hay Supabase, usuario e hidratacion completa.
+5. Se marca el dispositivo con cambios sin subir (`expense-log-sync-v1`).
+6. Se encola guardado cloud si hay Supabase, usuario e hidratacion completa.
+
+`expense-log-sync-v1` guarda `{ownerId, dirty, updatedAt}` fuera del store
+(`src/data/persistence/sync-meta-store.ts`). `ownerId` es la cuenta a la que
+pertenecen los datos locales: la del usuario actual o, sin sesion (por ejemplo
+sin red), la ultima sincronizada. `dirty` vuelve a `false` solo cuando la tabla
+confirma una version que incluye la ultima edicion local (un guardado en modo
+"sin nube" no cuenta).
 
 Si localStorage falla, la app intenta seguir viva y emite igualmente el evento
 de actualizacion.
@@ -63,12 +71,25 @@ La sync cloud usa Supabase `app_stores` con un JSONB completo del store por
 usuario. Al hidratar con sesion:
 
 1. Se carga el store local inicial.
-2. Se pide el usuario con `supabase.auth.getUser()`.
+2. Se pide el usuario con `supabase.auth.getUser()`. Un fallo de red
+   (`AuthRetryableFetchError`) no se trata como cierre de sesion, tampoco la
+   sesion inicial vacia que auth-js emite sin red (`INITIAL_SESSION` sin
+   sesion se comprueba con `getUser`).
 3. Se carga el store cloud desde `app_stores`.
-4. Se mezcla local y cloud.
+4. Gana la nube, salvo que haya cambios locales sin subir de esa misma cuenta o
+   ediciones hechas mientras cargaba: entonces se fusionan local y cloud.
 5. Se asigna `userId` real a entidades sincronizables.
-6. Se guarda local.
-7. Se persiste el resultado en cloud.
+6. Se guarda local y se hidrata React con el resultado.
+7. Si hubo fusion (o la cuenta no tenia store cloud), se sube el resultado.
+
+Los datos de otra cuenta (`ownerId` distinto) no se fusionan ni se suben nunca:
+al entrar con otra cuenta gana su nube y, si no tiene, se empieza vacio. Los
+cambios sin cuenta (uso sin sesion, o sin red antes de resolverla) se fusionan
+con la primera cuenta que entra.
+
+Solo la tabla inexistente (`PGRST205`, `42P01`) cuenta como "sin nube". Un
+fallo temporal de PostgREST o de permisos es un error a reintentar. Las
+peticiones a `app_stores` se cortan a los 20 s.
 
 Si la tabla `app_stores` no existe o no esta disponible, la app degrada a modo
 local sin romper la experiencia.
@@ -81,11 +102,16 @@ La mezcla actual usa ids:
 - Entidades locales como entrada con prioridad final.
 - Tombstones combinados para filtrar elementos borrados.
 - Mapas mensuales de salario y ahorro: cloud + local, con local al final.
+- Sueldos borrados: `deleted.monthlySalary` guarda la hora del borrado
+  (`*@<hora>` para todos los meses o `<mes>@<hora>`, ver
+  `salaryClearedTombstone`). Al fusionar desaparece cualquier sueldo editado
+  hasta esa hora, tambien copias antiguas de otro dispositivo; uno editado
+  despues se conserva.
 - Preferencias: local, luego cloud, luego defaults.
 
-La politica de hidratacion protege cambios hechos por el usuario mientras
-llegaba el cloud store: si la revision local cambio, se usa el store local mas
-reciente y no se pisa el estado React con datos antiguos.
+La politica de hidratacion (`resolveHydratedStore`) protege los cambios hechos
+mientras llegaba el cloud store y los que quedaron sin subir en una sesion
+anterior: en ambos casos se fusiona el store local mas reciente con la nube.
 
 ## Compatibilidad hacia delante
 
@@ -109,15 +135,36 @@ Reglas para campos nuevos:
   desplegado y abierto en todos los dispositivos.
 - Revertir un despliegue que añade campos solo es seguro hacia un build que ya
   tenga passthrough.
+- Excepcion: tombstones como `deleted.monthlySalary` se escriben ya. Si un build
+  antiguo los descarta, se vuelve al comportamiento anterior (el dato borrado
+  puede reaparecer al fusionar), nunca a perder datos.
 
 ## Cola de guardado
 
-Los cambios normales se guardan localmente y se encolan para cloud. Operaciones
-mas sensibles, como borrar gastos o limpiar gastos, usan persistencia inmediata
+Los cambios normales se guardan localmente y se encolan para cloud
+(`src/stores/app/cloud-save-queue.ts`, debounce de 350 ms). Operaciones mas
+sensibles, como borrar gastos o limpiar gastos, usan persistencia inmediata
 para reducir ventanas de inconsistencia.
 
-El estado de sync comunica preparando cloud, guardando, guardado, local o error.
-Los mensajes se traducen con `src/shared/i18n`.
+La cola:
+
+- Sube siempre la ultima version y nunca dos a la vez, para que una respuesta
+  lenta no pise otra mas nueva.
+- Si falla, no repite la misma copia: la nube puede haber cambiado. Marca la
+  nube como no lista y vuelve a sincronizar (cargar, fusionar con los cambios
+  pendientes y subir) a los 2, 5, 15, 30 y 60 s, y de inmediato al recuperar la
+  red (`online`) o volver a la app.
+- `persistImmediately` (borrar o vaciar) espera a que su version llegue a la
+  nube o falle, aunque haya otro guardado en curso.
+- Al ocultar o cerrar la app (`visibilitychange:hidden`, `pagehide`) sube ya lo
+  que esperaba al debounce.
+- Descarta lo encolado sin sesion o mientras la nube recarga: los cambios siguen
+  marcados como pendientes y la siguiente sincronizacion los fusiona.
+
+El estado de sync comunica preparando cloud, guardando, guardado, pendiente de
+subir, local o error. "Pendiente" solo se muestra para fallos temporales (sin
+red, cortes, servidor reiniciando) con cambios sin subir; el resto se muestra
+como error. Los mensajes se traducen con `src/shared/i18n`.
 
 ## Reglas actuales y limites
 

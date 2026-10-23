@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { emptyStore } from "@/domain/seed";
 import type {
   ExpenseOccurrenceRecord,
   ExpenseStore,
   ExpenseTemplate,
 } from "@/domain/types";
+import { clearIncomeFromStore } from "@/stores/app/finance-commands";
 import {
   clearExpenseLocalData,
   loadExpenseStore,
@@ -136,6 +137,58 @@ describe("mergeExpenseStores", () => {
 
     expect(readded.finance.monthlySavingsContributions?.["2026-06"])
       .toMatchObject({ id: replacement.id, amount: 450 });
+  });
+
+  it("does not bring back salaries cleared offline, older copies included", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-15T00:00:00.000Z"));
+    const salary = (amount: number, updatedAt: string) => ({
+      amount,
+      dayOfMonth: 28,
+      updatedAt,
+    });
+    // La nube tiene el sueldo de junio de antes; este dispositivo lo cambió
+    // sin conexión y después borró los ingresos.
+    const cloud: ExpenseStore = {
+      ...emptyStore,
+      schemaVersion: 3,
+      finance: {
+        ...emptyStore.finance,
+        monthlySalary: {
+          "2026-06": salary(2000, "2026-06-01T00:00:00.000Z"),
+          "2026-07": salary(2000, "2026-06-01T00:00:00.000Z"),
+        },
+      },
+    };
+    const editedOffline = {
+      ...cloud,
+      finance: {
+        ...cloud.finance,
+        monthlySalary: {
+          ...cloud.finance.monthlySalary,
+          "2026-06": salary(2400, "2026-06-10T00:00:00.000Z"),
+        },
+      },
+    };
+    const clearedLocal = clearIncomeFromStore(editedOffline);
+    vi.useRealTimers();
+
+    expect(mergeExpenseStores(clearedLocal, cloud).finance.monthlySalary)
+      .toEqual({});
+    expect(clearedLocal.deleted?.monthlySalary).toEqual([
+      "*@2026-06-15T00:00:00.000Z",
+    ]);
+
+    // Un sueldo puesto después del borrado, en otro dispositivo, se queda.
+    const editedLater = salary(2300, "2026-06-20T00:00:00.000Z");
+    const merged = mergeExpenseStores(clearedLocal, {
+      ...cloud,
+      finance: {
+        ...cloud.finance,
+        monthlySalary: { ...cloud.finance.monthlySalary, "2026-07": editedLater },
+      },
+    });
+    expect(merged.finance.monthlySalary).toEqual({ "2026-07": editedLater });
   });
 
   it("keeps fields it does not know from both stores", () => {

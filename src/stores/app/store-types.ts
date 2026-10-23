@@ -1,4 +1,4 @@
-export type SyncStatus = "local" | "syncing" | "synced" | "error";
+export type SyncStatus = "local" | "syncing" | "synced" | "pending" | "error";
 
 export type MoneySettingsInput = {
   salaryAmount: number;

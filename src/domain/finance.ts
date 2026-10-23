@@ -81,6 +81,26 @@ export function getMonthlySalarySettings(
   return latestRecordValue(finance.monthlySalary, monthId, fallback);
 }
 
+// Tombstones de sueldo: "<mes>@<hora>" o "*@<hora>" (todos los meses). Al
+// fusionar desaparece cualquier sueldo de ese mes editado hasta esa hora, de
+// este dispositivo o de otro; uno editado después se conserva.
+export function salaryClearedTombstone(clearedAt: string, monthId = "*") {
+  return `${monthId}@${clearedAt}`;
+}
+
+export function isSalaryCleared(
+  tombstones: string[],
+  monthId: string,
+  updatedAt: string,
+) {
+  return tombstones.some((tombstone) => {
+    const at = tombstone.indexOf("@");
+    if (at < 0) return false;
+    const scope = tombstone.slice(0, at);
+    return (scope === "*" || scope === monthId) && updatedAt <= tombstone.slice(at + 1);
+  });
+}
+
 export function getMonthlySavingsTarget(
   finance: FinanceStore,
   monthDate: Date | string,

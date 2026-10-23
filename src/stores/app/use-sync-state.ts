@@ -29,6 +29,11 @@ export function useSyncState() {
     setSyncMessage(savedMessage(mode));
   }, []);
 
+  const markPending = useCallback(() => {
+    setSyncStatus("pending");
+    setSyncMessage(t("settings.pendingSync"));
+  }, []);
+
   const markError = useCallback((error: unknown, fallbackKey: TranslationKey) => {
     setSyncStatus("error");
     setSyncMessage(errorMessage(error, fallbackKey));
@@ -41,6 +46,7 @@ export function useSyncState() {
     markSyncing,
     markSynced,
     markSaved,
+    markPending,
     markError,
   };
 }

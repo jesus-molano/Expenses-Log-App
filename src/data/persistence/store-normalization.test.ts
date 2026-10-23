@@ -397,7 +397,7 @@ describe("normalizeExpenseStore", () => {
       },
       deleted: {
         templates: ["tpl-old"],
-        monthlySalary: { "2026-09": "2026-10-01T00:00:00.000Z" },
+        monthClosures: { "2026-09": "2026-10-01T00:00:00.000Z" },
       },
       preferences: {
         theme: "nord",
@@ -415,7 +415,7 @@ describe("normalizeExpenseStore", () => {
       },
       deleted: {
         templates: ["tpl-old"],
-        monthlySalary: { "2026-09": "2026-10-01T00:00:00.000Z" },
+        monthClosures: { "2026-09": "2026-10-01T00:00:00.000Z" },
       },
       preferences: { theme: "nord", defaultReminderDays: 3 },
     });
