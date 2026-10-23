@@ -57,7 +57,7 @@ const EXAMPLES = [
   {
     text: "Netflix 12,99 el 5",
     expenses: [
-      { name: "Netflix", amount: 12.99, categoryName: "Suscripciones", frequency: "monthly", interval: null, unit: null, dueDay: 5, annualMonth: null, startDate: null },
+      { name: "Netflix", amount: 12.99, categoryName: "Suscripciones", frequency: null, interval: null, unit: null, dueDay: 5, annualMonth: null, startDate: null },
     ],
   },
   {
@@ -76,8 +76,8 @@ const EXAMPLES = [
   {
     text: "Rent 900 on the 1st and Spotify 10.99",
     expenses: [
-      { name: "Rent", amount: 900, categoryName: "Casa", frequency: "monthly", interval: null, unit: null, dueDay: 1, annualMonth: null, startDate: null },
-      { name: "Spotify", amount: 10.99, categoryName: "Suscripciones", frequency: "monthly", interval: null, unit: null, dueDay: null, annualMonth: null, startDate: null },
+      { name: "Rent", amount: 900, categoryName: "Casa", frequency: null, interval: null, unit: null, dueDay: 1, annualMonth: null, startDate: null },
+      { name: "Spotify", amount: 10.99, categoryName: "Suscripciones", frequency: null, interval: null, unit: null, dueDay: null, annualMonth: null, startDate: null },
     ],
   },
 ];
@@ -104,9 +104,9 @@ export function buildCaptureSystemInstruction({
     "- Un objeto por cada gasto mencionado. Si no hay ningún gasto, devuelve expenses vacío.",
     "- name: corto, como lo diría el usuario, sin importe ni fechas.",
     "- amount: en euros. \"12,99\" y \"12.99\" son 12.99; \"2.200\" y \"2,200\" son 2200. Si no aparece, null. Nunca inventes importes.",
-    "- frequency: mensual/al mes → monthly; trimestral/cada 3 meses → quarterly; anual/al año → yearly; puntual/una vez/solo este → once; cada N días, semanas o meses → custom con interval y unit. Si no se dice, monthly.",
+    "- frequency: mensual/al mes → monthly; trimestral/cada 3 meses → quarterly; anual/al año → yearly; puntual/una vez/solo este → once; cada N días, semanas o meses → custom con interval y unit. Si no se dice, null (la app lo marca para revisar).",
     "- dueDay: día del mes en que se cobra (\"el 5\", \"día 12\", \"on the 1st\"). Si no aparece, null.",
-    "- annualMonth: mes (1-12) de un gasto anual (\"en marzo\"). Si no aparece, null.",
+    "- annualMonth: mes (1-12) que se menciona para un gasto anual o puntual (\"en marzo\", \"el 12 de diciembre\"). Si no aparece, null.",
     "- startDate: fecha YYYY-MM-DD solo si el texto da una fecha concreta o relativa (\"mañana\", \"el viernes\", \"el mes que viene\"), calculada desde hoy. Si no, null.",
     "- Usa null para cualquier dato que no aparezca; no lo deduzcas.",
     "",

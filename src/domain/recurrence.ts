@@ -10,6 +10,7 @@
 } from "date-fns";
 import { RRule } from "rrule";
 import type {
+  DraftExpense,
   ExpenseOccurrence,
   ExpenseOccurrenceOverride,
   ExpenseTemplate,
@@ -20,8 +21,12 @@ import {
   buildDateWithDay,
   estimateChargeDate,
   isValidDateOnly,
+  normalizeDateOnly,
   toDateOnly,
 } from "./calendar";
+
+// Lo que decide en qué fechas cae un gasto.
+type TemplateSchedule = Pick<ExpenseTemplate, "startDate" | "endDate" | "dueDay" | "recurrence">;
 
 function nextDate(date: Date, rule: RecurrenceRule): Date {
   const interval = Math.max(rule.interval ?? 1, 1);
@@ -40,7 +45,7 @@ function nextDate(date: Date, rule: RecurrenceRule): Date {
   return addMonths(date, 1);
 }
 
-function dateForRule(date: Date, template: ExpenseTemplate): Date {
+function dateForRule(date: Date, template: TemplateSchedule): Date {
   const { recurrence } = template;
   if (recurrence.frequency === "once") return date;
   if (recurrence.frequency === "custom" && ["day", "week"].includes(recurrence.unit ?? "")) {
@@ -49,7 +54,7 @@ function dateForRule(date: Date, template: ExpenseTemplate): Date {
   return buildDateWithDay(date, template.dueDay);
 }
 
-function rruleDates(template: ExpenseTemplate, from: Date, to: Date): Date[] {
+function rruleDates(template: TemplateSchedule, from: Date, to: Date): Date[] {
   if (!template.recurrence.rrule) return [];
 
   try {
@@ -64,7 +69,7 @@ function rruleDates(template: ExpenseTemplate, from: Date, to: Date): Date[] {
 }
 
 function annualTemplateDates(
-  template: ExpenseTemplate,
+  template: TemplateSchedule,
   from: Date,
   to: Date,
 ): string[] {
@@ -86,7 +91,7 @@ function annualTemplateDates(
 }
 
 export function generateTemplateDates(
-  template: ExpenseTemplate,
+  template: TemplateSchedule,
   fromDate: string,
   toDate: string,
 ): string[] {
@@ -140,6 +145,23 @@ export function generateTemplateDates(
   }
 
   return dates;
+}
+
+// Primer cobro de un gasto, con las mismas reglas que generan sus ocurrencias.
+export function firstOccurrenceDate(template: TemplateSchedule): string | null {
+  if (!isValidDateOnly(template.startDate)) return null;
+  const horizon = toDateOnly(addYears(parseISO(template.startDate), 2));
+  return generateTemplateDates(template, template.startDate, horizon)[0] ?? null;
+}
+
+// Un gasto nuevo cuyo primer cobro ya pasó este mes: hay que preguntar si ya
+// se pagó. Sin fecha de inicio cuenta desde el día 1, como al guardarlo.
+export function firstChargeAlreadyPassed(draft: DraftExpense, today: string) {
+  const first = firstOccurrenceDate({
+    ...draft,
+    startDate: normalizeDateOnly(draft.startDate) ?? `${today.slice(0, 7)}-01`,
+  });
+  return first !== null && first.slice(0, 7) === today.slice(0, 7) && first < today;
 }
 
 export function generateOccurrences(

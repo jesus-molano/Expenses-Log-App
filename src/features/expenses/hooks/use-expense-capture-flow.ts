@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CapturedDraft } from "@/domain/expense-capture";
 import type { CreateExpenseOptions, DraftExpense } from "@/domain/types";
 import { createEmptyDraft } from "../lib/dashboard-config";
+import type { CaptureReason } from "../lib/capture-labels";
 import type { useQuickExpenseParser } from "./use-quick-expense-parser";
 
 type Review = Pick<CapturedDraft, "missingFields" | "inferredFields">;
+// Un id estable por borrador: la selección no depende de la posición, que
+// cambia al guardar uno desde el formulario.
+export type ReviewItem = CapturedDraft & { id: string };
+type InitialStatus = NonNullable<CreateExpenseOptions["initialStatus"]>;
 
 // Flujo de añadir gastos: captura por texto (IA o local), formulario de uno
 // y revisión de varios. El dashboard solo compone.
@@ -19,16 +24,25 @@ export function useExpenseCaptureFlow({
   parser: ReturnType<typeof useQuickExpenseParser>;
   initialFormOpen: boolean;
   addExpense: (draft: DraftExpense, options?: CreateExpenseOptions) => void;
-  addExpenses: (drafts: DraftExpense[]) => void;
+  addExpenses: (drafts: DraftExpense[], options?: CreateExpenseOptions) => void;
 }) {
   const [captureOpen, setCaptureOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(initialFormOpen);
   const [draft, setDraft] = useState<DraftExpense>(() => createEmptyDraft());
   const [draftReview, setDraftReview] = useState<Review | null>(null);
-  const [reviewItems, setReviewItems] = useState<CapturedDraft[] | null>(null);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[] | null>(null);
+  // La selección y "ya pagado" viven aquí: la revisión se desmonta mientras
+  // se edita uno de sus gastos.
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(() => new Set());
+  const [reviewStatus, setReviewStatus] = useState<InitialStatus>("due");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  // Por qué se usó el análisis local, para avisarlo donde se abra el borrador.
+  const [notice, setNotice] = useState<CaptureReason | null>(null);
   // Cada apertura del formulario empieza de cero aunque el borrador coincida.
   const [formKey, setFormKey] = useState(0);
+  // Una respuesta que llega después de cancelar o de pasar a manual se ignora.
+  const requestRef = useRef(0);
+  const nextIdRef = useRef(0);
 
   function openForm(nextDraft: DraftExpense, review: Review | null = null) {
     setDraft(nextDraft);
@@ -37,33 +51,62 @@ export function useExpenseCaptureFlow({
     setFormOpen(true);
   }
 
+  function supersede() {
+    requestRef.current += 1;
+    parser.cancel();
+  }
+
+  function clearReview() {
+    setReviewItems(null);
+    setExcludedIds(new Set());
+    setReviewStatus("due");
+    setEditingId(null);
+  }
+
   async function analyze() {
+    const request = ++requestRef.current;
     const result = await parser.parse();
+    if (request !== requestRef.current) return;
     if (!result || result.drafts.length === 0) return;
 
     setCaptureOpen(false);
+    setNotice(result.provider === "local" ? result.reason : null);
     if (result.drafts.length === 1) {
       openForm(result.drafts[0].draft, result.drafts[0]);
     } else {
-      setReviewItems(result.drafts);
+      clearReview();
+      setReviewItems(
+        result.drafts.map((item) => ({ ...item, id: `capture-${(nextIdRef.current += 1)}` })),
+      );
     }
   }
 
   function saveForm(nextDraft: DraftExpense, options?: CreateExpenseOptions) {
     addExpense(nextDraft, options);
     setFormOpen(false);
-    if (editingIndex !== null && reviewItems) {
-      const remaining = reviewItems.filter((_, index) => index !== editingIndex);
-      setReviewItems(remaining.length ? remaining : null);
-      setEditingIndex(null);
-      if (remaining.length) return;
+    if (editingId !== null && reviewItems) {
+      const remaining = reviewItems.filter((item) => item.id !== editingId);
+      setEditingId(null);
+      if (remaining.length) {
+        setReviewItems(remaining);
+        return;
+      }
+      clearReview();
     }
+    setNotice(null);
     parser.reset();
   }
 
-  function saveReviewed(drafts: DraftExpense[]) {
-    addExpenses(drafts);
-    setReviewItems(null);
+  function saveReviewed() {
+    if (!reviewItems) return;
+    addExpenses(
+      reviewItems
+        .filter((item) => item.draft.amount > 0 && !excludedIds.has(item.id))
+        .map((item) => item.draft),
+      { initialStatus: reviewStatus },
+    );
+    clearReview();
+    setNotice(null);
     parser.reset();
   }
 
@@ -73,29 +116,50 @@ export function useExpenseCaptureFlow({
     formKey,
     draft,
     draftReview,
+    notice,
     reviewItems: formOpen ? null : reviewItems,
+    excludedIds,
+    reviewStatus,
     isIdle: !captureOpen && !formOpen && !reviewItems,
     openCapture: () => setCaptureOpen(true),
     closeCapture: () => {
-      parser.cancel();
+      supersede();
       setCaptureOpen(false);
     },
+    cancelAnalysis: supersede,
     openManualForm: () => {
+      supersede();
       setCaptureOpen(false);
+      setNotice(null);
       openForm(createEmptyDraft());
     },
     analyze,
     closeForm: () => {
       setFormOpen(false);
-      setEditingIndex(null);
+      setEditingId(null);
     },
     saveForm,
-    editReviewItem: (index: number) => {
-      if (!reviewItems?.[index]) return;
-      setEditingIndex(index);
-      openForm(reviewItems[index].draft, reviewItems[index]);
+    editReviewItem: (id: string) => {
+      const item = reviewItems?.find((candidate) => candidate.id === id);
+      if (!item) return;
+      setEditingId(id);
+      openForm(item.draft, item);
     },
+    toggleReviewItem: (id: string) =>
+      setExcludedIds((current) => {
+        const next = new Set(current);
+        if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+        return next;
+      }),
+    setReviewStatus,
     saveReviewed,
-    closeReview: () => setReviewItems(null),
+    closeReview: () => {
+      clearReview();
+      setNotice(null);
+    },
   };
 }

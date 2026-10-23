@@ -1,10 +1,7 @@
 import { startOfMonth } from "date-fns";
-import {
-  buildDateWithDay,
-  normalizeDateOnly,
-  toDateOnly,
-} from "@/domain/calendar";
+import { normalizeDateOnly, toDateOnly } from "@/domain/calendar";
 import { occurrenceKeyOf, overrideIdFor } from "@/domain/overrides";
+import { firstChargeAlreadyPassed, firstOccurrenceDate } from "@/domain/recurrence";
 import type {
   CreateExpenseOptions,
   DraftExpense,
@@ -35,7 +32,8 @@ export function addExpenseToStore(
     categoryResult.categoryId,
     startDate,
   );
-  const occurrenceDate = getInitialOccurrenceDate(draft, startDate);
+  // El pago inicial va al primer cobro real (en un anual, su mes).
+  const occurrenceDate = firstOccurrenceDate(template) ?? startDate;
   const now = new Date().toISOString();
   const initialOverrides =
     options.initialStatus === "paid"
@@ -61,19 +59,6 @@ export function addExpenseToStore(
   };
 }
 
-function getInitialOccurrenceDate(draft: DraftExpense, startDate: string): string {
-  const isAnchoredToStartDate =
-    draft.recurrence.frequency === "once" ||
-    (draft.recurrence.frequency === "custom" &&
-      ["day", "week"].includes(draft.recurrence.unit ?? ""));
-
-  if (isAnchoredToStartDate) return startDate;
-
-  return toDateOnly(
-    buildDateWithDay(new Date(`${startDate}T00:00:00`), draft.dueDay),
-  );
-}
-
 function normalizeDraftStartDate(draft: DraftExpense, startDate: string): DraftExpense {
   if (draft.recurrence.frequency !== "yearly") return draft;
   if (draft.recurrence.annualMonth) return draft;
@@ -88,14 +73,26 @@ function normalizeDraftStartDate(draft: DraftExpense, startDate: string): DraftE
 }
 
 // Varios borradores de una captura, en un solo cambio del store. Solo los
-// que tienen importe: uno sin él no es un gasto que se pueda guardar.
+// que tienen importe: uno sin él no es un gasto que se pueda guardar. "Ya
+// pagado" solo se aplica a los que ya se cobraron este mes.
 export function addExpensesToStore(
   store: ExpenseStore,
   drafts: DraftExpense[],
+  options: CreateExpenseOptions = {},
 ): ExpenseStore {
+  const today = toDateOnly(new Date());
   return drafts
     .filter((draft) => Number.isFinite(draft.amount) && draft.amount > 0)
-    .reduce((current, draft) => addExpenseToStore(current, draft), store);
+    .reduce(
+      (current, draft) =>
+        addExpenseToStore(current, draft, {
+          initialStatus:
+            options.initialStatus === "paid" && firstChargeAlreadyPassed(draft, today)
+              ? "paid"
+              : "due",
+        }),
+      store,
+    );
 }
 
 export function dismissLastChanceReminderInStore(

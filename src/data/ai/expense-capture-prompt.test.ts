@@ -29,6 +29,19 @@ describe("Gemini expense capture contract", () => {
     expect(instruction).toContain("Nunca inventes importes");
   });
 
+  it("leaves an unstated frequency as null so the app flags it", () => {
+    const instruction = buildCaptureSystemInstruction({
+      today: "2026-10-23",
+      language: "es",
+      categories: ["Casa"],
+    });
+
+    expect(instruction).toContain("Si no se dice, null");
+    expect(instruction).not.toContain("Si no se dice, monthly");
+    // El ejemplo "Netflix 12,99 el 5" no dice la frecuencia.
+    expect(instruction).toMatch(/"name":"Netflix"[^}]*"frequency":null/);
+  });
+
   it("keeps usable items and drops the rest", () => {
     expect(
       parseCaptureResponse({

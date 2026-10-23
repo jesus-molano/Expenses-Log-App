@@ -3,7 +3,9 @@
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
+import { toDateOnly } from "@/domain/calendar";
 import type { CapturedDraft } from "@/domain/expense-capture";
+import { firstChargeAlreadyPassed } from "@/domain/recurrence";
 import type {
   AppLanguage,
   CreateExpenseOptions,
@@ -12,7 +14,8 @@ import type {
 } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
-import { inferredFieldsLabel } from "../lib/capture-labels";
+import { inferredFieldsLabel, type CaptureReason } from "../lib/capture-labels";
+import { CaptureNotice } from "./CaptureNotice";
 import { ExpenseForm } from "./ExpenseForm";
 
 type ExpenseFormSheetProps = {
@@ -20,6 +23,8 @@ type ExpenseFormSheetProps = {
   draft: DraftExpense;
   // Lo que la captura con IA no encontró o dedujo, para revisarlo.
   review?: Pick<CapturedDraft, "missingFields" | "inferredFields"> | null;
+  // Por qué el borrador viene del análisis local, si es el caso.
+  notice?: CaptureReason | null;
   language?: AppLanguage;
   onClose: () => void;
   onSave: (draft: DraftExpense, options?: CreateExpenseOptions) => void;
@@ -29,6 +34,7 @@ export function ExpenseFormSheet({
   open,
   draft,
   review = null,
+  notice = null,
   language = "es",
   onClose,
   onSave,
@@ -41,14 +47,9 @@ export function ExpenseFormSheet({
   const toReview = inferredFieldsLabel(review?.inferredFields ?? [], language);
   const [initialStatus, setInitialStatus] =
     useState<Extract<OccurrenceStatus, "due" | "paid">>("due");
-  const today = new Date();
-  const startDate = form.startDate
-    ? new Date(`${form.startDate}T00:00:00`)
-    : today;
-  const isPastCurrentMonthDay =
-    startDate.getFullYear() === today.getFullYear() &&
-    startDate.getMonth() === today.getMonth() &&
-    startDate.getDate() < today.getDate();
+  // Se pregunta por el primer cobro real, no por la fecha de inicio: un
+  // mensual que empieza el día 1 y se cobra el 25 aún no ha pasado el 23.
+  const isPastCurrentMonthDay = firstChargeAlreadyPassed(form, toDateOnly(new Date()));
 
   if (!open) return null;
 
@@ -98,6 +99,7 @@ export function ExpenseFormSheet({
         </div>
 
         <div className="grid gap-4 px-5 pb-5">
+          {notice ? <CaptureNotice reason={notice} language={language} /> : null}
           {review?.missingFields.includes("amount") || toReview ? (
             <p className="app-section-card p-3 text-xs text-[var(--app-text-muted)]">
               {[

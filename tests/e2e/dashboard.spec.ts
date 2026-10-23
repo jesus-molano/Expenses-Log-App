@@ -80,10 +80,15 @@ test("creates and pays a parsed recurring expense", async ({ page }) => {
   await page
     .getByPlaceholder("Ej: Luz 64,75 mensual día 8")
     .fill("Spotify 10,99 mensual el dia 12 musica");
-  // Intro analiza el texto.
+  // En móvil, Intro hace otra línea: se analiza con el botón.
   await page.getByPlaceholder("Ej: Luz 64,75 mensual día 8").press("Enter");
+  await expect(page.getByPlaceholder("Ej: Luz 64,75 mensual día 8")).toHaveValue(/\n$/);
+  await page.getByRole("button", { name: "Analizar texto" }).click();
 
-  await expect(page.getByRole("heading", { name: "Nuevo gasto" })).toBeVisible();
+  const form = page.getByRole("dialog", { name: "Nuevo gasto" });
+  await expect(form.getByRole("heading", { name: "Nuevo gasto" })).toBeVisible();
+  // El borrador viene del análisis local: se avisa de por qué.
+  await expect(form.getByText("IA no configurada. Análisis local usado.")).toBeVisible();
   await page.getByRole("button", { name: "Guardar gasto" }).click();
 
   await expect(
@@ -304,11 +309,17 @@ test("reviews and saves several expenses captured at once", async ({ page }) => 
       contentType: "application/json",
       body: JSON.stringify({
         provider: "gemini",
-        expenses: [draft("Tidal", 10.99, 3), draft("Audible", 0, 9), draft("Dropbox", 11.99, 14)],
+        expenses: [
+          draft("Tidal", 10.99, 3),
+          draft("Audible", 0, 9),
+          draft("Dropbox", 11.99, 14),
+          draft("Deezer", 9.99, 20),
+        ],
         review: [
           { missingFields: [], inferredFields: [] },
           { missingFields: ["amount"], inferredFields: [] },
           { missingFields: [], inferredFields: ["dueDay"] },
+          { missingFields: [], inferredFields: [] },
         ],
       }),
     });
@@ -324,10 +335,42 @@ test("reviews and saves several expenses captured at once", async ({ page }) => 
   await expect(review.getByText("Falta el importe")).toBeVisible();
   await expect(review.getByText("Revisa: día de cobro")).toBeVisible();
   await expect(review.getByRole("checkbox", { name: "Incluir Audible" })).toBeDisabled();
-  await review.getByRole("button", { name: "Guardar 2" }).click();
+
+  // Desmarcar uno y editar otro no vuelve a marcar el primero.
+  await review.getByRole("checkbox", { name: "Incluir Tidal" }).uncheck();
+  await expect(review.getByRole("button", { name: "Guardar 2" })).toBeVisible();
+  await review.getByRole("button", { name: "Editar: Dropbox" }).click();
+  await page.getByRole("button", { name: "Guardar gasto" }).click();
+
+  await expect(review).toBeVisible();
+  await expect(review.getByRole("checkbox", { name: "Incluir Tidal" })).not.toBeChecked();
+  await review.getByRole("button", { name: "Guardar 1" }).click();
 
   await expect(review).toBeHidden();
-  await expect(page.locator('[data-expense-row="true"]').filter({ hasText: "Tidal" }).first()).toBeAttached();
-  await expect(page.locator('[data-expense-row="true"]').filter({ hasText: "Dropbox" }).first()).toBeAttached();
-  await expect(page.locator('[data-expense-row="true"]').filter({ hasText: "Audible" })).toHaveCount(0);
+  const rows = page.locator('[data-expense-row="true"]');
+  await expect(rows.filter({ hasText: "Dropbox" }).first()).toBeAttached();
+  await expect(rows.filter({ hasText: "Deezer" }).first()).toBeAttached();
+  await expect(rows.filter({ hasText: "Tidal" })).toHaveCount(0);
+  await expect(rows.filter({ hasText: "Audible" })).toHaveCount(0);
+});
+
+test("cancels an analysis without starting another one", async ({ page }) => {
+  await loadDemoStore(page);
+  let requests = 0;
+  await page.route("**/api/ai/parse-expenses", async (route) => {
+    requests += 1;
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    await route.abort().catch(() => undefined);
+  });
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Añadir gasto" }).click();
+  await page.getByRole("button", { name: "Netflix 12,99 el 5" }).click();
+  await page.getByRole("button", { name: "Analizar texto" }).click();
+  await page.getByRole("button", { name: "Cancelar" }).click();
+
+  await expect(page.getByRole("button", { name: "Analizar texto" })).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(requests).toBe(1);
+  await expect(page.getByRole("dialog", { name: "Nuevo gasto" })).toHaveCount(0);
 });

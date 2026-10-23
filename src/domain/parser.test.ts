@@ -34,10 +34,22 @@ describe("parseExpenseTextLocally", () => {
     ["Bono transporte 20 mensual", { amount: 20, categoryName: "Transporte" }],
     ["Gasolina 60", { amount: 60, categoryName: "Vehiculo" }],
     ["Préstamo coche 210 el 28", { amount: 210, dueDay: 28 }],
-    ["Disney+ 8,99 el 20", { amount: 8.99, dueDay: 20, categoryName: "Suscripciones" }],
+    ["Disney+ 8,99 el 20", { name: "Disney+", amount: 8.99, dueDay: 20, categoryName: "Suscripciones" }],
+    ["Apple TV+ 9,99", { name: "Apple TV+", amount: 9.99 }],
+    ["HBO-Max 9,99", { name: "HBO-Max", amount: 9.99 }],
+    ["Agua/luz 60", { name: "Agua/luz", amount: 60 }],
+    ["Luz y gas 80", { name: "Luz y gas", amount: 80 }],
+    ["Seguro 300 en marzo de 2027 al año", { amount: 300, recurrence: { frequency: "yearly", annualMonth: 3 } }],
+    ["Seguro 300 al año 2026", { amount: 300 }],
+    ["Gimnasio 35 a las 9", { name: "Gimnasio", amount: 35 }],
+    ["Gimnasio 35 a las 9:30", { amount: 35 }],
+    ["Seguro 300 el 15/03 anual", { amount: 300, dueDay: 15, recurrence: { frequency: "yearly", annualMonth: 3 } }],
+    ["Dentista 80 el 12 de diciembre puntual", { amount: 80, recurrence: { frequency: "once" }, startDate: "2026-12-12", dueDay: 12 }],
+    ["Matrícula 300 puntual en septiembre", { amount: 300, recurrence: { frequency: "once" }, startDate: "2027-09-01" }],
     ["Rent 900 on the 1st", { name: "Rent", amount: 900, dueDay: 1, categoryName: "Casa" }],
     ["Spotify 10.99 monthly on the 3rd", { amount: 10.99, dueDay: 3, recurrence: { frequency: "monthly" } }],
-    ["Car insurance 420 yearly in march", { amount: 420, recurrence: { frequency: "yearly", annualMonth: 3 } }],
+    ["Car insurance 420 yearly in March", { name: "Car insurance", amount: 420, recurrence: { frequency: "yearly", annualMonth: 3 } }],
+    ["Insurance 400 a year in May", { name: "Insurance", amount: 400 }],
     ["Gym 35 every week", { amount: 35, recurrence: { frequency: "custom", interval: 1, unit: "week" } }],
     ["Plátanos 3", { name: "Plátanos", amount: 3, recurrence: { frequency: "monthly" } }],
     ["Colegio 2.200 anual en septiembre", { amount: 2200, recurrence: { frequency: "yearly", annualMonth: 9 } }],
@@ -68,10 +80,32 @@ describe("parseExpenseTextLocally", () => {
     );
 
     expect(results.map(({ draft }) => [draft.name, draft.amount])).toEqual([
-      ["Seguro coche", 420],
+      ["Seguro del coche", 420],
       ["Gimnasio", 35],
     ]);
     expect(parseExpenseTextLocally("luz y agua 60", { today })).toHaveLength(1);
+  });
+
+  it.each([
+    ["Luz y gas 80 y Netflix 12,99", [["Luz y gas", 80], ["Netflix", 12.99]]],
+    ["Rent and utilities 1000 and Netflix 12", [["Rent and utilities", 1000], ["Netflix", 12]]],
+    ["Seguro de vida y hogar 300 al año y Netflix 12,99", [["Seguro de vida y hogar", 300], ["Netflix", 12.99]]],
+    ["Gimnasio 35 el 1\nSpotify 10,99", [["Gimnasio", 35], ["Spotify", 10.99]]],
+    ["Netflix 12,99 y Spotify", [["Netflix", 12.99], ["Spotify", 0]]],
+  ])("keeps names with connectors when splitting %j", (text, expected) => {
+    const results = parseExpenseTextLocally(text, { today });
+
+    expect(results.map(({ draft }) => [draft.name, draft.amount])).toEqual(expected);
+  });
+
+  it("flags an amount picked among several numbers", () => {
+    expect(parseOne("Netflix 2 pantallas 15").inferredFields).toContain("amount");
+    expect(parseOne("Netflix 15,99").inferredFields).not.toContain("amount");
+  });
+
+  it("flags the date of a one-off expense with only a month", () => {
+    expect(parseOne("Matrícula 300 puntual en septiembre").inferredFields).toContain("startDate");
+    expect(parseOne("Dentista 80 el 12 de diciembre puntual").inferredFields).not.toContain("startDate");
   });
 
   it("uses the user's own category names", () => {

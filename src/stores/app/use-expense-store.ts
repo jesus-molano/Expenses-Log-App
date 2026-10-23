@@ -119,8 +119,8 @@ function useExpenseStoreValue() {
     persist(addExpenseToStore(current(), draft, options));
   }
 
-  function addExpenses(drafts: DraftExpense[]) {
-    persist(addExpensesToStore(store, drafts));
+  function addExpenses(drafts: DraftExpense[], options: CreateExpenseOptions = {}) {
+    persist(addExpensesToStore(current(), drafts, options));
   }
 
   async function deleteExpense(templateId: string) {

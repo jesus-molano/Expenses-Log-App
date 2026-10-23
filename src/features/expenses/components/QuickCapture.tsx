@@ -3,6 +3,7 @@ import { LogIn, Pencil, Plus, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Sheet } from "@/components/ui/Sheet";
+import { CAPTURE_TEXT_MAX_LENGTH } from "@/domain/expense-capture";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { cn } from "@/shared/ui";
@@ -114,6 +115,7 @@ export function QuickCapture({
             id="quick-expense-text"
             value={value}
             rows={3}
+            maxLength={CAPTURE_TEXT_MAX_LENGTH}
             aria-describedby="quick-expense-hint"
             onChange={(event) => {
               const textarea = event.currentTarget;
@@ -122,11 +124,14 @@ export function QuickCapture({
               onValueChange(textarea.value);
             }}
             onKeyDown={(event) => {
-              // Intro analiza; Mayús+Intro o un teclado componiendo (IME) no.
+              // Con teclado físico, Intro analiza; Mayús+Intro o un teclado
+              // componiendo (IME) no. En pantallas táctiles no hay Mayús+Intro:
+              // Intro hace otra línea y se analiza con el botón.
               if (
                 event.key === "Enter" &&
                 !event.shiftKey &&
-                !event.nativeEvent.isComposing
+                !event.nativeEvent.isComposing &&
+                !window.matchMedia("(pointer: coarse)").matches
               ) {
                 event.preventDefault();
                 event.currentTarget.form?.requestSubmit();
@@ -156,12 +161,25 @@ export function QuickCapture({
             ))}
           </div>
 
+          {/* Claves distintas: si React reutilizara el mismo <button>, al
+              cancelar pasaría a type=submit antes de que el navegador
+              procese el clic y enviaría el formulario otra vez. */}
           {isParsing ? (
-            <Button type="button" onClick={onCancel} className="w-full" size="lg">
+            <Button
+              key="cancel"
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                onCancel();
+              }}
+              className="w-full"
+              size="lg"
+            >
               {t("expenses.captureCancel", language)}
             </Button>
           ) : (
             <Button
+              key="submit"
               type="submit"
               disabled={!value.trim()}
               className="w-full"

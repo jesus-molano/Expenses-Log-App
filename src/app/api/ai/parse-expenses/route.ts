@@ -14,6 +14,7 @@ import {
 } from "@/data/ai/gemini-client";
 import { PRESET_EXPENSE_CATEGORIES } from "@/domain/categories";
 import {
+  CAPTURE_TEXT_MAX_LENGTH,
   normalizeCapturedExpense,
   type CapturedDraft,
 } from "@/domain/expense-capture";
@@ -21,10 +22,21 @@ import { parseExpenseTextLocally } from "@/domain/parser";
 import { createClient } from "@/utils/supabase/server";
 
 const requestSchema = z.object({
-  text: z.string().trim().min(1).max(2000),
+  text: z.string().trim().min(1).max(CAPTURE_TEXT_MAX_LENGTH),
   today: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   language: z.enum(["es", "en"]).optional(),
-  categories: z.array(z.string().trim().min(1).max(40)).max(40).optional(),
+  // Categorías raras (muy largas o demasiadas) se descartan sin rechazar el
+  // texto: solo sirven de pista al modelo.
+  categories: z
+    .array(z.string())
+    .max(500)
+    .optional()
+    .transform((names) =>
+      (names ?? [])
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0 && name.length <= 40)
+        .slice(0, 40),
+    ),
 });
 
 export type CaptureFallbackReason =
@@ -88,7 +100,7 @@ export async function POST(request: Request) {
   const categories = Array.from(
     new Set([
       ...PRESET_EXPENSE_CATEGORIES.map((category) => category.name),
-      ...(parsedRequest.data.categories ?? []),
+      ...parsedRequest.data.categories,
     ]),
   );
   const local = (reason: CaptureFallbackReason) =>

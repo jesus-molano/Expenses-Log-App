@@ -44,6 +44,8 @@ const CUSTOM_PATTERN =
   /\b(?:cada|every)\s+(\d{1,2})\s+(dias?|semanas?|meses|mes|anos?|days?|weeks?|months?|years?)\b/;
 
 const DAY_PATTERNS = [
+  // "15/03" o "15/03/2027": día y mes.
+  /\b(\d{1,2})\/(\d{1,2})(?:\/\d{2,4})?\b/,
   /\b(?:el\s+)?dia\s+(\d{1,2})\b/,
   /\bon the\s+(\d{1,2})(?:st|nd|rd|th)?\b/,
   /\b(\d{1,2})(?:st|nd|rd|th)\b/,
@@ -54,8 +56,17 @@ const DAY_PATTERNS = [
 const FILLER_WORDS = new Set([
   "de", "del", "el", "la", "los", "las", "al", "a", "en", "y", "cada", "por",
   "euros", "euro", "eur", "unos", "unas", "sobre", "the", "on", "of", "per",
-  "every", "and", "for", "about", "around", "mes", "ano", "dia",
+  "every", "and", "for", "about", "around", "mes", "ano", "dia", "in", "at",
 ]);
+
+// Números que no son importes: horas, fechas y años.
+const NOT_AMOUNT_PATTERNS = [
+  /\b(?:a las|at)\s+\d{1,2}(?:[:.]\d{2})?(?:\s*(?:h|am|pm)\b)?/g,
+  /\b\d{1,2}:\d{2}\b/g,
+  /\b\d{1,2}\s*(?:h|am|pm)\b/g,
+  /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g,
+];
+const YEAR_PATTERN = /\b(?:19|20)\d{2}\b/g;
 
 function unitFor(token: string): CapturedExpenseItem["unit"] {
   if (/^(dia|day)/.test(token)) return "day";
@@ -95,7 +106,8 @@ function detectMonth(text: string) {
 }
 
 // Importe: primero lo que lleva € o "euros", luego un número con decimales y,
-// si no, el último número que no sea el día.
+// si no, el último número que no sea el día, una hora, una fecha o un año.
+// En ese último caso, si había más de un candidato, se marca para revisar.
 function detectAmount(text: string) {
   const candidates = [
     /(\d[\d.,]*)\s*(?:€|eur\b|euros?\b)/,
@@ -107,19 +119,31 @@ function detectAmount(text: string) {
     const amount = match ? parseMoneyInput(match[1].replace(/[.,]$/, "")) : null;
     if (match && amount !== null) return { amount, match: match[0] };
   }
-  const numbers = Array.from(text.matchAll(/\b\d[\d.,]*\b/g));
+  let plain = NOT_AMOUNT_PATTERNS.reduce((rest, pattern) => rest.replace(pattern, " "), text);
+  const withoutYears = plain.replace(YEAR_PATTERN, " ");
+  if (/\d/.test(withoutYears)) plain = withoutYears;
+  const numbers = Array.from(plain.matchAll(/\b\d[\d.,]*\b/g));
   const last = numbers.at(-1);
   const amount = last ? parseMoneyInput(last[0]) : null;
-  return last && amount !== null ? { amount, match: last[0] } : { amount: null, match: null };
+  return last && amount !== null
+    ? { amount, match: last[0], guessed: numbers.length > 1 }
+    : { amount: null, match: null };
 }
 
 function detectDay(text: string) {
   for (const pattern of DAY_PATTERNS) {
     const match = text.match(pattern);
     const day = match ? Number(match[1]) : NaN;
-    if (match && day >= 1 && day <= 31) return { day, match: match[0] };
+    const month = match?.[2] ? Number(match[2]) : null;
+    if (match && day >= 1 && day <= 31 && (month === null || (month >= 1 && month <= 12))) {
+      return { day, month, match: match[0] };
+    }
   }
-  return { day: null, match: null };
+  return { day: null, month: null, match: null };
+}
+
+function wordCore(word: string) {
+  return foldText(word).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 }
 
 function cleanName(original: string, folded: string, removed: Array<string | null>) {
@@ -127,8 +151,10 @@ function cleanName(original: string, folded: string, removed: Array<string | nul
   for (const part of removed) {
     if (part) remaining = remaining.replace(part, " ");
   }
-  // Se recuperan las palabras originales (con tildes y mayúsculas) que siguen
-  // presentes tras quitar importe, día, frecuencia y mes.
+  // Se recuperan las palabras originales (con tildes, mayúsculas y símbolos
+  // como "Disney+") que siguen presentes tras quitar importe, día,
+  // frecuencia y mes. Los conectores ("de", "y") se conservan solo entre dos
+  // palabras del nombre: "Seguro del coche", "Luz y gas".
   const kept = new Set(
     remaining
       .split(/[^\p{L}\p{N}]+/u)
@@ -136,9 +162,29 @@ function cleanName(original: string, folded: string, removed: Array<string | nul
   );
   const words = original
     .split(/\s+/)
-    .map((word) => word.replace(/[.,;:€]+$/u, ""))
-    .filter((word) => kept.has(foldText(word)));
-  const name = words.slice(0, 5).join(" ");
+    .map((word) => word.replace(/^[("'¿¡]+|[.,;:€)"'!?]+$/gu, ""))
+    .filter(Boolean)
+    .map((word) => {
+      const core = wordCore(word);
+      if (core.length && core.every((token) => FILLER_WORDS.has(token))) {
+        return { word, kind: "filler" as const };
+      }
+      return { word, kind: core.some((token) => kept.has(token)) ? ("name" as const) : ("other" as const) };
+    });
+
+  const nameWords: string[] = [];
+  let connectors: string[] = [];
+  for (const { word, kind } of words) {
+    if (kind === "name") {
+      nameWords.push(...connectors, word);
+      connectors = [];
+    } else if (kind === "filler" && nameWords.length) {
+      connectors.push(word);
+    } else {
+      connectors = [];
+    }
+  }
+  const name = nameWords.slice(0, 6).join(" ");
   return name ? name.charAt(0).toLocaleUpperCase() + name.slice(1) : null;
 }
 
@@ -153,6 +199,7 @@ function parseSegment(segment: string): CapturedExpenseItem {
     : withoutDay;
   const month = detectMonth(withoutFrequency);
   const amount = detectAmount(withoutFrequency);
+  const annualMonth = month?.month ?? day.month;
   const name = cleanName(segment, folded, [
     day.match,
     frequency.match,
@@ -163,28 +210,36 @@ function parseSegment(segment: string): CapturedExpenseItem {
   return {
     name,
     amount: amount.amount,
+    amountGuessed: amount.guessed ?? false,
     categoryName: detectCategoryFromText(segment),
     frequency: frequency.frequency,
     interval: frequency.interval,
     unit: frequency.unit,
     dueDay: day.day,
-    annualMonth: month?.month ?? null,
+    annualMonth,
     startDate: null,
     description: segment.trim(),
   };
 }
 
-// Varios gastos separados por líneas, ";" o " y "/" and " cuando cada parte
-// tiene un número; si no, es un solo gasto ("luz y agua 60").
+// Varios gastos separados por líneas, ";" o " y "/" and ". Una parte sin
+// número pertenece al nombre de la siguiente ("luz y gas 80 y netflix 12,99"
+// son dos gastos: "luz y gas" y "netflix"); al final, es un gasto sin importe.
 function splitExpenses(text: string) {
-  const parts = text
-    .split(/\n|;|\s+y\s+|\s+and\s+/i)
-    .map((part) => part.trim())
-    .filter(Boolean);
-  const withNumbers = parts.filter((part) => /\d/.test(part));
-  return withNumbers.length >= 2 && withNumbers.length === parts.length
-    ? parts
-    : [text.trim()];
+  const pieces = text.split(/(\n|;|\s+(?:y|and)\s+)/i);
+  const segments: string[] = [];
+  let pending = "";
+  for (let index = 0; index < pieces.length; index += 2) {
+    const part = pending + pieces[index];
+    const separator = pieces[index + 1] ?? "";
+    if (/\d/.test(pieces[index]) || index === pieces.length - 1) {
+      if (part.trim()) segments.push(part.trim());
+      pending = "";
+    } else {
+      pending = part + (/^\s+(?:y|and)\s+$/i.test(separator) ? separator : " ");
+    }
+  }
+  return segments.length ? segments : [text.trim()];
 }
 
 export function parseExpenseTextLocally(

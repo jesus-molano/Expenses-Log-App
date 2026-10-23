@@ -2,27 +2,20 @@
 
 import { useRef, useState } from "react";
 import { toDateOnly } from "@/domain/calendar";
-import type { CaptureField, CapturedDraft } from "@/domain/expense-capture";
+import {
+  CAPTURE_TEXT_MAX_LENGTH,
+  type CaptureField,
+  type CapturedDraft,
+} from "@/domain/expense-capture";
 import { parseExpenseTextLocally } from "@/domain/parser";
 import type { AppLanguage, DraftExpense } from "@/domain/types";
-import { t, type TranslationKey } from "@/shared/i18n";
+import { t } from "@/shared/i18n";
+import { captureReasonLabel, type CaptureReason } from "../lib/capture-labels";
 
 type ParserStatus = "idle" | "loading" | "done";
 type ParserStatusTone = "neutral" | "success" | "warning";
 
-export type CaptureReason =
-  | "missing_key"
-  | "rate_limited"
-  | "unauthenticated"
-  | "auth_failed"
-  | "model_unavailable"
-  | "quota_exhausted"
-  | "blocked"
-  | "truncated"
-  | "invalid_response"
-  | "timeout"
-  | "ai_unavailable"
-  | "offline";
+export type { CaptureReason };
 
 export type CaptureResult = {
   drafts: CapturedDraft[];
@@ -40,21 +33,6 @@ type ParseResponse = {
 // El navegador espera algo más que el plazo del servidor (10 s) antes de
 // rendirse y usar el parser local.
 const CLIENT_TIMEOUT_MS = 12_000;
-
-const REASON_LABELS: Record<CaptureReason, TranslationKey> = {
-  missing_key: "expenses.aiNotConfigured",
-  rate_limited: "expenses.aiRateLimited",
-  unauthenticated: "expenses.aiRequiresLogin",
-  auth_failed: "expenses.aiAuthFailed",
-  model_unavailable: "expenses.aiModelUnavailable",
-  quota_exhausted: "expenses.aiQuotaExhausted",
-  blocked: "expenses.aiBlocked",
-  truncated: "expenses.aiTruncated",
-  invalid_response: "expenses.aiInvalidResponse",
-  timeout: "expenses.aiTimeout",
-  ai_unavailable: "expenses.aiUnavailable",
-  offline: "expenses.aiOffline",
-};
 
 export function useQuickExpenseParser({
   language,
@@ -76,7 +54,9 @@ export function useQuickExpenseParser({
   }
 
   async function parse(): Promise<CaptureResult | null> {
-    const text = quickText.trim();
+    // Un texto más largo que lo que acepta el servidor se recorta aquí en vez
+    // de fallar con un 400 que parecería "IA no disponible".
+    const text = quickText.trim().slice(0, CAPTURE_TEXT_MAX_LENGTH);
     if (!text) return null;
 
     const today = toDateOnly(new Date());
@@ -145,7 +125,7 @@ export function useQuickExpenseParser({
       ? t("expenses.analyzing", language)
       : status === "done" && result
         ? result.provider === "local"
-          ? t(result.reason ? REASON_LABELS[result.reason] : "expenses.aiLocal", language)
+          ? captureReasonLabel(result.reason, language)
           : result.drafts.length === 0
             ? t("expenses.aiNothingFound", language)
             : result.drafts.length > 1

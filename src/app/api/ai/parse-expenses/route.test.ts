@@ -189,6 +189,22 @@ describe("/api/ai/parse-expenses", () => {
   it.each([
     [new Response("{}", { status: 401 }), "auth_failed"],
     [new Response("{}", { status: 403 }), "auth_failed"],
+    [
+      new Response(
+        JSON.stringify({
+          error: {
+            code: 400,
+            message: "API key not valid. Please pass a valid API key.",
+            status: "INVALID_ARGUMENT",
+            details: [
+              { "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "API_KEY_INVALID", domain: "googleapis.com" },
+            ],
+          },
+        }),
+        { status: 400 },
+      ),
+      "auth_failed",
+    ],
     [new Response(JSON.stringify({ promptFeedback: { blockReason: "SAFETY" } }), { status: 200 }), "blocked"],
     [
       new Response(
@@ -256,6 +272,16 @@ describe("/api/ai/parse-expenses", () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(payload).toMatchObject({ provider: "local", reason: "unauthenticated" });
+  });
+
+  it("drops unusable categories instead of rejecting the text", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "");
+    const response = await POST(
+      parseRequest({ categories: ["x".repeat(60), ...Array.from({ length: 60 }, (_, i) => `Cat ${i}`)] }),
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).provider).toBe("local");
   });
 
   it("ignores a client date far from the server date", async () => {

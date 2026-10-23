@@ -1,23 +1,32 @@
 "use client";
 
 import { Pencil, X } from "lucide-react";
-import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Sheet } from "@/components/ui/Sheet";
-import { formatCurrency } from "@/domain/calendar";
-import { foldText, type CapturedDraft } from "@/domain/expense-capture";
-import type { AppLanguage, DraftExpense } from "@/domain/types";
+import { formatCurrency, toDateOnly } from "@/domain/calendar";
+import { foldText } from "@/domain/expense-capture";
+import { firstChargeAlreadyPassed } from "@/domain/recurrence";
+import type { AppLanguage, CreateExpenseOptions } from "@/domain/types";
 import { t } from "@/shared/i18n";
-import { inferredFieldsLabel } from "../lib/capture-labels";
+import type { ReviewItem } from "../hooks/use-expense-capture-flow";
+import { inferredFieldsLabel, type CaptureReason } from "../lib/capture-labels";
 import { localizedRecurrenceLabel } from "../lib/recurrence-label";
+import { CaptureNotice } from "./CaptureNotice";
+
+type InitialStatus = NonNullable<CreateExpenseOptions["initialStatus"]>;
 
 type QuickCaptureReviewProps = {
-  items: CapturedDraft[];
+  items: ReviewItem[];
+  excludedIds: Set<string>;
+  initialStatus: InitialStatus;
+  notice: CaptureReason | null;
   existingNames: string[];
   language: AppLanguage;
-  onEdit: (index: number) => void;
-  onSave: (drafts: DraftExpense[]) => void;
+  onToggle: (id: string) => void;
+  onInitialStatusChange: (status: InitialStatus) => void;
+  onEdit: (id: string) => void;
+  onSave: () => void;
   onClose: () => void;
 };
 
@@ -25,30 +34,23 @@ type QuickCaptureReviewProps = {
 // vez. Uno sin importe no se puede marcar hasta editarlo.
 export function QuickCaptureReview({
   items,
+  excludedIds,
+  initialStatus,
+  notice,
   existingNames,
   language,
+  onToggle,
+  onInitialStatusChange,
   onEdit,
   onSave,
   onClose,
 }: QuickCaptureReviewProps) {
-  const [excluded, setExcluded] = useState<Set<number>>(() => new Set());
   const existing = new Set(existingNames.map(foldText));
-  const selectable = (item: CapturedDraft) => item.draft.amount > 0;
-  const selected = items.filter(
-    (item, index) => selectable(item) && !excluded.has(index),
-  );
-
-  function toggle(index: number) {
-    setExcluded((current) => {
-      const next = new Set(current);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
-  }
+  const selectable = (item: ReviewItem) => item.draft.amount > 0;
+  const selected = items.filter((item) => selectable(item) && !excludedIds.has(item.id));
+  // Como en el formulario de uno: si alguno ya se cobró este mes, se pregunta.
+  const today = toDateOnly(new Date());
+  const asksPaid = selected.some((item) => firstChargeAlreadyPassed(item.draft, today));
 
   return (
     <Sheet ariaLabel={t("expenses.captureReviewTitle", language)} onBackdropClick={onClose}>
@@ -75,22 +77,28 @@ export function QuickCaptureReview({
           </header>
         </div>
 
+        {notice ? (
+          <div className="px-5 pb-2">
+            <CaptureNotice reason={notice} language={language} />
+          </div>
+        ) : null}
+
         <ul className="grid gap-2 px-5">
-          {items.map((item, index) => {
+          {items.map((item) => {
             const { draft } = item;
             const canSelect = selectable(item);
-            const checkboxId = `capture-item-${index}`;
+            const checkboxId = `capture-item-${item.id}`;
             const toReview = inferredFieldsLabel(item.inferredFields, language);
             return (
-              <li key={`${draft.name}-${index}`} className="app-section-card grid gap-2 p-3">
+              <li key={item.id} className="app-section-card grid gap-2 p-3">
                 <div className="flex items-start gap-3">
                   <input
                     id={checkboxId}
                     type="checkbox"
                     className="mt-1 size-5 shrink-0 accent-[var(--app-accent)]"
-                    checked={canSelect && !excluded.has(index)}
+                    checked={canSelect && !excludedIds.has(item.id)}
                     disabled={!canSelect}
-                    onChange={() => toggle(index)}
+                    onChange={() => onToggle(item.id)}
                     aria-label={t("expenses.captureInclude", language).replace("{name}", draft.name)}
                   />
                   <label htmlFor={checkboxId} className="grid min-w-0 flex-1 gap-0.5">
@@ -114,7 +122,7 @@ export function QuickCaptureReview({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    onClick={() => onEdit(index)}
+                    onClick={() => onEdit(item.id)}
                     aria-label={`${t("expenses.captureEdit", language)}: ${draft.name}`}
                   >
                     <Pencil size={15} />
@@ -140,13 +148,48 @@ export function QuickCaptureReview({
           })}
         </ul>
 
+        {asksPaid ? (
+          <div className="px-5 pt-4">
+            <div className="app-section-card border-[color-mix(in_srgb,var(--app-warning)_28%,transparent)] p-3">
+              <p className="text-sm font-semibold text-[var(--app-warning)]">
+                {t("expenses.captureReviewPastTitle", language)}
+              </p>
+              <p className="mt-1 text-xs text-[var(--app-text-muted)]">
+                {t("expenses.captureReviewPastBody", language)}
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  onClick={() => onInitialStatusChange("due")}
+                  variant={initialStatus === "due" ? "primary" : "secondary"}
+                  size="sm"
+                  className="h-10"
+                  aria-pressed={initialStatus === "due"}
+                >
+                  {t("common.pending", language)}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => onInitialStatusChange("paid")}
+                  variant={initialStatus === "paid" ? "primary" : "secondary"}
+                  size="sm"
+                  className="h-10"
+                  aria-pressed={initialStatus === "paid"}
+                >
+                  {t("common.paid", language)}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="grid gap-2 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
           <Button
             type="button"
             variant="primary"
             size="lg"
             disabled={selected.length === 0}
-            onClick={() => onSave(selected.map((item) => item.draft))}
+            onClick={onSave}
           >
             {t("expenses.captureSaveMany", language).replace("{count}", String(selected.length))}
           </Button>

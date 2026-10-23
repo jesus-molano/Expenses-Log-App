@@ -145,7 +145,14 @@ async function attempt(
   if (response.status === 400 && withThinking && thinkingConfig && message.includes("thinking")) {
     return { kind: "fail", reason: "invalid_response", thinkingRejected: true };
   }
-  if (response.status === 401 || response.status === 403) return { kind: "fail", reason: "auth_failed" };
+  // Una clave inválida o caducada llega como 400 (API_KEY_INVALID/EXPIRED).
+  if (
+    response.status === 401 ||
+    response.status === 403 ||
+    (response.status === 400 && (message.includes("api_key_") || message.includes("api key")))
+  ) {
+    return { kind: "fail", reason: "auth_failed" };
+  }
   if (response.status === 404) return { kind: "fail", reason: "model_unavailable" };
   if (response.status === 429) {
     return { kind: "fail", reason: "quota_exhausted", retryAfterMs: parseRetryDelay(body) };

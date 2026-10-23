@@ -202,15 +202,20 @@ export function ExpenseDashboard({
         onClose={capture.closeCapture}
         onValueChange={quickParser.setQuickText}
         onAnalyze={capture.analyze}
-        onCancel={quickParser.cancel}
+        onCancel={capture.cancelAnalysis}
         onManualAdd={capture.openManualForm}
       />
 
       {capture.reviewItems ? (
         <QuickCaptureReview
           items={capture.reviewItems}
+          excludedIds={capture.excludedIds}
+          initialStatus={capture.reviewStatus}
+          notice={capture.notice}
           existingNames={store.templates.map((template) => template.name)}
           language={language}
+          onToggle={capture.toggleReviewItem}
+          onInitialStatusChange={capture.setReviewStatus}
           onEdit={capture.editReviewItem}
           onSave={capture.saveReviewed}
           onClose={capture.closeReview}
@@ -222,6 +227,7 @@ export function ExpenseDashboard({
         open={capture.formOpen}
         draft={capture.draft}
         review={capture.draftReview}
+        notice={capture.notice}
         language={language}
         onClose={capture.closeForm}
         onSave={capture.saveForm}

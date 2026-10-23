@@ -7,6 +7,9 @@ import type {
   RecurrenceRule,
 } from "./types";
 
+// Lo que se acepta analizar de una vez (el campo de texto lo limita igual).
+export const CAPTURE_TEXT_MAX_LENGTH = 2000;
+
 // Lo que se extrae de un texto (Gemini o el parser local) antes de convertirlo
 // en borrador. Un dato que no aparece es null: nunca se inventa.
 export type CapturedExpenseItem = {
@@ -20,6 +23,8 @@ export type CapturedExpenseItem = {
   annualMonth: number | null;
   startDate: string | null;
   description?: string | null;
+  // El parser local eligió el importe entre varios números: hay que revisarlo.
+  amountGuessed?: boolean;
 };
 
 export type CaptureField = "amount" | "dueDay" | "startDate" | "categoryName" | "frequency";
@@ -124,6 +129,14 @@ function validMonth(value: number | null) {
   return value !== null && Number.isInteger(value) && value >= 1 && value <= 12 ? value : null;
 }
 
+function nextDateInMonth(today: string, month: number, day: number) {
+  const year = Number(today.slice(0, 4));
+  const thisYear = toDateOnly(buildDateWithDay(new Date(year, month - 1, 1), day));
+  return thisYear >= today
+    ? thisYear
+    : toDateOnly(buildDateWithDay(new Date(year + 1, month - 1, 1), day));
+}
+
 // Convierte lo extraído en un borrador que el formulario puede abrir. Las
 // fechas y el día de cobro se reconcilian con la misma regla que al guardar:
 // un gasto puntual (o cada N días/semanas) vive en su startDate; el resto, en
@@ -142,6 +155,7 @@ export function normalizeCapturedExpense(
       ? Math.round(item.amount * 100) / 100
       : 0;
   if (!amount) missingFields.push("amount");
+  if (amount && item.amountGuessed) inferredFields.push("amount");
 
   const { recurrence, inferred: frequencyInferred } = recurrenceFor(item);
   if (frequencyInferred) inferredFields.push("frequency");
@@ -154,11 +168,18 @@ export function normalizeCapturedExpense(
 
   let startDate: string;
   let dueDay: number;
+  const mentionedMonth = validMonth(item.annualMonth);
   if (anchoredToStart) {
-    startDate =
-      explicitStart ??
-      (explicitDay ? toDateOnly(buildDateWithDay(todayDate, explicitDay)) : today);
-    if (!explicitStart && !explicitDay) inferredFields.push("startDate");
+    if (explicitStart) {
+      startDate = explicitStart;
+    } else if (mentionedMonth) {
+      // "El 12 de diciembre": la próxima vez que llega esa fecha.
+      startDate = nextDateInMonth(today, mentionedMonth, explicitDay ?? 1);
+      if (!explicitDay) inferredFields.push("startDate");
+    } else {
+      startDate = explicitDay ? toDateOnly(buildDateWithDay(todayDate, explicitDay)) : today;
+      if (!explicitDay) inferredFields.push("startDate");
+    }
     dueDay = Number(startDate.slice(8, 10));
   } else {
     startDate = explicitStart ?? `${today.slice(0, 7)}-01`;
