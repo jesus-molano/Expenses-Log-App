@@ -100,13 +100,12 @@ describe("month close suggestion", () => {
     "2026-10",
   );
 
-  it("summarises the month and what is already paid of the next one", () => {
+  it("summarises the month", () => {
     expect(settled).toEqual({
       monthId: "2026-10",
       paidCount: 2,
       pendingCount: 0,
       pendingTotal: 0,
-      nextMonthPaidCount: 1,
       leftovers: [],
     });
   });
@@ -333,7 +332,7 @@ describe("month context", () => {
       activeMonthId: "2026-10",
       nextMonthId: "2026-11",
       payday: null,
-      closeStatus: { paidCount: 1, pendingCount: 1, nextMonthPaidCount: 1 },
+      closeStatus: { paidCount: 1, pendingCount: 1 },
     });
   });
 
@@ -553,7 +552,6 @@ describe("payday-anchored budget month", () => {
       paidCount: 0,
       pendingCount: 3,
       pendingTotal: 300,
-      nextMonthPaidCount: 0,
     });
     // Los restos del cierre son los mismos días del ciclo.
     expect(leftovers.map((item) => item.id).sort()).toEqual([
@@ -564,7 +562,6 @@ describe("payday-anchored budget month", () => {
     expect(buildMonthContext(allPaidNovember, "2026-10-29").closeStatus).toMatchObject({
       paidCount: 3,
       pendingCount: 0,
-      nextMonthPaidCount: 1,
     });
   });
 

@@ -59,34 +59,6 @@ describe("timeline for a viewed month", () => {
     ]);
   });
 
-  it("puts next month's prepaid bills at the end instead of on top", () => {
-    const sections = buildTimelineSections(
-      [
-        paid(occurrence("power", "2026-10-12", 60)),
-        occurrence("gym", "2026-10-30", 30),
-        paid(occurrence("rent", "2026-11-01", 700)),
-        paid(occurrence("insurance", "2026-11-15", 90)),
-      ],
-      "2026-10-28",
-      "es",
-      "2026-10",
-    );
-
-    expect(sections.map((section) => section.id)).toEqual([
-      "paid-2026-10-12",
-      "today",
-      "future-2026-10-30",
-      "paid-ahead-2026-11",
-    ]);
-    const paidAhead = sections.at(-1)!;
-    expect(paidAhead).toMatchObject({
-      title: "Ya pagado de noviembre",
-      muted: true,
-      total: 0,
-    });
-    expect(paidAhead.items.map((item) => item.id)).toEqual(["rent", "insurance"]);
-  });
-
   it("shows Today only in the calendar month", () => {
     // Septiembre visto el 3 de octubre: lo de hoy es un día más, con su mes.
     const september = buildTimelineSections(

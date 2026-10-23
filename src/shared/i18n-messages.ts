@@ -153,12 +153,9 @@ export const messages = {
       overduePending: "Aún sin pagar",
       monthStartsIn: "{month} empieza en {days} días",
       monthStartsTomorrow: "{month} empieza mañana",
-      monthStartsSubtitle: "Lo pagado por adelantado ya cuenta en su mes.",
       monthSettledTitle: "{month} al día",
       monthPaidOne: "1 pagado",
       monthPaidMany: "{count} pagados",
-      nextMonthPaidOne: "1 de {month} ya pagado",
-      nextMonthPaidMany: "{count} de {month} ya pagados",
       advanceToMonth: "Pasar a {month}",
       notNow: "Ahora no",
       monthActive: "{month} activo",
@@ -452,8 +449,6 @@ export const messages = {
     // Cierre de mes con restos, timeline por mes, "Hasta el cobro" y cobros
     // anteriores de un gasto nuevo (F1a-3).
     monthClose: {
-      paidAheadTitle: "Ya pagado de {month}",
-      paidAheadSubtitle: "Pagado por adelantado; cuenta en {month}",
       cardTitle: "Cierre de {month}",
       cardLeftoversOne: "Queda 1 recibo · {total}",
       cardLeftoversMany: "Quedan {count} recibos · {total}",
@@ -847,12 +842,9 @@ export const messages = {
       overduePending: "Still unpaid",
       monthStartsIn: "{month} starts in {days} days",
       monthStartsTomorrow: "{month} starts tomorrow",
-      monthStartsSubtitle: "Bills paid early already count in their month.",
       monthSettledTitle: "{month} is settled",
       monthPaidOne: "1 paid",
       monthPaidMany: "{count} paid",
-      nextMonthPaidOne: "1 for {month} already paid",
-      nextMonthPaidMany: "{count} for {month} already paid",
       advanceToMonth: "Move to {month}",
       notNow: "Not now",
       monthActive: "{month} is active",
@@ -1146,8 +1138,6 @@ export const messages = {
     // Month close with leftovers, timeline per month, "Until payday" and
     // previous charges of a new expense (F1a-3).
     monthClose: {
-      paidAheadTitle: "Already paid for {month}",
-      paidAheadSubtitle: "Paid early; counts in {month}",
       cardTitle: "Closing {month}",
       cardLeftoversOne: "1 bill left · {total}",
       cardLeftoversMany: "{count} bills left · {total}",

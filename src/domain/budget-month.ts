@@ -66,8 +66,6 @@ export type MonthCloseStatus = {
   paidCount: number;
   pendingCount: number;
   pendingTotal: number;
-  // Recibos del mes siguiente que ya están pagados.
-  nextMonthPaidCount: number;
   // Lo que queda pendiente del mes, para resolverlo al cerrarlo.
   leftovers: ExpenseOccurrence[];
 };
@@ -77,25 +75,22 @@ export function monthCloseStatus(
   monthId: string,
   cycle: BudgetCycle = CALENDAR_CYCLE,
 ): MonthCloseStatus {
-  const nextMonthId = addMonthId(monthId, 1);
   const pending = monthPendingSummary(
     occurrences,
     monthId,
     periodRange(monthId, cycle),
   );
-  const paidIn = (id: string) =>
-    occurrences.filter(
-      (occurrence) =>
-        occurrence.status === "paid" &&
-        periodIdOf(occurrence.dueDate, cycle) === id,
-    ).length;
+  const paidCount = occurrences.filter(
+    (occurrence) =>
+      occurrence.status === "paid" &&
+      periodIdOf(occurrence.dueDate, cycle) === monthId,
+  ).length;
 
   return {
     monthId,
-    paidCount: paidIn(monthId),
+    paidCount,
     pendingCount: pending.count,
     pendingTotal: pending.total,
-    nextMonthPaidCount: paidIn(nextMonthId),
     leftovers: pending.items,
   };
 }

@@ -58,15 +58,6 @@ export function MonthCloseCard({
         ).replace("{total}", formatCurrency(status.pendingTotal))
       : null,
     status.paidCount > 0 || !leftovers ? paidSummary : null,
-    status.nextMonthPaidCount > 0
-      ? (status.nextMonthPaidCount === 1
-          ? t("expenses.nextMonthPaidOne", language)
-          : t("expenses.nextMonthPaidMany", language).replace(
-              "{count}",
-              String(status.nextMonthPaidCount),
-            )
-        ).replace("{month}", nextMonth)
-      : null,
   ]
     .filter(Boolean)
     .join(" · ");

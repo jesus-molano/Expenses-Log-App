@@ -26,9 +26,11 @@ export function TimelineSectionHeader({
         >
           {section.title}
         </h2>
-        <p className="mt-0.5 break-words text-xs text-[var(--app-text-muted)]">
-          {section.subtitle}
-        </p>
+        {section.subtitle ? (
+          <p className="mt-0.5 break-words text-xs text-[var(--app-text-muted)]">
+            {section.subtitle}
+          </p>
+        ) : null}
       </div>
       {section.items.length > 1 && section.total > 0 ? (
         <p className="app-money shrink-0 whitespace-nowrap text-sm font-semibold text-[var(--app-text)]">

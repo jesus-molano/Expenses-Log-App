@@ -27,10 +27,6 @@ export type TimelineSection = {
   muted?: boolean;
 };
 
-// Lo pagado por adelantado del mes siguiente va al final, detrás de lo
-// pendiente del mes que se mira.
-const PAID_AHEAD_PRIORITY = 4;
-
 function sectionMeta(
   occurrence: ExpenseOccurrence,
   today: string,
@@ -51,23 +47,6 @@ function sectionMeta(
   // Mes de presupuesto del cobro: el natural o, con el ciclo anclado al cobro,
   // el ciclo en que cae.
   const dueMonthId = periodIdOf(occurrence.dueDate, cycle);
-
-  if (visualState === "paid" && dueMonthId > monthId) {
-    return {
-      id: `paid-ahead-${dueMonthId}`,
-      title: t("monthClose.paidAheadTitle", language).replace(
-        "{month}",
-        monthName(dueMonthId),
-      ),
-      subtitle: t("monthClose.paidAheadSubtitle", language).replace(
-        "{month}",
-        monthName(dueMonthId),
-      ),
-      tone: visualState,
-      priority: PAID_AHEAD_PRIORITY,
-      muted: true,
-    };
-  }
 
   if (visualState === "paid") {
     return {
@@ -226,7 +205,7 @@ function placeholderSection(
       ? t("expenses.monthStartsTomorrow", language)
       : t("expenses.monthStartsIn", language).replace("{days}", String(days))
     ).replace("{month}", month),
-    subtitle: t("expenses.monthStartsSubtitle", language),
+    subtitle: "",
     anchorDate: monthStart,
   };
 }

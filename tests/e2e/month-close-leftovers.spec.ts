@@ -86,14 +86,14 @@ test("closes October with leftovers after payday and starts November", async ({ 
   await expect(page.getByText("Por pagar · octubre")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Cierre de octubre" })).toBeVisible();
   await expect(
-    page.getByText("Quedan 2 recibos · 75,00 € · 1 pagado · 1 de noviembre ya pagado"),
+    page.getByText("Quedan 2 recibos · 75,00 € · 1 pagado", { exact: true }),
   ).toBeVisible();
 
   // Lo prepagado de noviembre se ve en noviembre, no en octubre.
   const ids = await sectionIds(page);
   expect(ids[0]).toBe("paid-2026-10-01");
   expect(ids).toContain("today");
-  expect(ids).not.toContain("paid-ahead-2026-11");
+  expect(ids).not.toContain("paid-2026-11-01");
 
   await page.getByRole("button", { name: "Cerrar octubre" }).click();
   const sheet = page.getByRole("dialog", { name: "Cerrar octubre" });
