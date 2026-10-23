@@ -8,8 +8,11 @@ export function useTimelineInitialFocus(
   today: string,
 ) {
   const focusRef = useRef<HTMLElement | null>(null);
-  const didFocusTimeline = useRef(false);
-  const overdueIndex = sections.findIndex((section) => section.id === "overdue");
+  const focusedDay = useRef<string | null>(null);
+  const overdueIndex = sections.findIndex(
+    (section) =>
+      section.id === "overdue" || section.id.startsWith("carry-over-"),
+  );
   const todayIndex = sections.findIndex((section) => section.id === "today");
   const nextRelevantIndex = sections.findIndex(
     (section) => section.anchorDate >= today && section.tone !== "paid",
@@ -22,8 +25,8 @@ export function useTimelineInitialFocus(
         : Math.max(0, nextRelevantIndex);
 
   useEffect(() => {
-    if (didFocusTimeline.current || !focusRef.current) return;
-    didFocusTimeline.current = true;
+    if (focusedDay.current === today || !focusRef.current) return;
+    focusedDay.current = today;
 
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
@@ -51,7 +54,7 @@ export function useTimelineInitialFocus(
         });
       });
     });
-  }, [sections]);
+  }, [sections, today]);
 
   return { focusIndex, focusRef };
 }

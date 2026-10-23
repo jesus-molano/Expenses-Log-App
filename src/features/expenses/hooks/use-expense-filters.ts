@@ -1,30 +1,46 @@
 "use client";
 
-import { addDays, addMonths, endOfMonth, startOfMonth } from "date-fns";
+import { useMemo } from "react";
+import { addDays, addMonths, endOfMonth, parseISO, startOfMonth } from "date-fns";
+import {
+  monthPendingSummary,
+  selectCarryOverOccurrences,
+} from "@/domain/budget-month";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
-import { generateStoreOccurrences } from "@/domain/finance";
+import { occurrencesDueBetween } from "@/domain/finance";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
 import { buildRecurringOverview } from "../lib/recurring-overview";
 import { buildTimelineSections } from "../lib/timeline";
 
 const NEXT_MONTH_VISIBLE_DAYS = 7;
 
-export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
-  const today = toDateOnly(new Date());
-  const windowStart = toDateOnly(startOfMonth(new Date()));
-  const currentMonthEnd = toDateOnly(endOfMonth(new Date()));
+export function useExpenseFilters(
+  store: ExpenseStore,
+  language: AppLanguage,
+  now: Date,
+) {
+  const today = toDateOnly(now);
+
+  return useMemo(
+    () => buildExpenseFilters(store, language, parseISO(today)),
+    [store, language, today],
+  );
+}
+
+function buildExpenseFilters(
+  store: ExpenseStore,
+  language: AppLanguage,
+  todayDate: Date,
+) {
+  const today = toDateOnly(todayDate);
+  const currentMonthId = today.slice(0, 7);
+  const windowStart = toDateOnly(startOfMonth(todayDate));
+  const currentMonthEnd = toDateOnly(endOfMonth(todayDate));
   const timelineWindowEnd = toDateOnly(
     addDays(
-      startOfMonth(addMonths(new Date(), 1)),
+      startOfMonth(addMonths(todayDate, 1)),
       NEXT_MONTH_VISIBLE_DAYS - 1,
     ),
-  );
-
-  const occurrences = generateStoreOccurrences(
-    store,
-    windowStart,
-    timelineWindowEnd,
-    language,
   );
 
   const recurringOverviewItems = buildRecurringOverview({
@@ -35,23 +51,15 @@ export function useExpenseFilters(store: ExpenseStore, language: AppLanguage) {
     language,
   });
 
-  const visibleOccurrences = occurrences.filter(
-    (occurrence) =>
-      occurrence.status !== "skipped" &&
-      (occurrence.occurrenceDate <= currentMonthEnd ||
-        occurrence.dueDate <= timelineWindowEnd),
-  );
+  const visibleOccurrences = [
+    ...selectCarryOverOccurrences(store, todayDate, language),
+    ...occurrencesDueBetween(store, windowStart, timelineWindowEnd, language),
+  ].filter((occurrence) => occurrence.status !== "skipped");
 
-  const pendingTotal = visibleOccurrences
-    .filter(
-      (occurrence) =>
-        occurrence.status !== "paid" &&
-        occurrence.status !== "skipped" &&
-        occurrence.dueDate >= windowStart &&
-        occurrence.dueDate <= currentMonthEnd &&
-        occurrence.estimatedChargeDate <= currentMonthEnd,
-    )
-    .reduce((sum, occurrence) => sum + occurrence.template.amount, 0);
+  const pendingTotal = monthPendingSummary(
+    visibleOccurrences,
+    currentMonthId,
+  ).total;
   const timelineSections = buildTimelineSections(
     visibleOccurrences,
     today,

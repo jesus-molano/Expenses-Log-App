@@ -1,6 +1,8 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildMonthlyMoneyPlan } from "@/domain/finance";
 import { emptyStore } from "@/domain/seed";
+import { occurrencesForMonth } from "@/features/plan/lib/plan-dashboard";
 import type {
   ExpenseOccurrenceOverride,
   ExpenseStore,
@@ -48,7 +50,7 @@ describe("expense timeline window", () => {
       ],
     };
 
-    const { result } = renderHook(() => useExpenseFilters(store, "es"));
+    const { result } = renderHook(() => useExpenseFilters(store, "es", new Date()));
     const nextMonthDates = result.current.visibleOccurrences
       .filter((item) => item.occurrenceDate.startsWith("2026-08"))
       .map((item) => item.dueDate);
@@ -94,13 +96,106 @@ describe("expense timeline window", () => {
       ],
     };
 
-    const { result } = renderHook(() => useExpenseFilters(store, "es"));
+    const { result } = renderHook(() => useExpenseFilters(store, "es", new Date()));
     const januaryDates = result.current.visibleOccurrences
       .filter((item) => item.occurrenceDate.startsWith("2027-01"))
       .map((item) => item.dueDate);
 
     expect(januaryDates).toEqual(["2027-01-07"]);
     expect(result.current.pendingTotal).toBe(0);
+  });
+});
+
+describe("month boundary", () => {
+  it("keeps last month's unpaid bills in their own section after the 1st", () => {
+    const store: ExpenseStore = {
+      ...emptyStore,
+      templates: [
+        monthlyTemplate("internet", "2026-09-28", 28),
+        monthlyTemplate("rent", "2026-09-05", 5),
+      ],
+      overrides: [
+        paidOverride("internet", "2026-09-28"),
+        paidOverride("rent", "2026-09-05"),
+        paidOverride("rent", "2026-10-05"),
+      ],
+    };
+
+    const { result, rerender } = renderHook(
+      ({ now }) => useExpenseFilters(store, "es", now),
+      { initialProps: { now: new Date(2026, 9, 31, 23, 59) } },
+    );
+
+    expect(result.current.pendingTotal).toBe(100);
+    expect(
+      result.current.timelineSections.some((section) =>
+        section.id.startsWith("carry-over-"),
+      ),
+    ).toBe(false);
+
+    rerender({ now: new Date(2026, 10, 1, 0, 5) });
+
+    const carryOver = result.current.timelineSections.find(
+      (section) => section.id === "carry-over-2026-10",
+    );
+    expect(carryOver).toMatchObject({
+      title: "Pendiente de octubre",
+      total: 100,
+      items: [expect.objectContaining({ dueDate: "2026-10-28" })],
+    });
+    expect(result.current.timelineSections[0].id).toBe("carry-over-2026-10");
+    expect(result.current.pendingTotal).toBe(200);
+  });
+
+  it("matches the Plan pending total, including weekend and moved bills", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 23, 12));
+
+    const store: ExpenseStore = {
+      ...emptyStore,
+      templates: [
+        monthlyTemplate("saturday", "2026-10-31", 31),
+        monthlyTemplate("moved-in", "2026-11-03", 3),
+        monthlyTemplate("moved-out", "2026-10-20", 20),
+        monthlyTemplate("prepaid", "2026-11-01", 1),
+      ],
+      overrides: [
+        {
+          id: "moved-in:2026-11-03",
+          userId: "demo",
+          templateId: "moved-in",
+          occurrenceDate: "2026-11-03",
+          dueDate: "2026-10-30",
+          status: "due",
+        },
+        {
+          id: "moved-out:2026-10-20",
+          userId: "demo",
+          templateId: "moved-out",
+          occurrenceDate: "2026-10-20",
+          dueDate: "2026-11-15",
+          status: "due",
+        },
+        paidOverride("prepaid", "2026-11-01"),
+      ],
+    };
+
+    const { result } = renderHook(() =>
+      useExpenseFilters(store, "es", new Date()),
+    );
+    const monthDate = new Date(2026, 9, 1);
+    const plan = buildMonthlyMoneyPlan({
+      monthDate,
+      finance: store.finance,
+      occurrences: occurrencesForMonth(store, monthDate, "es"),
+      today: new Date(),
+    });
+
+    expect(result.current.pendingTotal).toBe(200);
+    expect(plan.pendingExpensesTotal).toBe(result.current.pendingTotal);
+    expect(
+      result.current.visibleOccurrences.map((item) => item.dueDate),
+    ).not.toContain("2026-11-15");
   });
 });
 

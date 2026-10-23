@@ -289,6 +289,55 @@ export function generateStoreOccurrences(
   );
 }
 
+// Ocurrencias cuyo vencimiento efectivo cae en el rango. A diferencia de
+// generateStoreOccurrences, incluye las movidas al rango desde otro mes y
+// excluye las movidas fuera, para que cada cobro cuente en el mes de su dueDate.
+export function occurrencesDueBetween(
+  store: ExpenseStore,
+  fromDate: string,
+  toDate: string,
+  language: AppLanguage = "es",
+): ExpenseOccurrence[] {
+  const isInRange = (date: string) => date >= fromDate && date <= toDate;
+  const inRange = generateStoreOccurrences(
+    store,
+    fromDate,
+    toDate,
+    language,
+  ).filter((occurrence) => isInRange(occurrence.dueDate));
+  const seenIds = new Set(inRange.map((occurrence) => occurrence.id));
+  const movedIn = store.overrides.flatMap((override) => {
+    if (
+      !override.dueDate ||
+      !isInRange(override.dueDate) ||
+      isInRange(override.occurrenceDate)
+    ) {
+      return [];
+    }
+
+    return generateStoreOccurrences(
+      store,
+      override.occurrenceDate,
+      override.occurrenceDate,
+      language,
+    ).filter((occurrence) => {
+      if (
+        occurrence.template.id !== override.templateId ||
+        !isInRange(occurrence.dueDate) ||
+        seenIds.has(occurrence.id)
+      ) {
+        return false;
+      }
+      seenIds.add(occurrence.id);
+      return true;
+    });
+  });
+
+  return [...inRange, ...movedIn].sort(
+    (a, b) => a.dueDate.localeCompare(b.dueDate) || a.sortOrder - b.sortOrder,
+  );
+}
+
 export function materializeClosedOccurrenceRecords(
   store: ExpenseStore,
   options: {
