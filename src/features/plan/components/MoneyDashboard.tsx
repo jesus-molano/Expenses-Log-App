@@ -24,7 +24,7 @@ import { useCompactChart } from "../hooks/use-compact-chart";
 import { useOneOffIncomeForm } from "../hooks/use-one-off-income-form";
 import { usePlanSettingsForm } from "../hooks/use-plan-settings-form";
 import { useSkipOccurrenceConfirmation } from "../hooks/use-skip-occurrence-confirmation";
-import { formatMoneyInput, parseMoneyInput } from "../lib/money-input";
+import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 import {
   buildSeriesItem,
   getAvailableYears,
@@ -218,7 +218,7 @@ export function MoneyDashboard() {
     if (!savingsMonthId) return;
     updateMonthlySavingsContribution({
       monthId: savingsMonthId,
-      amount: parseMoneyInput(savingsActualText),
+      amount: parseMoneyInput(savingsActualText) ?? 0,
     });
     setSavingsMonthId(null);
   }

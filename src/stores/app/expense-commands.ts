@@ -1,5 +1,10 @@
 import { startOfMonth } from "date-fns";
-import { buildDateWithDay, estimateChargeDate, toDateOnly } from "@/domain/calendar";
+import {
+  buildDateWithDay,
+  estimateChargeDate,
+  normalizeDateOnly,
+  toDateOnly,
+} from "@/domain/calendar";
 import type {
   CreateExpenseOptions,
   DraftExpense,
@@ -20,7 +25,8 @@ export function addExpenseToStore(
   options: CreateExpenseOptions = {},
 ): ExpenseStore {
   const categoryResult = findOrCreateCategory(store, draft.categoryName);
-  const startDate = draft.startDate || toDateOnly(startOfMonth(new Date()));
+  const startDate =
+    normalizeDateOnly(draft.startDate) ?? toDateOnly(startOfMonth(new Date()));
   const template = buildTemplateFromDraft(
     normalizeDraftStartDate(draft, startDate),
     categoryResult.categoryId,

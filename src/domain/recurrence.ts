@@ -16,7 +16,12 @@ import type {
   AppLanguage,
   RecurrenceRule,
 } from "./types";
-import { buildDateWithDay, estimateChargeDate, toDateOnly } from "./calendar";
+import {
+  buildDateWithDay,
+  estimateChargeDate,
+  isValidDateOnly,
+  toDateOnly,
+} from "./calendar";
 
 function nextDate(date: Date, rule: RecurrenceRule): Date {
   const interval = Math.max(rule.interval ?? 1, 1);
@@ -47,10 +52,15 @@ function dateForRule(date: Date, template: ExpenseTemplate): Date {
 function rruleDates(template: ExpenseTemplate, from: Date, to: Date): Date[] {
   if (!template.recurrence.rrule) return [];
 
-  const rule = RRule.fromString(template.recurrence.rrule);
-  return rule.between(from, to, true).map((date) =>
-    buildDateWithDay(date, template.dueDay),
-  );
+  try {
+    const rule = RRule.fromString(template.recurrence.rrule);
+    return rule
+      .between(from, to, true)
+      .map((date) => buildDateWithDay(date, template.dueDay));
+  } catch {
+    // Una regla inválida no debe romper el resto de gastos.
+    return [];
+  }
 }
 
 function annualTemplateDates(
@@ -80,6 +90,16 @@ export function generateTemplateDates(
   fromDate: string,
   toDate: string,
 ): string[] {
+  // Un gasto con fechas imposibles (p. ej. de la IA) no genera ocurrencias en
+  // lugar de lanzar al formatear una fecha inválida.
+  if (
+    !isValidDateOnly(template.startDate) ||
+    (template.endDate && !isValidDateOnly(template.endDate)) ||
+    !Number.isFinite(template.dueDay)
+  ) {
+    return [];
+  }
+
   const from = parseISO(fromDate);
   const configuredTo = parseISO(toDate);
   const end = template.endDate ? parseISO(template.endDate) : configuredTo;

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { AppLanguage, IncomeEvent } from "@/domain/types";
-import { formatMoneyInput, parseMoneyInput } from "../lib/money-input";
+import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 
 export type IncomeEventUpdateInput = {
   name: string;
@@ -37,7 +37,7 @@ export function useIncomeEventRowEditor({
   function save() {
     onUpdate({
       name,
-      amount: parseMoneyInput(amount),
+      amount: parseMoneyInput(amount) ?? 0,
       receivedAt,
       note: event.note,
     });

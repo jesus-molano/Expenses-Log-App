@@ -2,7 +2,11 @@ import {
   materializeClosedOccurrenceRecords,
   toMonthId,
 } from "@/domain/finance";
-import { buildDateWithDay, toDateOnly } from "@/domain/calendar";
+import {
+  buildDateWithDay,
+  normalizeDateOnly,
+  toDateOnly,
+} from "@/domain/calendar";
 import type {
   ExpenseOccurrenceOverride,
   ExpenseStore,
@@ -271,7 +275,7 @@ export function normalizeExpenseStore(
       ? (store.categories as ExpenseStore["categories"])
       : [],
     templates: Array.isArray(store.templates)
-      ? (store.templates as ExpenseStore["templates"])
+      ? normalizeTemplates(store.templates, today)
       : [],
     overrides: Array.isArray(store.overrides)
       ? (store.overrides as ExpenseStore["overrides"])
@@ -297,6 +301,32 @@ export function normalizeExpenseStore(
   return materializeClosedOccurrenceRecords(normalized, {
     today,
     source: schemaVersion < 3 ? "legacy-derived" : "native",
+  });
+}
+
+// Repara fechas y día de cobro imposibles (de la IA o de datos antiguos) para
+// que un gasto corrupto no rompa el render ni el resto del store.
+function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
+  return value.filter(isRecord).map((raw) => {
+    const template = raw as ExpenseTemplate;
+    const startDate =
+      normalizeDateOnly(template.startDate) ??
+      normalizeDateOnly(String(template.createdAt ?? "").slice(0, 10)) ??
+      toDateOnly(today);
+    const endDate = normalizeDateOnly(template.endDate);
+    const dueDay = Number.isInteger(Number(template.dueDay))
+      ? Math.min(Math.max(Number(template.dueDay), 1), 31)
+      : Number(startDate.slice(8, 10));
+
+    if (
+      startDate === template.startDate &&
+      endDate === template.endDate &&
+      dueDay === template.dueDay
+    ) {
+      return template;
+    }
+
+    return { ...template, startDate, endDate, dueDay };
   });
 }
 

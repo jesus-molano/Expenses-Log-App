@@ -15,15 +15,27 @@ import {
 const STORAGE_KEY = "expense-log-store-v1";
 
 export function loadExpenseStore(): ExpenseStore {
+  let raw: string | null = null;
   try {
     if (typeof window === "undefined" || !window.localStorage) return emptyStore;
 
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return emptyStore;
 
     return normalizeExpenseStore(JSON.parse(raw));
   } catch {
+    // La app guarda el store normalizado justo después de cargarlo: sin esta
+    // copia, unos datos ilegibles se perderían al sobrescribirlos con uno vacío.
+    if (raw) backupCorruptStore(raw);
     return emptyStore;
+  }
+}
+
+function backupCorruptStore(raw: string) {
+  try {
+    window.localStorage.setItem(`${STORAGE_KEY}.corrupt-${Date.now()}`, raw);
+  } catch {
+    // Sin espacio para la copia no hay nada más que hacer sin bloquear la app.
   }
 }
 

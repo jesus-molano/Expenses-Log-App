@@ -89,6 +89,19 @@ describe("store commands", () => {
     ]);
   });
 
+  it("stores an impossible draft date as the last day of its month", () => {
+    const added = addExpenseToStore(emptyStore, {
+      ...draft,
+      startDate: "2026-11-31",
+      dueDay: 31,
+    });
+
+    expect(added.templates[0]).toMatchObject({
+      startDate: "2026-11-30",
+      dueDay: 31,
+    });
+  });
+
   it("clears only expense data", () => {
     const added = addExpenseToStore(emptyStore, draft);
     const cleared = clearExpensesFromStore(added);

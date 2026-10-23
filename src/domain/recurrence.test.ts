@@ -209,3 +209,56 @@ describe("recurrence", () => {
     ]);
   });
 });
+
+describe("generateTemplateDates with invalid data", () => {
+  const base = {
+    id: "broken",
+    userId: "demo",
+    name: "Broken",
+    description: "",
+    amount: 10,
+    currency: "EUR" as const,
+    categoryId: "cat",
+    startDate: "2026-11-31",
+    dueDay: 31,
+    recurrence: { frequency: "monthly" as const },
+    active: true,
+    createdAt: "2026-10-01T00:00:00.000Z",
+    updatedAt: "2026-10-01T00:00:00.000Z",
+  };
+
+  it("returns no dates instead of throwing for impossible dates", () => {
+    expect(() =>
+      generateTemplateDates(base, "2026-11-01", "2026-12-31"),
+    ).not.toThrow();
+    expect(generateTemplateDates(base, "2026-11-01", "2026-12-31")).toEqual([]);
+    expect(
+      generateTemplateDates(
+        { ...base, startDate: "2026-11-01", endDate: "nope" },
+        "2026-11-01",
+        "2026-12-31",
+      ),
+    ).toEqual([]);
+  });
+
+  it("ignores an empty end date and an invalid rrule", () => {
+    expect(
+      generateTemplateDates(
+        { ...base, startDate: "2026-11-01", dueDay: 1, endDate: "" },
+        "2026-11-01",
+        "2026-12-31",
+      ),
+    ).toEqual(["2026-11-01", "2026-12-01"]);
+    expect(
+      generateTemplateDates(
+        {
+          ...base,
+          startDate: "2026-11-01",
+          recurrence: { frequency: "rrule", rrule: "NOT A RULE" },
+        },
+        "2026-11-01",
+        "2026-12-31",
+      ),
+    ).toEqual([]);
+  });
+});

@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { parseMoneyInput } from "../lib/money-input";
+import { parseMoneyInput } from "@/shared/money";
 
 type UseOneOffIncomeFormOptions = {
   today: string;
@@ -21,7 +21,7 @@ export function useOneOffIncomeForm({
 
   function saveExtra(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const amount = parseMoneyInput(extraAmount);
+    const amount = parseMoneyInput(extraAmount) ?? 0;
     if (amount <= 0) return;
 
     onAddIncome({

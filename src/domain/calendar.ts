@@ -16,6 +16,25 @@ export function toDateOnly(date: Date): string {
   return format(date, "yyyy-MM-dd");
 }
 
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+export function isValidDateOnly(value: unknown): value is string {
+  return normalizeDateOnly(value) === value;
+}
+
+// Fecha YYYY-MM-DD válida. Un día que no existe en ese mes (31 de noviembre)
+// se ajusta al último día; cualquier otra cosa devuelve undefined.
+export function normalizeDateOnly(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const match = DATE_ONLY_PATTERN.exec(value.trim());
+  if (!match) return undefined;
+
+  const [, year, month, day] = match.map(Number);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+  const lastDay = new Date(year, month, 0).getDate();
+  return toDateOnly(new Date(year, month - 1, Math.min(day, lastDay)));
+}
+
 export function buildDateWithDay(baseDate: Date, dueDay: number): Date {
   const year = baseDate.getFullYear();
   const month = baseDate.getMonth();

@@ -5,7 +5,7 @@ import type {
   ExpenseStore,
   ExpenseTemplate,
 } from "@/domain/types";
-import { mergeExpenseStores } from "./local-store";
+import { loadExpenseStore, mergeExpenseStores } from "./local-store";
 
 function template(id: string): ExpenseTemplate {
   return {
@@ -216,3 +216,18 @@ function occurrenceRecord(
     ...overrides,
   };
 }
+
+describe("loadExpenseStore", () => {
+  it("keeps a copy of an unreadable store before falling back to empty", () => {
+    window.localStorage.setItem("expense-log-store-v1", "{not json");
+
+    expect(loadExpenseStore()).toBe(emptyStore);
+
+    const backups = Object.keys(window.localStorage).filter((key) =>
+      key.startsWith("expense-log-store-v1.corrupt-"),
+    );
+    expect(backups).toHaveLength(1);
+    expect(window.localStorage.getItem(backups[0])).toBe("{not json");
+    window.localStorage.clear();
+  });
+});

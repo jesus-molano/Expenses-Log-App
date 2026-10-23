@@ -11,11 +11,8 @@ import type {
 import {
   findOrCreateCategory,
 } from "@/features/expenses/lib/expense-actions";
-import {
-  formatEuroInput,
-  parseEuroInput,
-} from "@/features/expenses/components/ExpenseFormControls";
 import { t } from "@/shared/i18n";
+import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 import type { useExpenseStore } from "@/stores/app/use-expense-store";
 
 type UseExpenseEditorOptions = {
@@ -33,7 +30,7 @@ export function useExpenseEditor({
   const { store, persist, deleteExpense } = expenseStore;
   const category = store.categories.find((item) => item.id === template.categoryId);
   const [amountText, setAmountText] = useState(() =>
-    formatEuroInput(template.amount, language),
+    formatMoneyInput(template.amount, language),
   );
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [form, setForm] = useState<DraftExpense>(() => ({
@@ -48,13 +45,15 @@ export function useExpenseEditor({
     reminder: template.reminder,
   }));
 
-  const previewAmount = Math.max(parseEuroInput(amountText), 0);
+  const previewAmount = parseMoneyInput(amountText) ?? 0;
 
   function saveExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const amount = parseMoneyInput(amountText);
+    // El campo valida antes de enviar; esto solo protege de un importe vacío.
+    if (amount === null || amount <= 0) return;
     const categoryResult = findOrCreateCategory(store, form.categoryName);
-    const amount = Math.max(parseEuroInput(amountText), 0.01);
 
     persist({
       ...categoryResult.store,
