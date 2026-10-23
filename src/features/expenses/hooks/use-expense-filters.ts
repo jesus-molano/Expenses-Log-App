@@ -57,9 +57,20 @@ function buildExpenseFilters(
     language,
   });
 
+  // Del mes siguiente se ven sus primeros días y, entero, lo ya pagado por
+  // adelantado ("Ya pagado de noviembre", al final del timeline).
+  const nextMonthEnd = monthRange(addMonthId(monthId, 1)).end;
+  const paidAhead = occurrencesDueBetween(
+    store,
+    toDateOnly(addDays(parseISO(timelineWindowEnd), 1)),
+    nextMonthEnd,
+    language,
+  ).filter((occurrence) => occurrence.status === "paid");
+
   const visibleOccurrences = [
     ...selectCarryOverOccurrences(store, todayDate, language, monthId),
     ...occurrencesDueBetween(store, windowStart, timelineWindowEnd, language),
+    ...paidAhead,
   ].filter((occurrence) => occurrence.status !== "skipped");
 
   const pendingTotal = monthPendingSummary(visibleOccurrences, monthId).total;

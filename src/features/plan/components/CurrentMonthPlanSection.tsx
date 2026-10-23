@@ -7,6 +7,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
+import type { PaydayOutlook } from "@/domain/budget-month";
 import { formatCurrency } from "@/domain/calendar";
 import type {
   AppLanguage,
@@ -18,11 +19,15 @@ import { t } from "@/shared/i18n";
 import type { MonthlyExpenseOverrideInput } from "@/stores/app/store-types";
 import { formatShortDate, planCopy } from "../lib/plan-dashboard";
 import { MonthlyExpenseRow } from "./MonthlyExpenseRow";
+import { PaydayOutlookCard } from "./PaydayOutlookCard";
 
 export function CurrentMonthPlanSection({
   language,
   copy,
   monthLabel,
+  phaseLabel = null,
+  savingsLabel,
+  paydayOutlook = null,
   plan,
   paidProgress,
   pendingOccurrences,
@@ -38,6 +43,11 @@ export function CurrentMonthPlanSection({
   language: AppLanguage;
   copy: ReturnType<typeof planCopy>;
   monthLabel: string;
+  // Fase del mes que se mira cuando no es el activo ("Registrado", "Proyectado").
+  phaseLabel?: string | null;
+  savingsLabel: string;
+  // "Hasta el cobro", solo en el mes activo y con sueldo configurado.
+  paydayOutlook?: PaydayOutlook | null;
   plan: MonthlyMoneyPlan;
   paidProgress: number;
   pendingOccurrences: ExpenseOccurrence[];
@@ -60,10 +70,17 @@ export function CurrentMonthPlanSection({
           >
             {copy.planFor} {monthLabel}
           </h1>
-          <p className="mt-1 text-sm text-[var(--app-text-muted)]">
-            {plan.plannedExpenseCount
-              ? `${plan.paidExpenseCount} ${copy.of} ${plan.plannedExpenseCount} ${copy.paidReceipts}`
-              : copy.noReceipts}
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--app-text-muted)]">
+            {phaseLabel ? (
+              <span className="rounded-full bg-[var(--app-panel-soft-alpha)] px-2.5 py-0.5 text-xs font-semibold">
+                {phaseLabel}
+              </span>
+            ) : null}
+            <span>
+              {plan.plannedExpenseCount
+                ? `${plan.paidExpenseCount} ${copy.of} ${plan.plannedExpenseCount} ${copy.paidReceipts}`
+                : copy.noReceipts}
+            </span>
           </p>
         </div>
         <IconButton
@@ -115,6 +132,14 @@ export function CurrentMonthPlanSection({
           )}
         </div>
       </div>
+
+      {paydayOutlook ? (
+        <PaydayOutlookCard
+          outlook={paydayOutlook}
+          today={todayDateOnly}
+          language={language}
+        />
+      ) : null}
 
       <div className="mt-10 grid gap-10 sm:mt-12 sm:gap-12">
         <section
@@ -176,8 +201,8 @@ export function CurrentMonthPlanSection({
             className="app-plan-savings-action app-focus-ring flex min-h-14 w-full items-center justify-between gap-4 rounded-[var(--app-radius-md)] px-3 py-3 text-left"
           >
             <span className="min-w-0">
-              <span className="block font-semibold text-[var(--app-text)]">
-                {copy.savingsThisMonth}
+              <span className="block font-semibold text-[var(--app-text)] first-letter:uppercase">
+                {savingsLabel}
               </span>
               <span className="mt-1 block text-sm text-[var(--app-text-muted)]">
                 {copy.actual} {formatCurrency(plan.savingsActual)} · {copy.goal.toLowerCase()} {formatCurrency(plan.savingsTarget)}

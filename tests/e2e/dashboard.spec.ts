@@ -152,9 +152,10 @@ test("marks a pending receipt as paid directly from plan", async ({ page }) => {
   await loadDemoStore(page);
   await page.goto("/money");
 
-  const payButton = page.getByRole("button", {
-    name: "Marcar Movistar como pagado",
-  });
+  // La revisión del mes también tiene botón de pagar: se usa el de pendientes.
+  const payButton = page
+    .getByRole("region", { name: "Recibos pendientes" })
+    .getByRole("button", { name: "Marcar Movistar como pagado" });
   await expect(payButton).toBeVisible();
   const expenseRow = page.locator(".app-monthly-expense-row").filter({
     has: payButton,

@@ -233,6 +233,42 @@ describe("viewed month", () => {
       result.current.timelineSections.some((section) => section.id === "today"),
     ).toBe(false);
   });
+
+  it("shows everything already paid of next month at the end, not only its first week", () => {
+    const store: ExpenseStore = {
+      ...emptyStore,
+      templates: [
+        monthlyTemplate("rent", "2026-10-01", 1),
+        monthlyTemplate("insurance", "2026-10-15", 15),
+        monthlyTemplate("power", "2026-10-30", 30),
+      ],
+      overrides: [
+        paidOverride("rent", "2026-10-01"),
+        paidOverride("insurance", "2026-10-15"),
+        paidOverride("rent", "2026-11-01"),
+        paidOverride("insurance", "2026-11-15"),
+      ],
+    };
+
+    const { result } = renderHook(() =>
+      useExpenseFilters(store, "es", new Date(2026, 9, 28, 10), "2026-10"),
+    );
+    const sections = result.current.timelineSections;
+
+    expect(sections.at(-1)).toMatchObject({
+      id: "paid-ahead-2026-11",
+      title: "Ya pagado de noviembre",
+    });
+    expect(sections.at(-1)?.items.map((item) => item.dueDate)).toEqual([
+      "2026-11-01",
+      "2026-11-15",
+    ]);
+    // Lo pendiente de noviembre fuera de su primera semana sigue sin verse.
+    expect(
+      result.current.visibleOccurrences.some((item) => item.dueDate === "2026-11-30"),
+    ).toBe(false);
+    expect(result.current.pendingTotal).toBe(100);
+  });
 });
 
 function monthlyTemplate(

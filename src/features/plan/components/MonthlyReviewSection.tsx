@@ -1,3 +1,4 @@
+import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatCurrency } from "@/domain/calendar";
 import type {
@@ -39,6 +40,7 @@ export function MonthlyReviewSection({
   onUpdateIncomeEvent,
   onToggleExpanded,
   onSkipOccurrence,
+  onTogglePaid,
   onUpdateMonthlyExpense,
 }: {
   language: AppLanguage;
@@ -63,8 +65,16 @@ export function MonthlyReviewSection({
   onUpdateIncomeEvent: (id: string, input: IncomeEventInput) => void;
   onToggleExpanded: () => void;
   onSkipOccurrence: (occurrence: ExpenseOccurrence) => void;
+  onTogglePaid: (occurrence: ExpenseOccurrence) => void;
   onUpdateMonthlyExpense: (input: MonthlyExpenseOverrideInput) => void;
 }) {
+  // M17: en un mes registrado el libre solo resta el ahorro real; si había
+  // objetivo y no se apuntó nada, se avisa y se ofrece registrarlo.
+  const goalNotRegistered =
+    selectedSummary.phase === "registered" &&
+    (selectedSummary.savingsGoal ?? 0) > 0 &&
+    selectedSummary.savings === 0;
+
   return (
     <section className="min-w-0" aria-labelledby="monthly-review-title">
       <header className="px-1">
@@ -139,6 +149,29 @@ export function MonthlyReviewSection({
         />
       </dl>
 
+      {goalNotRegistered ? (
+        <div className="mt-3 grid gap-2 rounded-[var(--app-radius-md)] bg-[color-mix(in_srgb,var(--app-warning)_10%,transparent)] px-3 py-3">
+          <div className="flex items-start gap-2">
+            <TriangleAlert
+              size={16}
+              aria-hidden="true"
+              className="mt-0.5 shrink-0 text-[var(--app-warning)]"
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--app-warning)]">
+                {t("monthClose.goalNotRegistered", language)}
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-[var(--app-text-muted)]">
+                {t("monthClose.goalNotRegisteredBody", language)}
+              </p>
+            </div>
+          </div>
+          <Button size="sm" variant="secondary" className="justify-self-start" onClick={onEditSavings}>
+            {t("monthClose.registerSavings", language)}
+          </Button>
+        </div>
+      ) : null}
+
       <div className="mt-3 flex justify-end gap-2">
         <Button size="sm" variant="ghost" onClick={onEditSalary}>
           {copy.editFixedIncome}
@@ -164,6 +197,7 @@ export function MonthlyReviewSection({
           expanded={expandedReview}
           onToggleExpanded={onToggleExpanded}
           onSkipOccurrence={onSkipOccurrence}
+          onTogglePaid={onTogglePaid}
           onUpdateMonthlyExpense={onUpdateMonthlyExpense}
         />
       </div>

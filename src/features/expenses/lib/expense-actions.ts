@@ -99,9 +99,12 @@ export function statusLabel(
   }
   if (occurrence.estimatedChargeDate !== occurrence.dueDate) {
     const locale = language === "en" ? enUS : es;
+    // Un cargo que se va al mes siguiente lleva el mes: "estimado lunes 2 nov".
+    const otherMonth =
+      occurrence.estimatedChargeDate.slice(0, 7) !== occurrence.dueDate.slice(0, 7);
     return `${t("expenses.estimated", language).toLowerCase()} ${format(
       parseISO(occurrence.estimatedChargeDate),
-      "EEEE d",
+      otherMonth ? "EEEE d MMM" : "EEEE d",
       { locale },
     )}`;
   }

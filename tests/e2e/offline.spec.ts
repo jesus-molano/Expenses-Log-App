@@ -62,7 +62,10 @@ test("loads and edits the main app routes after going offline", async ({
   await expect(
     moneyPage.getByRole("heading", { level: 1, name: /Plan de/ }),
   ).toBeVisible();
+  // La revisión del mes también tiene el botón: se paga desde pendientes y
+  // desaparece de los dos sitios.
   await moneyPage
+    .getByRole("region", { name: "Recibos pendientes" })
     .getByRole("button", { name: "Marcar Movistar como pagado" })
     .click();
   await expect(
