@@ -81,7 +81,6 @@ export function ExpenseDashboard({
           .replace("{amount}", formatCurrency(prompt.to)),
       }),
   });
-  const paidToastFor = useRef<string | null>(null);
   const salaryPrompt = useSalaryPrompt({
     finance: store.finance,
     now,
@@ -163,26 +162,27 @@ export function ExpenseDashboard({
   function togglePaidWithMonthCheck(occurrence: ExpenseOccurrence) {
     const settles = month.settlesMonth(occurrence);
     runViewTransition(() => togglePaid(occurrence));
+    const paidMessage = t("bills.paidToast", language).replace(
+      "{name}",
+      occurrence.template.name,
+    );
     if (occurrence.status === "paid") {
       // Despagado: el aviso "pagado" de ese cobro ya no vale.
-      if (paidToastFor.current === occurrence.id) actionToast.dismiss();
-      paidToastFor.current = null;
+      if (actionToast.toast?.message === paidMessage) actionToast.dismiss();
       return;
     }
     if (!settles) {
-      paidToastFor.current = occurrence.id;
+      // Recibos variables: tras pagar se puede anotar lo que costó de verdad.
       actionToast.show({
-        message: t("bills.paidToast", language).replace("{name}", occurrence.template.name),
+        message: paidMessage,
         actionLabel: t("bills.otherAmount", language),
         onAction: () => {
           actionToast.dismiss();
-          paidToastFor.current = null;
           payFlow.open(occurrence);
         },
       });
       return;
     }
-    paidToastFor.current = null;
     actionToast.show({
       message: capitalize(
         t("expenses.monthSettledTitle", language).replace(

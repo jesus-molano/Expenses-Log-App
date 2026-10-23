@@ -419,7 +419,7 @@ export const messages = {
       historyEmpty: "Aún no hay cobros.",
       historyAverage: "Media de los {count} últimos pagos: {amount}",
       historyPlanned: "previsto {amount}",
-      historyEditPaid: "Cambiar el importe pagado del {date}",
+      historyEditPaid: "Corregir lo pagado el {date}",
       historyPay: "Pagar el cobro del {date}",
     },
     // Pagas extra, "¿Has cobrado?" y ámbito del sueldo (F3).
@@ -886,7 +886,7 @@ export const messages = {
       historyEmpty: "No charges yet.",
       historyAverage: "Average of the last {count} payments: {amount}",
       historyPlanned: "planned {amount}",
-      historyEditPaid: "Change the amount paid on {date}",
+      historyEditPaid: "Correct what was paid on {date}",
       historyPay: "Pay the {date} charge",
     },
     // Extra pay, "Have you been paid?" and salary scope (F3).
