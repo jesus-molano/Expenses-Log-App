@@ -16,7 +16,9 @@ El hook expone:
   move series.
 - Comandos financieros: salario, objetivo de ahorro, aportacion real, ingresos
   y overrides mensuales.
-- Comandos de preferencias: tema e idioma.
+- Comandos de preferencias: tema, idioma y ajustes de avisos
+  (`updateReminderPreferences`), y el aviso propio de un gasto
+  (`setTemplateReminder`, la campana de la fila).
 - Estado de sync: `syncStatus`, `syncMessage`, `isHydrated`.
 
 `useExpenseStore` falla explicitamente si se llama fuera del provider. Eso evita
@@ -30,7 +32,8 @@ Los comandos se dividen por responsabilidad:
   mueve o borra gastos.
 - `finance-commands`: modifica salario mensual, objetivos, aportaciones reales
   e ingresos.
-- `preference-commands`: actualiza tema e idioma en el store.
+- `preference-commands`: actualiza tema, idioma y ajustes de avisos en el
+  store.
 
 Los comandos reciben un `ExpenseStore` y devuelven otro. Esta forma mantiene la
 logica testeable y evita mutaciones ocultas dentro de componentes.
@@ -107,7 +110,12 @@ La mezcla actual usa ids:
   `salaryClearedTombstone`). Al fusionar desaparece cualquier sueldo editado
   hasta esa hora, tambien copias antiguas de otro dispositivo; uno editado
   despues se conserva.
-- Preferencias: local, luego cloud, luego defaults.
+- Preferencias: local, luego cloud, luego defaults. Excepcion:
+  `preferences.reminders` (ajustes de avisos, que lee el cron) gana la version
+  con el `updatedAt` mas reciente, de cualquier dispositivo.
+- Aviso de un gasto: `template.reminder` viaja con la plantilla (merge por
+  `updatedAt`). Sin el, el gasto sigue el aviso por defecto de
+  `preferences.reminders`.
 
 La politica de hidratacion (`resolveHydratedStore`) protege los cambios hechos
 mientras llegaba el cloud store y los que quedaron sin subir en una sesion
@@ -142,6 +150,12 @@ Reglas para campos nuevos:
   tambien. Si un build antiguo lo descarta, el mes activo vuelve a ser el
   natural. Se fusiona por mes con el `updatedAt` mas reciente; reabrir guarda
   `reopenedAt` en vez de borrar la entrada.
+- Excepcion: `preferences.reminders` (ajustes de avisos) tambien, solo cuando
+  el usuario los cambia. Un build con passthrough lo conserva como clave
+  desconocida; uno anterior lo descarta y los avisos vuelven a los valores
+  por defecto (solo los gastos con aviso propio, a las 8), sin perder datos.
+  La normalizacion corrige valores imposibles (hora, antelacion, zona) y
+  conserva las claves que añada un build mas nuevo dentro del objeto.
 
 ## Cola de guardado
 

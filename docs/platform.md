@@ -10,10 +10,27 @@ La metadata PWA se define en `src/app/layout.tsx` y `src/app/manifest.ts`.
 La app usa:
 
 - `manifest.webmanifest`.
-- Iconos versionados en `public/`.
+- Iconos versionados en `public/`. Los maskable (`icon-maskable-192.png` y
+  `icon-maskable-512.png`) llevan el dibujo dentro de la zona segura y el
+  badge de las notificaciones (`badge-96.png`) es una silueta blanca con
+  transparencia; los genera `scripts/generate-pwa-icons.mjs` (sharp) a partir
+  de `app-icon-1024.png`.
 - `display: standalone`.
 - `orientation: portrait`.
 - `start_url` y `scope` en `/`.
+- Atajos al mantener pulsado el icono (Android): "Añadir gasto"
+  (`/expenses/new`), "Añadir por voz" (`/expenses/new?mode=voice`) y "Plan"
+  (`/money`).
+- `theme-color` del tema elegido (`THEME_COLORS` en `src/shared/theme.ts`, que
+  un test compara con `--noctalia-background` de cada tema): el layout pone el
+  del tema por defecto, `boot-guard` el de la cookie al cargar y
+  `setThemeDom` el del tema al cambiarlo.
+- Número en el icono (`navigator.setAppBadge`) con los recibos vencidos y los
+  que vencen hoy desde el mes anterior (`countAttentionOccurrences`):
+  `AppBadgeSync` lo actualiza en cualquier pantalla y cada push trae el suyo.
+- Ajustes muestra en iPhone/iPad sin instalar la fila "Instalar en el iPhone"
+  con los pasos (Compartir › Añadir a pantalla de inicio): en iOS los push
+  solo funcionan con la app instalada (16.4 o posterior).
 - Registro del service worker desde `PwaRegister`.
 
 ## Service worker
@@ -55,8 +72,18 @@ Navegacion y red:
 
 El service worker tambien maneja:
 
-- `push`: muestra notificacion con titulo, cuerpo, icono y URL.
-- `notificationclick`: cierra la notificacion y abre la URL asociada.
+- `push`: valida el payload (`src/pwa/push-payload.ts`) y muestra la
+  notificacion con titulo, cuerpo, icono, badge monocromo, idioma, `tag` (una
+  nueva con la misma etiqueta sustituye a la anterior) y URL. Si trae
+  `badgeCount`, actualiza el numero del icono.
+- `notificationclick`: cierra la notificacion, enfoca la ventana abierta y la
+  lleva a la URL (solo rutas del mismo origen); si la ventana no esta
+  controlada o no hay ninguna, abre otra.
+- `pushsubscriptionchange`: el navegador renueva o invalida la suscripcion.
+  Se vuelve a suscribir con la misma clave (o la pide a
+  `/api/push/subscribe`) y la manda al servidor con `previousEndpoint`, que
+  borra la antigua. Sin sesion responde 401 y el latido de la app la registra
+  al abrirla.
 - `message` `GET_OFFLINE_STATUS`: responde por `MessageChannel` cuantas
   entradas del precache espera y cuantas tiene ya en cache.
 
@@ -165,8 +192,8 @@ Esto evita meter Supabase Auth en cada request API.
   ella el microfono avisa. Un error (red, permiso) deja lo oido en el campo sin
   analizarlo. Solo un "servicio no permitido" sin resultados (por ejemplo en
   Brave) oculta el microfono durante la sesion.
-- El manifest tiene atajos "Añadir gasto" (`/expenses/new`) y "Añadir por voz"
-  (`/expenses/new?mode=voice`). `mode` se lee en cliente y el precache lo ignora,
+- El manifest tiene atajos "Añadir gasto" (`/expenses/new`), "Añadir por voz"
+  (`/expenses/new?mode=voice`) y "Plan" (`/money`). `mode` se lee en cliente y el precache lo ignora,
   asi que la pagina sigue siendo estatica. Dictar siempre exige un toque. El
   atajo abre el formulario o la captura una sola vez por entrada del historial
   (`lib/new-expense-intent.ts`): volver a la pantalla con Atras no lo repite.
@@ -188,10 +215,14 @@ Endpoints principales:
   local. Solo llama a Gemini cuando el usuario esta autenticado.
 - `/api/auth/clear-sync-metadata`: POST autenticado para limpiar metadata legacy
   sobredimensionada de Supabase Auth. GET responde 405.
-- `/api/push/subscribe`: guarda suscripciones push.
-- `/api/push/test`: prueba notificaciones.
+- `/api/push/subscribe`: guarda suscripciones push (tambien es el latido del
+  dispositivo: renueva `updated_at` y pone `failure_count` a 0). Con
+  `previousEndpoint` borra la suscripcion que sustituye.
+- `/api/push/test`: prueba notificaciones, en el idioma que manda la app y con
+  TTL de 5 minutos.
 - `/api/push/status`: verifica que el endpoint actual sigue registrado y muestra
-  el ultimo envio programado completado.
+  el ultimo envio programado completado (de cualquier tipo) y los fallos
+  seguidos del dispositivo.
 - `/api/push/daily-reminders`: endpoint llamado por cron para recordatorios.
 - `/api/account`: borra el usuario autenticado; las filas dependientes se
   eliminan mediante claves foraneas `ON DELETE CASCADE`.
@@ -266,27 +297,92 @@ Ajustes diferencia permiso local, suscripcion del navegador y registro remoto.
 Puede resincronizar el dispositivo y enviar una notificacion de prueba. La
 configuracion se considera disponible solo cuando existen las dos claves VAPID.
 
-El cron envia recordatorios pendientes cuando:
+### Que se avisa
 
-- El gasto tiene `reminder.enabled`.
-- La ocurrencia sigue `due`.
-- Faltan entre 0 y `daysBeforeCharge` dias para `estimatedChargeDate`; esta
-  ventana permite recuperar una ejecucion diaria perdida.
-- El usuario no descarto el aviso para esa `estimatedChargeDate`.
-- Hay al menos una suscripcion push guardada para el usuario.
+Los ajustes viven en `preferences.reminders` (Ajustes › Recordatorios) y la
+logica pura en `src/domain/reminder-schedule.ts`:
 
-El endpoint reclama cada ocurrencia en `push_reminder_deliveries` con una clave
-por usuario, template y fechas. La reclamacion es un lease atomico de 15 minutos:
-otra ejecucion no puede enviar a la vez, pero puede recuperar el trabajo si el
-proceso anterior cae. La fila solo pasa a `delivered` cuando al menos un
-dispositivo acepta el push. Si todos fallan, se libera inmediatamente. Esta
-estrategia prioriza no perder avisos; una caida posterior a la aceptacion del
-proveedor y anterior al marcado final puede producir un duplicado excepcional.
+- Aviso de cada gasto: el suyo (`template.reminder`, la campana de la fila o
+  el formulario) o, sin el, el aviso por defecto. La antelacion por defecto
+  es de 1 a 5 dias para mensuales y de 7, 14 o 30 para trimestrales, anuales
+  y personalizados de 3 meses o mas.
+- Etapas de un cobro `due` con aviso:
+  - Antes (`last_chance`): faltan entre 1 y la antelacion dias para
+    `estimatedChargeDate` (desde 0 si la etapa del dia del cargo esta
+    apagada). La ventana recupera una ejecucion perdida. "Entendido" en el
+    aviso de la app la calla para ese cargo.
+  - El dia del cargo (`charge_day`).
+  - "¿Se cobro?" (`charge_check`): el cargo paso hace 1 a 3 dias y sigue
+    pendiente. No la calla "Entendido".
+- Avisos del mes (apagados por defecto): `month_close` con el criterio de la
+  tarjeta "Octubre al dia" (una vez por mes) y `payday` el dia de cobro
+  configurado (el ultimo del mes si es mas corto) con lo que queda por pagar.
+  El "Ahora no" de la tarjeta es por dispositivo y el push no lo ve.
+- Se usan las mismas ocurrencias que la app (`occurrencesDueBetween`, con
+  registros de meses cerrados y recibos movidos). Un gasto borrado o inactivo
+  no avisa.
+
+### Cuando y como se envia
+
+- El dia y la hora se calculan en la zona guardada en los ajustes (la del
+  dispositivo que los cambio; por defecto Atlantic/Canary). Un usuario recibe
+  lo del dia en la primera ejecucion a partir de su hora (por defecto las 8).
+- Con el cron diario de Vercel (08:00 UTC, las 8 o las 9 en Canarias) solo se
+  respetan horas de hasta esa ejecucion. Para cualquier hora, el cron tiene
+  que correr cada hora: en Vercel Pro, `0 * * * *` en `vercel.json`; en Hobby
+  (solo un cron diario), el workflow `.github/workflows/push-reminders.yml`,
+  que no hace nada hasta definir la variable `PUSH_CRON_URL`
+  (`https://<dominio>/api/push/daily-reminders`) y el secreto `CRON_SECRET`
+  en GitHub.
+- Una notificacion por etapa, en el idioma del usuario
+  (`src/features/expenses/lib/reminder-notifications.ts`). Un cobro suelto
+  dice nombre, importe y fecha y abre `/?occurrence=<id>`; varios se resumen
+  ("Hoy se cobran 2 recibos · Luz y Agua · 80,00 €") y abren el primero.
+  `month_close` abre `/` y `payday`, `/money`.
+- `/?occurrence=<id>` se lee en cliente (el precache ignora el parametro):
+  cambia al mes en que se ve el cobro, lo resalta y abre su hoja de acciones;
+  si ya no existe, lo dice. El parametro se quita de la URL.
+- TTL por tipo (20 h los avisos previos, la pregunta y el mes al dia; 12 h el
+  dia del cargo y el de cobro), `timeout` de 5 s y envio en paralelo a todos
+  los dispositivos.
+- El store pasa por `normalizeExpenseStore` y cada usuario va en su propio
+  try/catch: un store ilegible o un error de base de datos se cuenta en
+  `errors`, libera lo que habia reclamado y no corta el envio al resto.
+
+### Entregas
+
+El endpoint reclama cada aviso en `push_reminder_deliveries` con una clave
+por usuario, tipo (`kind`) y aviso: para un cobro, template y fechas (cambia
+si se mueve el cargo); para los del mes, el mes. Los cinco tipos usan el mismo
+RPC `claim_push_reminder_delivery`, sin cambio de esquema, y `last_chance`
+mantiene el nombre anterior para no repetir lo ya entregado. La reclamacion es
+un lease atomico de 15 minutos: otra ejecucion no puede enviar a la vez, pero
+puede recuperar el trabajo si el proceso anterior cae. La fila solo pasa a
+`delivered` cuando al menos un dispositivo acepta el push. Si todos fallan, se
+libera inmediatamente. Esta estrategia prioriza no perder avisos; una caida
+posterior a la aceptacion del proveedor y anterior al marcado final puede
+producir un duplicado excepcional.
 
 La funcion SQL `claim_push_reminder_delivery` usa `security invoker`. Solo
 `service_role` tiene permiso de ejecucion. La migracion
 `20260823215337_push_delivery_leases.sql` añade estado, token y tiempo de claim;
 debe aplicarse antes de desplegar el route handler nuevo.
+
+### Salud de las suscripciones (M12)
+
+- Latido (`PushHeartbeat` en el layout, `src/features/settings/lib/push-heartbeat.ts`):
+  con permiso y suscripcion, una vez al dia por dispositivo (o si cambia el
+  endpoint) y al volver a la app, confirma la suscripcion en
+  `/api/push/subscribe`. Si la suscripcion se creo con otra clave VAPID, crea
+  otra y borra la antigua. Nunca pide permiso.
+- Activar los avisos tampoco reutiliza una suscripcion de otra clave VAPID.
+- `failure_count` (migracion `20261023120000_push_subscription_health.sql`,
+  solo aditiva): un 404/410 borra la suscripcion al momento; otros fallos
+  (403 de clave, 5xx, tiempo agotado) suman uno y al quinto se borra. Un envio
+  correcto lo pone a 0. Ajustes avisa si los ultimos envios a ese dispositivo
+  fallaron. Sin la migracion, el cron y la app siguen funcionando: el cron lee
+  las filas con `select("*")` y no cuenta fallos, y el alta repite el upsert
+  sin las columnas nuevas.
 
 ## Variables de entorno
 
