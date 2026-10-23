@@ -1,7 +1,13 @@
 import { addMonths, parseISO } from "date-fns";
-import { addMonthId, monthRange } from "./budget-month";
+import {
+  addMonthId,
+  canMoveOccurrence,
+  monthRange,
+  occurrenceMoveRange,
+  resolveActiveMonth,
+} from "./budget-month";
 import { buildDateWithDay, normalizeDateOnly, toDateOnly } from "./calendar";
-import { occurrencesDueBetween } from "./finance";
+import { occurrencesDueBetween, paidAmount } from "./finance";
 import { foldText, wordsOf } from "./text";
 import type { AppLanguage, ExpenseOccurrence, ExpenseStore, ExpenseTemplate } from "./types";
 
@@ -33,7 +39,8 @@ export type CommandIssue =
   | "alreadySkipped"
   | "sameDate"
   | "missingDate"
-  | "closedMonth";
+  | "closedMonth"
+  | "tooFar";
 
 export type ResolvedCaptureCommand = {
   command: CaptureCommand;
@@ -233,13 +240,13 @@ export function resolveCaptureCommand(
   if (!occurrence) return { ...base, templateId: chosen.id, issue: "noOccurrence" };
 
   const resolved = { ...base, templateId: chosen.id, occurrence };
-  const openMonth = today.slice(0, 7);
+  // El mes abierto: el natural, o el siguiente si el natural ya se cerró.
+  const openMonth = resolveActiveMonth(today, store.finance?.monthClosures);
   const occurrenceMonth = occurrence.dueDate.slice(0, 7);
 
   if (command.intent === "pay") {
     const amount = command.amount ?? occurrence.template.amount;
-    const paidAmount = occurrence.override?.amountPaid ?? occurrence.record?.amountPaid ?? occurrence.template.amount;
-    const alreadyPaid = occurrence.status === "paid" && paidAmount === amount;
+    const alreadyPaid = occurrence.status === "paid" && paidAmount(occurrence) === amount;
     return { ...resolved, amount, issue: alreadyPaid ? "alreadyPaid" : null };
   }
 
@@ -258,14 +265,17 @@ export function resolveCaptureCommand(
     (command.day
       ? toDateOnly(buildDateWithDay(parseISO(`${occurrenceMonth}-01`), command.day))
       : null);
+  // Los mismos límites que al mover desde las acciones del cobro.
+  const moveRange = occurrenceMoveRange(openMonth);
   const issue: CommandIssue | null = !newDueDate
     ? "missingDate"
     : newDueDate === occurrence.dueDate
       ? "sameDate"
-      : newDueDate.slice(0, 7) < openMonth ||
-          (occurrenceMonth < openMonth && occurrence.status !== "due")
+      : newDueDate < moveRange.min || !canMoveOccurrence(occurrence, openMonth)
         ? "closedMonth"
-        : null;
+        : newDueDate > moveRange.max
+          ? "tooFar"
+          : null;
   // Como al arrastrar: la serie solo cambia con un mensual que se queda en su
   // mes y no es historial.
   const canMoveSeries = Boolean(

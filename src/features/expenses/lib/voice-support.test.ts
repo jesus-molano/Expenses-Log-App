@@ -96,6 +96,14 @@ describe("word boundaries and typed text", () => {
     expect(sessionTranscript([result("dos", true), result("doscientos", false)]).interim).toBe(
       "doscientos",
     );
+    // Android reenvía la frase cambiando el final de la última palabra.
+    expect(
+      sessionTranscript([result("Netflix doce euro", true), result("Netflix doce euros", true)]).final,
+    ).toBe("Netflix doce euros");
+    expect(sessionTranscript([result("Netflix 12", true), result("Netflix 12€", true)]).final).toBe(
+      "Netflix 12€",
+    );
+    expect(sessionTranscript([result("doce", true), result("doce€", true)]).final).toBe("doce€");
   });
 
   it("keeps a typed line break before what is dictated", () => {

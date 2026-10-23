@@ -140,6 +140,40 @@ describe("capture commands", () => {
     ).toBe("closedMonth");
   });
 
+  it("moves within the same limits as the charge actions", () => {
+    // Hasta el final del mes siguiente al abierto.
+    expect(
+      resolveCaptureCommand(cmd("move", "netflix", { date: "2026-11-30" }), store, context).issue,
+    ).toBeNull();
+    expect(
+      resolveCaptureCommand(cmd("move", "netflix", { date: "2026-12-01" }), store, context).issue,
+    ).toBe("tooFar");
+    // Lo pagado de un mes cerrado es historial.
+    const paidInSeptember: ExpenseStore = {
+      ...store,
+      overrides: [override("luz", "2026-09-08", { status: "paid", amountPaid: 60 })],
+    };
+    expect(
+      resolveCaptureCommand(cmd("move", "luz", { date: "2026-10-12", month: 9 }), paidInSeptember, context).issue,
+    ).toBe("closedMonth");
+    // Con octubre cerrado, el mes abierto es noviembre.
+    const octoberClosed: ExpenseStore = {
+      ...store,
+      finance: {
+        ...store.finance,
+        monthClosures: {
+          "2026-10": { closedAt: "2026-10-20T10:00:00.000Z", updatedAt: "2026-10-20T10:00:00.000Z" },
+        },
+      },
+    };
+    expect(
+      resolveCaptureCommand(cmd("move", "netflix", { date: "2026-10-30" }), octoberClosed, context).issue,
+    ).toBe("closedMonth");
+    expect(
+      resolveCaptureCommand(cmd("move", "netflix", { date: "2026-12-10" }), octoberClosed, context).issue,
+    ).toBeNull();
+  });
+
   it("asks which one when the name is ambiguous or unknown", () => {
     expect(resolveCaptureCommand(cmd("pay", "seguro"), store, context)).toMatchObject({
       templateId: null,

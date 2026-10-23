@@ -1,5 +1,5 @@
 ﻿import { Plus, WalletCards } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Surface } from "@/components/ui/Surface";
 import {
   buildCategoryOptions,
@@ -8,7 +8,7 @@ import {
 } from "@/domain/categories";
 import { foldText } from "@/domain/text";
 import type { AppLanguage, ExpenseCategory } from "@/domain/types";
-import { categoryLabel, compactCategoryLabel } from "@/shared/category-labels";
+import { categoryLabel } from "@/shared/category-labels";
 import { t } from "@/shared/i18n";
 import { categoryToneClass } from "../../lib/expense-actions";
 import { categoryNameErrorLabel } from "../../lib/expense-detail-labels";
@@ -24,6 +24,19 @@ type CategoryPickerProps = {
   // Crea una categoría propia y devuelve su id (null si no es válida).
   onCreateCategory?: (input: CategoryInput) => string | null;
 };
+
+// "Educacion/Trabajo" no tiene hueco donde saltar de linea y se partia a
+// mitad de palabra ("Educacion/Tra" + "bajo"). <wbr> tras cada barra deja que
+// salte justo despues de ella sin cambiar el texto ni el nombre accesible.
+function SlashBreakableText({ text }: { text: string }) {
+  return text.split("/").map((part, index) => (
+    <Fragment key={index}>
+      {index > 0 ? "/" : null}
+      {index > 0 ? <wbr /> : null}
+      {part}
+    </Fragment>
+  ));
+}
 
 export function CategoryPicker({
   value,
@@ -76,16 +89,16 @@ export function CategoryPicker({
               type="button"
               onClick={() => onChange(category.name)}
               aria-pressed={selected}
-              aria-label={label}
-              title={label}
               className={`app-control app-category-picker-option inline-flex min-h-10 items-center justify-center gap-1.5 px-2 text-xs font-bold ${
                 selected ? "" : categoryToneClass(category.tone)
               }`}
               data-selected={selected ? "true" : "false"}
             >
               <Icon size={14} />
-              <span className="min-w-0 truncate">
-                {compactCategoryLabel(category.name, language)}
+              {/* Nombre completo de la categoria (el mismo que en las filas):
+                  si no cabe, salta de linea y el boton crece en alto. */}
+              <span className="min-w-0 break-words text-center leading-tight">
+                <SlashBreakableText text={label} />
               </span>
             </button>
           );
@@ -101,7 +114,7 @@ export function CategoryPicker({
             className="app-control col-span-full inline-flex min-h-10 items-center justify-center gap-1.5 px-2 text-xs font-bold"
           >
             <Plus size={14} />
-            <span className="min-w-0 truncate">{t("categoryManager.newCategory", language)}</span>
+            <span className="min-w-0 break-words">{t("categoryManager.newCategory", language)}</span>
           </button>
         ) : null}
       </div>

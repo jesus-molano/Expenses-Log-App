@@ -1,5 +1,9 @@
+import { canMoveOccurrence } from "@/domain/budget-month";
 import type { ExpenseOccurrence } from "@/domain/types";
 import type { DropTarget } from "./expense-dnd-target";
+
+// Vive en el dominio porque las órdenes de la captura siguen la misma regla.
+export { canMoveOccurrence };
 
 export type DragMoveAction = "ignore" | "single" | "series";
 
@@ -23,9 +27,7 @@ export function resolveDragMove({
 }): DragMoveAction {
   if (!isDropTargetAllowed(target, currentMonth, openMonth)) return "ignore";
   if (target.date === occurrence.dueDate && !target.rowId) return "ignore";
-  if (occurrence.dueDate.slice(0, 7) < openMonth && occurrence.status !== "due") {
-    return "ignore";
-  }
+  if (!canMoveOccurrence(occurrence, openMonth)) return "ignore";
   if (occurrence.record || occurrence.dueDate.slice(0, 7) < currentMonth) {
     return "single";
   }

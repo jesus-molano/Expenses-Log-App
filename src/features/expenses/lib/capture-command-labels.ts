@@ -59,6 +59,7 @@ const ISSUE_LABELS: Record<CommandIssue, TranslationKey> = {
   sameDate: "captureCommands.sameDate",
   missingDate: "captureCommands.missingDate",
   closedMonth: "captureCommands.closedMonth",
+  tooFar: "captureCommands.tooFar",
 };
 
 // Por qué una orden no se puede aplicar tal cual. `viewMonthId` es el mes

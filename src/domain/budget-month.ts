@@ -50,6 +50,18 @@ export function resolveActiveMonth(
     : calendarMonthId;
 }
 
+// Lo pagado de un mes cerrado es historial y no se mueve (ni arrastrando, ni
+// desde las acciones del cobro, ni con una orden de la captura).
+export function canMoveOccurrence(occurrence: ExpenseOccurrence, openMonth: string) {
+  return !(occurrence.dueDate.slice(0, 7) < openMonth && occurrence.status !== "due");
+}
+
+// Primer y último día a los que se puede mover un cobro: no a un mes cerrado
+// ni más allá del mes que se puede ver después del abierto.
+export function occurrenceMoveRange(openMonthId: string) {
+  return { min: `${openMonthId}-01`, max: monthRange(addMonthId(openMonthId, 1)).end };
+}
+
 export type MonthCloseStatus = {
   monthId: string;
   paidCount: number;

@@ -181,9 +181,9 @@ function CommandCard({
           aria-label={t("captureCommands.include", language).replace("{label}", title)}
         />
         <label htmlFor={checkboxId} className="grid min-w-0 flex-1 gap-0.5">
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-[var(--app-text)]">
-            <span className="shrink-0 text-[var(--app-accent)]">{INTENT_ICONS[command.intent]}</span>
-            <span className="min-w-0 truncate">{title}</span>
+          <span className="flex items-start gap-1.5 text-sm font-semibold leading-snug text-[var(--app-text)]">
+            <span className="mt-0.5 shrink-0 text-[var(--app-accent)]">{INTENT_ICONS[command.intent]}</span>
+            <span className="min-w-0 break-words">{title}</span>
           </span>
           {detail ? <span className="text-xs text-[var(--app-text-muted)]">{detail}</span> : null}
         </label>

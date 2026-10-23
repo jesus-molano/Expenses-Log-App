@@ -47,13 +47,13 @@ export function CatalogItemCard({ item, category, language }: CatalogItemCardPro
         </span>
         <span className="min-w-0">
           <span
-            className={`block truncate text-sm font-semibold ${
+            className={`block break-words text-sm font-semibold leading-snug ${
               item.finished ? "text-[var(--app-text-muted)]" : "text-[var(--app-text)]"
             }`}
           >
             {template.name}
           </span>
-          <span className="block truncate text-xs font-medium text-[var(--app-text-muted)]">
+          <span className="block break-words text-xs font-medium text-[var(--app-text-muted)]">
             {subtitle}
           </span>
           <CatalogItemStatus item={item} language={language} />

@@ -187,8 +187,7 @@ export function buildMonthlyMoneyPlan({
     0,
   );
   const paidExpensesTotal = paidOccurrences.reduce(
-    (sum, occurrence) =>
-      sum + (occurrence.override?.amountPaid ?? occurrence.record?.amountPaid ?? occurrence.template.amount),
+    (sum, occurrence) => sum + paidAmount(occurrence),
     0,
   );
   const pendingExpensesTotal = pendingSummary.total;
@@ -257,6 +256,11 @@ export function buildMonthlyMoneyPlan({
     investmentContribution: 0,
     shortfall: billsShortfall,
   };
+}
+
+// Lo que se pagó de un cobro (puede diferir de lo previsto).
+export function paidAmount(occurrence: ExpenseOccurrence) {
+  return occurrence.override?.amountPaid ?? occurrence.record?.amountPaid ?? occurrence.template.amount;
 }
 
 export function generateStoreOccurrences(

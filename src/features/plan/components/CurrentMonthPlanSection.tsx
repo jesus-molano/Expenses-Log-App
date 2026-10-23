@@ -99,7 +99,7 @@ export function CurrentMonthPlanSection({
         <div className="min-w-0 flex-1">
           {plan.nextPending ? (
             <>
-              <p className="truncate text-sm font-semibold text-[var(--app-text)]">
+              <p className="break-words text-sm font-semibold text-[var(--app-text)]">
                 {plan.nextPending.overdue ? copy.overdue : copy.nextReceipt}: {plan.nextPending.name}
               </p>
               <p className="mt-0.5 text-xs text-[var(--app-text-muted)]">
@@ -144,7 +144,7 @@ export function CurrentMonthPlanSection({
               value={-plan.savingsReserved}
             />
             <div className="app-plan-equation-total mt-1 flex items-end justify-between gap-4 rounded-[var(--app-radius-md)] px-3 py-3">
-              <div>
+              <div className="min-w-0">
                 <dt className="font-semibold text-[var(--app-text)]">
                   {copy.freeAccordingToPlan}
                 </dt>
@@ -260,8 +260,10 @@ function EquationRow({
   return (
     <div className="flex items-center justify-between gap-4 rounded-[var(--app-radius-sm)] px-3 py-2.5">
       <div className="min-w-0">
-        <dt className="font-medium text-[var(--app-text)]">{label}</dt>
-        <dd className="mt-1 truncate text-xs text-[var(--app-text-muted)]">
+        <dt className="break-words font-medium text-[var(--app-text)]">
+          {label}
+        </dt>
+        <dd className="mt-1 break-words text-xs text-[var(--app-text-muted)]">
           {detail}
         </dd>
       </div>
@@ -288,16 +290,16 @@ function PlanAction({
     <button
       type="button"
       onClick={onClick}
-      className="app-plan-action-row app-focus-ring flex min-h-14 w-full items-center gap-3 rounded-[var(--app-radius-md)] px-3 text-left"
+      className="app-plan-action-row app-focus-ring flex min-h-14 w-full items-center gap-3 rounded-[var(--app-radius-md)] px-3 py-2 text-left"
     >
       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--app-control)] text-[var(--app-accent)]">
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-[var(--app-text)]">
+        <span className="block break-words text-sm font-semibold text-[var(--app-text)]">
           {label}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-[var(--app-text-muted)]">
+        <span className="mt-0.5 block text-xs text-[var(--app-text-muted)]">
           {detail}
         </span>
       </span>

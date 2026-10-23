@@ -51,25 +51,16 @@ describe("expense timeline window", () => {
     };
 
     const { result } = renderHook(() => useExpenseFilters(store, "es", new Date()));
-    const nextMonthDates = result.current.visibleOccurrences
-      .filter((item) => item.occurrenceDate.startsWith("2026-08"))
-      .map((item) => item.dueDate);
-
-    expect(nextMonthDates).toEqual([
-      "2026-08-01",
-      "2026-08-05",
-      "2026-08-07",
-    ]);
-    expect(nextMonthDates).not.toContain("2026-08-08");
-    expect(nextMonthDates).not.toContain("2026-08-12");
-    expect(result.current.timelineSections).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: "future-2026-08-01",
-          items: [expect.objectContaining({ dueDate: "2026-08-01" })],
-        }),
-      ]),
-    );
+    // El mes visto solo muestra sus cobros; los primeros días del siguiente
+    // se resumen aparte.
+    expect(
+      result.current.visibleOccurrences.filter((item) => item.dueDate.startsWith("2026-08")),
+    ).toEqual([]);
+    expect(result.current.nextMonthPreview).toEqual({
+      monthId: "2026-08",
+      count: 3,
+      total: expect.any(Number),
+    });
     expect(result.current.pendingTotal).toBe(0);
   });
 
@@ -90,11 +81,11 @@ describe("expense timeline window", () => {
     };
 
     const { result } = renderHook(() => useExpenseFilters(store, "es", new Date()));
-    const januaryDates = result.current.visibleOccurrences
-      .filter((item) => item.occurrenceDate.startsWith("2027-01"))
-      .map((item) => item.dueDate);
-
-    expect(januaryDates).toEqual(["2027-01-07"]);
+    // Diciembre no mezcla enero: sus primeros días se resumen aparte.
+    expect(
+      result.current.visibleOccurrences.some((item) => item.dueDate.startsWith("2027-01")),
+    ).toBe(false);
+    expect(result.current.nextMonthPreview).toMatchObject({ monthId: "2027-01", count: 1 });
     expect(result.current.pendingTotal).toBe(0);
   });
 });
@@ -215,7 +206,11 @@ describe("viewed month", () => {
     expect(result.current.pendingTotal).toBe(100);
     expect(
       result.current.visibleOccurrences.map((item) => item.dueDate),
-    ).toEqual(expect.arrayContaining(["2026-11-01", "2026-11-12", "2026-12-01"]));
+    ).toEqual(expect.arrayContaining(["2026-11-01", "2026-11-12"]));
+    expect(
+      result.current.visibleOccurrences.some((item) => item.dueDate >= "2026-12-01"),
+    ).toBe(false);
+    expect(result.current.nextMonthPreview).toMatchObject({ monthId: "2026-12", count: 1 });
     expect(
       result.current.visibleOccurrences.some((item) => item.dueDate < "2026-11-01"),
     ).toBe(false);

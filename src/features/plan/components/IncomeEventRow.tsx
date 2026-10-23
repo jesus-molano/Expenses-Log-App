@@ -11,6 +11,7 @@ import {
   useIncomeEventRowEditor,
   type IncomeEventUpdateInput,
 } from "../hooks/use-income-event-row-editor";
+import { formatShortDate } from "../lib/plan-dashboard";
 
 export function IncomeEventRow({
   event,
@@ -78,36 +79,41 @@ export function IncomeEventRow({
     );
   }
 
+  // En movil, igual que MonthlyExpenseRow: nombre | importe arriba y fecha |
+  // acciones debajo, con tres columnas para que el nombre solo ceda el ancho
+  // del importe. Desde sm vuelven a ser las cuatro columnas de la tabla.
   return (
-    <div className="app-list-item app-income-event-row app-monthly-table-row grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 px-3 py-2">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-[var(--app-text)]">
+    <div className="app-list-item app-income-event-row app-monthly-table-row grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-2 gap-y-1 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center">
+      <div className="contents sm:block sm:min-w-0">
+        <p className="col-[1/3] row-start-1 min-w-0 break-words text-sm font-semibold text-[var(--app-text)]">
           {event.name}
         </p>
-        <p className="text-xs font-medium text-[var(--app-text-muted)]">
-          {event.receivedAt}
+        <p className="col-start-1 row-start-2 text-xs font-medium text-[var(--app-text-muted)]">
+          {formatShortDate(event.receivedAt, language)}
         </p>
       </div>
-      <p className="app-money text-sm font-semibold text-[var(--app-text)]">
+      <p className="app-money col-start-3 row-start-1 justify-self-end whitespace-nowrap text-sm font-semibold text-[var(--app-text)] sm:col-auto sm:row-auto sm:justify-self-auto">
         {formatCurrency(event.amount)}
       </p>
-      <IconButton
-        type="button"
-        onClick={editor.openEditor}
-        aria-label={t("money.editIncome", language)}
-        size="sm"
-      >
-        <Pencil size={14} />
-      </IconButton>
-      <IconButton
-        type="button"
-        onClick={onRemove}
-        aria-label={removeLabel}
-        variant="danger"
-        size="sm"
-      >
-        <X size={15} />
-      </IconButton>
+      <div className="col-[2/4] row-start-2 flex items-center gap-2 justify-self-end sm:contents">
+        <IconButton
+          type="button"
+          onClick={editor.openEditor}
+          aria-label={t("money.editIncome", language)}
+          size="sm"
+        >
+          <Pencil size={14} />
+        </IconButton>
+        <IconButton
+          type="button"
+          onClick={onRemove}
+          aria-label={removeLabel}
+          variant="danger"
+          size="sm"
+        >
+          <X size={15} />
+        </IconButton>
+      </div>
     </div>
   );
 }

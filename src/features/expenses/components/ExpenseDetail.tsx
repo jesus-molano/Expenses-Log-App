@@ -11,6 +11,7 @@ import type {
 } from "@/domain/types";
 import { useExpenseEditor } from "@/features/expenses/hooks/use-expense-editor";
 import { localizedRecurrenceLabel } from "@/features/expenses/lib/recurrence-label";
+import type { SeriesAmountScope } from "@/stores/app/store-commands";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
@@ -62,6 +63,43 @@ export function ExpenseDetail({ id }: { id: string }) {
   );
 }
 
+function AmountScopeChoice({
+  scope,
+  language,
+  onChange,
+}: {
+  scope: SeriesAmountScope;
+  language: AppLanguage;
+  onChange: (scope: SeriesAmountScope) => void;
+}) {
+  return (
+    <fieldset className="app-section-card mt-4 border-[color-mix(in_srgb,var(--app-warning)_28%,transparent)] p-3">
+      <legend className="sr-only">{t("expenses.amountScopeTitle", language)}</legend>
+      <p className="text-sm font-semibold text-[var(--app-text)]">
+        {t("expenses.amountScopeTitle", language)}
+      </p>
+      <p className="mt-1 text-xs text-[var(--app-text-muted)]">
+        {t("expenses.amountScopeBody", language)}
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {(["current", "next"] as const).map((option) => (
+          <Button
+            key={option}
+            type="button"
+            size="sm"
+            className="h-auto min-h-10 py-2"
+            variant={scope === option ? "primary" : "secondary"}
+            aria-pressed={scope === option}
+            onClick={() => onChange(option)}
+          >
+            {t(option === "current" ? "expenses.amountScopeCurrent" : "expenses.amountScopeNext", language)}
+          </Button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 function ExpenseDetailForm({
   template,
   expenseStore,
@@ -89,16 +127,18 @@ function ExpenseDetailForm({
           onSubmit={editor.saveExpense}
           className="app-section-card mt-4 p-5"
         >
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-[var(--app-accent)]">
+          {/* Si el nombre no cabe junto al importe, el importe baja a su propia
+              linea en vez de recortar el nombre. */}
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+            <div className="min-w-0 max-w-full">
+              <p className="break-words text-sm font-medium text-[var(--app-accent)]">
                 {localizedRecurrenceLabel(editor.form.recurrence, language)}
               </p>
-              <h1 className="mt-1 truncate text-3xl font-semibold text-[var(--app-text)]">
+              <h1 className="mt-1 break-words text-3xl font-semibold text-[var(--app-text)]">
                 {editor.form.name || template.name}
               </h1>
             </div>
-            <p className="app-money shrink-0 text-xl font-semibold text-[var(--app-text)]">
+            <p className="app-money shrink-0 whitespace-nowrap text-xl font-semibold text-[var(--app-text)]">
               {formatCurrency(editor.previewAmount)}
             </p>
           </div>
@@ -116,6 +156,14 @@ function ExpenseDetailForm({
               onAmountTextChange={editor.setAmountText}
             />
           </div>
+
+          {editor.amountChanged ? (
+            <AmountScopeChoice
+              scope={editor.amountScope}
+              language={language}
+              onChange={editor.setAmountScope}
+            />
+          ) : null}
 
           <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
             <Button type="submit">

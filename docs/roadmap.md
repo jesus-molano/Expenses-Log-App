@@ -60,6 +60,11 @@ Estado:
   - Catálogo «Todos» desde la cabecera de Gastos: todas las series con búsqueda (también en notas) y filtros de estado, frecuencia y categoría. Sustituye a la hoja de recurrentes.
   - Campos de contrato (notas, enlace de baja, permanencia con aviso a 30 días, método de pago) en el formulario, el detalle y la normalización; categorías propias con gestor en Ajustes (crear, renombrar, color y borrar pasando los gastos a otra).
   - Órdenes en la captura («marca la luz pagada 71,20», «salta el gimnasio este mes», «mueve Netflix al 10») con `intent` en el esquema de Gemini y en el parser local, siempre confirmadas y con deshacer.
+- **Cambios de importe de una serie: hecho.** Al editar el importe, lo ya pasado y lo ya pagado no cambian (meses anteriores como registros; mes cerrado con "Pasar al mes siguiente", cobros pagados y adelantados con override) y el editor pregunta "Desde este mes" o "Desde el mes que viene" (`keepAmountBeforeSeriesChange`). Para un solo mes, se edita el cobro.
+  - Tocar un gasto abre sus acciones (`OccurrenceActionSheet`, M19): pagar o deshacer, pagar con otro importe, mover solo este cobro (no a un mes cerrado), saltar este mes con "Deshacer" y editar la serie. Deslizar o arrastrar no cuentan como toque.
+  - Hoja de acciones revisada: "Editar la serie" navega (sustituye la entrada de la hoja en el historial), "Pagado con otro importe" solo apunta lo pagado (la fila pagada muestra lo pagado), mover solo toca el cobro y no se ofrece para lo pagado de un mes cerrado ni más allá del mes siguiente, Intro la abre desde el teclado y los clicks de lector de pantalla cuentan.
+  - Cada mes del listado muestra solo sus cobros (más lo pendiente que arrastra); al final, "Noviembre empieza con N cobros en sus primeros días" con "Ver noviembre".
+  - Pendiente de F2a: `ConfirmActionDialog` con `useDialogA11y` y M22.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
@@ -374,7 +379,7 @@ Estado:
   - Micrófono `IconButton` de 44 px con `aria-pressed` y región `aria-live`, dentro del textarea de `QuickCapture`.
   - Sin soporte: pista "usa el micrófono del teclado".
   - Shortcut "Añadir por voz" → `/expenses/new?mode=voice`, con `mode` leído en cliente para que la página siga siendo estática. Arrancar exige un toque.
-- **`OccurrenceActionSheet`** (al tocar un gasto; sobre `Sheet` y `useMonthlyExpenseRowEditor`): pagar, pagar con otro importe, mover solo este, saltar o restaurar, editar la serie y finalizar. Resuelve M19.
+- **`OccurrenceActionSheet`** (al tocar un gasto; sobre `Sheet`): pagar, pagar con otro importe, mover solo este, saltar (restaurar desde el aviso "Deshacer") y editar la serie. Resuelve M19. Hecho; "finalizar la serie" queda en la pantalla de edición.
 - **`useSheetBackButton`** en `Sheet`: pushState al abrir y `popstate` cierra la hoja (Atrás en Android). Con test e2e.
 - **`ConfirmActionDialog`:** foco, Escape y bloqueo de scroll, con `useDialogA11y` extraído de `Sheet.tsx`.
 - **M22.** `router.replace` tras guardar en el detalle, más una guarda de cambios sin guardar.
@@ -413,7 +418,7 @@ Estado:
 11. **Comandos por voz o IA** ("marca la luz pagada 71,20"). **Hecho.**
     - `intent` (create, pay, skip, move) en el esquema y el prompt, con los nombres de los gastos del usuario como contexto; la ruta devuelve `commands` aparte.
     - `parseCaptureTextLocally` entiende las mismas órdenes (español e inglés) sin IA ni conexión.
-    - `domain/capture-commands.ts` resuelve serie y cobro; `CaptureCommandReview` las confirma; `capture-command-actions.ts` las aplica con los comandos de siempre (nuevo `payOccurrenceInStore`) y las deshace.
+    - `domain/capture-commands.ts` resuelve serie y cobro; `CaptureCommandReview` las confirma; `capture-command-actions.ts` las aplica con los comandos de siempre (el mismo `payOccurrenceInStore` que «Pagado con otro importe»; corregir lo pagado conserva la fecha del pago) y las deshace. Mover sigue los límites de la hoja de acciones (`canMoveOccurrence` y `occurrenceMoveRange`): ni a un mes cerrado, ni lo pagado de un mes cerrado, ni más allá del mes siguiente.
     - Pendiente: medir las órdenes con la clave real en `scripts/eval-ai-parse.mjs` (sin clave en este entorno, como en F1b).
 12. **Resumen del mes** y **registro de saldo**.
 13. **Ciclo anclado al día de cobro** (opción).

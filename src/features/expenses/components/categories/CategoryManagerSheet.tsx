@@ -201,8 +201,8 @@ function CategoryManagerRow({
         <Icon size={16} aria-hidden="true" />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-sm font-semibold text-[var(--app-text)]">{label}</span>
-        <span className="block truncate text-xs font-medium text-[var(--app-text-muted)]">
+        <span className="block break-words text-sm font-semibold leading-snug text-[var(--app-text)]">{label}</span>
+        <span className="block break-words text-xs font-medium text-[var(--app-text-muted)]">
           {categoryUsageLabel(usage.templates, language)}
         </span>
       </span>

@@ -13,7 +13,8 @@ import { occurrencesDueBetween } from "@/domain/finance";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
 import { buildTimelineSections } from "../lib/timeline";
 
-const NEXT_MONTH_VISIBLE_DAYS = 7;
+// Primeros días del mes siguiente que se resumen al final del mes visto.
+const NEXT_MONTH_PREVIEW_DAYS = 7;
 
 // `monthId` es el mes que se mira (el activo por defecto); `now`, el día real.
 export function useExpenseFilters(
@@ -37,18 +38,29 @@ function buildExpenseFilters(
   monthId: string,
 ) {
   const today = toDateOnly(todayDate);
-  const { start: windowStart } = monthRange(monthId);
-  const timelineWindowEnd = toDateOnly(
-    addDays(
-      parseISO(monthRange(addMonthId(monthId, 1)).start),
-      NEXT_MONTH_VISIBLE_DAYS - 1,
-    ),
+  // Cada mes muestra solo sus cobros (más lo pendiente que arrastre): lo del
+  // mes siguiente se ve avanzando o mirando ese mes.
+  const { start: windowStart, end: windowEnd } = monthRange(monthId);
+  const nextMonthId = addMonthId(monthId, 1);
+  const nextMonthStart = monthRange(nextMonthId).start;
+  const previewEnd = toDateOnly(
+    addDays(parseISO(nextMonthStart), NEXT_MONTH_PREVIEW_DAYS - 1),
   );
 
   const visibleOccurrences = [
     ...selectCarryOverOccurrences(store, todayDate, language, monthId),
-    ...occurrencesDueBetween(store, windowStart, timelineWindowEnd, language),
+    ...occurrencesDueBetween(store, windowStart, windowEnd, language),
   ].filter((occurrence) => occurrence.status !== "skipped");
+  const upcoming = occurrencesDueBetween(store, nextMonthStart, previewEnd, language).filter(
+    (occurrence) => occurrence.status === "due",
+  );
+  const nextMonthPreview = upcoming.length
+    ? {
+        monthId: nextMonthId,
+        count: upcoming.length,
+        total: upcoming.reduce((sum, occurrence) => sum + occurrence.template.amount, 0),
+      }
+    : null;
 
   const pendingTotal = monthPendingSummary(visibleOccurrences, monthId).total;
   const timelineSections = buildTimelineSections(
@@ -70,6 +82,7 @@ function buildExpenseFilters(
     pendingTotal,
     pendingTotalLabel: formatCurrency(pendingTotal),
     nextOccurrence,
+    nextMonthPreview,
     visibleOccurrences,
     timelineSections,
   };

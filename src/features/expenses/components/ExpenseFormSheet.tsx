@@ -83,12 +83,12 @@ export function ExpenseFormSheet({
       <form onSubmit={submit} className="contents">
         <div className="app-sheet-header sticky top-0 z-10 px-5 pb-3 pt-3">
           <div className="app-sheet-handle mx-auto mb-3 sm:hidden" />
-          <header className="flex items-center justify-between gap-4">
+          <header className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="text-lg font-semibold text-[var(--app-text)]">
                 {t("expenses.newExpense", language)}
               </h2>
-              <p className="truncate text-sm text-[var(--app-text-muted)]">
+              <p className="break-words text-sm text-[var(--app-text-muted)]">
                 {t("expenses.newExpenseSubtitle", language)}
               </p>
             </div>
@@ -141,8 +141,6 @@ export function ExpenseFormSheet({
                   type="button"
                   onClick={() => setInitialStatus("due")}
                   variant={initialStatus === "due" ? "primary" : "secondary"}
-                  size="sm"
-                  className="h-10"
                 >
                   {t("common.pending", language)}
                 </Button>
@@ -150,8 +148,6 @@ export function ExpenseFormSheet({
                   type="button"
                   onClick={() => setInitialStatus("paid")}
                   variant={initialStatus === "paid" ? "primary" : "secondary"}
-                  size="sm"
-                  className="h-10"
                 >
                   {t("common.paid", language)}
                 </Button>
