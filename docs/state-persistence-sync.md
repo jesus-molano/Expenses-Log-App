@@ -75,7 +75,7 @@ usuario. Al hidratar con sesion:
    (`AuthRetryableFetchError`) no se trata como cierre de sesion, tampoco la
    sesion inicial vacia que auth-js emite sin red (`INITIAL_SESSION` sin
    sesion se comprueba con `getUser`).
-3. Se carga el store cloud desde `app_stores`.
+3. Se carga el store cloud desde `app_stores`, con su `revision`.
 4. Gana la nube, salvo que haya cambios locales sin subir de esa misma cuenta o
    ediciones hechas mientras cargaba: entonces se fusionan local y cloud.
 5. Se asigna `userId` real a entidades sincronizables.
@@ -88,11 +88,60 @@ cambios sin cuenta (uso sin sesion, o sin red antes de resolverla) se fusionan
 con la primera cuenta que entra.
 
 Solo la tabla inexistente (`PGRST205`, `42P01`) cuenta como "sin nube". Un
-fallo temporal de PostgREST o de permisos es un error a reintentar. Las
-peticiones a `app_stores` se cortan a los 20 s.
+fallo temporal de PostgREST, de permisos o la falta del RPC del CAS
+(`PGRST202`) no. Las peticiones a `app_stores` se cortan a los 20 s.
 
 Si la tabla `app_stores` no existe o no esta disponible, la app degrada a modo
 local sin romper la experiencia.
+
+## Multi-dispositivo (compare-and-swap)
+
+La migracion `20261023120000_app_store_revision_cas.sql` añade
+`app_stores.revision` y un trigger `BEFORE UPDATE` que la incrementa en cada
+escritura, tambien en el upsert ciego de los clientes anteriores. Los guardados
+pasan por el RPC `save_app_store(p_store, p_expected_revision)`:
+
+- Guarda solo si la fila sigue en la revision que leyo el cliente (`null`:
+  "aun no hay fila") y devuelve la nueva. Si otro dispositivo guardo antes,
+  devuelve `conflict` con la revision actual en vez de pisarlo.
+- Ante un conflicto (`saveResolvingConflicts`, `cloud-save-queue.ts`) se
+  vuelve a cargar la nube, se fusiona con lo que muestra la app (no con la
+  copia que fallo), se guarda local, se hidrata y se reintenta sobre la nueva
+  revision, hasta 3 veces. Lo encolado mientras tanto se sustituye por la
+  fusion, que ya lo incluye. Si la nube sigue cambiando, el fallo cuenta como
+  temporal y se reintenta con la resincronizacion normal.
+- Sin la migracion aplicada (`PGRST202`), `saveCloudStore` cae al upsert de
+  siempre, lo registra una vez y no vuelve a probar el RPC en 10 minutos. La
+  carga usa `select("*")` para no pedir una columna que aun no existe. Mergear
+  el cliente antes que la migracion es seguro.
+- La revocacion de la escritura directa en `app_stores` (contract) queda para
+  un PR posterior; entonces el RPC pasara a `security definer`.
+
+Al volver a la app (`visibilitychange` visible u `online`), con la nube lista y
+sin guardado en curso, se trae la nube como mucho cada 30 s
+(`CLOUD_PULL_THROTTLE_MS`). Si la revision no cambio, no se hace nada. Si
+cambio y no hay cambios locales sin subir, gana la nube; si los hay, se fusiona
+y se sube con CAS. Ajustes muestra "Sincronizado · con cambios de otro
+dispositivo" cuando llegan datos de fuera.
+
+Tras cualquier fusion (`mergeStoresForSync`) se recolocan los overrides
+huerfanos (`reconcileOrphanOverrides`): el rekey de un cambio de dia solo corre
+en el dispositivo que edita, asi que un pago hecho en otro con la fecha antigua
+queda en una clave que la plantilla ya no genera. Se repite el rekey de los
+meses abiertos contra las plantillas actuales; si la nube ya traia huerfanos,
+la version corregida tambien se sube.
+
+## Varias pestañas
+
+Cada escritura local lee antes lo que haya en localStorage: si otra pestaña
+guardo despues de la ultima escritura de esta (`readExpenseStoreFromOtherTab`),
+se fusiona antes de escribir, para que dos pestañas no se pisen. Al recibir el
+evento `storage` del store (o al volver a la pestaña), lo de la otra se
+incorpora a lo que se muestra sin volver a escribirlo; la revision local sube
+para que un guardado en curso de esta pestaña no de por subido un estado sin
+esos cambios. Las preferencias vienen de la escritura mas reciente. Los datos
+de otra cuenta escritos por otra pestaña no se mezclan: esta vuelve a
+sincronizar.
 
 ## Merge local/cloud
 
@@ -107,7 +156,11 @@ La mezcla actual usa ids:
   `salaryClearedTombstone`). Al fusionar desaparece cualquier sueldo editado
   hasta esa hora, tambien copias antiguas de otro dispositivo; uno editado
   despues se conserva.
-- Preferencias: local, luego cloud, luego defaults.
+- Preferencias: local, luego cloud, luego defaults. Son de cada dispositivo:
+  las cookies de tema e idioma mandan sobre el store al cargar.
+- Categorias: llevan `updatedAt` desde F0c-2 y se fusionan por entidad como
+  plantillas, ingresos o registros. Las antiguas no lo tienen y gana la local;
+  los builds anteriores conservan el campo porque no reescriben las entidades.
 
 La politica de hidratacion (`resolveHydratedStore`) protege los cambios hechos
 mientras llegaba el cloud store y los que quedaron sin subir en una sesion
@@ -154,6 +207,8 @@ La cola:
 
 - Sube siempre la ultima version y nunca dos a la vez, para que una respuesta
   lenta no pise otra mas nueva.
+- Sube con CAS: un conflicto se fusiona y se reintenta dentro del mismo
+  guardado (ver "Multi-dispositivo").
 - Si falla, no repite la misma copia: la nube puede haber cambiado. Marca la
   nube como no lista y vuelve a sincronizar (cargar, fusionar con los cambios
   pendientes y subir) a los 2, 5, 15, 30 y 60 s, y de inmediato al recuperar la
@@ -176,8 +231,9 @@ como error. Los mensajes se traducen con `src/shared/i18n`.
   entidad.
 - Los tombstones evitan reaparicion de deletes, pero no son un sistema completo
   de resolucion por revision de cada campo.
-- En ediciones concurrentes del mismo elemento, gana el item que entra al final
-  en el merge por id.
+- En ediciones concurrentes del mismo elemento gana el `updatedAt` mas
+  reciente; sin el, la copia local. El CAS garantiza que ninguna escritura
+  pisa a otra sin fusionarla, no que se conserve cada campo de las dos.
 - Los deletes deben seguir registrando tombstones en nuevos comandos.
 - La migracion v3 descarta cuentas y datos bancarios legacy despues de
   materializar conciliaciones pagadas.

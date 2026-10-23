@@ -188,7 +188,9 @@ Endpoints principales:
   local. Solo llama a Gemini cuando el usuario esta autenticado.
 - `/api/auth/clear-sync-metadata`: POST autenticado para limpiar metadata legacy
   sobredimensionada de Supabase Auth. GET responde 405.
-- `/api/push/subscribe`: guarda suscripciones push.
+- `/api/push/subscribe`: guarda suscripciones push con el RPC
+  `claim_push_subscription`, que pasa el endpoint a la cuenta actual aunque lo
+  registrara otra en el mismo navegador. Sin la migracion usa el upsert directo.
 - `/api/push/test`: prueba notificaciones.
 - `/api/push/status`: verifica que el endpoint actual sigue registrado y muestra
   el ultimo envio programado completado.
@@ -287,6 +289,30 @@ La funcion SQL `claim_push_reminder_delivery` usa `security invoker`. Solo
 `service_role` tiene permiso de ejecucion. La migracion
 `20260823215337_push_delivery_leases.sql` añade estado, token y tiempo de claim;
 debe aplicarse antes de desplegar el route handler nuevo.
+
+Cada usuario tiene como maximo 10 suscripciones push: un trigger rechaza la
+undecima (tambien en inserciones directas) y `claim_push_subscription` hace
+sitio borrando las que llevan mas tiempo sin renovarse.
+
+## Migraciones de Supabase
+
+Se aplican en el SQL Editor del proyecto (o con `supabase db push`) en orden de
+nombre y son idempotentes. `supabase/schema.sql` refleja el estado final para
+proyectos nuevos.
+
+`20261023120000_app_store_revision_cas.sql` (F0c-2, solo aditiva):
+
+- `app_stores.revision` con el trigger que la incrementa en cada `UPDATE`.
+- RPC `save_app_store(p_store, p_expected_revision)` para el guardado con CAS
+  (`security invoker`, ejecutable por `authenticated`).
+- Limite de 10 suscripciones push por usuario y RPC `claim_push_subscription`
+  (`security definer`, ejecutable por `authenticated`).
+
+Conviene aplicarla en produccion antes de mergear, porque las previews
+comparten la base de datos, pero el cliente funciona sin ella: cae al upsert y
+lo registra una vez en consola. Para comprobarla: con dos dispositivos abiertos,
+editar en uno y volver al otro; la fila de `app_stores` sube de `revision` con
+cada guardado.
 
 ## Variables de entorno
 

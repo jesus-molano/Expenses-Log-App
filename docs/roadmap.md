@@ -56,6 +56,12 @@ Estado:
   - Atrás cierra la hoja abierta (`src/components/ui/sheet-history.ts`).
   - Pendiente de F2a: `OccurrenceActionSheet`, `ConfirmActionDialog` con `useDialogA11y` y M22.
 - **Cambios de importe de una serie: hecho.** Al editar el importe, lo ya pasado y lo ya pagado no cambian (meses anteriores como registros; mes cerrado con "Pasar al mes siguiente", cobros pagados y adelantados con override) y el editor pregunta "Desde este mes" o "Desde el mes que viene" (`keepAmountBeforeSeriesChange`). Para un solo mes, se edita el cobro.
+- **F0c-2 (sync multi-dispositivo): hecho, falta aplicar la migración.**
+  - Migración aditiva `20261023120000_app_store_revision_cas.sql`: `revision` con trigger, RPC `save_app_store` con CAS, máximo 10 suscripciones push por usuario y RPC `claim_push_subscription` (M15). Probada sobre PostgreSQL (PGlite) con los stubs de Supabase.
+  - Cliente con CAS: ante un conflicto fusiona, hidrata y reintenta; sin la migración cae al upsert y lo registra una vez.
+  - Pull al volver a la app (cada 30 s como mucho) y sincronización entre pestañas por el evento `storage`.
+  - Overrides huérfanos reconciliados tras cada fusión y `updatedAt` en las categorías.
+  - Diferido: `ai_usage`/`consume_ai_quota`, porque la cuota durable sigue diferida mientras solo use la app el dueño (F1b). El contract (revocar la escritura directa en `app_stores`) va en un PR posterior.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
@@ -224,6 +230,8 @@ Estado:
 - **M13** (parte de la app): lista de hosts push permitidos, `{timeout:5000, TTL}` y `Promise.allSettled`.
 
 ### F0c-2 — Sync multi-dispositivo (A2, migración expand/contract)
+**Estado: hecho (expand y cliente).** Falta aplicar la migración en producción; `ai_usage` y el contract quedan diferidos (ver "Estado" arriba). Detalle en `docs/state-persistence-sync.md`.
+
 1. **Migración aditiva:**
    - `revision bigint default 0` y un trigger `BEFORE UPDATE` que incrementa `revision`, para que los upserts ciegos de clientes viejos invaliden el CAS.
    - RPC `save_app_store(p_store, p_expected_revision)`.
