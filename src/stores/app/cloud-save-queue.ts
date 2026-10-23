@@ -3,9 +3,53 @@ import type { ExpenseStore } from "@/domain/types";
 
 export const CLOUD_SAVE_DEBOUNCE_MS = 350;
 
-export type CloudSaveTarget = {
-  userId: string;
+// Reintentos tras un conflicto (otro dispositivo guardó antes). Si la nube
+// sigue cambiando, se deja para la siguiente sincronización.
+export const MAX_CONFLICT_RETRIES = 3;
+
+type SaveMode = Extract<CloudStoreSaveResult, { status: "saved" }>["mode"];
+
+export class CloudSaveConflictError extends Error {
+  constructor() {
+    super("The cloud store kept changing while saving.");
+    this.name = "CloudSaveConflictError";
+  }
+}
+
+export type ConflictAwareSave = {
   save: (store: ExpenseStore) => Promise<CloudStoreSaveResult>;
+  // Trae la nube, la fusiona con lo último del dispositivo, lo hidrata y
+  // devuelve la versión a subir.
+  resolveConflict: (store: ExpenseStore) => Promise<ExpenseStore>;
+};
+
+// Guarda con compare-and-swap: ante un conflicto fusiona con la nube y vuelve
+// a intentarlo con la fusión. `onResolved` recibe cada fusión para que quien
+// tenga copias pendientes las sustituya (ya están incluidas en ella).
+export async function saveResolvingConflicts(
+  store: ExpenseStore,
+  {
+    save,
+    resolveConflict,
+    onResolved,
+    maxRetries = MAX_CONFLICT_RETRIES,
+  }: ConflictAwareSave & {
+    onResolved?: (merged: ExpenseStore) => void;
+    maxRetries?: number;
+  },
+): Promise<{ mode: SaveMode; store: ExpenseStore }> {
+  let attempt = store;
+  for (let retry = 0; ; retry += 1) {
+    const result = await save(attempt);
+    if (result.status === "saved") return { mode: result.mode, store: attempt };
+    if (retry >= maxRetries) throw new CloudSaveConflictError();
+    attempt = await resolveConflict(attempt);
+    onResolved?.(attempt);
+  }
+}
+
+export type CloudSaveTarget = ConflictAwareSave & {
+  userId: string;
 };
 
 export type CloudSaveQueueDeps = {
@@ -13,7 +57,7 @@ export type CloudSaveQueueDeps = {
   resolveTarget: () => CloudSaveTarget | null;
   onSaving: (message?: string) => void;
   onSaved: (saved: {
-    mode: CloudStoreSaveResult["mode"];
+    mode: SaveMode;
     revision: number;
     userId: string;
     hasNewerChanges: boolean;
@@ -40,6 +84,7 @@ export function createCloudSaveQueue({
   let pending: PendingSave | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let running = false;
+  let inFlight: PendingSave | null = null;
   let waiters: Waiter[] = [];
 
   function clearTimer() {
@@ -77,13 +122,19 @@ export function createCloudSaveQueue({
 
     const current = pending;
     running = true;
+    inFlight = current;
     onSaving(current.message);
     try {
-      const result = await target.save(current.store);
+      const { mode } = await saveResolvingConflicts(current.store, {
+        save: target.save,
+        resolveConflict: target.resolveConflict,
+        // Lo encolado durante la subida no lleva lo que trajo la nube.
+        onResolved: rebase,
+      });
       if (pending === current) pending = null;
       settleWaiters(true, current.revision);
       onSaved({
-        mode: result.mode,
+        mode,
         revision: current.revision,
         userId: target.userId,
         hasNewerChanges: pending !== null,
@@ -94,6 +145,7 @@ export function createCloudSaveQueue({
       onFailed(error);
     } finally {
       running = false;
+      inFlight = null;
     }
 
     if (pending && pending !== current) await flush();
@@ -111,6 +163,13 @@ export function createCloudSaveQueue({
     return saved;
   }
 
+  // Sustituye la copia pendiente por una que ya la incluye (una fusión con la
+  // nube o con otra pestaña), sin cambiar su revisión local. La que está
+  // subiendo no se toca: si se fusionó, ella misma sube la fusión.
+  function rebase(store: ExpenseStore) {
+    if (pending && pending !== inFlight) pending = { ...pending, store };
+  }
+
   function clear() {
     clearTimer();
     pending = null;
@@ -121,8 +180,10 @@ export function createCloudSaveQueue({
     enqueue,
     flush,
     saveNow,
+    rebase,
     clear,
     hasPending: () => pending !== null,
+    isIdle: () => !running && pending === null,
   };
 }
 

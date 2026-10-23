@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { savePushSubscription } from "@/data/push/push-subscriptions";
 import { toDatabaseUuid } from "@/data/supabase/database.types";
 import {
   isAllowedPushEndpoint,
@@ -93,25 +94,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error } = await supabase.from("push_subscriptions").upsert(
-    {
-      user_id: userId,
-      endpoint: parsed.data.endpoint,
-      p256dh: parsed.data.keys.p256dh,
-      auth: parsed.data.keys.auth,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "endpoint" },
-  );
-
-  if (error?.code === RLS_VIOLATION) {
-    return NextResponse.json(
-      { code: "PUSH_SUBSCRIPTION_IN_USE" },
-      { status: 409 },
-    );
-  }
-
-  if (error) {
+  try {
+    // RPC que reclama el endpoint (con la migración de F0c-2) o, sin ella, el
+    // upsert de siempre.
+    await savePushSubscription(supabase, user.id, parsed.data);
+  } catch (error) {
+    if ((error as { code?: string } | null)?.code === RLS_VIOLATION) {
+      return NextResponse.json(
+        { code: "PUSH_SUBSCRIPTION_IN_USE" },
+        { status: 409 },
+      );
+    }
     console.error("Could not save push subscription", error);
     return NextResponse.json(
       { code: "PUSH_SUBSCRIPTION_SAVE_FAILED" },

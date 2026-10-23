@@ -24,6 +24,9 @@ export type ExpenseCategory = {
   name: string;
   icon: string;
   tone: CategoryTone;
+  // Para fusionar por entidad como el resto. Las categorías antiguas no lo
+  // tienen: entonces gana la copia local.
+  updatedAt?: string;
 };
 
 export type RecurrenceRule = {

@@ -17,6 +17,11 @@ import {
 import { SYNC_META_KEY } from "./sync-meta-store";
 
 const STORAGE_KEY = "expense-log-store-v1";
+export const EXPENSE_STORE_KEY = STORAGE_KEY;
+
+// Último contenido que esta pestaña escribió o ya incorporó. Si localStorage
+// guarda otro, lo escribió otra pestaña después.
+let lastKnownRaw: string | null = null;
 
 export function loadExpenseStore(): ExpenseStore {
   let raw: string | null = null;
@@ -49,11 +54,34 @@ function backupCorruptStore(raw: string) {
 export function saveExpenseStore(store: ExpenseStore): void {
   try {
     if (!window.localStorage) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    const raw = JSON.stringify(store);
+    window.localStorage.setItem(STORAGE_KEY, raw);
+    lastKnownRaw = raw;
     window.dispatchEvent(new Event("expense-store-updated"));
   } catch {
     window.dispatchEvent(new Event("expense-store-updated"));
   }
+}
+
+// Store que otra pestaña guardó después de la última escritura (o fusión) de
+// esta. null si no hay nada nuevo o no se puede leer.
+export function readExpenseStoreFromOtherTab(): {
+  store: ExpenseStore;
+  raw: string;
+} | null {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return null;
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw || raw === lastKnownRaw) return null;
+    return { store: normalizeExpenseStore(JSON.parse(raw)), raw };
+  } catch {
+    return null;
+  }
+}
+
+// Esta pestaña ya incorporó ese contenido: no hace falta volver a fusionarlo.
+export function markExpenseStoreSeen(raw: string): void {
+  lastKnownRaw = raw;
 }
 
 // Borra los datos de gastos de este dispositivo y sus metadatos de sync: sin
