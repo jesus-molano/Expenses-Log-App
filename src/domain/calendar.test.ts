@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { daysBetween, isValidDateOnly, normalizeDateOnly } from "./calendar";
+import {
+  daysBetween,
+  isValidDateOnly,
+  isValidTimeZone,
+  normalizeDateOnly,
+  zonedDateParts,
+} from "./calendar";
 
 describe("daysBetween", () => {
   const originalTimeZone = process.env.TZ;
@@ -51,5 +57,30 @@ describe("normalizeDateOnly", () => {
   it("only accepts real dates as valid", () => {
     expect(isValidDateOnly("2026-11-30")).toBe(true);
     expect(isValidDateOnly("2026-11-31")).toBe(false);
+  });
+});
+
+describe("zonedDateParts", () => {
+  it("reads the date and hour in the user's zone, not the server's", () => {
+    // 23:30 UTC del sábado 24 de octubre (horario de verano en Canarias).
+    const instant = new Date("2026-10-24T23:30:00.000Z");
+    expect(zonedDateParts(instant, "Atlantic/Canary")).toEqual({ date: "2026-10-25", hour: 0 });
+    expect(zonedDateParts(instant, "America/New_York")).toEqual({ date: "2026-10-24", hour: 19 });
+    expect(zonedDateParts(instant, "UTC")).toEqual({ date: "2026-10-24", hour: 23 });
+  });
+
+  it("follows the DST change", () => {
+    // El 25 de octubre Canarias vuelve a UTC+0.
+    expect(zonedDateParts(new Date("2026-10-25T08:00:00.000Z"), "Atlantic/Canary").hour).toBe(8);
+    expect(zonedDateParts(new Date("2026-10-24T08:00:00.000Z"), "Atlantic/Canary").hour).toBe(9);
+  });
+
+  it("falls back to the app zone with an invalid zone", () => {
+    expect(isValidTimeZone("Mars/Olympus")).toBe(false);
+    expect(isValidTimeZone("Europe/Madrid")).toBe(true);
+    expect(zonedDateParts(new Date("2026-07-01T07:00:00.000Z"), "Mars/Olympus")).toEqual({
+      date: "2026-07-01",
+      hour: 8,
+    });
   });
 });

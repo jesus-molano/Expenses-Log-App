@@ -52,9 +52,33 @@ export type ExpenseTemplate = {
   updatedAt: string;
 };
 
+// Aviso propio de un gasto. Sin él, el gasto sigue el aviso por defecto de
+// Ajustes (`ReminderPreferences`).
 export type ExpenseReminderSettings = {
   enabled: boolean;
   daysBeforeCharge: number;
+};
+
+// Ajustes de avisos de la cuenta. Los lee también el cron de avisos push, por
+// eso viven en el store sincronizado y no en el dispositivo.
+export type ReminderPreferences = {
+  // Aviso de los gastos sin ajuste propio.
+  defaultEnabled: boolean;
+  // Antelación por defecto de los mensuales y del resto de ciclos cortos.
+  defaultDaysBefore: number;
+  // Antelación por defecto de trimestrales y anuales (7, 14 o 30 días).
+  longCycleDaysBefore: number;
+  // Etapas: el día del cargo y "¿se cobró?" si sigue pendiente después.
+  onChargeDay: boolean;
+  askIfCharged: boolean;
+  // Avisos de la cuenta: mes al día y día de cobro.
+  monthClose: boolean;
+  payday: boolean;
+  // Hora local (0-23) a partir de la que se envían los push del día.
+  pushHour: number;
+  // Zona horaria IANA del dispositivo que guardó los ajustes.
+  timeZone: string;
+  updatedAt: string;
 };
 
 export type ExpenseOccurrenceOverride = {
@@ -251,5 +275,6 @@ export type ExpenseStore = {
   preferences?: {
     theme: AppTheme;
     language?: AppLanguage;
+    reminders?: ReminderPreferences;
   };
 };

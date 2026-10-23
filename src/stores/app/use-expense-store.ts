@@ -14,6 +14,7 @@ import type {
   CreateExpenseOptions,
   DraftExpense,
   ExpenseOccurrence,
+  ExpenseReminderSettings,
   ExpenseStore,
 } from "@/domain/types";
 import { emptyStore } from "@/domain/seed";
@@ -35,6 +36,7 @@ import {
   moveOccurrenceSeriesInStore,
   reopenMonthInStore,
   restoreOccurrenceInStore,
+  setTemplateReminderInStore,
   skipOccurrenceInStore,
   payOccurrenceInStore,
   togglePaidInStore,
@@ -45,7 +47,9 @@ import {
   updateMonthlySalaryInStore,
   updateMonthlySavingsContributionInStore,
   updateMonthlySavingsTargetInStore,
+  updateReminderPreferencesInStore,
   updateThemeInStore,
+  type ReminderPreferencesInput,
 } from "./store-commands";
 import type {
   IncomeEventInput,
@@ -241,6 +245,17 @@ function useExpenseStoreValue() {
     persist(updateMonthlyExpenseOccurrenceInStore(current(), input));
   }
 
+  function setTemplateReminder(
+    templateId: string,
+    reminder: ExpenseReminderSettings | undefined,
+  ) {
+    persist(setTemplateReminderInStore(current(), templateId, reminder));
+  }
+
+  function updateReminderPreferences(changes: ReminderPreferencesInput) {
+    persist(updateReminderPreferencesInStore(current(), changes));
+  }
+
   function closeMonth(monthId: string) {
     persist(closeMonthInStore(current(), monthId));
   }
@@ -283,6 +298,8 @@ function useExpenseStoreValue() {
     deleteIncomeEvent,
     updateIncomeEvent,
     updateMonthlyExpenseOccurrence,
+    setTemplateReminder,
+    updateReminderPreferences,
     closeMonth,
     reopenMonth,
     updateTheme,

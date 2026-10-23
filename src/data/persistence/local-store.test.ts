@@ -10,6 +10,7 @@ import {
   closeMonthInStore,
   reopenMonthInStore,
 } from "@/stores/app/finance-commands";
+import { updateReminderPreferencesInStore } from "@/stores/app/preference-commands";
 import {
   clearExpenseLocalData,
   loadExpenseStore,
@@ -212,6 +213,32 @@ describe("mergeExpenseStores", () => {
     expect(mergeExpenseStores(reopened, closed).finance.monthClosures)
       .toEqual(reopened.finance.monthClosures);
     expect("monthClosures" in mergeExpenseStores(emptyStore, emptyStore).finance)
+      .toBe(false);
+  });
+
+  it("keeps the latest reminder settings from either device", () => {
+    const older = updateReminderPreferencesInStore(
+      emptyStore,
+      { defaultEnabled: true, pushHour: 9 },
+      new Date("2026-10-20T10:00:00.000Z"),
+    );
+    const newer = updateReminderPreferencesInStore(
+      emptyStore,
+      { defaultEnabled: false, pushHour: 20 },
+      new Date("2026-10-21T10:00:00.000Z"),
+    );
+
+    // El resto de preferencias gana la local; los avisos, la última edición.
+    expect(mergeExpenseStores(older, newer).preferences?.reminders).toMatchObject({
+      pushHour: 20,
+    });
+    expect(mergeExpenseStores(newer, older).preferences?.reminders).toMatchObject({
+      pushHour: 20,
+    });
+    expect(mergeExpenseStores(emptyStore, older).preferences?.reminders).toMatchObject({
+      pushHour: 9,
+    });
+    expect("reminders" in (mergeExpenseStores(emptyStore, emptyStore).preferences ?? {}))
       .toBe(false);
   });
 

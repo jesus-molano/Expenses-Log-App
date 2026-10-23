@@ -485,4 +485,53 @@ describe("normalizeExpenseStore", () => {
       { id: "ended", startDate: "2026-06-01", endDate: "2026-06-01" },
     ]);
   });
+
+  it("keeps valid reminder settings and repairs malformed ones", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      categories: [],
+      overrides: [],
+      templates: [
+        { id: "own", startDate: "2026-10-01", dueDay: 1, reminder: { enabled: true, daysBeforeCharge: 14 } },
+        { id: "broken", startDate: "2026-10-01", dueDay: 1, reminder: { enabled: "yes", daysBeforeCharge: 90 } },
+        { id: "null", startDate: "2026-10-01", dueDay: 1, reminder: null },
+      ],
+      preferences: {
+        theme: "nord",
+        language: "es",
+        reminders: {
+          defaultEnabled: true,
+          defaultDaysBefore: 2,
+          pushHour: 99,
+          timeZone: "Europe/Madrid",
+          updatedAt: "2026-10-20T10:00:00.000Z",
+        },
+      },
+    });
+
+    expect(store.templates[0].reminder).toEqual({ enabled: true, daysBeforeCharge: 14 });
+    expect(store.templates[1].reminder).toEqual({ enabled: false, daysBeforeCharge: 30 });
+    expect("reminder" in store.templates[2]).toBe(false);
+    expect(store.preferences?.reminders).toMatchObject({
+      defaultEnabled: true,
+      defaultDaysBefore: 2,
+      longCycleDaysBefore: 14,
+      pushHour: 23,
+      timeZone: "Europe/Madrid",
+      updatedAt: "2026-10-20T10:00:00.000Z",
+    });
+  });
+
+  it("does not add reminder settings to stores without them", () => {
+    const template = { id: "plain", startDate: "2026-10-01", dueDay: 1 };
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      templates: [template],
+      preferences: { theme: "nord", language: "es", reminders: "bad" },
+    });
+
+    expect(store.preferences).toEqual({ theme: "nord", language: "es" });
+    // Un gasto sin cambios se conserva tal cual.
+    expect(store.templates[0]).toBe(template);
+  });
 });
