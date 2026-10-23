@@ -63,7 +63,7 @@ export type Database = {
       };
       push_subscriptions: {
         // failure_count, last_failure_at y last_success_at llegan con la
-        // migración 20261023120000_push_subscription_health: hasta aplicarla
+        // migración 20261023220000_push_subscription_health: hasta aplicarla
         // no existen, por eso son opcionales también en Row.
         Row: {
           id: UUID;

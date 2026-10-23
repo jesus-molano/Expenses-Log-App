@@ -376,7 +376,7 @@ debe aplicarse antes de desplegar el route handler nuevo.
   `/api/push/subscribe`. Si la suscripcion se creo con otra clave VAPID, crea
   otra y borra la antigua. Nunca pide permiso.
 - Activar los avisos tampoco reutiliza una suscripcion de otra clave VAPID.
-- `failure_count` (migracion `20261023120000_push_subscription_health.sql`,
+- `failure_count` (migracion `20261023220000_push_subscription_health.sql`,
   solo aditiva): un 404/410 borra la suscripcion al momento; otros fallos
   (403 de clave, 5xx, tiempo agotado) suman uno y al quinto se borra. Un envio
   correcto lo pone a 0. Ajustes avisa si los ultimos envios a ese dispositivo
