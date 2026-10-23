@@ -1,7 +1,6 @@
 "use client";
 
 import { Bell, BellRing } from "lucide-react";
-import { resolveTemplateReminder } from "@/domain/reminder-schedule";
 import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { useRowReminderControls } from "./RowReminderContext";
@@ -17,14 +16,13 @@ function stopRowGesture(event: React.SyntheticEvent) {
 }
 
 // Campana de la fila: muestra si el gasto avisa (propio o por defecto) y lo
-// cambia. Solo en recibos pendientes de gastos que siguen existiendo.
+// cambia. Solo en recibos pendientes de gastos que siguen existiendo, también
+// los que arrastra el mes anterior.
 export function ReminderBellButton({ occurrence, language }: ReminderBellButtonProps) {
   const controls = useRowReminderControls();
-  if (!controls || occurrence.status !== "due" || !occurrence.template.active) {
-    return null;
-  }
+  const reminder = controls?.reminderFor(occurrence) ?? null;
+  if (!controls || !reminder || occurrence.status !== "due") return null;
 
-  const reminder = resolveTemplateReminder(occurrence.template, controls.preferences);
   const label = t("reminders.bellLabel", language).replace(
     "{name}",
     occurrence.template.name,

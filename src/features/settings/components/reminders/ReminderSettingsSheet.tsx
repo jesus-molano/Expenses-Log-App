@@ -140,7 +140,8 @@ export function ReminderSettingsSheet({
           />
         </Surface>
 
-        <Surface as="section" variant="section" padding="sm">
+        {/* Sin recortar: el menú de horas se despliega fuera de la tarjeta. */}
+        <Surface as="section" variant="section" padding="sm" className="app-settings-card">
           <div className="flex items-center justify-between gap-3 py-1">
             <p id={hourId} className="text-sm font-semibold text-[var(--app-text)]">
               {t("reminders.hourTitle", language)}

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import {
   resolveReminderPreferences,
+  resolveTemplateReminder,
   toggledTemplateReminder,
 } from "@/domain/reminder-schedule";
 import type {
@@ -42,9 +43,20 @@ export function useReminderBell({
   dismissToast,
 }: UseReminderBellOptions): RowReminderControls {
   const preferences = useMemo(() => resolveReminderPreferences(store), [store]);
+  const templatesById = useMemo(
+    () => new Map(store.templates.map((template) => [template.id, template])),
+    [store.templates],
+  );
+
+  // Siempre la plantilla viva: el cobro de un mes cerrado trae una copia
+  // congelada (inactiva y sin aviso).
+  function reminderFor(occurrence: ExpenseOccurrence) {
+    const template = templatesById.get(occurrence.template.id);
+    return template?.active ? resolveTemplateReminder(template, preferences) : null;
+  }
 
   function onToggle(occurrence: ExpenseOccurrence) {
-    const template = store.templates.find((item) => item.id === occurrence.template.id);
+    const template = templatesById.get(occurrence.template.id);
     if (!template) return;
     const previous = template.reminder;
     const next = toggledTemplateReminder(template, preferences);
@@ -65,5 +77,5 @@ export function useReminderBell({
     });
   }
 
-  return { preferences, onToggle };
+  return { preferences, reminderFor, onToggle };
 }
