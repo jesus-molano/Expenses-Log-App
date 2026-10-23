@@ -12,6 +12,7 @@ import {
   STORE_KEYS,
   normalizeExpenseStore,
   unknownEntries,
+  withBalanceCheckins,
   withBudgetCycle,
   withMonthClosures,
 } from "./store-normalization";
@@ -146,6 +147,13 @@ export function mergeExpenseStores(
               normalizedLocalStore.finance.budgetCycle,
             )
           : normalizedCloudStore.finance.budgetCycle,
+      ),
+      // Por día, el cambio más reciente (borrar también es un cambio).
+      ...withBalanceCheckins(
+        mergeMonthlyRecord(
+          normalizedCloudStore.finance.balanceCheckins,
+          normalizedLocalStore.finance.balanceCheckins,
+        ),
       ),
     },
     preferences: {

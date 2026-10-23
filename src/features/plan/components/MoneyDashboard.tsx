@@ -3,6 +3,7 @@
 import { type FormEvent, useMemo, useState } from "react";
 import { format, parseISO, subMonths } from "date-fns";
 import { enUS, es } from "date-fns/locale";
+import { ActionToast } from "@/components/ui/ActionToast";
 import { Button } from "@/components/ui/Button";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Sheet } from "@/components/ui/Sheet";
@@ -19,8 +20,8 @@ import {
   periodRange,
   resolveBudgetCycle,
 } from "@/domain/budget-cycle";
-import type { AppLanguage } from "@/domain/types";
 import { DashboardShell } from "@/features/expenses/components/DashboardShell";
+import { useActionToast } from "@/features/expenses/hooks/use-action-toast";
 import { useScrollChrome } from "@/features/expenses/hooks/use-scroll-chrome";
 import { formatPeriodRange } from "@/features/expenses/lib/month-view";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
@@ -29,23 +30,31 @@ import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { useMonthlySalaryEditor } from "../hooks/use-monthly-salary-editor";
 import { useCompactChart } from "../hooks/use-compact-chart";
 import { useOneOffIncomeForm } from "../hooks/use-one-off-income-form";
+import { useBalanceLog } from "../hooks/use-balance-log";
+import { useMonthSummary, useMonthSummaryPrompt } from "../hooks/use-month-summary";
 import { usePlanInsights } from "../hooks/use-plan-insights";
 import { usePlanSettingsForm } from "../hooks/use-plan-settings-form";
 import { useSkipOccurrenceConfirmation } from "../hooks/use-skip-occurrence-confirmation";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 import {
   buildSeriesItem,
+  formatShortDate,
   getAvailableYears,
   incomeEventsInMonth,
   occurrencesForMonth,
   planCopy,
 } from "../lib/plan-dashboard";
 import { AnnualPlanSection } from "./AnnualPlanSection";
+import { BalanceCheckinSheet } from "./BalanceCheckinSheet";
+import { BalanceLogSection } from "./BalanceLogSection";
 import { CurrentMonthPlanSection } from "./CurrentMonthPlanSection";
 import { MonthlyReviewSection } from "./MonthlyReviewSection";
 import { MonthlySalaryDialog } from "./MonthlySalaryDialog";
+import { MonthSummaryPrompt } from "./MonthSummaryPrompt";
+import { MonthSummarySheet } from "./MonthSummarySheet";
 import { OneOffIncomePanel } from "./OneOffIncomePanel";
 import { PlanSettingsSheet } from "./PlanSettingsSheet";
+import { PlanSheetHeader as SheetHeader } from "./PlanSheetHeader";
 import { RecurringCostSection } from "./RecurringCostSection";
 import { SkipOccurrenceDialog } from "./SkipOccurrenceDialog";
 import { UpcomingBillsSection } from "./UpcomingBillsSection";
@@ -63,6 +72,8 @@ export function MoneyDashboard() {
     updateMonthlyExpenseOccurrence,
     skipOccurrence,
     togglePaid,
+    recordBalance,
+    deleteBalanceCheckin,
   } = expenseStore;
   const chrome = useScrollChrome();
   const isCompactChart = useCompactChart();
@@ -121,6 +132,37 @@ export function MoneyDashboard() {
     today: todayDateOnly,
     language,
   });
+  const monthSummary = useMonthSummary({ store, today: todayDateOnly, language });
+  const summaryPrompt = useMonthSummaryPrompt({
+    store,
+    today: todayDateOnly,
+    language,
+    cycle,
+    calendarMonthId: periodIdOf(todayDateOnly, cycle),
+    activeMonthId: currentMonthId,
+  });
+  const balanceLog = useBalanceLog({
+    finance: store.finance,
+    today: todayDateOnly,
+    language,
+    onRecord: recordBalance,
+  });
+  const actionToast = useActionToast();
+
+  function deleteBalanceWithUndo(entry: { date: string; amount: number }) {
+    deleteBalanceCheckin(entry.date);
+    actionToast.show({
+      message: t("insights.balance.deleted", language).replace(
+        "{date}",
+        formatShortDate(entry.date, language),
+      ),
+      actionLabel: t("common.undo", language),
+      onAction: () => {
+        recordBalance(entry);
+        actionToast.dismiss();
+      },
+    });
+  }
   const paidProgress = plan.plannedExpenseCount
     ? Math.round((plan.paidExpenseCount / plan.plannedExpenseCount) * 100)
     : 0;
@@ -309,11 +351,27 @@ export function MoneyDashboard() {
           onUpdateMonthlyExpense={updateMonthlyExpenseOccurrence}
         />
 
+        {summaryPrompt ? (
+          <MonthSummaryPrompt
+            summary={summaryPrompt}
+            language={language}
+            onOpen={() => monthSummary.open(summaryPrompt.monthId)}
+          />
+        ) : null}
+
         <UpcomingBillsSection
           language={language}
           largeBills={insights.largeBills.items}
           largeBillsTotal={insights.largeBills.total}
           provision={insights.provision}
+        />
+
+        <BalanceLogSection
+          language={language}
+          entries={balanceLog.entries}
+          trend={balanceLog.trend}
+          onRecord={balanceLog.openForm}
+          onDelete={deleteBalanceWithUndo}
         />
 
         <AnnualPlanSection
@@ -356,6 +414,7 @@ export function MoneyDashboard() {
           }}
           onEditSalary={salaryEditor.openEditor}
           onEditSavings={() => openSavings(selectedSummary.id)}
+          onOpenSummary={() => monthSummary.open(selectedSummary.id.slice(0, 7))}
           onDeleteIncomeEvent={deleteIncomeEvent}
           onUpdateIncomeEvent={updateIncomeEvent}
           onToggleExpanded={() => setExpandedReview((value) => !value)}
@@ -449,6 +508,44 @@ export function MoneyDashboard() {
         />
       ) : null}
 
+      {monthSummary.summary ? (
+        <MonthSummarySheet
+          summary={monthSummary.summary}
+          language={language}
+          periodLabel={
+            cycle.anchor === "payday"
+              ? formatPeriodRange(periodRange(monthSummary.summary.monthId, cycle), language)
+              : null
+          }
+          onClose={monthSummary.close}
+        />
+      ) : null}
+
+      {balanceLog.formOpen ? (
+        <BalanceCheckinSheet
+          language={language}
+          date={balanceLog.date}
+          amountText={balanceLog.amountText}
+          maxDate={todayDateOnly}
+          replacesEntry={balanceLog.replacesEntry}
+          onDateChange={balanceLog.setDate}
+          onAmountChange={balanceLog.setAmountText}
+          onClose={balanceLog.closeForm}
+          onSubmit={balanceLog.submit}
+        />
+      ) : null}
+
+      {actionToast.toast ? (
+        <ActionToast
+          key={actionToast.toast.id}
+          message={actionToast.toast.message}
+          actionLabel={actionToast.toast.actionLabel}
+          onAction={actionToast.toast.onAction}
+          onPause={actionToast.pause}
+          onResume={actionToast.resume}
+        />
+      ) : null}
+
       <SkipOccurrenceDialog
         occurrence={skipDialog.occurrenceToSkip}
         language={language}
@@ -456,32 +553,5 @@ export function MoneyDashboard() {
         onConfirm={skipDialog.confirmSkipOccurrence}
       />
     </DashboardShell>
-  );
-}
-
-function SheetHeader({
-  title,
-  subtitle,
-  onClose,
-  language,
-}: {
-  title: string;
-  subtitle?: string;
-  onClose: () => void;
-  language: AppLanguage;
-}) {
-  return (
-    <>
-      <div className="app-sheet-handle mx-auto mb-3 sm:hidden" />
-      <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-[var(--app-text)]">{title}</h2>
-          {subtitle ? <p className="mt-1 capitalize text-sm text-[var(--app-text-muted)]">{subtitle}</p> : null}
-        </div>
-        <Button type="button" onClick={onClose} variant="ghost" size="sm" className="rounded-full">
-          {t("money.close", language)}
-        </Button>
-      </header>
-    </>
   );
 }

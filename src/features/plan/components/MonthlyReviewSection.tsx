@@ -35,6 +35,7 @@ export function MonthlyReviewSection({
   onMonthChange,
   onEditSalary,
   onEditSavings,
+  onOpenSummary,
   onDeleteIncomeEvent,
   onUpdateIncomeEvent,
   onToggleExpanded,
@@ -59,6 +60,8 @@ export function MonthlyReviewSection({
   onMonthChange: (monthId: string) => void;
   onEditSalary: () => void;
   onEditSavings: () => void;
+  // Abre "Resumen de <mes>" del mes elegido.
+  onOpenSummary: () => void;
   onDeleteIncomeEvent: (id: string) => void;
   onUpdateIncomeEvent: (id: string, input: IncomeEventInput) => void;
   onToggleExpanded: () => void;
@@ -139,7 +142,10 @@ export function MonthlyReviewSection({
         />
       </dl>
 
-      <div className="mt-3 flex justify-end gap-2">
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={onOpenSummary}>
+          {t("insights.summary.open", language)}
+        </Button>
         <Button size="sm" variant="ghost" onClick={onEditSalary}>
           {copy.editFixedIncome}
         </Button>

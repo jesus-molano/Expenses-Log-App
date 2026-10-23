@@ -40,6 +40,8 @@ import {
   markNewExpenseIntentHandled,
   readNewExpenseIntent,
 } from "@/features/expenses/lib/new-expense-intent";
+import { MonthSummarySheet } from "@/features/plan/components/MonthSummarySheet";
+import { useMonthSummary } from "@/features/plan/hooks/use-month-summary";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
 
@@ -70,6 +72,11 @@ export function ExpenseDashboard({
   const month = useActiveMonth({ store, language, now, closeMonth, reopenMonth });
   const filters = useExpenseFilters(store, language, now, month.viewMonthId);
   const actionToast = useActionToast();
+  const monthSummary = useMonthSummary({
+    store,
+    today: filters.today,
+    language,
+  });
   const monthHeadingRef = useRef<HTMLHeadingElement>(null);
   const showCloseCard =
     month.suggestAdvance && month.viewMonthId === month.activeMonthId;
@@ -232,6 +239,7 @@ export function ExpenseDashboard({
               month.dismiss();
               focusMonthHeading();
             }}
+            onOpenSummary={() => monthSummary.open(month.calendarMonthId)}
           />
         ) : null}
       </div>
@@ -334,6 +342,19 @@ export function ExpenseDashboard({
           // replace: la entrada de la hoja en el historial pasa a ser la del
           // detalle, y Atrás desde el detalle vuelve al listado.
           onEditSeries={(occurrence) => router.replace(`/expenses/${occurrence.template.id}`)}
+        />
+      ) : null}
+
+      {monthSummary.summary ? (
+        <MonthSummarySheet
+          summary={monthSummary.summary}
+          language={language}
+          periodLabel={
+            month.cycle.anchor === "payday"
+              ? formatPeriodRange(periodRange(monthSummary.summary.monthId, month.cycle), language)
+              : null
+          }
+          onClose={monthSummary.close}
         />
       ) : null}
 

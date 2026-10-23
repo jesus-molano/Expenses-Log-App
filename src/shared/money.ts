@@ -28,10 +28,23 @@ export function parseMoneyInput(value: string): number | null {
 
 export function isValidMoneyInput(
   value: string,
-  { allowZero = false }: { allowZero?: boolean } = {},
+  {
+    allowZero = false,
+    allowNegative = false,
+  }: { allowZero?: boolean; allowNegative?: boolean } = {},
 ) {
+  if (allowNegative) return parseSignedMoneyInput(value) !== null;
   const amount = parseMoneyInput(value);
   return amount !== null && (allowZero ? amount >= 0 : amount > 0);
+}
+
+// Como parseMoneyInput, pero admite un signo menos delante ("-35", "− 1.200,50"):
+// un saldo en números rojos.
+export function parseSignedMoneyInput(value: string): number | null {
+  const match = /^\s*([-−])?\s*(.*)$/.exec(value);
+  const amount = parseMoneyInput(match?.[2] ?? "");
+  if (amount === null) return null;
+  return match?.[1] && amount !== 0 ? -amount : amount;
 }
 
 export function isValidPositiveMoneyInput(value: string) {

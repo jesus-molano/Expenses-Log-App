@@ -154,6 +154,39 @@ describe("normalizeExpenseStore", () => {
     expect("budgetCycle" in store.finance).toBe(false);
   });
 
+  it("keeps valid balance check-ins and drops malformed ones", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      finance: {
+        balanceCheckins: {
+          "2026-10-23": { amount: 1250.404, updatedAt: "2026-10-23T10:00:00.000Z" },
+          "2026-10-20": {
+            amount: -35,
+            updatedAt: "2026-10-21T10:00:00.000Z",
+            deletedAt: "2026-10-21T10:00:00.000Z",
+          },
+          "2026-10-21": { amount: "12", updatedAt: "2026-10-21T10:00:00.000Z" },
+          "2026-10-22": { amount: 12 },
+          "2026-02-30": { amount: 12, updatedAt: "2026-10-21T10:00:00.000Z" },
+          yesterday: { amount: 12, updatedAt: "2026-10-21T10:00:00.000Z" },
+        },
+      },
+    });
+
+    expect(store.finance.balanceCheckins).toEqual({
+      "2026-10-23": { amount: 1250.4, updatedAt: "2026-10-23T10:00:00.000Z" },
+      "2026-10-20": {
+        amount: -35,
+        updatedAt: "2026-10-21T10:00:00.000Z",
+        deletedAt: "2026-10-21T10:00:00.000Z",
+      },
+    });
+    expect(
+      "balanceCheckins" in
+        normalizeExpenseStore({ schemaVersion: 3, finance: { balanceCheckins: { x: 1 } } }).finance,
+    ).toBe(false);
+  });
+
   it("falls back to a safe empty shape for invalid payloads", () => {
     expect(normalizeExpenseStore(null)).toMatchObject({
       categories: [],

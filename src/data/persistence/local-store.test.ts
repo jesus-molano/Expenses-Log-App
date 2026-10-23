@@ -8,6 +8,8 @@ import type {
 import {
   clearIncomeFromStore,
   closeMonthInStore,
+  deleteBalanceCheckinInStore,
+  recordBalanceInStore,
   reopenMonthInStore,
   updateBudgetCycleInStore,
 } from "@/stores/app/finance-commands";
@@ -238,6 +240,30 @@ describe("mergeExpenseStores", () => {
     expect(mergeExpenseStores(emptyStore, payday).finance.budgetCycle?.anchor).toBe("payday");
     expect(mergeExpenseStores(payday, emptyStore).finance.budgetCycle?.anchor).toBe("payday");
     expect("budgetCycle" in mergeExpenseStores(emptyStore, emptyStore).finance).toBe(false);
+  });
+
+  it("merges balance check-ins day by day, deletions included", () => {
+    const base = recordBalanceInStore(
+      recordBalanceInStore(emptyStore, { date: "2026-10-01", amount: 2100 }, new Date("2026-10-01T10:00:00.000Z")),
+      { date: "2026-10-11", amount: 1600 },
+      new Date("2026-10-11T10:00:00.000Z"),
+    );
+    // Un dispositivo borra el día 11; el otro anota el 23.
+    const phone = deleteBalanceCheckinInStore(base, "2026-10-11", new Date("2026-10-20T10:00:00.000Z"));
+    const laptop = recordBalanceInStore(base, { date: "2026-10-23", amount: 1250 }, new Date("2026-10-23T10:00:00.000Z"));
+
+    for (const merged of [mergeExpenseStores(phone, laptop), mergeExpenseStores(laptop, phone)]) {
+      expect(merged.finance.balanceCheckins).toEqual({
+        "2026-10-01": { amount: 2100, updatedAt: "2026-10-01T10:00:00.000Z" },
+        "2026-10-11": {
+          amount: 1600,
+          updatedAt: "2026-10-20T10:00:00.000Z",
+          deletedAt: "2026-10-20T10:00:00.000Z",
+        },
+        "2026-10-23": { amount: 1250, updatedAt: "2026-10-23T10:00:00.000Z" },
+      });
+    }
+    expect("balanceCheckins" in mergeExpenseStores(emptyStore, emptyStore).finance).toBe(false);
   });
 
   it("keeps fields it does not know from both stores", () => {

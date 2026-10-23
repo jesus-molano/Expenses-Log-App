@@ -6,6 +6,7 @@ import {
   toMonthId,
   updateIncomeEvent,
 } from "@/domain/finance";
+import { isValidDateOnly } from "@/domain/calendar";
 import type {
   BudgetCycleAnchor,
   ExpenseStore,
@@ -331,6 +332,52 @@ export function updateBudgetCycleInStore(
     finance: {
       ...store.finance,
       budgetCycle: { anchor, updatedAt: timestampAfter(current?.updatedAt, now) },
+    },
+  };
+}
+
+// Anota el saldo de la cuenta un día. Un segundo saldo el mismo día sustituye
+// al primero; anotar un día borrado lo recupera.
+export function recordBalanceInStore(
+  store: ExpenseStore,
+  input: { date: string; amount: number },
+  now: Date = new Date(),
+): ExpenseStore {
+  if (!isValidDateOnly(input.date) || !Number.isFinite(input.amount)) return store;
+  const existing = store.finance.balanceCheckins?.[input.date];
+  return withBalanceCheckin(store, input.date, {
+    amount: Math.round(input.amount * 100) / 100,
+    updatedAt: timestampAfter(existing?.updatedAt, now),
+  });
+}
+
+// Borrar guarda `deletedAt` en vez de quitar la entrada: si no, el merge con
+// otro dispositivo la devolvería.
+export function deleteBalanceCheckinInStore(
+  store: ExpenseStore,
+  date: string,
+  now: Date = new Date(),
+): ExpenseStore {
+  const existing = store.finance.balanceCheckins?.[date];
+  if (!existing || existing.deletedAt) return store;
+  const timestamp = timestampAfter(existing.updatedAt, now);
+  return withBalanceCheckin(store, date, {
+    ...existing,
+    deletedAt: timestamp,
+    updatedAt: timestamp,
+  });
+}
+
+function withBalanceCheckin(
+  store: ExpenseStore,
+  date: string,
+  checkin: NonNullable<ExpenseStore["finance"]["balanceCheckins"]>[string],
+): ExpenseStore {
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      balanceCheckins: { ...store.finance.balanceCheckins, [date]: checkin },
     },
   };
 }

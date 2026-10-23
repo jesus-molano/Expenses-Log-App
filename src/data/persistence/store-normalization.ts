@@ -5,10 +5,12 @@ import {
 import { dedupeOverrides } from "@/domain/overrides";
 import {
   buildDateWithDay,
+  isValidDateOnly,
   normalizeDateOnly,
   toDateOnly,
 } from "@/domain/calendar";
 import type {
+  BalanceCheckin,
   BudgetCycleSetting,
   ExpenseOccurrenceOverride,
   ExpenseStore,
@@ -39,6 +41,7 @@ export const FINANCE_KEYS = [
   "monthlySavingsContributions",
   "monthClosures",
   "budgetCycle",
+  "balanceCheckins",
 ] as const;
 
 export const DELETED_KEYS = [
@@ -147,7 +150,37 @@ function normalizeFinanceStore(
     monthlySavingsContributions,
     ...withMonthClosures(normalizeMonthClosures(finance.monthClosures)),
     ...withBudgetCycle(normalizeBudgetCycle(finance.budgetCycle)),
+    ...withBalanceCheckins(normalizeBalanceCheckins(finance.balanceCheckins)),
   };
+}
+
+// Un saldo por fecha YYYY-MM-DD con importe y hora de cambio; lo ilegible se
+// descarta sin tocar el resto.
+function normalizeBalanceCheckins(value: unknown): Record<string, BalanceCheckin> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([date, entry]) => {
+      if (
+        !isValidDateOnly(date) ||
+        !isRecord(entry) ||
+        typeof entry.amount !== "number" ||
+        !Number.isFinite(entry.amount) ||
+        !isTimestamp(entry.updatedAt)
+      ) {
+        return [];
+      }
+      const checkin: BalanceCheckin = {
+        amount: Math.round(entry.amount * 100) / 100,
+        updatedAt: entry.updatedAt,
+      };
+      if (isTimestamp(entry.deletedAt)) checkin.deletedAt = entry.deletedAt;
+      return [[date, checkin]];
+    }),
+  );
+}
+
+// Solo se escribe cuando hay algún saldo anotado.
+export function withBalanceCheckins(checkins: Record<string, BalanceCheckin>) {
+  return Object.keys(checkins).length > 0 ? { balanceCheckins: checkins } : {};
 }
 
 // Un ciclo ilegible vuelve al mes natural, que es el valor por defecto.

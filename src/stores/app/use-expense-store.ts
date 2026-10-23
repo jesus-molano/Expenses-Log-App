@@ -28,12 +28,14 @@ import {
   clearExpensesFromStore,
   clearIncomeFromStore,
   closeMonthInStore,
+  deleteBalanceCheckinInStore,
   deleteExpenseFromStore,
   deleteIncomeEventFromStore,
   dismissLastChanceReminderInStore,
   moveOccurrenceInStore,
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
+  recordBalanceInStore,
   reopenMonthInStore,
   restoreOccurrenceInStore,
   skipOccurrenceInStore,
@@ -255,6 +257,14 @@ function useExpenseStoreValue() {
     persist(updateBudgetCycleInStore(current(), anchor));
   }
 
+  function recordBalance(input: { date: string; amount: number }) {
+    persist(recordBalanceInStore(current(), input));
+  }
+
+  function deleteBalanceCheckin(date: string) {
+    persist(deleteBalanceCheckinInStore(current(), date));
+  }
+
   function updateTheme(theme: AppTheme) {
     applyAppTheme(theme);
     persist(updateThemeInStore(current(), theme));
@@ -292,6 +302,8 @@ function useExpenseStoreValue() {
     closeMonth,
     reopenMonth,
     updateBudgetCycle,
+    recordBalance,
+    deleteBalanceCheckin,
     updateTheme,
     updateLanguage,
     syncStatus: persistence.syncStatus,

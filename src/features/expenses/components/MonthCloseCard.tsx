@@ -14,6 +14,8 @@ type MonthCloseCardProps = {
   language: AppLanguage;
   onAdvance: () => void;
   onDismiss: () => void;
+  // Abre "Resumen de <mes>" antes de pasar al siguiente.
+  onOpenSummary?: () => void;
 };
 
 // "Octubre al día · 12 pagados · 1 de noviembre ya pagado": propone pasar al
@@ -25,6 +27,7 @@ export function MonthCloseCard({
   language,
   onAdvance,
   onDismiss,
+  onOpenSummary,
 }: MonthCloseCardProps) {
   const month = formatMonthName(status.monthId, language);
   const nextMonth = formatMonthName(nextMonthId, language);
@@ -73,6 +76,11 @@ export function MonthCloseCard({
         <Button variant="primary" size="sm" onClick={onAdvance}>
           {capitalize(t("expenses.advanceToMonth", language).replace("{month}", nextMonth))}
         </Button>
+        {onOpenSummary ? (
+          <Button variant="ghost" size="sm" onClick={onOpenSummary}>
+            {t("insights.summary.open", language)}
+          </Button>
+        ) : null}
         <Button variant="ghost" size="sm" onClick={onDismiss}>
           {t("expenses.notNow", language)}
         </Button>
