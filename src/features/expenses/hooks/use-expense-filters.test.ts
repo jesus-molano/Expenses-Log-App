@@ -88,11 +88,11 @@ describe("expense timeline window", () => {
     };
 
     const { result } = renderHook(() => useExpenseFilters(store, "es", new Date()));
-    const januaryDates = result.current.visibleOccurrences
-      .filter((item) => item.occurrenceDate.startsWith("2027-01"))
-      .map((item) => item.dueDate);
-
-    expect(januaryDates).toEqual(["2027-01-07"]);
+    // Diciembre no mezcla enero: sus primeros días se resumen aparte.
+    expect(
+      result.current.visibleOccurrences.some((item) => item.dueDate.startsWith("2027-01")),
+    ).toBe(false);
+    expect(result.current.nextMonthPreview).toMatchObject({ monthId: "2027-01", count: 1 });
     expect(result.current.pendingTotal).toBe(0);
   });
 });
@@ -213,7 +213,11 @@ describe("viewed month", () => {
     expect(result.current.pendingTotal).toBe(100);
     expect(
       result.current.visibleOccurrences.map((item) => item.dueDate),
-    ).toEqual(expect.arrayContaining(["2026-11-01", "2026-11-12", "2026-12-01"]));
+    ).toEqual(expect.arrayContaining(["2026-11-01", "2026-11-12"]));
+    expect(
+      result.current.visibleOccurrences.some((item) => item.dueDate >= "2026-12-01"),
+    ).toBe(false);
+    expect(result.current.nextMonthPreview).toMatchObject({ monthId: "2026-12", count: 1 });
     expect(
       result.current.visibleOccurrences.some((item) => item.dueDate < "2026-11-01"),
     ).toBe(false);
