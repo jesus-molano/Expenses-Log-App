@@ -72,7 +72,7 @@ export function ExpenseCatalogSheet({
               <LayoutList size={20} className="text-[var(--app-accent)]" aria-hidden="true" />
               {t("catalog.title", language)}
             </h2>
-            <p className="app-money mt-1 text-sm font-medium text-[var(--app-text-muted)]">
+            <p className="mt-1 text-sm font-medium text-[var(--app-text-muted)]">
               {t("catalog.summary", language)
                 .replace("{count}", String(summary.activeCount))
                 .replace("{monthly}", formatCurrency(summary.monthlyAverage))
@@ -102,7 +102,9 @@ export function ExpenseCatalogSheet({
             aria-label={t("catalog.searchLabel", language)}
             placeholder={t("catalog.searchPlaceholder", language)}
             autoComplete="off"
-            className="input-control w-full pl-9"
+            // .input-control fija su padding: el hueco del icono va en línea.
+            style={{ paddingLeft: "2.25rem" }}
+            className="input-control w-full"
           />
         </div>
 
@@ -124,7 +126,8 @@ export function ExpenseCatalogSheet({
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        {/* Uno debajo del otro en móvil: así se lee el valor elegido entero. */}
+        <div className="grid gap-2 min-[480px]:grid-cols-2">
           <SelectMenu
             open={frequencyOpen}
             onOpenChange={setFrequencyOpen}

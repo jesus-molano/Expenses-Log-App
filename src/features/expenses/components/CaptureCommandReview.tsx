@@ -8,6 +8,7 @@ import { MoneyInput } from "@/components/ui/MoneyInput";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { Sheet } from "@/components/ui/Sheet";
 import type { CaptureCommand } from "@/domain/capture-commands";
+import { foldText } from "@/domain/text";
 import type { AppLanguage, ExpenseStore } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import type { ConfirmedCaptureCommand } from "@/stores/app/capture-command-actions";
@@ -160,6 +161,11 @@ function CommandCard({
   const title = `${commandIntentLabel(command.intent, language)}: ${template?.name ?? `«${command.target}»`}`;
   const checkboxId = `capture-command-${item.id}`;
   const needsChoice = resolved.issue === "notFound" || resolved.issue === "ambiguous";
+  // Si el nombre no coincide del todo, se ofrece corregir la serie elegida.
+  const canCorrect =
+    Boolean(template) &&
+    foldText(template?.name ?? "") !== foldText(command.target) &&
+    resolved.candidates.length > 1;
   const detail = commandDetailLabel(resolved, language, item.amount);
 
   return (
@@ -190,8 +196,7 @@ function CommandCard({
         </p>
       ) : null}
 
-      {/* Se puede corregir la serie aunque se haya encontrado una. */}
-      {needsChoice || resolved.candidates.length > 1 ? (
+      {needsChoice || canCorrect ? (
         <div className="pl-8">
           <SelectMenu
             open={menuOpen}

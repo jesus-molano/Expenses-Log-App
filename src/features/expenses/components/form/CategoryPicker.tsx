@@ -98,7 +98,7 @@ export function CategoryPicker({
               setDraft(draft ? null : { name: "", tone: "violet" });
             }}
             aria-expanded={draft !== null}
-            className="app-control inline-flex min-h-10 items-center justify-center gap-1.5 px-2 text-xs font-bold"
+            className="app-control col-span-full inline-flex min-h-10 items-center justify-center gap-1.5 px-2 text-xs font-bold"
           >
             <Plus size={14} />
             <span className="min-w-0 truncate">{t("categoryManager.newCategory", language)}</span>
