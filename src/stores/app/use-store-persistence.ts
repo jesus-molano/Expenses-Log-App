@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import type { User } from "@supabase/supabase-js";
+import { isAuthRetryableFetchError, type User } from "@supabase/supabase-js";
 import type { AppSupabaseClient } from "@/data/supabase/database.types";
 import type { ExpenseStore } from "@/domain/types";
 import { loadCloudStore, saveCloudStore } from "@/data/persistence/cloud-store";
@@ -11,6 +11,11 @@ import {
   saveExpenseStore,
 } from "@/data/persistence/local-store";
 import { assignExpenseStoreOwner } from "@/data/persistence/store-normalization";
+import {
+  hasUnsyncedChangesFor,
+  readSyncMeta,
+  writeSyncMeta,
+} from "@/data/persistence/sync-meta-store";
 import { t } from "@/shared/i18n";
 import { createClient } from "@/utils/supabase/client";
 import { applyRuntimePreferences } from "./runtime-preferences";
@@ -41,19 +46,29 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
     markSyncing,
     markSynced,
     markSaved,
+    markPending,
     markError,
   } = useSyncState();
+  // Solo se da por subido si nadie ha editado desde que salió esa versión.
+  const markCloudSaved = useCallback((revision: number, userId: string) => {
+    if (revision !== localRevisionRef.current) return;
+    writeSyncMeta({ ownerId: userId, dirty: false });
+  }, []);
   const {
     queueCloudSave,
     saveImmediately,
     clearQueuedSave,
+    flushQueuedSave,
+    retryQueuedSave,
   } = useCloudSaveQueue({
     supabaseRef,
     userRef,
     cloudReadyRef,
     markSyncing,
     markSaved,
+    markPending,
     markError,
+    onCloudSaved: markCloudSaved,
   });
 
   useEffect(() => {
@@ -118,6 +133,7 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
 
       const revisionBeforeCloudHydration = localRevisionRef.current;
       const initialLocalStore = applyRuntimePreferences(loadExpenseStore());
+      const localDirty = hasUnsyncedChangesFor(readSyncMeta(), user.id);
       const syncRun = syncRunRef.current + 1;
       syncRunRef.current = syncRun;
       syncingUserIdRef.current = user.id;
@@ -131,41 +147,53 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
         if (!active || syncRunRef.current !== syncRun) return;
 
         const latestLocalStore = applyRuntimePreferences(loadExpenseStore());
-        const {
-          mergedStore,
-          shouldHydrateReactState,
-          shouldSaveCloud,
-        } = resolveHydratedStore({
+        const { mergedStore, shouldSaveCloud } = resolveHydratedStore({
           initialLocalStore,
           latestLocalStore,
           cloudStore: cloud.store,
           revisionAtCloudLoad: revisionBeforeCloudHydration,
           currentRevision: localRevisionRef.current,
+          localDirty,
         });
         const ownedStore = assignExpenseStoreOwner(mergedStore, user.id);
+        // La fusión incluye las ediciones hechas mientras cargaba la nube:
+        // sin hidratarla, el siguiente guardado subiría el estado sin lo que
+        // solo estaba en la nube.
         saveExpenseStore(ownedStore);
-        if (active && shouldHydrateReactState) {
-          onHydrate(ownedStore);
-        }
+        if (active) onHydrate(ownedStore);
         markHydrated();
         syncedUserIdRef.current = user.id;
         syncingUserIdRef.current = null;
 
         if (shouldSaveCloud) {
+          const revisionAtSave = localRevisionRef.current;
           const saved = await saveCloudStore(supabase, user, ownedStore);
           if (!active || syncRunRef.current !== syncRun) return;
           cloudReadyRef.current = saved.mode === "table";
+          markCloudSaved(revisionAtSave, user.id);
           markSynced(saved.mode);
+          // Lo editado mientras subía la fusión no pudo encolarse aún.
+          if (localRevisionRef.current !== revisionAtSave) {
+            queueCloudSave(
+              assignExpenseStoreOwner(loadExpenseStore(), user.id),
+              localRevisionRef.current,
+            );
+          }
           return;
         }
 
+        writeSyncMeta({ ownerId: user.id, dirty: false });
         cloudReadyRef.current = cloud.mode === "table";
         markSynced(cloud.mode);
       } catch (error) {
         syncingUserIdRef.current = null;
         cloudReadyRef.current = false;
         markHydrated();
-        markError(error, "settings.cloudSyncError");
+        if (hasUnsyncedChangesFor(readSyncMeta(), user.id)) {
+          markPending();
+        } else {
+          markError(error, "settings.cloudSyncError");
+        }
       }
     }
 
@@ -177,7 +205,11 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
 
       void supabase.auth
         .getUser()
-        .then(({ data }) => syncAuthenticatedUser(data.user ?? null))
+        .then(({ data, error }) => {
+          // Sin red la sesión sigue siendo válida: no es un cierre de sesión.
+          if (!data.user && isAuthRetryableFetchError(error)) return;
+          return syncAuthenticatedUser(data.user ?? null);
+        })
         .catch((error: unknown) => {
           cloudReadyRef.current = false;
           markError(error, "settings.cloudSyncError");
@@ -192,31 +224,75 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
 
     const frame = window.requestAnimationFrame(() => refreshAuthRef.current());
 
+    // Al recuperar la red o volver a la app se reintenta lo pendiente; si la
+    // nube no llegó a cargar, se vuelve a sincronizar (y a fusionar).
+    function resumeSync() {
+      retryQueuedSave();
+      if (!cloudReadyRef.current) refreshAuthRef.current();
+    }
+
+    // Al salir de la app se sube ya lo que esperaba al debounce.
+    function flushBeforeLeaving() {
+      void flushQueuedSave();
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        flushBeforeLeaving();
+      } else {
+        resumeSync();
+      }
+    }
+
+    window.addEventListener("online", resumeSync);
+    window.addEventListener("pagehide", flushBeforeLeaving);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       active = false;
       window.cancelAnimationFrame(frame);
       subscription?.unsubscribe();
+      window.removeEventListener("online", resumeSync);
+      window.removeEventListener("pagehide", flushBeforeLeaving);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearQueuedSave();
     };
   }, [
     clearQueuedSave,
+    flushQueuedSave,
+    markCloudSaved,
     markError,
     markLocal,
+    markPending,
     markSynced,
     markSyncing,
     onHydrate,
+    queueCloudSave,
+    retryQueuedSave,
   ]);
 
   useEffect(() => {
     refreshAuthRef.current();
   }, [pathname]);
 
-  function persist(nextStore: ExpenseStore, onPersist: (store: ExpenseStore) => void) {
+  // Guarda en el dispositivo y lo marca pendiente de subir antes de intentar
+  // la nube: si la app se cierra o no hay red, la siguiente sincronización
+  // fusiona estos cambios en lugar de descartarlos.
+  function saveLocally(nextStore: ExpenseStore) {
     const ownedStore = assignExpenseStoreOwner(nextStore, userRef.current?.id);
     localRevisionRef.current += 1;
     saveExpenseStore(ownedStore);
+    writeSyncMeta({
+      ownerId: userRef.current?.id ?? readSyncMeta().ownerId,
+      dirty: true,
+    });
+    return { ownedStore, revision: localRevisionRef.current };
+  }
+
+  function persist(nextStore: ExpenseStore, onPersist: (store: ExpenseStore) => void) {
+    const { ownedStore, revision } = saveLocally(nextStore);
     onPersist(ownedStore);
-    queueCloudSave(ownedStore);
+    queueCloudSave(ownedStore, revision);
   }
 
   async function persistImmediately(
@@ -224,16 +300,9 @@ export function useStorePersistence({ onHydrate }: UseStorePersistenceOptions) {
     onPersist: (store: ExpenseStore) => void,
     syncingMessage: string,
   ) {
-    const ownedStore = assignExpenseStoreOwner(nextStore, userRef.current?.id);
-    localRevisionRef.current += 1;
-    saveExpenseStore(ownedStore);
+    const { ownedStore, revision } = saveLocally(nextStore);
     onPersist(ownedStore);
-
-    try {
-      await saveImmediately(ownedStore, syncingMessage);
-    } catch (error) {
-      markError(error, "settings.cloudSaveError");
-    }
+    await saveImmediately(ownedStore, revision, syncingMessage);
   }
 
   return {

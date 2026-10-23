@@ -44,6 +44,7 @@ export const DELETED_KEYS = [
   "incomeEvents",
   "occurrenceRecords",
   "savingsContributions",
+  "monthlySalary",
 ] as const;
 
 export const PREFERENCE_KEYS = ["theme", "language"] as const;
@@ -245,6 +246,7 @@ function normalizeDeletedIds(
     incomeEvents: stringArray(deleted.incomeEvents),
     occurrenceRecords: stringArray(deleted.occurrenceRecords),
     savingsContributions: stringArray(deleted.savingsContributions),
+    monthlySalary: stringArray(deleted.monthlySalary),
   };
 }
 

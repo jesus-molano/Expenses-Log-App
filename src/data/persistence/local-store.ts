@@ -1,5 +1,6 @@
 "use client";
 
+import { monthlySalaryVersionId } from "@/domain/finance";
 import { dedupeOverrides } from "@/domain/overrides";
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore } from "@/domain/types";
@@ -115,9 +116,10 @@ export function mergeExpenseStores(
         normalizedLocalStore.finance.incomeEvents,
         deleted.incomeEvents,
       ),
-      monthlySalary: mergeMonthlyRecord(
+      monthlySalary: mergeSalaryRecord(
         normalizedCloudStore.finance.monthlySalary,
         normalizedLocalStore.finance.monthlySalary,
+        deleted.monthlySalary,
       ),
       monthlySavingsTargets: mergeMonthlyRecord(
         normalizedCloudStore.finance.monthlySavingsTargets,
@@ -166,6 +168,7 @@ function mergeDeletedIds(
       base?.savingsContributions,
       incoming?.savingsContributions,
     ),
+    monthlySalary: mergeIdLists(base?.monthlySalary, incoming?.monthlySalary),
   };
 }
 
@@ -217,6 +220,20 @@ function mergeMonthlyRecord<T>(
     result[monthId] = latestUpdated(result[monthId], value);
   }
   return result;
+}
+
+function mergeSalaryRecord(
+  cloud: ExpenseStore["finance"]["monthlySalary"] | undefined,
+  local: ExpenseStore["finance"]["monthlySalary"] | undefined,
+  deletedVersions: string[] = [],
+) {
+  const deleted = new Set(deletedVersions);
+  return Object.fromEntries(
+    Object.entries(mergeMonthlyRecord(cloud, local)).filter(
+      ([monthId, salary]) =>
+        !deleted.has(monthlySalaryVersionId(monthId, salary.updatedAt ?? "")),
+    ),
+  );
 }
 
 function mergeContributionRecord(

@@ -2,6 +2,7 @@ import {
   createIncomeEvent,
   getMonthlySalarySettings,
   getMonthlySavingsTarget,
+  monthlySalaryVersionId,
   toMonthId,
   updateIncomeEvent,
 } from "@/domain/finance";
@@ -226,6 +227,10 @@ export function deleteIncomeEventFromStore(
 
 export function clearIncomeFromStore(store: ExpenseStore): ExpenseStore {
   const incomeEventIds = store.finance.incomeEvents.map((event) => event.id);
+  // Sin tombstone, fusionar con la nube devolvería los sueldos borrados.
+  const salaryVersionIds = Object.entries(store.finance.monthlySalary).map(
+    ([monthId, salary]) => monthlySalaryVersionId(monthId, salary.updatedAt ?? ""),
+  );
 
   return {
     ...store,
@@ -239,6 +244,10 @@ export function clearIncomeFromStore(store: ExpenseStore): ExpenseStore {
       incomeEvents: mergeDeletedIds(
         store.deleted?.incomeEvents,
         incomeEventIds,
+      ),
+      monthlySalary: mergeDeletedIds(
+        store.deleted?.monthlySalary,
+        salaryVersionIds,
       ),
     },
   };

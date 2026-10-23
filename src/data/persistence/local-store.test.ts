@@ -5,6 +5,7 @@ import type {
   ExpenseStore,
   ExpenseTemplate,
 } from "@/domain/types";
+import { clearIncomeFromStore } from "@/stores/app/finance-commands";
 import {
   clearExpenseLocalData,
   loadExpenseStore,
@@ -136,6 +137,45 @@ describe("mergeExpenseStores", () => {
 
     expect(readded.finance.monthlySavingsContributions?.["2026-06"])
       .toMatchObject({ id: replacement.id, amount: 450 });
+  });
+
+  it("does not bring back salaries cleared offline but keeps newer edits", () => {
+    const salary = {
+      amount: 2200,
+      dayOfMonth: 28,
+      updatedAt: "2026-06-01T00:00:00.000Z",
+    };
+    const cloud: ExpenseStore = {
+      ...emptyStore,
+      schemaVersion: 3,
+      finance: {
+        ...emptyStore.finance,
+        monthlySalary: { "2026-06": salary, "2026-07": salary },
+      },
+    };
+    const clearedLocal = clearIncomeFromStore(cloud);
+
+    expect(mergeExpenseStores(clearedLocal, cloud).finance.monthlySalary)
+      .toEqual({});
+
+    const editedElsewhere = {
+      ...salary,
+      amount: 2300,
+      updatedAt: "2026-06-20T00:00:00.000Z",
+    };
+    const merged = mergeExpenseStores(clearedLocal, {
+      ...cloud,
+      finance: {
+        ...cloud.finance,
+        monthlySalary: { ...cloud.finance.monthlySalary, "2026-07": editedElsewhere },
+      },
+    });
+
+    expect(merged.finance.monthlySalary).toEqual({ "2026-07": editedElsewhere });
+    expect(merged.deleted?.monthlySalary).toEqual([
+      "2026-06@2026-06-01T00:00:00.000Z",
+      "2026-07@2026-06-01T00:00:00.000Z",
+    ]);
   });
 
   it("keeps fields it does not know from both stores", () => {

@@ -116,6 +116,8 @@ export const messages = {
       savingChanges: "Guardando cambios",
       savedLocal: "Guardado localmente",
       cloudSaveError: "No se pudo guardar en la nube.",
+      pendingSync:
+        "Cambios pendientes de subir. Se sincronizarán al recuperar la conexión.",
       cloudSyncError: "No se pudo sincronizar con la nube.",
     },
     login: {
@@ -427,6 +429,7 @@ export const messages = {
       savingChanges: "Saving changes",
       savedLocal: "Saved locally",
       cloudSaveError: "Could not save to the cloud.",
+      pendingSync: "Changes waiting to upload. They will sync when you are back online.",
       cloudSyncError: "Could not sync with the cloud.",
     },
     login: {

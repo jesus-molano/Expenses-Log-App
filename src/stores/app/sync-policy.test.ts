@@ -39,7 +39,6 @@ describe("sync policy", () => {
       currentRevision: 0,
     });
 
-    expect(result.shouldHydrateReactState).toBe(true);
     expect(result.shouldSaveCloud).toBe(false);
     expect(result.mergedStore.templates.map((item) => item.id)).toEqual([
       "cloud",
@@ -57,7 +56,6 @@ describe("sync policy", () => {
       currentRevision: 0,
     });
 
-    expect(result.shouldHydrateReactState).toBe(true);
     expect(result.shouldSaveCloud).toBe(true);
     expect(result.mergedStore.templates.map((item) => item.id)).toEqual([
       "local",
@@ -77,7 +75,6 @@ describe("sync policy", () => {
       currentRevision: 1,
     });
 
-    expect(result.shouldHydrateReactState).toBe(false);
     expect(result.shouldSaveCloud).toBe(true);
     expect(result.mergedStore.templates.map((item) => item.id)).toEqual([
       "cloud",
@@ -86,6 +83,26 @@ describe("sync policy", () => {
     expect(result.mergedStore.templates.map((item) => item.id)).not.toContain(
       "initial",
     );
+  });
+
+  it("merges unsynced changes from a previous session instead of dropping them", () => {
+    const local = storeWithTemplate("paid-offline");
+    const cloud = storeWithTemplate("cloud");
+
+    const result = resolveHydratedStore({
+      initialLocalStore: local,
+      latestLocalStore: local,
+      cloudStore: cloud,
+      revisionAtCloudLoad: 0,
+      currentRevision: 0,
+      localDirty: true,
+    });
+
+    expect(result.shouldSaveCloud).toBe(true);
+    expect(result.mergedStore.templates.map((item) => item.id)).toEqual([
+      "cloud",
+      "paid-offline",
+    ]);
   });
 
   it("queues cloud save only when session is ready", () => {

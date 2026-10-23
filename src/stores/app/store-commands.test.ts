@@ -135,6 +135,7 @@ describe("store commands", () => {
           "2026-06": {
             amount: 2200,
             dayOfMonth: 28,
+            updatedAt: "2026-06-01T00:00:00.000Z",
           },
         },
         monthlySavingsTargets: {
@@ -154,6 +155,9 @@ describe("store commands", () => {
     expect(cleared.templates).toEqual(incomeStore.templates);
     expect(cleared.overrides).toEqual(incomeStore.overrides);
     expect(cleared.deleted?.incomeEvents).toContain("income-1");
+    expect(cleared.deleted?.monthlySalary).toEqual([
+      "2026-06@2026-06-01T00:00:00.000Z",
+    ]);
   });
 
   it("creates paid and skipped occurrence overrides", () => {

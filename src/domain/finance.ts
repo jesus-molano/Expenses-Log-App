@@ -81,6 +81,12 @@ export function getMonthlySalarySettings(
   return latestRecordValue(finance.monthlySalary, monthId, fallback);
 }
 
+// Identifica una versión concreta del sueldo de un mes: borrarla no tapa un
+// cambio posterior hecho en otro dispositivo.
+export function monthlySalaryVersionId(monthId: string, updatedAt: string) {
+  return `${monthId}@${updatedAt}`;
+}
+
 export function getMonthlySavingsTarget(
   finance: FinanceStore,
   monthDate: Date | string,

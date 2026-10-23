@@ -166,6 +166,7 @@ export function useSettingsController({
 export function syncDescription(status: string, message: string) {
   if (status === "syncing") return t("settings.syncing");
   if (status === "synced") return message;
+  if (status === "pending") return t("settings.pendingSync");
   if (status === "error") return `${t("settings.cloudError")}: ${message}`;
   return t("settings.localChanges");
 }
