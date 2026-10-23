@@ -1,26 +1,30 @@
 import { endOfMonth, parseISO } from "date-fns";
+import {
+  addMonthId,
+  CALENDAR_CYCLE,
+  configuredPayday,
+  cyclePayday,
+  periodIdOf,
+  periodRange,
+  resolveBudgetCycle,
+  type BudgetCycle,
+} from "./budget-cycle";
 import { daysBetween, toDateOnly } from "./calendar";
-import { getMonthlySalarySettings, occurrencesDueBetween } from "./finance";
+import { occurrencesDueBetween } from "./finance";
 import { isOccurrenceOverdue, monthPendingSummary } from "./pending";
 import type {
   AppLanguage,
   ExpenseOccurrence,
   ExpenseStore,
-  FinanceStore,
   MonthClosure,
 } from "./types";
 
 export { monthPendingSummary, type MonthPendingSummary } from "./pending";
+export { addMonthId, configuredPayday } from "./budget-cycle";
 
 // Días antes de fin de mes en los que se ofrece pasar al siguiente aunque no
 // haya llegado el cobro.
 export const ADVANCE_SUGGESTION_DAYS = 10;
-
-export function addMonthId(monthId: string, delta: number): string {
-  const [year, month] = monthId.split("-").map(Number);
-  const date = new Date(year, month - 1 + delta, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
 
 export function monthRange(monthId: string) {
   const start = `${monthId}-01`;
@@ -37,14 +41,15 @@ export function isMonthClosed(
   );
 }
 
-// El mes natural, o el siguiente si el natural está cerrado; nunca más de uno
-// por delante. El cierre deja de importar cuando el calendario alcanza al mes
-// activo.
+// El mes natural (el de presupuesto en que cae hoy), o el siguiente si el
+// natural está cerrado; nunca más de uno por delante. El cierre deja de
+// importar cuando el calendario alcanza al mes activo.
 export function resolveActiveMonth(
   today: string,
   closures: Record<string, MonthClosure> | undefined,
+  cycle: BudgetCycle = CALENDAR_CYCLE,
 ) {
-  const calendarMonthId = today.slice(0, 7);
+  const calendarMonthId = periodIdOf(today, cycle);
   return isMonthClosed(closures, calendarMonthId)
     ? addMonthId(calendarMonthId, 1)
     : calendarMonthId;
@@ -62,13 +67,19 @@ export type MonthCloseStatus = {
 export function monthCloseStatus(
   occurrences: ExpenseOccurrence[],
   monthId: string,
+  cycle: BudgetCycle = CALENDAR_CYCLE,
 ): MonthCloseStatus {
   const nextMonthId = addMonthId(monthId, 1);
-  const pending = monthPendingSummary(occurrences, monthId);
+  const pending = monthPendingSummary(
+    occurrences,
+    monthId,
+    periodRange(monthId, cycle),
+  );
   const paidIn = (id: string) =>
     occurrences.filter(
       (occurrence) =>
-        occurrence.status === "paid" && occurrence.dueDate.slice(0, 7) === id,
+        occurrence.status === "paid" &&
+        periodIdOf(occurrence.dueDate, cycle) === id,
     ).length;
 
   return {
@@ -80,32 +91,28 @@ export function monthCloseStatus(
   };
 }
 
-// Día de cobro solo si el sueldo está configurado: sin él, "ya cobraste" no
-// significa nada.
-export function configuredPayday(finance: FinanceStore, monthId: string) {
-  const hasSalary = Object.keys(finance.monthlySalary).some(
-    (salaryMonthId) => salaryMonthId <= monthId,
-  );
-  const salary = getMonthlySalarySettings(finance, monthId);
-  return hasSalary && salary.amount > 0 ? salary.dayOfMonth : null;
-}
-
 // Se ofrece pasar de mes cuando el mes natural tiene recibos, ninguno
-// pendiente, y queda poco para fin de mes o ya llegó el cobro.
+// pendiente, y queda poco para fin de mes o ya llegó el cobro. Con el ciclo
+// anclado al cobro, el cobro abre el mes siguiente: solo cuentan los días.
 export function shouldSuggestAdvance({
   status,
   today,
   payday,
+  cycle = CALENDAR_CYCLE,
 }: {
   status: MonthCloseStatus;
   today: string;
   payday: number | null;
+  cycle?: BudgetCycle;
 }) {
-  if (status.monthId !== today.slice(0, 7)) return false;
+  if (status.monthId !== periodIdOf(today, cycle)) return false;
   if (status.paidCount === 0 || status.pendingCount > 0) return false;
 
-  const daysLeft = daysBetween(today, monthRange(status.monthId).end);
-  const paydayReached = payday !== null && Number(today.slice(8, 10)) >= payday;
+  const daysLeft = daysBetween(today, periodRange(status.monthId, cycle).end);
+  const paydayReached =
+    payday !== null &&
+    cyclePayday(cycle, status.monthId) === null &&
+    Number(today.slice(8, 10)) >= payday;
   return daysLeft <= ADVANCE_SUGGESTION_DAYS || paydayReached;
 }
 
@@ -118,8 +125,9 @@ export function selectCarryOverOccurrences(
   today: Date,
   language: AppLanguage = "es",
   monthId: string = toDateOnly(today).slice(0, 7),
+  cycle: BudgetCycle = CALENDAR_CYCLE,
 ): ExpenseOccurrence[] {
-  const previousMonth = monthRange(addMonthId(monthId, -1));
+  const previousMonth = periodRange(addMonthId(monthId, -1), cycle);
   const todayId = toDateOnly(today);
   const templateIds = new Set(store.templates.map((template) => template.id));
 
@@ -148,11 +156,14 @@ function paidOn(occurrence: ExpenseOccurrence) {
 
 export type MonthContext = {
   today: string;
+  // Mes de presupuesto en que cae hoy: el natural o, con el ciclo anclado al
+  // cobro, el ciclo en curso.
   calendarMonthId: string;
   activeMonthId: string;
   nextMonthId: string;
   closeStatus: MonthCloseStatus;
   payday: number | null;
+  cycle: BudgetCycle;
 };
 
 // Todo lo que la vista del mes necesita saber de hoy y del store.
@@ -161,23 +172,26 @@ export function buildMonthContext(
   today: string,
   language: AppLanguage = "es",
 ): MonthContext {
-  const calendarMonthId = today.slice(0, 7);
+  const cycle = resolveBudgetCycle(store.finance);
+  const calendarMonthId = periodIdOf(today, cycle);
   const nextMonthId = addMonthId(calendarMonthId, 1);
   return {
     today,
     calendarMonthId,
-    activeMonthId: resolveActiveMonth(today, store.finance.monthClosures),
+    activeMonthId: resolveActiveMonth(today, store.finance.monthClosures, cycle),
     nextMonthId,
     closeStatus: monthCloseStatus(
       occurrencesDueBetween(
         store,
-        monthRange(calendarMonthId).start,
-        monthRange(nextMonthId).end,
+        periodRange(calendarMonthId, cycle).start,
+        periodRange(nextMonthId, cycle).end,
         language,
       ),
       calendarMonthId,
+      cycle,
     ),
     payday: configuredPayday(store.finance, calendarMonthId),
+    cycle,
   };
 }
 
@@ -186,10 +200,10 @@ export function paymentSettlesMonth(
   context: MonthContext,
   occurrence: ExpenseOccurrence,
 ) {
-  const { closeStatus, calendarMonthId } = context;
+  const { closeStatus, calendarMonthId, cycle } = context;
   return (
     occurrence.status === "due" &&
-    occurrence.dueDate.slice(0, 7) === calendarMonthId &&
+    periodIdOf(occurrence.dueDate, cycle) === calendarMonthId &&
     closeStatus.pendingCount === 1 &&
     shouldSuggestAdvance({
       status: {
@@ -200,6 +214,7 @@ export function paymentSettlesMonth(
       },
       today: context.today,
       payday: context.payday,
+      cycle,
     })
   );
 }

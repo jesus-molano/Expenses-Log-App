@@ -11,6 +11,7 @@ import {
   selectCarryOverOccurrences,
   shouldSuggestAdvance,
 } from "./budget-month";
+import { resolveBudgetCycle } from "./budget-cycle";
 import { estimateChargeDate } from "./calendar";
 import {
   materializeClosedOccurrenceRecords,
@@ -338,6 +339,139 @@ describe("selectCarryOverOccurrences", () => {
     expect(
       selectCarryOverOccurrences(deleted, new Date(2026, 10, 1, 9)),
     ).toEqual([]);
+  });
+});
+
+describe("payday-anchored budget month", () => {
+  // Cobro el 28: "noviembre" va del 28 de octubre al 27 de noviembre.
+  const finance = {
+    ...emptyFinanceStore,
+    monthlySalary: {
+      "2026-09": { amount: 2000, dayOfMonth: 28, updatedAt: "2026-09-01T00:00:00.000Z" },
+    },
+    budgetCycle: { anchor: "payday" as const, updatedAt: "2026-10-01T00:00:00.000Z" },
+  };
+  const base: ExpenseStore = {
+    ...emptyStore,
+    finance,
+    templates: [
+      template("rent", "2026-09-01", 1),
+      template("internet", "2026-09-29", 29),
+      template("gym", "2026-09-12", 12),
+    ],
+  };
+  const cycle = resolveBudgetCycle(finance);
+  const allPaidNovember: ExpenseStore = {
+    ...base,
+    overrides: [
+      paidOverride("internet", "2026-10-29"),
+      paidOverride("rent", "2026-11-01"),
+      paidOverride("gym", "2026-11-12"),
+      paidOverride("rent", "2026-12-01"),
+    ],
+  };
+
+  it("puts today in the cycle that started on the last payday", () => {
+    expect(buildMonthContext(base, "2026-10-27")).toMatchObject({
+      calendarMonthId: "2026-10",
+      activeMonthId: "2026-10",
+      nextMonthId: "2026-11",
+    });
+    expect(buildMonthContext(base, "2026-10-28")).toMatchObject({
+      calendarMonthId: "2026-11",
+      activeMonthId: "2026-11",
+      nextMonthId: "2026-12",
+      payday: 28,
+    });
+  });
+
+  it("counts the bills of the cycle, including the ones before the 1st", () => {
+    const context = buildMonthContext(base, "2026-10-29");
+
+    expect(context.closeStatus).toEqual({
+      monthId: "2026-11",
+      paidCount: 0,
+      pendingCount: 3,
+      pendingTotal: 300,
+      nextMonthPaidCount: 0,
+    });
+    expect(buildMonthContext(allPaidNovember, "2026-10-29").closeStatus).toMatchObject({
+      paidCount: 3,
+      pendingCount: 0,
+      nextMonthPaidCount: 1,
+    });
+  });
+
+  it("suggests advancing near the end of the cycle, not on payday", () => {
+    const status = buildMonthContext(allPaidNovember, "2026-10-29").closeStatus;
+
+    expect(shouldSuggestAdvance({ status, today: "2026-10-29", payday: 28, cycle })).toBe(false);
+    expect(shouldSuggestAdvance({ status, today: "2026-11-16", payday: 28, cycle })).toBe(false);
+    expect(shouldSuggestAdvance({ status, today: "2026-11-17", payday: 28, cycle })).toBe(true);
+    // El 28 de noviembre ya es diciembre: el estado de noviembre no aplica.
+    expect(shouldSuggestAdvance({ status, today: "2026-11-28", payday: 28, cycle })).toBe(false);
+  });
+
+  it("keeps the next cycle active until the calendar reaches it", () => {
+    const closures = {
+      "2026-11": { closedAt: "2026-11-20T10:00:00.000Z", updatedAt: "2026-11-20T10:00:00.000Z" },
+    };
+
+    expect(resolveActiveMonth("2026-11-20", closures, cycle)).toBe("2026-12");
+    expect(resolveActiveMonth("2026-11-28", closures, cycle)).toBe("2026-12");
+    expect(resolveActiveMonth("2026-11-20", closures)).toBe("2026-12");
+    expect(resolveActiveMonth("2026-12-28", closures, cycle)).toBe("2027-01");
+  });
+
+  it("carries over what the previous cycle left unpaid", () => {
+    const store: ExpenseStore = {
+      ...base,
+      overrides: [paidOverride("rent", "2026-10-01"), paidOverride("internet", "2026-09-29")],
+    };
+
+    const carried = selectCarryOverOccurrences(
+      store,
+      new Date(2026, 9, 29, 9),
+      "es",
+      "2026-11",
+      cycle,
+    );
+
+    // El ciclo anterior va del 28 de septiembre al 27 de octubre.
+    expect(carried.map((item) => item.id)).toEqual(["gym:2026-10-12"]);
+  });
+
+  it("detects the payment that settles the cycle", () => {
+    const store: ExpenseStore = {
+      ...allPaidNovember,
+      overrides: allPaidNovember.overrides.filter(
+        (override) => override.id !== "gym:2026-11-12",
+      ),
+    };
+    const gym = occurrencesDueBetween(store, "2026-11-12", "2026-11-12").find(
+      (item) => item.template.id === "gym",
+    )!;
+
+    expect(paymentSettlesMonth(buildMonthContext(store, "2026-11-20"), gym)).toBe(true);
+    expect(paymentSettlesMonth(buildMonthContext(store, "2026-11-10"), gym)).toBe(false);
+  });
+
+  it("splits pending totals by the cycle's days", () => {
+    const occurrences = [
+      occurrence("before", 40, "2026-10-27"),
+      occurrence("first-day", 30, "2026-10-28"),
+      occurrence("last-day", 20, "2026-11-27"),
+      occurrence("after", 10, "2026-11-28"),
+    ];
+
+    expect(monthCloseStatus(occurrences, "2026-11", cycle)).toMatchObject({
+      pendingCount: 2,
+      pendingTotal: 50,
+    });
+    expect(monthCloseStatus(occurrences, "2026-11")).toMatchObject({
+      pendingCount: 2,
+      pendingTotal: 30,
+    });
   });
 });
 

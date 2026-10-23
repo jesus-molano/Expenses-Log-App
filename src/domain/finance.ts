@@ -69,7 +69,7 @@ export function toMonthId(monthDate: Date | string | null | undefined): string {
 }
 
 export function getMonthlySalarySettings(
-  finance: FinanceStore,
+  finance: Pick<FinanceStore, "monthlySalary">,
   monthDate: Date | string,
 ): MonthlySalarySettings {
   const monthId = toMonthId(monthDate);
@@ -142,22 +142,28 @@ function latestRecordValue<T>(
   return candidates[0]?.[1] ?? fallback;
 }
 
+// `range` y `currentMonthId` describen el mes de presupuesto cuando no es el
+// natural (ciclo anclado al cobro): sus días y el mes en que cae hoy.
 export function buildMonthlyMoneyPlan({
   monthDate,
   finance,
   occurrences,
   today = new Date(),
   includeExtraIncome = true,
+  range,
+  currentMonthId = toMonthId(today),
 }: {
   monthDate: Date;
   finance: FinanceStore;
   occurrences: ExpenseOccurrence[];
   today?: Date;
   includeExtraIncome?: boolean;
+  range?: { start: string; end: string };
+  currentMonthId?: string;
 }): MonthlyMoneyPlan {
-  const monthStart = toDateOnly(startOfMonth(monthDate));
-  const monthEnd = toDateOnly(endOfMonth(monthDate));
-  const month = monthStart.slice(0, 7);
+  const month = toMonthId(monthDate);
+  const monthStart = range?.start ?? toDateOnly(startOfMonth(monthDate));
+  const monthEnd = range?.end ?? toDateOnly(endOfMonth(monthDate));
   const salarySettings = getMonthlySalarySettings(finance, month);
   const salaryIncomeTotal = Math.max(Number(salarySettings.amount), 0);
   const monthlySavingsTarget = getMonthlySavingsTarget(finance, month);
@@ -180,7 +186,10 @@ export function buildMonthlyMoneyPlan({
   const paidOccurrences = relevantOccurrences.filter(
     (occurrence) => occurrence.status === "paid",
   );
-  const pendingSummary = monthPendingSummary(relevantOccurrences, month);
+  const pendingSummary = monthPendingSummary(relevantOccurrences, month, {
+    start: monthStart,
+    end: monthEnd,
+  });
   const pendingOccurrences = pendingSummary.items;
   const plannedExpensesTotal = relevantOccurrences.reduce(
     (sum, occurrence) => sum + occurrence.template.amount,
@@ -205,7 +214,6 @@ export function buildMonthlyMoneyPlan({
     monthlySavingsTarget - maxSavingsCapacity,
     0,
   );
-  const currentMonthId = toMonthId(today);
   const phase =
     month < currentMonthId
       ? "registered"

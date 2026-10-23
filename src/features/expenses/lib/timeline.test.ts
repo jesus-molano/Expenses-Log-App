@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { BudgetCycle } from "@/domain/budget-cycle";
 import type { ExpenseOccurrence } from "@/domain/types";
 import { buildTimelineSections } from "./timeline";
 
@@ -36,6 +37,43 @@ describe("timeline sections", () => {
     expect(sectionOn("2026-11-01").id).toBe("future-2026-10-31");
     expect(sectionOn("2026-11-02").id).toBe("today");
     expect(sectionOn("2026-11-03").id).toBe("carry-over-2026-10");
+  });
+});
+
+describe("timeline with a payday-anchored month", () => {
+  // Cobro el 28: "noviembre" va del 28 de octubre al 27 de noviembre.
+  const cycle: BudgetCycle = {
+    anchor: "payday",
+    monthlySalary: { "2026-01": { amount: 2000, dayOfMonth: 28 } },
+  };
+
+  it("shows Today in the current cycle even before the calendar month starts", () => {
+    const sections = buildTimelineSections([], "2026-10-29", "es", "2026-11", cycle);
+    expect(sections.map((section) => section.id)).toEqual(["today"]);
+  });
+
+  it("counts the days until the next cycle starts on payday", () => {
+    const [placeholder] = buildTimelineSections([], "2026-10-20", "es", "2026-11", cycle);
+    expect(placeholder).toMatchObject({
+      id: "month-start",
+      title: "noviembre empieza en 8 días",
+      anchorDate: "2026-10-28",
+    });
+  });
+
+  it("groups what the previous cycle left unpaid under its name", () => {
+    // El 20 de octubre pertenece al ciclo de octubre (28 sep - 27 oct).
+    const sections = buildTimelineSections(
+      [occurrence("gym", "2026-10-20", 30)],
+      "2026-10-29",
+      "es",
+      "2026-11",
+      cycle,
+    );
+    expect(sections[0]).toMatchObject({
+      id: "carry-over-2026-10",
+      title: "Pendiente de octubre",
+    });
   });
 });
 

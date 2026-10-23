@@ -11,6 +11,7 @@ import {
 import type {
   AppLanguage,
   AppTheme,
+  BudgetCycleAnchor,
   CreateExpenseOptions,
   DraftExpense,
   ExpenseOccurrence,
@@ -38,6 +39,7 @@ import {
   skipOccurrenceInStore,
   payOccurrenceInStore,
   togglePaidInStore,
+  updateBudgetCycleInStore,
   updateIncomeEventInStore,
   updateLanguageInStore,
   updateMoneySettingsInStore,
@@ -249,6 +251,10 @@ function useExpenseStoreValue() {
     persist(reopenMonthInStore(current(), monthId));
   }
 
+  function updateBudgetCycle(anchor: BudgetCycleAnchor) {
+    persist(updateBudgetCycleInStore(current(), anchor));
+  }
+
   function updateTheme(theme: AppTheme) {
     applyAppTheme(theme);
     persist(updateThemeInStore(current(), theme));
@@ -285,6 +291,7 @@ function useExpenseStoreValue() {
     updateMonthlyExpenseOccurrence,
     closeMonth,
     reopenMonth,
+    updateBudgetCycle,
     updateTheme,
     updateLanguage,
     syncStatus: persistence.syncStatus,

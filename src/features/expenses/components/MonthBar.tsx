@@ -10,6 +10,8 @@ import { capitalize, formatMonthName } from "../lib/month-view";
 
 type MonthBarProps = {
   monthId: string;
+  // "28 oct – 27 nov" cuando el mes empieza el día de cobro.
+  rangeLabel?: string | null;
   activeMonthId: string;
   calendarMonthId: string;
   language: AppLanguage;
@@ -26,6 +28,7 @@ type MonthBarProps = {
 // natural cuando el activo es el siguiente.
 export function MonthBar({
   monthId,
+  rangeLabel,
   activeMonthId,
   calendarMonthId,
   language,
@@ -75,6 +78,9 @@ export function MonthBar({
         >
           {capitalize(formatMonthName(monthId, language, { withYear: true }))}
         </h2>
+        {rangeLabel ? (
+          <p className="text-xs text-[var(--app-text-muted)]">{rangeLabel}</p>
+        ) : null}
         {monthId !== activeMonthId ? (
           <Button variant="ghost" size="sm" onClick={onReset}>
             {t("expenses.goToMonth", language).replace("{month}", name(activeMonthId))}

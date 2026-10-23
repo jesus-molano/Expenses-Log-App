@@ -13,9 +13,14 @@ import {
   paymentSettlesMonth,
   shouldSuggestAdvance,
 } from "@/domain/budget-month";
+import { periodRange } from "@/domain/budget-cycle";
 import { toDateOnly } from "@/domain/calendar";
 import type { AppLanguage, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
-import { clampViewMonth, viewMonthBounds } from "../lib/month-view";
+import {
+  clampViewMonth,
+  cycleDropFloorDate,
+  viewMonthBounds,
+} from "../lib/month-view";
 
 type UseActiveMonthOptions = {
   store: ExpenseStore;
@@ -57,9 +62,22 @@ export function useActiveMonth({
     writeViewMonth(next);
   }
 
+  const paydayCycle = context.cycle.anchor === "payday";
+
   return {
     ...context,
     viewMonthId,
+    // Días del mes que se mira, solo cuando no es el natural (ciclo anclado
+    // al cobro): la cabecera los muestra para que se entienda el corte.
+    viewRange: paydayCycle ? periodRange(viewMonthId, context.cycle) : null,
+    dropFloorDate: paydayCycle
+      ? cycleDropFloorDate({
+          viewMonthId,
+          calendarMonthId,
+          today: context.today,
+          cycle: context.cycle,
+        })
+      : undefined,
     canBrowseBack: viewMonthId > bounds.min,
     canBrowseForward: viewMonthId < bounds.max,
     suggestAdvance:
@@ -68,6 +86,7 @@ export function useActiveMonth({
         status: context.closeStatus,
         today: context.today,
         payday: context.payday,
+        cycle: context.cycle,
       }),
     settlesMonth: (occurrence: ExpenseOccurrence) =>
       canSuggest && paymentSettlesMonth(context, occurrence),

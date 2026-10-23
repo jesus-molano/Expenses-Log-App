@@ -34,6 +34,8 @@ type UseExpenseDndOptions = {
   currentMonth: string;
   // Mes natural: no se suelta antes de él aunque se mire un mes pasado.
   openMonth?: string;
+  // Con el ciclo anclado al cobro, primer día en que se puede soltar.
+  floorDate?: string;
   onMoveOccurrenceOnly: (
     occurrence: ExpenseOccurrence,
     dueDate: string,
@@ -49,6 +51,7 @@ export function useExpenseDnd({
   sections,
   currentMonth,
   openMonth = currentMonth,
+  floorDate,
   onMoveOccurrenceOnly,
   onMoveOccurrenceSeries,
 }: UseExpenseDndOptions) {
@@ -107,7 +110,9 @@ export function useExpenseDnd({
     autoScrollWithDrag(event);
     const target = getDropTargetFromEvent(event);
     setActiveDropTarget(
-      isDropTargetAllowed(target, currentMonth, openMonth) ? target : null,
+      isDropTargetAllowed(target, currentMonth, openMonth, floorDate)
+        ? target
+        : null,
     );
   }
 
@@ -120,7 +125,13 @@ export function useExpenseDnd({
 
     if (!occurrence || !target) return;
 
-    const action = resolveDragMove({ occurrence, target, currentMonth, openMonth });
+    const action = resolveDragMove({
+      occurrence,
+      target,
+      currentMonth,
+      openMonth,
+      floorDate,
+    });
     if (action === "series") {
       scheduleSeriesMove(occurrence, target.date, target);
     } else if (action === "single") {

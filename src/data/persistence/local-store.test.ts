@@ -9,6 +9,7 @@ import {
   clearIncomeFromStore,
   closeMonthInStore,
   reopenMonthInStore,
+  updateBudgetCycleInStore,
 } from "@/stores/app/finance-commands";
 import {
   clearExpenseLocalData,
@@ -213,6 +214,30 @@ describe("mergeExpenseStores", () => {
       .toEqual(reopened.finance.monthClosures);
     expect("monthClosures" in mergeExpenseStores(emptyStore, emptyStore).finance)
       .toBe(false);
+  });
+
+  it("keeps the most recent budget cycle choice from either store", () => {
+    const payday = updateBudgetCycleInStore(
+      emptyStore,
+      "payday",
+      new Date("2026-10-20T10:00:00.000Z"),
+    );
+    const backToCalendar = updateBudgetCycleInStore(
+      payday,
+      "calendar",
+      new Date("2026-10-21T10:00:00.000Z"),
+    );
+
+    expect(mergeExpenseStores(payday, backToCalendar).finance.budgetCycle).toEqual(
+      backToCalendar.finance.budgetCycle,
+    );
+    expect(mergeExpenseStores(backToCalendar, payday).finance.budgetCycle).toEqual(
+      backToCalendar.finance.budgetCycle,
+    );
+    // Solo uno de los dos lo ha elegido: se conserva.
+    expect(mergeExpenseStores(emptyStore, payday).finance.budgetCycle?.anchor).toBe("payday");
+    expect(mergeExpenseStores(payday, emptyStore).finance.budgetCycle?.anchor).toBe("payday");
+    expect("budgetCycle" in mergeExpenseStores(emptyStore, emptyStore).finance).toBe(false);
   });
 
   it("keeps fields it does not know from both stores", () => {

@@ -6,7 +6,11 @@ import {
   toMonthId,
   updateIncomeEvent,
 } from "@/domain/finance";
-import type { ExpenseStore, MonthClosure } from "@/domain/types";
+import type {
+  BudgetCycleAnchor,
+  ExpenseStore,
+  MonthClosure,
+} from "@/domain/types";
 import type {
   IncomeEventInput,
   MoneySettingsInput,
@@ -311,4 +315,34 @@ function withMonthClosure(
       monthClosures: { ...store.finance.monthClosures, [monthId]: closure },
     },
   };
+}
+
+// Mes natural o ciclo desde el día de cobro. Se guarda con hora para que gane
+// la elección más reciente al fusionar dispositivos.
+export function updateBudgetCycleInStore(
+  store: ExpenseStore,
+  anchor: BudgetCycleAnchor,
+  now: Date = new Date(),
+): ExpenseStore {
+  const current = store.finance.budgetCycle;
+  if ((current?.anchor ?? "calendar") === anchor) return store;
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      budgetCycle: { anchor, updatedAt: timestampAfter(current?.updatedAt, now) },
+    },
+  };
+}
+
+// La hora de un cambio queda siempre después de la del anterior aunque el
+// reloj de este dispositivo vaya atrasado: si no, el merge se quedaría con la
+// versión vieja.
+export function timestampAfter(previous: string | undefined, now: Date) {
+  const previousTime = previous ? Date.parse(previous) : Number.NaN;
+  return new Date(
+    Number.isNaN(previousTime)
+      ? now.getTime()
+      : Math.max(now.getTime(), previousTime + 1),
+  ).toISOString();
 }

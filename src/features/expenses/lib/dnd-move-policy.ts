@@ -16,18 +16,24 @@ export function canMoveOccurrence(occurrence: ExpenseOccurrence, openMonth: stri
   return !(occurrence.dueDate.slice(0, 7) < openMonth && occurrence.status !== "due");
 }
 
+// Con el ciclo anclado al cobro los meses no empiezan el día 1: `floorDate`
+// es el primer día en que se puede soltar (`cycleDropFloorDate`).
 export function resolveDragMove({
   occurrence,
   target,
   currentMonth,
   openMonth = currentMonth,
+  floorDate,
 }: {
   occurrence: ExpenseOccurrence;
   target: Pick<DropTarget, "date" | "rowId">;
   currentMonth: string;
   openMonth?: string;
+  floorDate?: string;
 }): DragMoveAction {
-  if (!isDropTargetAllowed(target, currentMonth, openMonth)) return "ignore";
+  if (!isDropTargetAllowed(target, currentMonth, openMonth, floorDate)) {
+    return "ignore";
+  }
   if (target.date === occurrence.dueDate && !target.rowId) return "ignore";
   if (!canMoveOccurrence(occurrence, openMonth)) return "ignore";
   if (occurrence.record || occurrence.dueDate.slice(0, 7) < currentMonth) {
@@ -40,7 +46,10 @@ export function isDropTargetAllowed(
   target: (Partial<DropTarget> & Pick<DropTarget, "date">) | null,
   currentMonth: string,
   openMonth: string = currentMonth,
+  floorDate?: string,
 ) {
+  if (!target) return false;
+  if (floorDate) return target.date >= floorDate;
   const floor = currentMonth > openMonth ? currentMonth : openMonth;
-  return Boolean(target && target.date.slice(0, 7) >= floor);
+  return target.date.slice(0, 7) >= floor;
 }

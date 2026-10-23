@@ -9,6 +9,7 @@ import {
   toDateOnly,
 } from "@/domain/calendar";
 import type {
+  BudgetCycleSetting,
   ExpenseOccurrenceOverride,
   ExpenseStore,
   ExpenseTemplate,
@@ -37,6 +38,7 @@ export const FINANCE_KEYS = [
   "monthlySavingsTargets",
   "monthlySavingsContributions",
   "monthClosures",
+  "budgetCycle",
 ] as const;
 
 export const DELETED_KEYS = [
@@ -144,7 +146,25 @@ function normalizeFinanceStore(
     monthlySavingsTargets,
     monthlySavingsContributions,
     ...withMonthClosures(normalizeMonthClosures(finance.monthClosures)),
+    ...withBudgetCycle(normalizeBudgetCycle(finance.budgetCycle)),
   };
+}
+
+// Un ciclo ilegible vuelve al mes natural, que es el valor por defecto.
+function normalizeBudgetCycle(value: unknown): BudgetCycleSetting | undefined {
+  if (
+    !isRecord(value) ||
+    (value.anchor !== "calendar" && value.anchor !== "payday") ||
+    !isTimestamp(value.updatedAt)
+  ) {
+    return undefined;
+  }
+  return { anchor: value.anchor, updatedAt: value.updatedAt };
+}
+
+// Solo se escribe cuando alguien lo ha elegido en Ajustes.
+export function withBudgetCycle(setting: BudgetCycleSetting | undefined) {
+  return setting ? { budgetCycle: setting } : {};
 }
 
 function normalizeMonthClosures(value: unknown): Record<string, MonthClosure> {

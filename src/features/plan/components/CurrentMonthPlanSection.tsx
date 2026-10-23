@@ -23,6 +23,7 @@ export function CurrentMonthPlanSection({
   language,
   copy,
   monthLabel,
+  periodLabel,
   plan,
   paidProgress,
   pendingOccurrences,
@@ -38,6 +39,8 @@ export function CurrentMonthPlanSection({
   language: AppLanguage;
   copy: ReturnType<typeof planCopy>;
   monthLabel: string;
+  // "28 oct – 27 nov" cuando el mes empieza el día de cobro.
+  periodLabel?: string | null;
   plan: MonthlyMoneyPlan;
   paidProgress: number;
   pendingOccurrences: ExpenseOccurrence[];
@@ -60,6 +63,11 @@ export function CurrentMonthPlanSection({
           >
             {copy.planFor} {monthLabel}
           </h1>
+          {periodLabel ? (
+            <p className="mt-1 text-xs font-medium text-[var(--app-text-muted)]">
+              {periodLabel}
+            </p>
+          ) : null}
           <p className="mt-1 text-sm text-[var(--app-text-muted)]">
             {plan.plannedExpenseCount
               ? `${plan.paidExpenseCount} ${copy.of} ${plan.plannedExpenseCount} ${copy.paidReceipts}`

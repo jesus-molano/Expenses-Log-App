@@ -12,6 +12,7 @@ import {
   STORE_KEYS,
   normalizeExpenseStore,
   unknownEntries,
+  withBudgetCycle,
   withMonthClosures,
 } from "./store-normalization";
 
@@ -136,6 +137,15 @@ export function mergeExpenseStores(
           normalizedCloudStore.finance.monthClosures,
           normalizedLocalStore.finance.monthClosures,
         ),
+      ),
+      // La elección más reciente, sea de este dispositivo o de otro.
+      ...withBudgetCycle(
+        normalizedLocalStore.finance.budgetCycle
+          ? latestUpdated(
+              normalizedCloudStore.finance.budgetCycle,
+              normalizedLocalStore.finance.budgetCycle,
+            )
+          : normalizedCloudStore.finance.budgetCycle,
       ),
     },
     preferences: {

@@ -1,24 +1,72 @@
-import { endOfMonth, format, startOfMonth } from "date-fns";
+import { format, startOfMonth } from "date-fns";
 import { enUS, es } from "date-fns/locale";
+import {
+  CALENDAR_CYCLE,
+  isInRange,
+  periodIdOf,
+  periodRange,
+  type BudgetCycle,
+} from "@/domain/budget-cycle";
 import { toDateOnly } from "@/domain/calendar";
 import {
   buildMonthlyMoneyPlan,
   occurrencesDueBetween,
   toMonthId,
 } from "@/domain/finance";
-import type { AppLanguage, ExpenseStore } from "@/domain/types";
+import type {
+  AppLanguage,
+  ExpenseStore,
+  FinanceStore,
+  IncomeEvent,
+} from "@/domain/types";
 import type { MoneySeriesItem } from "../types";
 
+// `cycle` decide qué días forman el mes: el natural o desde el día de cobro.
 export function occurrencesForMonth(
   store: ExpenseStore,
   monthDate: Date,
   language: AppLanguage,
+  cycle: BudgetCycle = CALENDAR_CYCLE,
 ) {
-  return occurrencesDueBetween(
-    store,
-    toDateOnly(startOfMonth(monthDate)),
-    toDateOnly(endOfMonth(monthDate)),
-    language,
+  const range = periodRange(toMonthId(monthDate), cycle);
+  return occurrencesDueBetween(store, range.start, range.end, language);
+}
+
+// Plan de un mes de presupuesto con sus días y el mes en que cae hoy.
+export function buildPlanForMonth({
+  store,
+  monthDate,
+  today,
+  language,
+  cycle = CALENDAR_CYCLE,
+  includeExtraIncome = true,
+}: {
+  store: ExpenseStore;
+  monthDate: Date;
+  today: Date;
+  language: AppLanguage;
+  cycle?: BudgetCycle;
+  includeExtraIncome?: boolean;
+}) {
+  return buildMonthlyMoneyPlan({
+    monthDate,
+    finance: store.finance,
+    occurrences: occurrencesForMonth(store, monthDate, language, cycle),
+    today,
+    includeExtraIncome,
+    range: periodRange(toMonthId(monthDate), cycle),
+    currentMonthId: periodIdOf(toDateOnly(today), cycle),
+  });
+}
+
+export function incomeEventsInMonth(
+  finance: FinanceStore,
+  monthId: string,
+  cycle: BudgetCycle = CALENDAR_CYCLE,
+): IncomeEvent[] {
+  const range = periodRange(monthId, cycle);
+  return finance.incomeEvents.filter((event) =>
+    isInRange(event.receivedAt.slice(0, 10), range),
   );
 }
 
@@ -27,15 +75,18 @@ export function buildSeriesItem(
   monthDate: Date,
   today: Date,
   language: AppLanguage,
+  cycle: BudgetCycle = CALENDAR_CYCLE,
 ): MoneySeriesItem {
   const locale = language === "en" ? enUS : es;
   const monthId = toDateOnly(startOfMonth(monthDate));
-  const plan = buildMonthlyMoneyPlan({
+  const plan = buildPlanForMonth({
+    store,
     monthDate,
-    finance: store.finance,
-    occurrences: occurrencesForMonth(store, monthDate, language),
     today,
-    includeExtraIncome: toMonthId(monthDate) <= toMonthId(today),
+    language,
+    cycle,
+    includeExtraIncome:
+      toMonthId(monthDate) <= periodIdOf(toDateOnly(today), cycle),
   });
 
   return {
