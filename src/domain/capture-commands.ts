@@ -253,8 +253,11 @@ export function resolveCaptureCommand(
   const occurrenceMonth = occurrence.dueDate.slice(0, 7);
 
   if (command.intent === "pay") {
-    const amount = command.amount ?? occurrence.template.amount;
-    const alreadyPaid = occurrence.status === "paid" && paidAmount(occurrence) === amount;
+    // Ya pagado y sin importe dicho: se queda lo pagado (un recibo variable
+    // no vuelve a lo previsto). Otro importe corrige lo pagado.
+    const paidBefore = occurrence.status === "paid" ? paidAmount(occurrence) : null;
+    const amount = command.amount ?? paidBefore ?? occurrence.template.amount;
+    const alreadyPaid = paidBefore !== null && paidBefore === amount;
     return { ...resolved, amount, issue: alreadyPaid ? "alreadyPaid" : null };
   }
 

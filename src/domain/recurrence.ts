@@ -64,14 +64,34 @@ function dateForRule(date: Date, template: TemplateSchedule): Date {
   return buildDateWithDay(date, template.dueDay);
 }
 
-function rruleDates(template: TemplateSchedule, from: Date, to: Date): Date[] {
+// Tope de fechas que expande una regla rrule, el mismo que el bucle de las
+// demás reglas (`scheduledTemplateDates`).
+const MAX_RRULE_DATES = 1000;
+
+// Una regla de varias veces al día (cada hora, minuto o segundo, o con varias
+// horas, minutos o segundos) llega solo desde un archivo o un store
+// manipulado: la app nunca la crea. Expandirla en meses daría millones de
+// fechas y tumbaría la app y el cron de avisos de todos.
+function isSubDailyRule(rule: RRule) {
+  const { freq, byhour, byminute, bysecond } = rule.options;
+  return (
+    freq > RRule.DAILY ||
+    [byhour, byminute, bysecond].some((values) => (values?.length ?? 0) > 1)
+  );
+}
+
+// Cada fecha de la regla cae en el día de cobro de su mes: varias del mismo
+// mes darían el mismo cobro (mismo id), así que cuenta una vez.
+function rruleDates(template: TemplateSchedule, from: Date, to: Date): string[] {
   if (!template.recurrence.rrule) return [];
 
   try {
     const rule = RRule.fromString(template.recurrence.rrule);
-    return rule
-      .between(from, to, true)
-      .map((date) => buildDateWithDay(date, template.dueDay));
+    if (isSubDailyRule(rule)) return [];
+    const dates = rule
+      .between(from, to, true, (_date, count) => count < MAX_RRULE_DATES)
+      .map((date) => toDateOnly(buildDateWithDay(date, template.dueDay)));
+    return [...new Set(dates)];
   } catch {
     // Una regla inválida no debe romper el resto de gastos.
     return [];
@@ -143,7 +163,7 @@ function scheduledTemplateDates(
   }
 
   if (template.recurrence.frequency === "rrule") {
-    return rruleDates(template, from, to).map(toDateOnly);
+    return rruleDates(template, from, to);
   }
 
   if (template.recurrence.frequency === "yearly") {

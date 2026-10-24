@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { BudgetCycle } from "@/domain/budget-cycle";
 import type { ExpenseOccurrence } from "@/domain/types";
 import { canMoveOccurrence, isDropTargetAllowed, resolveDragMove } from "./dnd-move-policy";
 
@@ -79,6 +80,16 @@ describe("resolveDragMove", () => {
     ).toBe("ignore");
   });
 
+  it("moves only that bill when it is dropped in the next month", () => {
+    expect(
+      resolveDragMove({
+        occurrence: occurrence("2026-11-05"),
+        target: { date: "2026-12-02" },
+        currentMonth,
+      }),
+    ).toBe("single");
+  });
+
   it("never drops into a closed month while looking at a past month", () => {
     const octoberBill = occurrence("2026-10-03");
     const viewing = { currentMonth: "2026-09", openMonth: "2026-10" };
@@ -128,6 +139,58 @@ describe("resolveDragMove", () => {
     expect(
       resolveDragMove({ occurrence: bill, target: { date: "2026-10-20", rowId: undefined }, ...viewing }),
     ).toBe("ignore");
+  });
+});
+
+describe("resolveDragMove with a payday cycle", () => {
+  // Cobro el 28 y hoy 29 de octubre: "noviembre" va del 28 de octubre al 27
+  // de noviembre y es el mes abierto.
+  const cycle: BudgetCycle = {
+    anchor: "payday",
+    monthlySalary: {
+      "2026-09": { amount: 2000, dayOfMonth: 28, updatedAt: "2026-09-01T00:00:00.000Z" },
+    },
+  };
+  const viewing = {
+    currentMonth: "2026-11",
+    openMonth: "2026-10",
+    floorDate: "2026-10-28",
+    // La regla de las acciones del cobro, como la pasa Gastos.
+    canMove: (candidate: ExpenseOccurrence) =>
+      canMoveOccurrence(candidate, "2026-11", cycle, "2026-10-29"),
+  };
+
+  it("does not drag out paid history of the previous budget month", () => {
+    const paidOctober = { ...occurrence("2026-10-02"), status: "paid" as const };
+
+    expect(
+      resolveDragMove({ occurrence: paidOctober, target: { date: "2026-11-03" }, ...viewing }),
+    ).toBe("ignore");
+  });
+
+  it("moves only that bill when it lands in another calendar month", () => {
+    expect(
+      resolveDragMove({
+        occurrence: occurrence("2026-11-03"),
+        target: { date: "2026-10-29" },
+        ...viewing,
+      }),
+    ).toBe("single");
+    expect(
+      resolveDragMove({
+        occurrence: occurrence("2026-11-03"),
+        target: { date: "2026-11-10" },
+        ...viewing,
+      }),
+    ).toBe("series");
+  });
+
+  it("moves only that bill when it was already moved from another calendar month", () => {
+    const movedFromOctober = { ...occurrence("2026-11-02"), occurrenceDate: "2026-10-30" };
+
+    expect(
+      resolveDragMove({ occurrence: movedFromOctober, target: { date: "2026-11-05" }, ...viewing }),
+    ).toBe("single");
   });
 });
 

@@ -288,4 +288,27 @@ describe("toReminderStore", () => {
 
     expect(planUserReminders(reminderStore!, today)?.candidates).toEqual([]);
   });
+
+  it("does not expand a crafted sub-daily rrule and still reminds the rest", { timeout: 1000 }, () => {
+    const reminderStore = toReminderStore(
+      store([
+        template({ id: "spotify", name: "Spotify", dueDay: 12 }),
+        template({
+          id: "crafted",
+          startDate: "2026-01-01",
+          recurrence: { frequency: "rrule", rrule: "FREQ=SECONDLY;DTSTART=20260101T000000Z" },
+        }),
+      ]),
+      today,
+    );
+
+    expect(
+      reminderStore?.occurrenceRecords?.filter((record) => record.templateId === "crafted"),
+    ).toEqual([]);
+    expect(
+      planUserReminders(reminderStore!, today)?.candidates.map((candidate) =>
+        "reminder" in candidate ? candidate.reminder.occurrence.template.id : candidate.kind,
+      ),
+    ).toEqual(["spotify"]);
+  });
 });

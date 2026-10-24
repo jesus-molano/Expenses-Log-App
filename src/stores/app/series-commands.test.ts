@@ -1,11 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { buildMonthPlan, selectCarryOverOccurrences } from "@/domain/budget-month";
 import { generateStoreOccurrences } from "@/domain/finance";
 import { emptyStore } from "@/domain/seed";
-import { latestPaidChargeDate } from "@/domain/series-lifecycle";
+import {
+  latestPaidChargeDate,
+  pauseUntilResume,
+  seriesLifecycle,
+} from "@/domain/series-lifecycle";
 import type { ExpenseStore, ExpenseTemplate } from "@/domain/types";
 import { closeMonthInStore } from "./finance-commands";
 import {
   endSeriesInStore,
+  moveOccurrenceOnlyInStore,
+  moveOccurrenceSeriesInStore,
   pauseSeriesInStore,
   payOccurrenceInStore,
   reactivateSeriesInStore,
@@ -15,6 +22,7 @@ import {
   scheduleAmountChangeInStore,
   setSeriesAmountInStore,
   togglePaidInStore,
+  updateExpenseTemplateInStore,
 } from "./store-commands";
 import { preserveClosedOccurrenceRecords } from "./store-history";
 
@@ -267,6 +275,55 @@ describe("series commands", () => {
       expect(reactivateSeriesInStore(ended, "luz").templates[0].endDate).toBeUndefined();
       expect(reactivateSeriesInStore(store, "luz")).toBe(store);
     });
+
+    it("comes back from today when it ended months ago, leaving closed months as they were", () => {
+      vi.setSystemTime(new Date("2026-07-20T10:00:00"));
+      store = pay(store, "2026-06-08");
+      store = pay(store, "2026-07-08");
+      store = commit(store, endSeriesInStore(store, "luz", "2026-07-08"));
+      vi.setSystemTime(new Date("2026-10-23T10:00:00"));
+      store = commit(store, store);
+      const septemberPending = buildMonthPlan(store, "2026-09", { today: "2026-10-23" })
+        .pendingExpensesTotal;
+
+      store = commit(store, reactivateSeriesInStore(store, "luz"));
+      // El siguiente cambio vuelve a congelar los meses cerrados.
+      store = commit(store, store);
+
+      expect(store.templates[0].endDate).toBeUndefined();
+      expect(summary(store, "2026-06-01")).toEqual({
+        "2026-06": "60/60",
+        "2026-07": "60/60",
+        "2026-11": 60,
+        "2026-12": 60,
+        "2027-01": 60,
+      });
+      expect(
+        store.occurrenceRecords?.filter(
+          (record) => record.occurrenceDate >= "2026-08-01",
+        ),
+      ).toEqual([]);
+      expect(
+        buildMonthPlan(store, "2026-09", { today: "2026-10-23" }).pendingExpensesTotal,
+      ).toBe(septemberPending);
+      expect(selectCarryOverOccurrences(store, new Date())).toEqual([]);
+      expect(occurrenceOn(store, "2026-11-08").status).toBe("due");
+      // La pausa del hueco ya pasó: la ficha no la muestra como pausa.
+      expect(seriesLifecycle(store.templates[0], "2026-10-23")).toEqual({
+        end: null,
+        pause: null,
+      });
+    });
+
+    it("only drops the end when it was yesterday or later", () => {
+      for (const endDate of ["2026-11-08", "2026-10-22"]) {
+        const ended = endSeriesInStore(store, "luz", endDate);
+        const reactivated = reactivateSeriesInStore(ended, "luz").templates[0];
+
+        expect(reactivated.endDate).toBeUndefined();
+        expect(reactivated.pauses).toBeUndefined();
+      }
+    });
   });
 
   describe("pausing a subscription", () => {
@@ -320,6 +377,120 @@ describe("series commands", () => {
       // toca, y de octubre en adelante no se genera nada.
       expect(next.templates[0].pauses).toEqual([{ from: "2026-08-01" }]);
       expect(summary(next)).toEqual({ "2026-08": 60, "2026-09": "60/60" });
+    });
+  });
+
+  describe("moving the charge day of a finished or paused subscription", () => {
+    function chargeDates(current: ExpenseStore) {
+      return generateStoreOccurrences(current, "2026-10-01", "2027-03-31")
+        .filter((occurrence) => occurrence.template.id === "luz")
+        .map((occurrence) => `${occurrence.occurrenceDate}:${occurrence.status}`);
+    }
+
+    function moveSeries(current: ExpenseStore, from: string, to: string) {
+      return commit(
+        current,
+        moveOccurrenceSeriesInStore(current, occurrenceOn(current, from), to),
+      );
+    }
+
+    it("keeps ending after the chosen last charge", () => {
+      store = commit(store, endSeriesInStore(store, "luz", "2026-12-08"));
+
+      const moved = moveSeries(store, "2026-11-08", "2026-11-12");
+
+      expect(chargeDates(moved)).toEqual([
+        "2026-10-12:due",
+        "2026-11-12:due",
+        "2026-12-12:due",
+      ]);
+      expect(seriesLifecycle(moved.templates[0], "2026-10-23").end?.lastCharge).toBe(
+        "2026-12-12",
+      );
+    });
+
+    it("keeps a prepaid last charge paid, whether the day moves later or earlier", () => {
+      store = pay(store, "2026-11-08");
+      store = commit(store, endSeriesInStore(store, "luz", "2026-11-08"));
+
+      expect(chargeDates(moveSeries(store, "2026-10-08", "2026-10-12"))).toEqual([
+        "2026-10-12:due",
+        "2026-11-12:paid",
+      ]);
+      expect(chargeDates(moveSeries(store, "2026-10-08", "2026-10-03"))).toEqual([
+        "2026-10-03:due",
+        "2026-11-03:paid",
+      ]);
+    });
+
+    it("keeps a pause skipping the same months", () => {
+      store = commit(
+        store,
+        pauseSeriesInStore(store, "luz", pauseUntilResume("2026-11-08", "2027-01-08")),
+      );
+
+      const moved = moveSeries(store, "2026-10-08", "2026-10-03");
+
+      expect(chargeDates(moved)).toEqual([
+        "2026-10-03:due",
+        "2027-01-03:due",
+        "2027-02-03:due",
+        "2027-03-03:due",
+      ]);
+      expect(seriesLifecycle(moved.templates[0], "2026-10-23").pause).toMatchObject({
+        firstSkipped: "2026-11-03",
+        resumesOn: "2027-01-03",
+      });
+    });
+
+    it("keeps this month's payment when a resumed pause skipped nothing", () => {
+      store = pay(store, "2026-10-08");
+      // Empieza tras lo pagado (el 9) y se reanuda hoy: no saltó ningún cobro.
+      store = commit(store, pauseSeriesInStore(store, "luz", { from: "2026-10-01" }));
+      store = commit(store, resumeSeriesInStore(store, "luz"));
+
+      const moved = moveSeries(store, "2026-10-08", "2026-10-12");
+
+      expect(chargeDates(moved).slice(0, 2)).toEqual(["2026-10-12:paid", "2026-11-12:due"]);
+      expect(moved.templates[0].pauses).toEqual([{ from: "2026-10-13", to: "2026-10-22" }]);
+    });
+
+    it("puts the end and the pause back when only this month moves", () => {
+      store = commit(store, endSeriesInStore(store, "luz", "2027-03-08"));
+      store = commit(
+        store,
+        pauseSeriesInStore(store, "luz", pauseUntilResume("2026-11-08", "2027-01-08")),
+      );
+      const original = store.templates[0];
+      const dragged = occurrenceOn(store, "2026-10-08");
+
+      const moved = moveSeries(store, "2026-10-08", "2026-10-03");
+      const onlyThisMonth = commit(
+        moved,
+        moveOccurrenceOnlyInStore(moved, dragged, "2026-10-03"),
+      );
+
+      expect(onlyThisMonth.templates[0]).toMatchObject({
+        dueDay: 8,
+        endDate: original.endDate,
+        pauses: original.pauses,
+      });
+    });
+
+    it("re-anchors an end left as it was in the editor, but keeps a new one", () => {
+      store = commit(store, endSeriesInStore(store, "luz", "2026-12-08"));
+
+      const untouched = updateExpenseTemplateInStore(store, "luz", {
+        dueDay: 12,
+        endDate: "2026-12-08",
+      });
+      const changed = updateExpenseTemplateInStore(store, "luz", {
+        dueDay: 12,
+        endDate: "2026-11-30",
+      });
+
+      expect(untouched.templates[0].endDate).toBe("2026-12-12");
+      expect(changed.templates[0].endDate).toBe("2026-11-30");
     });
   });
 });

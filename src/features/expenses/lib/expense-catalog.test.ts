@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { occurrencesDueBetween } from "@/domain/finance";
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore, ExpenseTemplate } from "@/domain/types";
 import {
@@ -10,6 +11,11 @@ import {
   hasActiveCatalogFilters,
   summarizeCatalog,
 } from "./expense-catalog";
+import {
+  markOccurrencesPaidInStore,
+  moveOccurrenceSeriesInStore,
+} from "@/stores/app/expense-commands";
+import { preserveClosedOccurrenceRecords } from "@/stores/app/store-history";
 
 const TODAY = "2026-10-23";
 
@@ -200,5 +206,71 @@ describe("expense catalog", () => {
 
   it("counts commitments that end within the hint window", () => {
     expect(countEndingCommitments(items)).toBe(1);
+  });
+});
+
+describe("expense catalog with closed months", () => {
+  const luz = template("Luz", { amount: 60, dueDay: 8, startDate: "2026-10-01" });
+
+  it("reads a closed month from its records, as Gastos does", () => {
+    const [item] = buildExpenseCatalog({
+      store: {
+        ...emptyStore,
+        templates: [luz],
+        // Una copia restaurada guarda el mes cerrado solo como registro.
+        occurrenceRecords: [
+          {
+            id: "record:Luz:2026-10-08",
+            userId: "demo",
+            templateId: "Luz",
+            occurrenceDate: "2026-10-08",
+            monthId: "2026-10",
+            dueDate: "2026-10-08",
+            name: "Luz",
+            description: "",
+            plannedAmount: 60,
+            currency: "EUR",
+            categoryId: "casa",
+            categoryName: "Casa",
+            status: "paid",
+            sortOrder: 0,
+            paidAt: "2026-10-08T09:00:00.000Z",
+            amountPaid: 60,
+            source: "native",
+            createdAt: "2026-10-08T09:00:00.000Z",
+            updatedAt: "2026-10-08T09:00:00.000Z",
+          },
+        ],
+      },
+      today: "2026-11-03",
+    });
+
+    expect(item.overdueOccurrence).toBeNull();
+    expect(item.nextOccurrence?.dueDate).toBe("2026-11-08");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows no phantom overdue charge after moving the series in a later month", () => {
+    vi.useFakeTimers({ now: new Date("2026-10-08T12:00:00") });
+    const october = { ...emptyStore, templates: [luz] };
+    const paid = markOccurrencesPaidInStore(october, [
+      occurrencesDueBetween(october, "2026-10-01", "2026-10-31")[0],
+    ]);
+
+    // En noviembre la serie pasa al día 20; octubre ya está cerrado.
+    vi.setSystemTime(new Date("2026-11-03T12:00:00"));
+    const [november] = occurrencesDueBetween(paid, "2026-11-01", "2026-11-30");
+    const moved = preserveClosedOccurrenceRecords(
+      paid,
+      moveOccurrenceSeriesInStore(paid, november, "2026-11-20"),
+    );
+
+    const [item] = buildExpenseCatalog({ store: moved, today: "2026-11-03" });
+
+    expect(item.overdueOccurrence).toBeNull();
+    expect(item.nextOccurrence?.dueDate).toBe("2026-11-20");
   });
 });

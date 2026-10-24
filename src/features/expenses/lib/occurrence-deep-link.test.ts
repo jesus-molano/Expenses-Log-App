@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolveBudgetCycle } from "@/domain/budget-cycle";
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore, ExpenseTemplate } from "@/domain/types";
 import {
@@ -77,5 +78,20 @@ describe("occurrence deep links", () => {
     const occurrence = { id: "exp-rent:2026-09-01", dueDate: "2026-09-01" };
     expect(deepLinkViewMonth(occurrence, "2026-10", new Set([occurrence.id]))).toBe("2026-10");
     expect(deepLinkViewMonth(occurrence, "2026-10", new Set())).toBe("2026-09");
+  });
+
+  it("goes to the budget month of the charge with the payday cycle", () => {
+    // Cobro el 28: "noviembre" va del 28 de octubre al 27 de noviembre.
+    const cycle = resolveBudgetCycle({
+      ...emptyStore.finance,
+      monthlySalary: { "2026-01": { amount: 2000, dayOfMonth: 28 } },
+      budgetCycle: { anchor: "payday", updatedAt: "2026-01-01T00:00:00.000Z" },
+    });
+    const late = { id: "bill:2026-10-30", dueDate: "2026-10-30" };
+    expect(deepLinkViewMonth(late, "2026-10", new Set(), cycle)).toBe("2026-11");
+    const early = { id: "bill:2026-10-26", dueDate: "2026-10-26" };
+    expect(deepLinkViewMonth(early, "2026-11", new Set(), cycle)).toBe("2026-10");
+    // Con el mes natural, el del vencimiento.
+    expect(deepLinkViewMonth(late, "2026-10", new Set())).toBe("2026-10");
   });
 });

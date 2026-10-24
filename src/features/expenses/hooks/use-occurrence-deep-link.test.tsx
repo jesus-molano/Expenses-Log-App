@@ -103,6 +103,40 @@ describe("useOccurrenceDeepLink", () => {
     expect(options.onMissing).not.toHaveBeenCalled();
   });
 
+  it("moves to the budget month of the charge with the payday cycle", () => {
+    // Cobro el 28: el 27 de octubre aún es "octubre" (28 sep - 27 oct) y un
+    // recibo del 30 ya es de "noviembre".
+    const paydayStore: ExpenseStore = {
+      ...emptyStore,
+      finance: {
+        ...emptyStore.finance,
+        monthlySalary: { "2026-01": { amount: 2000, dayOfMonth: 28 } },
+        budgetCycle: { anchor: "payday", updatedAt: "2026-01-01T00:00:00.000Z" },
+      },
+      templates: [{ ...store.templates[0], id: "bill", dueDay: 30 }],
+    };
+    const septemberCycle = occurrencesDueBetween(paydayStore, "2026-09-28", "2026-10-27");
+    const novemberCycle = occurrencesDueBetween(paydayStore, "2026-10-28", "2026-11-27");
+    window.history.replaceState(null, "", "/?occurrence=bill%3A2026-10-30");
+    const row = addRow("bill:2026-10-30");
+
+    const { options, rerender } = render({
+      store: paydayStore,
+      visibleOccurrences: septemberCycle,
+    });
+    expect(options.showMonth).toHaveBeenCalledWith("2026-11");
+    expect(options.onMissing).not.toHaveBeenCalled();
+
+    rerender({ ...options, viewMonthId: "2026-11", visibleOccurrences: novemberCycle });
+    vi.advanceTimersToNextFrame();
+
+    expect(row.dataset.highlighted).toBe("true");
+    expect(options.onMissing).not.toHaveBeenCalled();
+    expect(options.onOpen).toHaveBeenCalledWith(
+      novemberCycle.find((occurrence) => occurrence.id === "bill:2026-10-30"),
+    );
+  });
+
   it("says so when the occurrence no longer exists", () => {
     window.history.replaceState(null, "", "/?occurrence=exp-gone%3A2026-10-01");
 

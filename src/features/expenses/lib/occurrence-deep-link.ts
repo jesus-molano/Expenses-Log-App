@@ -1,4 +1,5 @@
 import { addDays, parseISO, subDays } from "date-fns";
+import { CALENDAR_CYCLE, periodIdOf, type BudgetCycle } from "@/domain/budget-cycle";
 import { isValidDateOnly, toDateOnly } from "@/domain/calendar";
 import { generateStoreOccurrences, occurrencesDueBetween } from "@/domain/finance";
 import type { AppLanguage, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
@@ -66,11 +67,13 @@ export function locateOccurrence(
 }
 
 // Mes que hay que mirar para ver el cobro: el actual si ya sale en la lista
-// (por ejemplo, como pendiente del mes anterior) o el de su vencimiento.
+// (por ejemplo, como pendiente del mes anterior) o el mes de presupuesto de su
+// vencimiento (con el ciclo anclado al cobro no siempre es el mes natural).
 export function deepLinkViewMonth(
   occurrence: Pick<ExpenseOccurrence, "id" | "dueDate">,
   viewMonthId: string,
   visibleIds: ReadonlySet<string>,
+  cycle: BudgetCycle = CALENDAR_CYCLE,
 ) {
-  return visibleIds.has(occurrence.id) ? viewMonthId : occurrence.dueDate.slice(0, 7);
+  return visibleIds.has(occurrence.id) ? viewMonthId : periodIdOf(occurrence.dueDate, cycle);
 }

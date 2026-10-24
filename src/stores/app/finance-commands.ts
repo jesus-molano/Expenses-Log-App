@@ -162,19 +162,24 @@ export function updateMonthlySalaryInStore(
   if (input.scope === "month") {
     // Solo este mes (la paga extra, un mes con horas extra...): los
     // siguientes siguen con lo que tenían. Si este mes empezaba un sueldo
-    // nuevo, ese sueldo pasa a empezar el mes siguiente.
-    const followingBefore = getMonthlySalarySettings(store.finance, nextMonth);
+    // nuevo, ese sueldo pasa a empezar el primer mes que lo hereda (los de
+    // "solo este mes" que vienen detrás no lo heredan).
+    let following = nextMonth;
+    while (store.finance.monthlySalary[following]?.onlyThisMonth) {
+      following = nextMonthId(following);
+    }
+    const followingBefore = getMonthlySalarySettings(store.finance, following);
     nextSalary[monthId] = { ...salary, onlyThisMonth: true };
     const followingAfter = getMonthlySalarySettings(
       { ...store.finance, monthlySalary: nextSalary },
-      nextMonth,
+      following,
     );
     if (
-      !(nextMonth in store.finance.monthlySalary) &&
+      !(following in store.finance.monthlySalary) &&
       (followingAfter.amount !== followingBefore.amount ||
         followingAfter.dayOfMonth !== followingBefore.dayOfMonth)
     ) {
-      nextSalary[nextMonth] = {
+      nextSalary[following] = {
         amount: followingBefore.amount,
         dayOfMonth: followingBefore.dayOfMonth,
         updatedAt,

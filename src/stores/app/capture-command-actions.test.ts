@@ -113,6 +113,28 @@ describe("capture command actions", () => {
     expect(october(reverted).netflix).toMatchObject({ status: "due", dueDate: "2026-10-28" });
   });
 
+  it("keeps a finished series ending after the same charge when it moves, and on undo", () => {
+    const ending: ExpenseStore = {
+      ...base,
+      templates: base.templates.map((item) =>
+        item.id === "luz" ? { ...item, endDate: "2026-12-08" } : item,
+      ),
+    };
+    const luzDates = (store: ExpenseStore) =>
+      occurrencesDueBetween(store, "2026-10-01", "2027-02-28")
+        .filter((occurrence) => occurrence.template.id === "luz")
+        .map((occurrence) => occurrence.occurrenceDate);
+
+    const { store, changes } = applyCaptureCommandsInStore(ending, [
+      { resolved: resolve(ending, cmd("move", "luz", { day: 20 })), scope: "series" },
+    ]);
+
+    expect(luzDates(store)).toEqual(["2026-10-20", "2026-11-20", "2026-12-20"]);
+    const reverted = revertCaptureCommandsInStore(store, changes);
+    expect(reverted.templates.find((item) => item.id === "luz")?.endDate).toBe("2026-12-08");
+    expect(luzDates(reverted)).toEqual(["2026-10-08", "2026-11-08", "2026-12-08"]);
+  });
+
   it("restores a previous payment instead of leaving it unpaid", () => {
     const paid = applyCaptureCommandsInStore(base, [
       { resolved: resolve(base, cmd("pay", "luz", { amount: 60 })) },

@@ -1,6 +1,8 @@
+import { addDays, format, parseISO } from "date-fns";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { estimateChargeDate } from "./calendar";
+import { daysBetween, estimateChargeDate } from "./calendar";
 import {
+  MAX_CHARGE_DELAY_DAYS,
   bankHolidayOn,
   easterSunday,
   isBankBusinessDay,
@@ -91,6 +93,19 @@ describe("nextBankBusinessDay", () => {
 
   it("handles 26 December on a weekday", () => {
     expect(nextBankBusinessDay("2028-12-25")).toBe("2028-12-27");
+  });
+
+  it("never delays a charge more than MAX_CHARGE_DELAY_DAYS", () => {
+    let longest = 0;
+    for (
+      let date = parseISO("2026-01-01");
+      date < parseISO("2041-01-01");
+      date = addDays(date, 1)
+    ) {
+      const day = format(date, "yyyy-MM-dd");
+      longest = Math.max(longest, daysBetween(day, nextBankBusinessDay(day)));
+    }
+    expect(longest).toBe(MAX_CHARGE_DELAY_DAYS);
   });
 });
 

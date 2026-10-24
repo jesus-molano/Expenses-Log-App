@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { useRef, useState } from "react";
+import { StrictMode, useRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDialogA11y } from "./use-dialog-a11y";
 
@@ -52,6 +52,32 @@ function Harness({ focusMiddle = false }: { focusMiddle?: boolean }) {
         </button>
       ) : null}
       {nestedOpen ? <Dialog label="Confirm" onEscape={() => setNestedOpen(false)} /> : null}
+    </>
+  );
+}
+
+// Una hoja cuyo campo de importe se enfoca solo al montar (`autoFocus`).
+function AutoFocusDialog({ onEscape }: { onEscape: () => void }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogA11y({ panelRef, onEscape });
+
+  return (
+    <div ref={panelRef} role="dialog" aria-label="Amount" tabIndex={-1}>
+      <button type="button">Close</button>
+      <input aria-label="amount" autoFocus />
+    </div>
+  );
+}
+
+function AutoFocusHarness() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Open
+      </button>
+      {open ? <AutoFocusDialog onEscape={() => setOpen(false)} /> : null}
     </>
   );
 }
@@ -112,6 +138,24 @@ describe("useDialogA11y", () => {
     expect(screen.queryByRole("dialog", { name: "Sheet" })).not.toBeInTheDocument();
     expect(opener).toHaveFocus();
   });
+
+  it.each([
+    ["", false],
+    [" under StrictMode", true],
+  ])(
+    "keeps an autoFocused field focused and gives the focus back to the opener%s",
+    (_label, strict) => {
+      render(strict ? <StrictMode><AutoFocusHarness /></StrictMode> : <AutoFocusHarness />);
+      const opener = screen.getByRole("button", { name: "Open" });
+      opener.focus();
+      fireEvent.click(opener);
+      expect(screen.getByRole("textbox", { name: "amount" })).toHaveFocus();
+
+      pressKey("Escape");
+      expect(screen.queryByRole("dialog", { name: "Amount" })).not.toBeInTheDocument();
+      expect(opener).toHaveFocus();
+    },
+  );
 
   it("locks the page scroll while open", () => {
     document.body.style.overflow = "auto";

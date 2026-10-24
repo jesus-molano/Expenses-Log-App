@@ -118,9 +118,13 @@ export function isBankBusinessDay(date: string): boolean {
   return !isWeekend(parseISO(date)) && !bankHolidayOn(date);
 }
 
-// Primer día hábil en o después de `date`. Como mucho hay cinco días seguidos
-// sin cargos (Jueves Santo a Lunes de Pascua); el tope solo evita un bucle si
-// llegara una fecha ilegible.
+// Días que, como mucho, se retrasa un cargo: hay hasta cinco días seguidos sin
+// cargos (Jueves Santo a Lunes de Pascua) y se cobra el martes.
+export const MAX_CHARGE_DELAY_DAYS = 5;
+
+// Primer día hábil en o después de `date`. Como mucho está a
+// MAX_CHARGE_DELAY_DAYS; el tope solo evita un bucle si llegara una fecha
+// ilegible.
 export function nextBankBusinessDay(date: string): string {
   let current = date;
   for (let guard = 0; guard < 10 && !isBankBusinessDay(current); guard += 1) {

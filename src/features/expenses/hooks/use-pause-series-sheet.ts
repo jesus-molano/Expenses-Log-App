@@ -51,8 +51,15 @@ export function usePauseSeriesSheet({
 
   function changeFrom(next: string) {
     setFrom(next);
-    // Una vuelta anterior al nuevo inicio ya no vale.
-    if (resumeOn !== OPEN_PAUSE && resumeOn <= next) setResumeOn(OPEN_PAUSE);
+    // Una vuelta que ya no se ofrece desde el nuevo inicio (anterior a él o
+    // más allá de las que se listan) no vale: no se guardaría una pausa
+    // con fecha sin que se vea elegida.
+    if (
+      resumeOn !== OPEN_PAUSE &&
+      !pauseResumeChoices(template, next, RESUME_CHOICES).includes(resumeOn)
+    ) {
+      setResumeOn(OPEN_PAUSE);
+    }
   }
 
   function confirm() {

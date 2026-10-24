@@ -142,11 +142,19 @@ function rekeyOpenOverrides(
       continue;
     }
     const month = parseISO(override.occurrenceDate);
-    const [target, ...others] = generateTemplateDates(
-      template,
-      toDateOnly(startOfMonth(month)),
-      toDateOnly(endOfMonth(month)),
-    );
+    const monthStart = toDateOnly(startOfMonth(month));
+    const monthEnd = toDateOnly(endOfMonth(month));
+    // Un cobro que la serie sigue programando pero tapa una pausa o el fin no
+    // es huérfano: su override se queda en su fecha (si no, en una semanal
+    // pausada a mitad de mes iría al único cobro que queda).
+    if (
+      scheduledDatesIgnoringLifecycle(template, monthStart, monthEnd).includes(
+        override.occurrenceDate,
+      )
+    ) {
+      continue;
+    }
+    const [target, ...others] = generateTemplateDates(template, monthStart, monthEnd);
     if (!target || others.length || target === override.occurrenceDate) continue;
 
     const targetExisting = result.overrides.find(
@@ -201,7 +209,21 @@ function neutralizeOverride(
   };
 }
 
-function scheduleChanged(previous: ExpenseTemplate, next: ExpenseTemplate) {
+// Fechas del calendario de la serie sin pausas ni fin.
+function scheduledDatesIgnoringLifecycle(
+  template: ExpenseTemplate,
+  fromDate: string,
+  toDate: string,
+) {
+  return generateTemplateDates(
+    { ...template, endDate: undefined, pauses: undefined },
+    fromDate,
+    toDate,
+  );
+}
+
+// Si cambia en qué fechas cae la serie (día de cobro, inicio o recurrencia).
+export function scheduleChanged(previous: ExpenseTemplate, next: ExpenseTemplate) {
   return (
     previous.dueDay !== next.dueDay ||
     previous.startDate !== next.startDate ||

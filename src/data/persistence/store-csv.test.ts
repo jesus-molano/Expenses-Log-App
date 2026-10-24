@@ -179,6 +179,47 @@ describe("storeToCsv", () => {
     );
     expect(market?.name).toBe("'=Compra");
   });
+
+  it("protects custom category names a spreadsheet would run and reads them back as typed", () => {
+    const withFormulaCategories = normalizeExpenseStore(
+      {
+        ...emptyStore,
+        categories: [
+          { id: "cat-misc", userId: "demo", name: "-Varios", icon: "Tag", tone: "violet" },
+          { id: "cat-sum", userId: "demo", name: "=1+1", icon: "Tag", tone: "blue" },
+        ],
+        templates: [
+          template("misc", "Varios", 20, "cat-misc", "2026-08-01"),
+          template("sum", "Suma", 5, "cat-sum", "2026-08-02"),
+        ],
+        overrides: [paid("misc", "2026-08-01", 20), paid("sum", "2026-08-02", 5)],
+      },
+      today,
+    );
+
+    const csv = storeToCsv(withFormulaCategories, { today });
+    const rows = rowsOf(csv);
+    for (const [expenseId, label] of [
+      ["misc", "'-Varios"],
+      ["sum", "'=1+1"],
+    ]) {
+      const expenseRows = rows.filter((row) => row.expense_id === expenseId);
+      expect(expenseRows.find((row) => row.type === "expense")?.category).toBe(label);
+      expect(
+        expenseRows.find(
+          (row) => row.type === "occurrence" && row.occurrence_date?.startsWith("2026-08"),
+        )?.category,
+      ).toBe(label);
+    }
+
+    const { store: imported } = csvToStore(csv, { now: today });
+    const categories = new Map(imported.categories.map((category) => [category.id, category]));
+    const categoryOf = (id: string) =>
+      categories.get(imported.templates.find((item) => item.id === id)?.categoryId ?? "")?.name;
+    expect(categoryOf("misc")).toBe("-Varios");
+    expect(categoryOf("sum")).toBe("=1+1");
+    expect(imported.categories.map((category) => category.name).sort()).toEqual(["-Varios", "=1+1"]);
+  });
 });
 
 describe("csvToStore", () => {

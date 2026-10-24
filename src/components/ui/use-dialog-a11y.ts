@@ -1,6 +1,6 @@
 "use client";
 
-import { type RefObject, useEffect, useRef } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { useBodyScrollLock } from "./use-body-scroll-lock";
 
 const focusableSelector = [
@@ -52,27 +52,39 @@ export function useDialogA11y({
     onEscapeRef.current = onEscape;
   }, [onEscape]);
 
+  // Lo que tenía el foco al abrir, leído en el primer render: en un efecto
+  // ya sería el campo con `autoFocus` de dentro del diálogo (los hijos se
+  // enfocan antes), y al cerrar el foco no volvería a quien lo abrió.
+  const [opener] = useState(() =>
+    typeof document !== "undefined" && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
+
   useBodyScrollLock(true);
 
   useEffect(() => {
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
     const panel = panelRef.current;
     const focusFrame = window.requestAnimationFrame(() => {
-      const first =
-        initialFocusRef?.current ?? (panel ? getFocusableElements(panel)[0] : null);
+      const initial = initialFocusRef?.current;
+      if (initial) {
+        initial.focus({ preventScroll: true });
+        return;
+      }
+      // Un campo con `autoFocus` dentro del diálogo ya tiene el foco: se queda.
+      if (panel?.contains(document.activeElement)) return;
+      const first = panel ? getFocusableElements(panel)[0] : null;
       (first ?? panel)?.focus({ preventScroll: true });
     });
 
     return () => {
       window.cancelAnimationFrame(focusFrame);
-      if (previouslyFocused?.isConnected) {
-        previouslyFocused.focus({ preventScroll: true });
-      }
+      // Solo al cerrar de verdad (el panel ya no está en la página): el
+      // desmontaje simulado de StrictMode no le quita el foco al campo.
+      if (panel?.isConnected) return;
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
-  }, [panelRef, initialFocusRef]);
+  }, [panelRef, initialFocusRef, opener]);
 
   useEffect(() => {
     const id = Symbol("dialog");

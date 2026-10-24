@@ -16,6 +16,8 @@ type MoneyInputProps = Omit<
   // En editores sin <form> propio no debe bloquear el formulario que lo
   // contenga: solo se marca como inválido.
   blockSubmit?: boolean;
+  // Vacío se puede enviar; un texto que no se entiende sigue sin poder.
+  optional?: boolean;
 };
 
 // Campo de importe que solo deja enviar un importe legible: un texto que no se
@@ -28,6 +30,7 @@ export function MoneyInput({
   allowZero = false,
   allowNegative = false,
   blockSubmit = true,
+  optional = false,
   className,
   ...props
 }: MoneyInputProps) {
@@ -40,7 +43,7 @@ export function MoneyInput({
       value={value}
       // El teclado decimal de algunos móviles no tiene signo menos.
       inputMode={allowNegative ? "text" : "decimal"}
-      required={blockSubmit}
+      required={blockSubmit && !optional}
       onChange={(event) => onValueChange(event.target.value)}
       ref={(input) =>
         input?.setCustomValidity(

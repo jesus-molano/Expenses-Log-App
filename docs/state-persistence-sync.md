@@ -408,10 +408,16 @@ Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/Ba
      sueldos con tombstone por mes, pagas extra reescritas con las que el
      archivo tiene vigentes ese mes, saldos con `deletedAt` y el ciclo del
      presupuesto de vuelta al mes natural), porque un tombstone de un id
-     determinista impediria volver a usarlo. Un id que el
-     archivo trae se quita de los tombstones. Limite conocido: los objetivos de
-     ahorro no tienen tombstone, asi que un mes que solo estaba en los datos
-     actuales puede volver en esa fusion.
+     determinista impediria volver a usarlo. Lo que el archivo trae con un id
+     que ya tiene tombstone (borrado aqui o en el archivo) entra con un id
+     nuevo, junto con lo que depende de el (la categoria de sus gastos, sus
+     cobros `ovr:*` y su historico `record:*`), y el tombstone se queda: una
+     copia que aun lo tenga suelta la version antigua sin borrar la restaurada
+     ni duplicarla (`rekeyTombstonedIds`). Tema e idioma se quedan; los avisos,
+     que son de la cuenta y los lee el cron, vienen del archivo marcados como
+     editados ahora (si el archivo no los trae, se quedan los actuales). Limite
+     conocido: los objetivos de ahorro no tienen tombstone, asi que un mes que
+     solo estaba en los datos actuales puede volver en esa fusion.
    - El CSV solo trae gastos, cobros e historico: sustituir no toca Plan,
      ingresos ni preferencias. Los meses cerrados vuelven como historico
      (`occurrenceRecords`) y los abiertos como overrides de su gasto.
@@ -432,6 +438,9 @@ Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/Ba
 - Restaurar es sustituir con alcance completo, despues de guardar una copia
   "Antes de restaurar"; la copia pasa por `normalizeExpenseStore`, asi que una
   guardada por una version anterior sigue cargando.
+- Salir borrando los datos del dispositivo y borrar la cuenta vacian tambien
+  las copias (`clearDeviceData` en `src/data/persistence/device-data.ts`):
+  llevan el store entero y quien use despues el navegador podria restaurarlas.
 
 ### Almacenamiento persistente
 

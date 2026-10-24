@@ -40,10 +40,10 @@ export function ChoiceGroup<T extends string>({
   const labelId = useId();
   const hintId = useId();
   const buttonsRef = useRef<Array<HTMLButtonElement | null>>([]);
-  const selectedIndex = Math.max(
-    options.findIndex((option) => option.value === value),
-    0,
-  );
+  const selectedIndex = options.findIndex((option) => option.value === value);
+  // Sin opción elegida (el valor ya no está entre las opciones) ninguna se
+  // marca, pero la primera sigue recibiendo el foco con Tab.
+  const tabStopIndex = selectedIndex === -1 ? 0 : selectedIndex;
 
   function select(index: number) {
     const option = options[(index + options.length) % options.length];
@@ -91,7 +91,7 @@ export function ChoiceGroup<T extends string>({
               type="button"
               role="radio"
               aria-checked={selected}
-              tabIndex={selected ? 0 : -1}
+              tabIndex={index === tabStopIndex ? 0 : -1}
               data-selected={selected ? "true" : "false"}
               onClick={() => onChange(option.value)}
               onKeyDown={(event) => handleKeyDown(event, index)}

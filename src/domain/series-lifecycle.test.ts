@@ -6,6 +6,7 @@ import {
   pauseResumeChoices,
   pauseStartChoices,
   pauseUntilResume,
+  reanchorLifecycleForSchedule,
   seriesAmountPromptFor,
   seriesLifecycle,
 } from "./series-lifecycle";
@@ -127,6 +128,57 @@ describe("series lifecycle status", () => {
       seriesLifecycle({ ...gym, pauses: [{ from: "2026-12-01", to: "2026-12-31" }] }, "2026-10-23")
         .pause,
     ).toMatchObject({ active: false, firstSkipped: "2026-12-05", resumesOn: "2027-01-05" });
+  });
+});
+
+describe("re-anchoring the end and pauses to a new schedule", () => {
+  const onDay = (dueDay: number, template: ExpenseTemplate = gym) => ({ ...template, dueDay });
+
+  it("keeps ending after the same charge", () => {
+    const ending = { ...gym, endDate: "2026-12-05" };
+
+    expect(reanchorLifecycleForSchedule(ending, onDay(10, ending)).endDate).toBe("2026-12-10");
+    expect(reanchorLifecycleForSchedule(ending, onDay(3, ending)).endDate).toBe("2026-12-03");
+    // Un fin libre que sigue entre el mismo cobro y el siguiente se conserva.
+    const free = { ...gym, endDate: "2026-12-20" };
+    expect(reanchorLifecycleForSchedule(free, onDay(10, free)).endDate).toBe("2026-12-20");
+    expect(reanchorLifecycleForSchedule(free, onDay(25, free)).endDate).toBe("2026-12-25");
+  });
+
+  it("keeps a pause skipping the same charges and no others", () => {
+    const paused = { ...gym, pauses: [pauseUntilResume("2026-11-05", "2027-01-05")] };
+    const open = { ...gym, pauses: [{ from: "2026-10-06" }] };
+    // Empezó tras el cobro de octubre y se reanudó antes del de noviembre.
+    const skippedNothing = { ...gym, pauses: [{ from: "2026-10-06", to: "2026-10-22" }] };
+
+    expect(reanchorLifecycleForSchedule(paused, onDay(3, paused)).pauses).toEqual([
+      { from: "2026-11-03", to: "2027-01-02" },
+    ]);
+    expect(reanchorLifecycleForSchedule(paused, onDay(20, paused)).pauses).toEqual([
+      { from: "2026-11-20", to: "2027-01-19" },
+    ]);
+    expect(reanchorLifecycleForSchedule(open, onDay(20, open)).pauses).toEqual([
+      { from: "2026-11-20" },
+    ]);
+    expect(reanchorLifecycleForSchedule(skippedNothing, onDay(10, skippedNothing)).pauses).toEqual(
+      [{ from: "2026-10-11", to: "2026-10-22" }],
+    );
+    expect(
+      reanchorLifecycleForSchedule(skippedNothing, onDay(25, skippedNothing)).pauses,
+    ).toBeUndefined();
+  });
+
+  it("leaves series with several charges a month as they were", () => {
+    const weekly: ExpenseTemplate = {
+      ...gym,
+      recurrence: { frequency: "custom", interval: 1, unit: "week" },
+      endDate: "2026-12-05",
+      pauses: [{ from: "2026-11-05", to: "2026-11-30" }],
+    };
+
+    expect(
+      reanchorLifecycleForSchedule(weekly, { ...weekly, startDate: "2026-06-08" }),
+    ).toEqual({ endDate: weekly.endDate, pauses: weekly.pauses });
   });
 });
 

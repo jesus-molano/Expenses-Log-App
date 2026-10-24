@@ -138,13 +138,33 @@ export function endSeriesInStore(
   return updateExpenseTemplateInStore(store, templateId, { endDate }, today);
 }
 
+// Reactiva una serie finalizada desde hoy, como al reanudar: el cobro de hoy y
+// los siguientes vuelven. Los que habrían caído mientras estuvo terminada
+// quedan tapados por una pausa ya pasada; si volvieran, saldrían como
+// impagados en meses cerrados y se congelarían así en el historial.
 export function reactivateSeriesInStore(
   store: ExpenseStore,
   templateId: string,
   today: Date = new Date(),
 ): ExpenseStore {
-  if (!findTemplate(store, templateId)?.endDate) return store;
-  return updateExpenseTemplateInStore(store, templateId, { endDate: undefined }, today);
+  const template = findTemplate(store, templateId);
+  if (!template?.endDate) return store;
+
+  const yesterday = toDateOnly(addDays(today, -1));
+  const gapFrom = isValidDateOnly(template.endDate)
+    ? toDateOnly(addDays(parseISO(template.endDate), 1))
+    : null;
+  return updateExpenseTemplateInStore(
+    store,
+    templateId,
+    {
+      endDate: undefined,
+      ...(gapFrom && gapFrom <= yesterday
+        ? { pauses: withPause(template.pauses, { from: gapFrom, to: yesterday }) }
+        : {}),
+    },
+    today,
+  );
 }
 
 // Pausa la serie entre dos fechas (sin fin, hasta reanudarla). La pausa nunca

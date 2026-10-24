@@ -12,6 +12,7 @@ import {
   previousMonthsChargeDates,
   templateAmountOn,
 } from "@/domain/recurrence";
+import { reanchorLifecycleForSchedule } from "@/domain/series-lifecycle";
 import type {
   CreateExpenseOptions,
   DraftExpense,
@@ -27,6 +28,7 @@ import {
 } from "@/features/expenses/lib/expense-actions";
 import {
   rekeyOverridesForTemplateChange,
+  scheduleChanged,
   upsertOccurrenceOverride,
 } from "./occurrence-overrides";
 import type { MonthlyExpenseOverrideInput } from "./store-types";
@@ -440,22 +442,28 @@ export function keepAmountBeforeSeriesChange(
     );
 }
 
+type TemplateChanges = Partial<Omit<ExpenseTemplate, "id" | "userId" | "createdAt">>;
+
 // Cambia la serie y recoloca los overrides de los meses abiertos si cambia su
-// calendario, para que el pago o el movimiento de este mes no se pierda.
+// calendario, para que el pago o el movimiento de este mes no se pierda. El
+// fin y las pausas que no cambian a la vez siguen señalando los mismos cobros.
 export function updateExpenseTemplateInStore(
   store: ExpenseStore,
   templateId: string,
-  changes: Partial<Omit<ExpenseTemplate, "id" | "userId" | "createdAt">>,
+  changes: TemplateChanges,
   today: Date = new Date(),
 ): ExpenseStore {
   const previous = store.templates.find((template) => template.id === templateId);
   if (!previous) return store;
 
-  const next: ExpenseTemplate = {
+  const changed: ExpenseTemplate = {
     ...previous,
     ...changes,
     updatedAt: new Date().toISOString(),
   };
+  const next = scheduleChanged(previous, changed)
+    ? withReanchoredLifecycle(previous, changed, changes)
+    : changed;
 
   return rekeyOverridesForTemplateChange(
     {
@@ -468,6 +476,25 @@ export function updateExpenseTemplateInStore(
     next,
     today,
   );
+}
+
+function withReanchoredLifecycle(
+  previous: ExpenseTemplate,
+  next: ExpenseTemplate,
+  changes: TemplateChanges,
+): ExpenseTemplate {
+  const { endDate, pauses } = reanchorLifecycleForSchedule(previous, next);
+  const keepsEnd = !("endDate" in changes) || changes.endDate === previous.endDate;
+  const keepsPauses =
+    !("pauses" in changes) ||
+    JSON.stringify(changes.pauses) === JSON.stringify(previous.pauses);
+  return {
+    ...next,
+    ...(keepsEnd && endDate !== previous.endDate ? { endDate } : {}),
+    ...(keepsPauses && JSON.stringify(pauses) !== JSON.stringify(previous.pauses)
+      ? { pauses }
+      : {}),
+  };
 }
 
 // Aviso propio de un gasto (la campana de la fila). undefined lo devuelve al

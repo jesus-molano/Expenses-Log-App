@@ -67,8 +67,9 @@ export function ExtraPayFields({
           <MoneyInput
             value={amount}
             onValueChange={onAmountChange}
+            allowZero
             invalidMessage={t("money.amountInvalid", language)}
-            blockSubmit={false}
+            optional
           />
         </Field>
       ) : null}

@@ -1,9 +1,8 @@
 import { addDays, subDays } from "date-fns";
-import { periodRange, resolveBudgetCycle } from "./budget-cycle";
+import { periodIdOf, periodRange, resolveBudgetCycle } from "./budget-cycle";
 import {
   addMonthId,
   buildMonthContext,
-  monthRange,
   paydayMonthOn,
   shouldSuggestAdvance,
 } from "./budget-month";
@@ -14,6 +13,7 @@ import {
   toDateOnly,
 } from "./calendar";
 import { occurrencesDueBetween } from "./finance";
+import { MAX_CHARGE_DELAY_DAYS } from "./holidays";
 import { monthPendingSummary } from "./pending";
 import type {
   AppLanguage,
@@ -141,6 +141,16 @@ export function leadDayOptions(rule: RecurrenceRule): readonly number[] {
     : SHORT_CYCLE_LEAD_DAYS;
 }
 
+// La antelación más cercana que se ofrece para esa frecuencia (a igual
+// distancia, la menor): al pasar de anual a mensual, 30 días pasan a 5 y
+// no a una antelación que el selector no muestra.
+export function snapLeadDays(rule: RecurrenceRule, days: number): number {
+  const options = leadDayOptions(rule);
+  return options.reduce((best, option) =>
+    Math.abs(option - days) < Math.abs(best - days) ? option : best,
+  );
+}
+
 export type ResolvedReminder = ExpenseReminderSettings & {
   // "template": el gasto tiene aviso propio; "default": sigue Ajustes.
   source: "template" | "default";
@@ -220,8 +230,10 @@ export function buildOccurrenceReminders(
   const preferences = resolveReminderPreferences(store);
   const todayKey = toDateOnly(today);
   const templatesById = new Map(store.templates.map((template) => [template.id, template]));
-  // El cargo estimado cae hasta 2 días después del vencimiento (fin de semana).
-  const from = toDateOnly(subDays(today, CHARGE_CHECK_WINDOW_DAYS + 2));
+  // El cargo estimado cae hasta MAX_CHARGE_DELAY_DAYS después del vencimiento
+  // (fin de semana o festivos: Jueves Santo se cobra el martes). La etapa se
+  // decide con el cargo estimado, así que mirar más atrás no avisa de más.
+  const from = toDateOnly(subDays(today, CHARGE_CHECK_WINDOW_DAYS + MAX_CHARGE_DELAY_DAYS));
   const to = toDateOnly(addDays(today, MAX_REMINDER_LEAD_DAYS));
 
   return occurrencesDueBetween(store, from, to, language)
@@ -311,14 +323,16 @@ export function buildPaydayNotice(
 }
 
 // Recibos que piden atención hoy (vencidos o que vencen hoy), para el número
-// del icono de la app. Mira desde el mes anterior, como "Pendiente de <mes>".
+// del icono de la app. Mira desde el mes de presupuesto anterior, como
+// "Pendiente de <mes>" (con el ciclo anclado al cobro, no el mes natural).
 export function countAttentionOccurrences(
   store: ExpenseStore,
   today: Date,
   language: AppLanguage = "es",
 ): number {
   const todayKey = toDateOnly(today);
-  const from = monthRange(addMonthId(todayKey.slice(0, 7), -1)).start;
+  const cycle = resolveBudgetCycle(store.finance);
+  const from = periodRange(addMonthId(periodIdOf(todayKey, cycle), -1), cycle).start;
   const templateIds = new Set(store.templates.map((template) => template.id));
 
   return occurrencesDueBetween(store, from, todayKey, language).filter(
