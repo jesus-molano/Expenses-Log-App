@@ -54,7 +54,7 @@ de red, mensajes y caches obsoletas) viven en `src/pwa/cache-policy.ts`.
   (`scripts/verify-sw.mjs` falla el build si falta alguna). No entran `_not-found`,
   `_global-error` ni las rutas dinamicas (`/expenses/[id]`, `/auth/callback`,
   `/api/*`).
-- Como mucho 5 MB por archivo. Hoy son unas 38 URLs (2,4 MB).
+- Como mucho 5 MB por archivo. Hoy son unas 55 URLs (3,1 MB).
 
 No entran las fuentes de `next/font` (`.next/static/media/*.woff2`, fuera del
 glob), `/manifest.webmanifest` (lo genera una ruta, no es HTML) ni los iconos
@@ -117,9 +117,9 @@ Las caducidades cuentan desde el ultimo uso.
   (`cleanupOutdatedCaches` borra ademas las caches de formatos de precache
   antiguos) y borra las caches `pages`, `pages-rsc` y la antigua
   `expense-reminders-*`, que pueden apuntar a chunks de otro build.
-- Los enlaces entre Gastos, Plan y Ajustes (`OfflineLink`) hacen una
-  navegacion de documento si el navegador esta offline, por lo que no dependen
-  de una respuesta RSC nueva.
+- Los enlaces entre las pestañas (Gastos, Mes, Cuentas y Prevision) y Ajustes
+  (`OfflineLink`) hacen una navegacion de documento si el navegador esta
+  offline, por lo que no dependen de una respuesta RSC nueva.
 
 El service worker tambien maneja:
 
@@ -208,7 +208,7 @@ y chunks. El script:
 
 ### Aviso "Sin conexion"
 
-Las cabeceras de Gastos y Plan (`DashboardShell`) y de Ajustes muestran el chip
+Las cabeceras de las cuatro pestañas (`DashboardShell`) y de Ajustes muestran el chip
 "Sin conexion" (`src/components/ui/OfflineStatusChip.tsx`) mientras el
 navegador esta offline:
 
@@ -220,8 +220,8 @@ navegador esta offline:
   conexion real; nada decide si guardar o sincronizar a partir de el.
 - La region `role="status"` existe siempre (vacia y sin ancho con conexion),
   para que el lector de pantalla anuncie el chip al perder la conexion.
-- No mueve la cabecera: en Gastos y Plan va en la linea del titulo, de alto
-  fijo, y a 360 px recorta el titulo (el mes sigue en la barra de mes); en
+- No mueve la cabecera: en las pestañas va sobre el borde superior de la
+  tarjeta de la cabecera, sin recortar el titulo ni cambiar su alto; en
   Ajustes va junto al `h1`.
 
 ### Pruebas del modo sin conexion

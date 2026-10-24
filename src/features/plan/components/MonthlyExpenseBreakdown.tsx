@@ -10,7 +10,6 @@ import { MonthlyExpenseRow } from "./MonthlyExpenseRow";
 import { PlanEmptyTableRow } from "./PlanSectionList";
 
 type MonthlyExpenseBreakdownProps = {
-  id?: string;
   language: AppLanguage;
   today: string;
   occurrences: ExpenseOccurrence[];
@@ -25,7 +24,6 @@ type MonthlyExpenseBreakdownProps = {
 // Tabla de los recibos de un mes: pagar, editar (también lo pagado de
 // verdad) y quitar del mes cada uno.
 export function MonthlyExpenseBreakdown({
-  id,
   language,
   today,
   occurrences,
@@ -36,7 +34,7 @@ export function MonthlyExpenseBreakdown({
   suggestPaidAmount,
 }: MonthlyExpenseBreakdownProps) {
   return (
-    <div id={id} className="app-monthly-table" data-tone="expense">
+    <div className="app-monthly-table" data-tone="expense">
       <div className="app-monthly-table-head app-monthly-expense-table-head">
         <span>{t("money.expenseItem", language)}</span>
         <span>{t("money.amountColumn", language)}</span>

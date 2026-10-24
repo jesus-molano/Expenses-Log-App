@@ -275,7 +275,7 @@ Reglas para campos nuevos:
   cobros anteriores de un gasto nuevo (M18) tambien son overrides; los pagos se
   fechan el dia de su cargo.
 - Excepcion: `finance.budgetCycle` tambien. Si un build antiguo lo descarta,
-  Gastos y Plan vuelven al mes natural, que es el valor por defecto. Un build
+  Gastos y Mes vuelven al mes natural, que es el valor por defecto. Un build
   con passthrough lo conserva; al fusionar dos copias gana la local, porque no
   conoce su `updatedAt`.
 - `finance.balanceCheckins` se escribe en cuanto se anota un saldo. Los builds
@@ -347,7 +347,7 @@ un alias ("Streaming", "Hogar") vuelve como propia y no como la preset.
 No se sincronizan y viven fuera del store:
 
 - El mes que se mira vive en `sessionStorage['expense-view-month']`, por
-  pestaña y compartido entre Gastos y Plan: al cambiar de mes en una pestaña,
+  pestaña y compartido entre Gastos y Mes: al cambiar de mes en una pestaña,
   la otra lo sigue. Sin valor se ve el mes activo.
 - El "Ahora no" a pasar o cerrar el mes se guarda por dispositivo y por mes en
   `localStorage['plan-close-dismissed:YYYY-MM']`.

@@ -183,6 +183,43 @@ describe("MonthDashboard", () => {
     });
   });
 
+  it("edits and removes the month's one-off income from its summary", async () => {
+    saveExpenseStore({
+      ...store,
+      finance: {
+        ...store.finance,
+        incomeEvents: [
+          {
+            id: "bizum",
+            userId: "demo",
+            name: "Bizum",
+            amount: 40,
+            currency: "EUR",
+            receivedAt: "2026-10-05",
+            createdAt: "2026-10-05T10:00:00.000Z",
+            updatedAt: "2026-10-05T10:00:00.000Z",
+          },
+        ],
+      },
+    });
+    await renderMonth();
+
+    fireEvent.click(screen.getByRole("button", { name: /Resumen de octubre/ }));
+    const summary = screen.getByRole("dialog", { name: "Resumen de octubre" });
+    fireEvent.click(within(summary).getByRole("button", { name: "Editar ingreso" }));
+    fireEvent.change(within(summary).getByLabelText("Importe"), { target: { value: "55" } });
+    fireEvent.click(within(summary).getByRole("button", { name: "Guardar ingreso" }));
+    await waitFor(() =>
+      expect(loadExpenseStore().finance.incomeEvents[0]).toMatchObject({ amount: 55 }),
+    );
+
+    fireEvent.click(within(summary).getByRole("button", { name: "Quitar ingreso" }));
+    const confirm = screen.getByRole("alertdialog", { name: "¿Quitar «Bizum»?" });
+    fireEvent.click(within(confirm).getByRole("button", { name: "Quitar" }));
+    await waitFor(() => expect(loadExpenseStore().finance.incomeEvents).toEqual([]));
+    expect(within(summary).getByText("Sin ingresos puntuales en este mes.")).toBeInTheDocument();
+  });
+
   it("warns in a registered month's summary that its savings were not recorded", async () => {
     await renderMonth();
 

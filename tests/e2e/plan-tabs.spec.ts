@@ -48,7 +48,8 @@ function paid(templateId: string, occurrenceDate: string): ExpenseOccurrenceOver
 
 // 23 de octubre. Sueldo de 2000 € y 300 € de ahorro. Alquiler pagado; luz y
 // gimnasio por pagar (90 €). La cuenta de recibos, Sabadell, tiene 1000 €.
-// El IBI trimestral pide 50 €/mes hasta enero.
+// El IBI trimestral (150 €, pagado en octubre) vence el 10 de enero: de
+// octubre a enero son cuatro meses, 37,50 €/mes.
 const store: ExpenseStore = {
   ...emptyStore,
   templates: [
@@ -105,6 +106,11 @@ function headline(page: Page) {
   return page.locator("header[data-app-chrome]");
 }
 
+// Cada pestaña tiene un solo h1, aunque sea solo para el lector de pantalla.
+function pageTitle(page: Page) {
+  return page.getByRole("heading", { level: 1 });
+}
+
 function monthBar(page: Page) {
   return page.getByRole("navigation", { name: "Cambiar de mes" });
 }
@@ -140,6 +146,7 @@ test("moves between the four tabs, each with its own headline", async ({ page })
   // Gastos: lo que queda por pagar del mes.
   await expect(headline(page)).toContainText("Por pagar · octubre");
   await expect(headline(page)).toContainText(/90,00\s€/);
+  await expect(pageTitle(page)).toHaveText("Gastos");
   await expect(monthBar(page)).toBeVisible();
 
   // Mes: lo libre según el plan (2000 − 940 − 300).
@@ -147,6 +154,7 @@ test("moves between the four tabs, each with its own headline", async ({ page })
   await expect(page).toHaveURL(/\/money$/);
   await expect(headline(page)).toContainText("Libre · octubre");
   await expect(headline(page)).toContainText(/760,00\s€/);
+  await expect(pageTitle(page)).toHaveText("Plan de octubre 2026");
   await expect(monthBar(page)).toBeVisible();
   await expect(nav.getByRole("link", { name: "Mes" })).toHaveAttribute("aria-current", "page");
   expect(await noHorizontalScroll(page)).toBe(true);
@@ -156,6 +164,7 @@ test("moves between the four tabs, each with its own headline", async ({ page })
   await expect(page).toHaveURL(/\/accounts$/);
   await expect(headline(page)).toContainText("Te sobran · Sabadell");
   await expect(headline(page)).toContainText(/910,00\s€/);
+  await expect(pageTitle(page)).toHaveText("Cuentas");
   await expect(page.getByRole("region", { name: "Cuentas" })).toBeVisible();
   await expect(monthBar(page)).toHaveCount(0);
   expect(await noHorizontalScroll(page)).toBe(true);
@@ -165,6 +174,7 @@ test("moves between the four tabs, each with its own headline", async ({ page })
   await expect(page).toHaveURL(/\/forecast$/);
   await expect(headline(page)).toContainText("Aparta al mes");
   await expect(headline(page)).toContainText(/37,50\s€/);
+  await expect(pageTitle(page)).toHaveText("Previsión");
   await expect(page.getByRole("region", { name: "Próximos recibos grandes" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Coste por categoría" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Plan anual" })).toBeVisible();

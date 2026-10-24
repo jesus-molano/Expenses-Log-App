@@ -17,9 +17,12 @@ Mobile-first recurring expense tracker inspired by iPhone Reminders.
   expenses and a checklist (salary, first expense, reminders, install).
 - Manual-first expense capture; text analysis remains an optional secondary
   shortcut.
-- Plan split into current month, annual projection and monthly review. It keeps
-  fixed salary/payday, habitual savings goal, actual monthly savings and
-  one-off income as separate concepts.
+- Four bottom tabs, each with its own headline figure: Expenses (what is left
+  to pay), Month (what is free according to the plan, the month's bills and
+  its summary), Accounts (balances and whether the bills account covers what
+  is left) and Forecast (large bills, monthly set-aside, cost by category and
+  the annual plan). The plan keeps fixed salary/payday, habitual savings goal,
+  actual monthly savings and one-off income as separate concepts.
 - No bank aggregation or spreadsheet import: the app intentionally tracks
   recurring commitments and manual payments, not every small transaction.
 - Per-expense Web Push reminders in the configured pre-charge window, with
@@ -29,7 +32,7 @@ Mobile-first recurring expense tracker inspired by iPhone Reminders.
   "salta el gimnasio este mes", "mueve Netflix al 10"), always confirmed
   before applying.
 - Build-aware offline PWA after the first production visit, including internal
-  navigation between Expenses, Plan and Settings.
+  navigation between the four tabs and Settings.
 - Eight Noctalia-aligned themes with semantic chart and UI colors.
 - Supabase SSR helpers, Next 16 `proxy.ts` session refresh and RLS schema.
 

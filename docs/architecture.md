@@ -97,20 +97,28 @@ Dashboard de gastos:
    "Empezar noviembre"). La logica vive en `domain/budget-month.ts`,
    `features/expenses/lib/month-close.ts` y `use-month-close-sheet.ts`.
 
-Pantalla de dinero:
+Pestañas del plan (Mes, Cuentas y Prevision):
 
-1. `CurrentMonthPlanSection` responde que queda por pagar, que ya esta pagado y
-   cuanto queda libre segun el plan del mes que se mira en Gastos (con su
-   mismo selector). La fase "actual" es el mes activo; en el, "Hasta el cobro"
-   suma lo pendiente antes del proximo sueldo.
-2. `AnnualPlanSection` muestra gasto recurrente, pagado, ahorro real y capacidad
-   maxima de los doce meses del año seleccionado.
-3. `MonthlyReviewSection` compara un mes con el anterior y permite editar sus
-   ingresos y ahorro real.
-4. `MoneyDashboard` compone las secciones; los calculos puros viven en dominio y
-   `features/plan/lib`.
-5. La base del plan guarda sueldo fijo, dia de cobro y objetivo habitual. La
-   transferencia real de ahorro pertenece a cada mes y no cambia ese objetivo.
+1. `MonthDashboard` (Mes) responde cuanto queda libre segun el plan del mes
+   que se mira en Gastos (con la misma barra de mes, `useMonthPlan`), que
+   falta por pagar y lo ya pagado. La fase "actual" es el mes activo; en el,
+   "Hasta el cobro" suma lo pendiente antes del proximo sueldo. "Recibos de
+   <mes>" (`MonthReceiptsList`) es la unica lista para pagar, corregir lo
+   pagado o quitar del mes cada recibo.
+2. `MonthSummaryLayer` abre "Resumen de <mes>" con lo que antes era la
+   revision mensual: editar el ingreso fijo y el ahorro, el aviso del ahorro
+   sin registrar y los ingresos puntuales. Lo abren la fila del resumen en Mes
+   y "Ver resumen" en Gastos.
+3. `AccountsDashboard` (Cuentas) y `ForecastDashboard` (Prevision) miran el
+   mes activo (`useActiveBudgetMonth`); Prevision tiene `AnnualPlanSection`
+   con gasto recurrente, pagado, ahorro real y capacidad maxima de los doce
+   meses del año elegido (`useAnnualPlan`).
+4. Los calculos puros viven en dominio y `features/plan/lib`; el estado y las
+   hojas compartidas, en `features/plan/hooks` y en componentes pequeños.
+5. La base del plan guarda sueldo fijo, dia de cobro y objetivo habitual
+   (`usePlanBaseSettings`, la misma hoja desde Mes, la guia de Gastos y
+   Ajustes). La transferencia real de ahorro pertenece a cada mes y no cambia
+   ese objetivo.
 
 Ajustes:
 

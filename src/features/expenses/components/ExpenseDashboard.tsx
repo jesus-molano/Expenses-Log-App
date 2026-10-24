@@ -401,6 +401,8 @@ export function ExpenseDashboard({
       }
     >
       <div className="mb-5 grid gap-3">
+        {/* Cada pestaña tiene su h1; a la vista, el mes lo dice la barra. */}
+        <h1 className="sr-only">{t("common.expenses", language)}</h1>
         <MonthBar
           monthId={month.viewMonthId}
           rangeLabel={periodRangeLabel(month.viewMonthId, month.cycle, language)}

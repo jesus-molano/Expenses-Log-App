@@ -147,7 +147,7 @@ en un mensual que se queda en su mes, como al arrastrar.
 - `accountCheckins`: saldos de las demas cuentas, uno por cuenta y dia, con la
   clave `${accountId}:${YYYY-MM-DD}` y el mismo valor que `balanceCheckins`.
 
-La pantalla `/money` calcula un `MonthlyMoneyPlan` con ingresos, gastos
+La pestaña Mes (`/money`) calcula un `MonthlyMoneyPlan` con ingresos, gastos
 planificados, ahorro reservado, capacidad, restante y faltantes.
 
 Semantica de producto:
@@ -229,7 +229,7 @@ cuentas que la app ya no usa.
 
 ## Mes del presupuesto
 
-Gastos y Plan reparten los recibos por meses de presupuesto con id `YYYY-MM`
+Gastos y Mes reparten los recibos por meses de presupuesto con id `YYYY-MM`
 (`src/domain/budget-cycle.ts`). Por defecto son meses naturales. Con el ciclo
 anclado al cobro, cada mes empieza el dia de cobro configurado para ese mes y
 termina el dia antes del siguiente inicio, y lleva el nombre del mes que tiene
