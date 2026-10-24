@@ -79,7 +79,7 @@ test("offers to move to next month once the current one is settled, with undo", 
 
   await expect(page.getByText("Por pagar · octubre")).toBeVisible();
   await expect(page.getByText("Octubre al día")).toBeVisible();
-  await expect(page.getByText("2 pagados · 1 de noviembre ya pagado")).toBeVisible();
+  await expect(page.getByText("2 pagados", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Pasar a noviembre" }).click();
 

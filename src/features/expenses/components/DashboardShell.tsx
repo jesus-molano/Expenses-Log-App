@@ -50,14 +50,9 @@ export function DashboardShell({
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                {/* El título nunca se recorta: si el chip sin conexión no cabe
-                    a su lado, pasa a la línea siguiente. */}
-                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <p className="break-words text-xs font-semibold uppercase tracking-wide text-[var(--app-text-subtle)]">
-                    {headlineTitle}
-                  </p>
-                  <OfflineStatusChip language={language} />
-                </div>
+                <p className="break-words text-xs font-semibold uppercase tracking-wide text-[var(--app-text-subtle)]">
+                  {headlineTitle}
+                </p>
                 <p className="app-money mt-1 text-[32px] font-semibold leading-none text-[var(--app-text)]">
                   {headlineLabel}
                 </p>
@@ -74,6 +69,12 @@ export function DashboardShell({
               </div>
             </div>
           </section>
+          {/* El chip sin conexión va sobre el borde superior de la tarjeta: no
+              recorta el título ni cambia la altura de la cabecera. */}
+          <OfflineStatusChip
+            language={language}
+            className="app-chip-solid absolute left-7 top-[calc(max(0.65rem,env(safe-area-inset-top))-0.5rem)] z-20"
+          />
         </header>
 
         <section className="flex min-w-0 flex-1 flex-col px-3 pt-5 sm:px-6">

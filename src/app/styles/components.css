@@ -1128,6 +1128,11 @@
   --chip-color: var(--app-category-orange);
 }
 
+/* Chip opaco para ir encima de un borde o de otra superficie. */
+.app-chip-solid {
+  background: color-mix(in srgb, var(--chip-color) 18%, var(--app-surface));
+}
+
 .app-chip-rose {
   --chip-color: var(--app-category-rose);
 }
