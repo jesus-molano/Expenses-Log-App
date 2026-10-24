@@ -365,9 +365,22 @@ export function ExpenseDashboard({
       },
     });
     // Un recibo pagado con otro importe: se pregunta por el primero, como al
-    // pagarlo desde sus acciones.
+    // pagarlo desde sus acciones. Mientras se responde, el aviso con
+    // "Deshacer" queda bajo la hoja: no se cierra hasta que se conteste.
     const [paidOther] = paidOtherAmounts(confirmed);
-    if (paidOther) commandSeriesPrompt.askAfterPayment(paidOther.templateId, paidOther.amount, now);
+    if (
+      paidOther &&
+      commandSeriesPrompt.askAfterPayment(paidOther.templateId, paidOther.amount, now)
+    ) {
+      actionToast.pause();
+    }
+  }
+
+  function closeCommandSeriesPrompt(apply: boolean) {
+    const applied = apply ? commandSeriesPrompt.apply() : null;
+    if (!apply) commandSeriesPrompt.dismiss();
+    actionToast.resume();
+    if (applied) announceSeriesAmount(applied);
   }
 
   // No se mueve a un mes ya cerrado ni más allá del mes que se puede ver
@@ -540,11 +553,8 @@ export function ExpenseDashboard({
         <SeriesAmountPromptSheet
           prompt={commandSeriesPrompt.prompt}
           language={language}
-          onApply={() => {
-            const applied = commandSeriesPrompt.apply();
-            if (applied) announceSeriesAmount(applied);
-          }}
-          onKeep={commandSeriesPrompt.dismiss}
+          onApply={() => closeCommandSeriesPrompt(true)}
+          onKeep={() => closeCommandSeriesPrompt(false)}
         />
       ) : null}
 

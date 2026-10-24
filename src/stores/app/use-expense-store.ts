@@ -357,12 +357,15 @@ function useExpenseStoreValue() {
     const result = createCategoryInStore(current(), input);
     if (result.store !== current()) persist(result.store);
     return result.categoryId;
+  }
 
   function updateCategory(categoryId: string, changes: Partial<CategoryInput>) {
     persist(updateCategoryInStore(current(), categoryId, changes));
+  }
 
   function deleteCategory(categoryId: string, replacementName: string) {
     persist(deleteCategoryInStore(current(), categoryId, replacementName));
+  }
 
   // Órdenes de la captura ya confirmadas. Devuelve lo necesario para
   // deshacerlas.
@@ -370,6 +373,7 @@ function useExpenseStoreValue() {
     const result = applyCaptureCommandsInStore(current(), commands);
     if (result.changes.length) persist(result.store);
     return result.changes;
+  }
 
   function revertCaptureCommands(changes: CaptureCommandChange[]) {
     if (changes.length) persist(revertCaptureCommandsInStore(current(), changes));

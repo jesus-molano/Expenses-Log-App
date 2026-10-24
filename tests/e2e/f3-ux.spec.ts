@@ -284,6 +284,14 @@ test("confirms spoken orders before applying them, with undo", async ({ page }) 
     ]),
   );
 
+  // La luz se pagó con otro importe: la misma pregunta que en las acciones
+  // del cobro. El aviso con "Deshacer" espera a que se conteste.
+  const question = page.getByRole("dialog", { name: "¿Actualizar el importe desde ahora?" });
+  await expect(question).toContainText("Los próximos cobros de Luz");
+  await question.getByRole("button", { name: "Solo este cobro" }).click();
+  await expect(question).toHaveCount(0);
+  expect((await savedStore(page)).templates.find((item) => item.id === "luz")?.amount).toBe(60);
+
   await page.getByRole("button", { name: "Deshacer" }).click();
   await expect(row(page, "Luz")).not.toContainText("pagado");
 });
