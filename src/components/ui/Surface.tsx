@@ -5,6 +5,8 @@ type SurfaceProps = {
   variant?: "default" | "muted" | "raised" | "section" | "stat" | "empty";
   padding?: "none" | "sm" | "md" | "lg";
   className?: string;
+  // Nombre accesible de una tarjeta con título (un `article` o `section`).
+  "aria-labelledby"?: string;
   children: React.ReactNode;
 };
 
@@ -29,12 +31,16 @@ export function Surface({
   variant = "default",
   padding = "none",
   className,
+  "aria-labelledby": ariaLabelledBy,
   children,
 }: SurfaceProps) {
   const Component = as;
 
   return (
-    <Component className={cn(variants[variant], paddings[padding], className)}>
+    <Component
+      aria-labelledby={ariaLabelledBy}
+      className={cn(variants[variant], paddings[padding], className)}
+    >
       {children}
     </Component>
   );

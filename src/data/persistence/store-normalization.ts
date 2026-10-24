@@ -20,7 +20,15 @@ import {
   normalizeDateOnly,
   toDateOnly,
 } from "@/domain/calendar";
+import {
+  ACCOUNT_NAME_MAX_LENGTH,
+  PRIMARY_ACCOUNT_ID,
+  isBalanceAccountId,
+  isBalanceAccountRole,
+  parseAccountCheckinKey,
+} from "@/domain/balance-accounts";
 import type {
+  BalanceAccount,
   BalanceCheckin,
   BudgetCycleSetting,
   ExpenseCategory,
@@ -57,6 +65,8 @@ export const FINANCE_KEYS = [
   "monthClosures",
   "budgetCycle",
   "balanceCheckins",
+  "balanceAccounts",
+  "accountCheckins",
   "salaryExtraPays",
   "salaryReceipts",
 ] as const;
@@ -168,6 +178,8 @@ function normalizeFinanceStore(
     ...withMonthClosures(normalizeMonthClosures(finance.monthClosures)),
     ...withBudgetCycle(normalizeBudgetCycle(finance.budgetCycle)),
     ...withNonEmpty("balanceCheckins", normalizeBalanceCheckins(finance.balanceCheckins)),
+    ...withNonEmpty("balanceAccounts", normalizeBalanceAccounts(finance.balanceAccounts)),
+    ...withNonEmpty("accountCheckins", normalizeAccountCheckins(finance.accountCheckins)),
     ...withNonEmpty("salaryExtraPays", normalizeSalaryExtraPays(finance.salaryExtraPays)),
     ...withNonEmpty("salaryReceipts", normalizeSalaryReceipts(finance.salaryReceipts)),
   };
@@ -189,21 +201,69 @@ export function withNonEmpty<K extends string, T>(
 function normalizeBalanceCheckins(value: unknown): Record<string, BalanceCheckin> {
   return Object.fromEntries(
     Object.entries(recordOrEmpty<unknown>(value)).flatMap(([date, entry]) => {
+      const checkin = isValidDateOnly(date) ? normalizeBalanceCheckin(entry) : null;
+      return checkin ? [[date, checkin]] : [];
+    }),
+  );
+}
+
+// Saldos de las demás cuentas, por `${accountId}:${YYYY-MM-DD}`. Los de la
+// `primary` solo valen en `balanceCheckins`: aquí se descartan.
+function normalizeAccountCheckins(value: unknown): Record<string, BalanceCheckin> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([key, entry]) => {
+      const parsed = parseAccountCheckinKey(key);
+      const checkin =
+        parsed && parsed.accountId !== PRIMARY_ACCOUNT_ID ? normalizeBalanceCheckin(entry) : null;
+      return checkin ? [[key, checkin]] : [];
+    }),
+  );
+}
+
+function normalizeBalanceCheckin(entry: unknown): BalanceCheckin | null {
+  if (
+    !isRecord(entry) ||
+    typeof entry.amount !== "number" ||
+    !Number.isFinite(entry.amount) ||
+    !isTimestamp(entry.updatedAt)
+  ) {
+    return null;
+  }
+  const checkin: BalanceCheckin = {
+    amount: Math.round(entry.amount * 100) / 100,
+    updatedAt: entry.updatedAt,
+  };
+  if (isTimestamp(entry.deletedAt)) checkin.deletedAt = entry.deletedAt;
+  return checkin;
+}
+
+// Cuentas por id. Sin papel conocido o sin hora de cambio no se pueden
+// mostrar ni fusionar: se descartan. Un nombre ilegible pasa a vacío (el
+// nombre de su papel) y un orden ilegible, a 0.
+function normalizeBalanceAccounts(value: unknown): Record<string, BalanceAccount> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([id, entry]) => {
       if (
-        !isValidDateOnly(date) ||
+        !isBalanceAccountId(id) ||
         !isRecord(entry) ||
-        typeof entry.amount !== "number" ||
-        !Number.isFinite(entry.amount) ||
+        !isBalanceAccountRole(entry.role) ||
         !isTimestamp(entry.updatedAt)
       ) {
         return [];
       }
-      const checkin: BalanceCheckin = {
-        amount: Math.round(entry.amount * 100) / 100,
+      const account: BalanceAccount = {
+        name:
+          typeof entry.name === "string"
+            ? entry.name.trim().slice(0, ACCOUNT_NAME_MAX_LENGTH)
+            : "",
+        role: entry.role,
+        order:
+          typeof entry.order === "number" && Number.isFinite(entry.order) ? entry.order : 0,
+        createdAt: isTimestamp(entry.createdAt) ? entry.createdAt : entry.updatedAt,
         updatedAt: entry.updatedAt,
       };
-      if (isTimestamp(entry.deletedAt)) checkin.deletedAt = entry.deletedAt;
-      return [[date, checkin]];
+      if (isTimestamp(entry.deletedAt)) account.deletedAt = entry.deletedAt;
+      return [[id, account]];
     }),
   );
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mergeExpenseStores } from "@/data/persistence/local-store";
 import { normalizeExpenseStore } from "@/data/persistence/store-normalization";
+import { listBalanceAccounts } from "@/domain/balance-accounts";
 import { getSalaryExtraPay } from "@/domain/finance";
 import { overrideIdFor } from "@/domain/overrides";
 import { DEFAULT_REMINDER_PREFERENCES } from "@/domain/reminder-schedule";
@@ -11,6 +12,12 @@ import type {
   ExpenseTemplate,
   IncomeEvent,
 } from "@/domain/types";
+import {
+  addBalanceAccountInStore,
+  deleteBalanceAccountInStore,
+  recordAccountBalanceInStore,
+  updateBalanceAccountInStore,
+} from "./account-commands";
 import { importStoreInStore, replaceStoreContents } from "./backup-commands";
 import { clearExpensesFromStore, deleteExpenseFromStore } from "./expense-commands";
 import { clearIncomeFromStore } from "./finance-commands";
@@ -408,6 +415,139 @@ describe("replaceStoreContents — budget cycle and balance log", () => {
       // El saldo que solo estaba en los datos actuales queda borrado.
       expect(store.finance.balanceCheckins?.["2026-10-15"]?.deletedAt).toBe(stamp);
     }
+  });
+});
+
+describe("replaceStoreContents — accounts", () => {
+  const at = (iso: string) => new Date(iso);
+  const withAccount = (
+    store: ExpenseStore,
+    id: string,
+    role: "bills" | "savings" | "spending",
+    iso: string,
+  ) => addBalanceAccountInStore(store, { name: id, role }, at(iso), id);
+  const listed = (store: ExpenseStore) =>
+    listBalanceAccounts(store.finance).map((account) => account.id);
+
+  // Aquí: Sabadell (la primary renombrada), un ahorro y una cuenta "local"
+  // que el archivo no trae.
+  const here = [
+    (store: ExpenseStore) =>
+      updateBalanceAccountInStore(store, "primary", { name: "Sabadell" }, at("2026-10-05T09:00:00.000Z")),
+    (store: ExpenseStore) => withAccount(store, "savings", "savings", "2026-10-05T09:00:00.000Z"),
+    (store: ExpenseStore) => withAccount(store, "local", "spending", "2026-10-05T09:00:00.000Z"),
+    (store: ExpenseStore) =>
+      recordAccountBalanceInStore(store, { accountId: "savings", date: "2026-10-10", amount: 5000 }, at("2026-10-10T09:00:00.000Z")),
+    (store: ExpenseStore) =>
+      recordAccountBalanceInStore(store, { accountId: "local", date: "2026-10-10", amount: 80 }, at("2026-10-10T09:00:00.000Z")),
+    (store: ExpenseStore) =>
+      recordAccountBalanceInStore(store, { accountId: "primary", date: "2026-10-10", amount: 1200 }, at("2026-10-10T09:00:00.000Z")),
+  ].reduce((store, step) => step(store), current);
+
+  // El archivo: el ahorro con otro saldo y la primary sin renombrar.
+  const file = [
+    (store: ExpenseStore) => withAccount(store, "savings", "savings", "2026-09-05T09:00:00.000Z"),
+    (store: ExpenseStore) =>
+      recordAccountBalanceInStore(store, { accountId: "savings", date: "2026-09-30", amount: 4700 }, at("2026-09-30T09:00:00.000Z")),
+    (store: ExpenseStore) =>
+      recordAccountBalanceInStore(store, { accountId: "primary", date: "2026-09-30", amount: 900 }, at("2026-09-30T09:00:00.000Z")),
+  ].reduce((store, step) => step(store), imported);
+
+  it("leaves the file's accounts and balances, also after a later merge", () => {
+    const replaced = replaceStoreContents(here, file, { scope: "all", now });
+
+    for (const store of [replaced, mergeExpenseStores(replaced, here), mergeExpenseStores(here, replaced)]) {
+      expect(listed(store)).toEqual(["primary", "savings"]);
+      // El archivo es de antes de renombrarla: vuelve a su nombre por defecto.
+      expect(store.finance.balanceAccounts?.primary).toMatchObject({ name: "", role: "bills", updatedAt: stamp });
+      expect(store.finance.balanceAccounts?.local?.deletedAt).toBe(stamp);
+      expect(store.finance.accountCheckins).toEqual({
+        "savings:2026-09-30": { amount: 4700, updatedAt: stamp },
+        "savings:2026-10-10": { amount: 5000, updatedAt: stamp, deletedAt: stamp },
+        "local:2026-10-10": { amount: 80, updatedAt: stamp, deletedAt: stamp },
+      });
+      expect(store.finance.balanceCheckins?.["2026-09-30"]).toEqual({ amount: 900, updatedAt: stamp });
+      expect(store.finance.balanceCheckins?.["2026-10-10"]?.deletedAt).toBe(stamp);
+    }
+  });
+
+  it("deletes the default account when the file has neither its metadata nor its balances", () => {
+    const replaced = replaceStoreContents(here, imported, { scope: "all", now });
+
+    expect(listed(replaced)).toEqual([]);
+    expect(replaced.finance.balanceAccounts?.primary?.deletedAt).toBe(stamp);
+  });
+
+  it("brings back an account deleted here under a new id that survives a merge with the deleted copy", () => {
+    const later = new Date("2026-10-24T10:00:00.000Z");
+    const deletedHere = deleteBalanceAccountInStore(here, "savings", at("2026-10-20T09:00:00.000Z"));
+    const restored = replaceStoreContents(deletedHere, here, { scope: "all", now: later });
+
+    for (const store of [
+      restored,
+      mergeExpenseStores(restored, deletedHere),
+      mergeExpenseStores(deletedHere, restored),
+    ]) {
+      const savings = listBalanceAccounts(store.finance).filter((account) => account.role === "savings");
+      expect(savings).toHaveLength(1);
+      expect(savings[0].id).not.toBe("savings");
+      expect(savings[0].id).toMatch(/^savings-r/);
+      expect(store.finance.balanceAccounts?.savings?.deletedAt).toBeTruthy();
+      expect(store.finance.accountCheckins?.[`${savings[0].id}:2026-10-10`]).toMatchObject({
+        amount: 5000,
+      });
+      expect(store.finance.accountCheckins?.[`${savings[0].id}:2026-10-10`]?.deletedAt).toBeUndefined();
+    }
+    // Restaurar otra vez no acumula sufijos.
+    const again = replaceStoreContents(
+      deleteBalanceAccountInStore(restored, listed(restored).find((id) => id.startsWith("savings"))!),
+      restored,
+      { scope: "all", now: new Date("2026-10-25T10:00:00.000Z") },
+    );
+    expect(listed(again).filter((id) => id.startsWith("savings"))).toEqual([
+      `savings-r${new Date("2026-10-25T10:00:00.000Z").getTime().toString(36)}`,
+    ]);
+  });
+
+  it("moves a deleted default account's balances to a new account when restoring it", () => {
+    const later = new Date("2026-10-24T10:00:00.000Z");
+    const deletedHere = deleteBalanceAccountInStore(here, "primary", at("2026-10-20T09:00:00.000Z"));
+    const restored = replaceStoreContents(deletedHere, here, { scope: "all", now: later });
+
+    for (const store of [
+      restored,
+      mergeExpenseStores(restored, deletedHere),
+      mergeExpenseStores(deletedHere, restored),
+    ]) {
+      const [bills] = listBalanceAccounts(store.finance);
+      expect(bills).toMatchObject({ name: "Sabadell", role: "bills" });
+      expect(bills.id).toMatch(/^primary-r/);
+      expect(store.finance.accountCheckins?.[`${bills.id}:2026-10-10`]).toMatchObject({ amount: 1200 });
+      // La primary sigue borrada, y sus saldos también para los builds anteriores.
+      expect(store.finance.balanceAccounts?.primary?.deletedAt).toBeTruthy();
+      expect(
+        Object.values(store.finance.balanceCheckins ?? {}).every((checkin) => checkin.deletedAt),
+      ).toBe(true);
+    }
+  });
+
+  it("merges accounts from the file like a sync when combining", () => {
+    const merged = importStoreInStore(here, file, { mode: "merge", scope: "all", now });
+
+    expect(listed(merged)).toEqual(["primary", "savings", "local"]);
+    expect(merged.finance.balanceAccounts?.primary?.name).toBe("Sabadell");
+    expect(Object.keys(merged.finance.accountCheckins ?? {}).sort()).toEqual([
+      "local:2026-10-10",
+      "savings:2026-09-30",
+      "savings:2026-10-10",
+    ]);
+  });
+
+  it("leaves accounts alone when the file only has expenses", () => {
+    const replaced = replaceStoreContents(here, file, { scope: "expenses", now });
+
+    expect(replaced.finance.balanceAccounts).toEqual(here.finance.balanceAccounts);
+    expect(replaced.finance.accountCheckins).toEqual(here.finance.accountCheckins);
   });
 });
 

@@ -18,6 +18,10 @@ El hook expone:
   y move series.
 - Comandos financieros: salario, objetivo de ahorro, aportacion real, ingresos,
   overrides mensuales y cerrar o reabrir un mes.
+- Cuentas: crear, editar (nombre y papel), subir o bajar, borrar
+  (`addBalanceAccount`, `updateBalanceAccount`, `moveBalanceAccount`,
+  `deleteBalanceAccount`) y anotar o borrar el saldo de una cuenta un dia
+  (`recordAccountBalance`, `deleteAccountBalance`).
 - Comandos de preferencias: tema, idioma y ajustes de avisos
   (`updateReminderPreferences`), y el aviso propio de un gasto
   (`setTemplateReminder`, la campana de la fila).
@@ -38,8 +42,12 @@ Los comandos se dividen por responsabilidad:
   `upsertOccurrenceOverride` y se guardan con un solo persist.
 - `finance-commands`: modifica salario mensual (con ambito "solo este mes" o
   "desde este mes"), pagas extra, la respuesta a "¿Has cobrado?", objetivos,
-  aportaciones reales, ingresos, el ciclo del presupuesto y el registro de
-  saldo.
+  aportaciones reales, ingresos, el ciclo del presupuesto y los saldos de la
+  cuenta `primary` (`recordBalanceInStore`, `deleteBalanceCheckinInStore`).
+- `account-commands`: cuentas (crear, renombrar, cambiar de papel, reordenar y
+  borrar con tombstone, junto con sus saldos) y el saldo de cada cuenta por dia.
+  Los de la `primary` pasan por `finance-commands` y se guardan en
+  `balanceCheckins`.
 - `series-commands`: cambiar el importe de la serie desde ahora, programar o
   quitar un precio, finalizar, pausar, reanudar y quitar una pausa. Ninguno
   reescribe un cobro pagado ni un mes cerrado. Pagar con otro importe
@@ -192,10 +200,17 @@ La mezcla actual usa ids:
 - `finance.budgetCycle` (mes natural o desde el dia de cobro): gana el de
   `updatedAt` mas reciente; si solo uno de los dos stores lo tiene, se
   conserva.
-- `finance.balanceCheckins` (saldo por fecha): por dia, la version con el
-  `updatedAt` mas reciente. Borrar guarda `deletedAt` en vez de quitar la
-  entrada, asi que un borrado gana a una copia vieja y volver a anotar ese dia
-  gana al borrado.
+- `finance.balanceCheckins` (saldo por fecha de la cuenta `primary`): por dia,
+  la version con el `updatedAt` mas reciente. Borrar guarda `deletedAt` en vez
+  de quitar la entrada, asi que un borrado gana a una copia vieja y volver a
+  anotar ese dia gana al borrado.
+- `finance.accountCheckins` (saldo de las demas cuentas, por
+  `${accountId}:${YYYY-MM-DD}`): igual que `balanceCheckins`, por cuenta y dia.
+- `finance.balanceAccounts` (cuentas por id): la version con el `updatedAt` mas
+  reciente, salvo que una de las dos este borrada (`deletedAt`): el borrado gana
+  siempre (`mergeAccountRecord`), como los tombstones de `deleted`. Renombrar en
+  otro dispositivo una cuenta ya borrada no la devuelve. Borrar una cuenta
+  tambien marca `deletedAt` en cada uno de sus saldos.
 - Pagas extra (`finance.salaryExtraPays`) y respuestas a "¿Has cobrado?"
   (`finance.salaryReceipts`): por mes, la version con el `updatedAt` mas
   reciente. Deshacer un cobro marca `undone` con una version nueva en vez de
@@ -268,9 +283,29 @@ Reglas para campos nuevos:
   `updatedAt` mas reciente, igual que este build. Solo un build anterior a PR 0
   lo descartaria: antes de anotar saldos hay que abrir la app actualizada en
   todos los dispositivos.
+- Cuentas (`finance.balanceAccounts` y `finance.accountCheckins`): se escriben
+  ya, solo cuando tienen algo (`withNonEmpty`). Los builds con passthrough las
+  conservan como claves desconocidas de `finance` y las fusionan entrada a
+  entrada por `updatedAt`. Por eso los saldos van en un registro plano por
+  `${accountId}:${fecha}` y no anidados por cuenta: anidados, esos builds
+  fusionarian cada cuenta entera (el registro interior no tiene `updatedAt`)
+  quedandose con la copia local y perderian saldos anotados en otro
+  dispositivo. Los builds anteriores a las cuentas siguen leyendo y anotando
+  "Saldo de la cuenta" en `balanceCheckins`, que es la cuenta `primary`: lo que
+  anoten aparece en la cuenta de recibos migrada. Solo un build anterior a PR 0
+  (sin passthrough) descartaria las claves nuevas. La clave
+  no se llama `accounts` porque esa es una clave retirada (las cuentas
+  bancarias legacy) que todos los builds descartan. Limite conocido: un build
+  con passthrough fusiona `balanceAccounts` sin la regla de "el borrado gana",
+  y una `primary` borrada no vuelve a mostrar los saldos que un build anterior
+  anote despues en `balanceCheckins`.
 - Los stores anteriores a estos campos cargan igual: sin `budgetCycle` el mes
-  es natural y sin `balanceCheckins` el registro de saldo esta vacio. Un valor
-  ilegible se descarta en la normalizacion sin tocar el resto.
+  es natural, sin `balanceCheckins` no hay cuenta migrada y sin
+  `balanceAccounts` ni `accountCheckins` no hay mas cuentas. Un valor ilegible
+  se descarta en la normalizacion sin tocar el resto: una cuenta sin papel
+  conocido o sin `updatedAt`, un id con caracteres fuera de `[A-Za-z0-9_-]`, un
+  saldo sin importe finito o con una clave sin fecha valida, o un saldo de la
+  `primary` dentro de `accountCheckins`.
 - Excepcion: los campos de F3 de dinero tambien se escriben ya, porque cada uno
   degrada a un comportamiento anterior y no a perder datos:
   - `templates[].amountChanges` y `templates[].pauses`: los builds con
@@ -408,12 +443,19 @@ Ajustes tiene la seccion "Copias y datos" (`features/settings/components/rows/Ba
      sueldos con tombstone por mes, pagas extra reescritas con las que el
      archivo tiene vigentes ese mes, saldos con `deletedAt` y el ciclo del
      presupuesto de vuelta al mes natural), porque un tombstone de un id
-     determinista impediria volver a usarlo. Lo que el archivo trae con un id
+     determinista impediria volver a usarlo. Las cuentas que solo estaban en los
+     datos actuales se borran con `deletedAt`, y sus saldos tambien; si el
+     archivo trae saldos de la `primary` sin sus metadatos (es de un build
+     anterior a las cuentas), la `primary` vuelve a sus valores por defecto en
+     lugar de borrarse. Lo que el archivo trae con un id
      que ya tiene tombstone (borrado aqui o en el archivo) entra con un id
      nuevo, junto con lo que depende de el (la categoria de sus gastos, sus
      cobros `ovr:*` y su historico `record:*`), y el tombstone se queda: una
      copia que aun lo tenga suelta la version antigua sin borrar la restaurada
-     ni duplicarla (`rekeyTombstonedIds`). Tema e idioma se quedan; los avisos,
+     ni duplicarla (`rekeyTombstonedIds`). Igual con una cuenta del archivo
+     borrada aqui (`rekeyTombstonedAccounts`): entra con un id nuevo y sus
+     saldos con ella; si es la `primary`, sus saldos pasan de
+     `balanceCheckins` a `accountCheckins`. Tema e idioma se quedan; los avisos,
      que son de la cuenta y los lee el cron, vienen del archivo marcados como
      editados ahora (si el archivo no los trae, se quedan los actuales). Limite
      conocido: los objetivos de ahorro no tienen tombstone, asi que un mes que
@@ -463,5 +505,7 @@ en silencio al registrar el service worker.
   materializar conciliaciones pagadas.
 - Un override pagado persistido tiene prioridad sobre el pago sintetizado desde
   un movimiento bancario legacy de la misma ocurrencia.
-- La v3 no mantiene importador bancario, movimientos, alias ni cuentas; no deben
+- La v3 no mantiene importador bancario, movimientos ni alias; no deben
   reintroducirse en el store o los comandos sin una decision de producto nueva.
+  Las cuentas de ahora (`balanceAccounts`) son otra cosa: solo nombre, papel y
+  saldos anotados a mano, sin movimientos.

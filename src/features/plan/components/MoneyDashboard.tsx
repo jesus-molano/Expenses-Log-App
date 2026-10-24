@@ -36,12 +36,14 @@ import {
 } from "@/features/expenses/lib/month-view";
 import type { MonthlyExpenseOverrideInput } from "@/stores/app/store-types";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
-import { t } from "@/shared/i18n";
+import { formatMessage, t } from "@/shared/i18n";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { useMonthlySalaryEditor } from "../hooks/use-monthly-salary-editor";
 import { useCompactChart } from "../hooks/use-compact-chart";
 import { useOneOffIncomeForm } from "../hooks/use-one-off-income-form";
-import { useBalanceLog } from "../hooks/use-balance-log";
+import { useAccountEditor } from "../hooks/use-account-editor";
+import { useAccountSummaries } from "../hooks/use-account-summaries";
+import { useBalanceCheckinForm } from "../hooks/use-balance-checkin-form";
 import { useMonthSummary, useMonthSummaryPrompt } from "../hooks/use-month-summary";
 import { usePlanInsights } from "../hooks/use-plan-insights";
 import { usePlanSettingsForm } from "../hooks/use-plan-settings-form";
@@ -57,9 +59,12 @@ import {
   occurrencesForMonth,
   phaseLabel,
 } from "../lib/plan-dashboard";
+import { accountDisplayName } from "../lib/account-labels";
+import { AccountEditorSheet } from "./AccountEditorSheet";
+import { AccountsSection } from "./AccountsSection";
 import { AnnualPlanSection } from "./AnnualPlanSection";
 import { BalanceCheckinSheet } from "./BalanceCheckinSheet";
-import { BalanceLogSection } from "./BalanceLogSection";
+import { DeleteAccountDialog } from "./DeleteAccountDialog";
 import { CurrentMonthPlanSection } from "./CurrentMonthPlanSection";
 import { MonthlyReviewSection } from "./MonthlyReviewSection";
 import { MonthlySalaryDialog } from "./MonthlySalaryDialog";
@@ -93,8 +98,12 @@ export function MoneyDashboard() {
     undoSalaryReceipt,
     closeMonth,
     reopenMonth,
-    recordBalance,
-    deleteBalanceCheckin,
+    addBalanceAccount,
+    updateBalanceAccount,
+    moveBalanceAccount,
+    deleteBalanceAccount,
+    recordAccountBalance,
+    deleteAccountBalance,
   } = expenseStore;
   const chrome = useScrollChrome();
   const isCompactChart = useCompactChart();
@@ -179,16 +188,33 @@ export function MoneyDashboard() {
     calendarMonthId: month.calendarMonthId,
     activeMonthId,
   });
-  const balanceLog = useBalanceLog({
-    finance: store.finance,
+  // Cuentas: se comparan con el mes activo aunque se esté mirando otro.
+  const accounts = useAccountSummaries({ store, activeMonthId, cycle, language });
+  const checkinForm = useBalanceCheckinForm({
+    summaries: accounts.summaries,
     today: todayDateOnly,
     language,
-    onRecord: recordBalance,
+    onRecord: recordAccountBalance,
   });
   const actionToast = useActionToast();
+  const accountEditor = useAccountEditor({
+    summaries: accounts.summaries,
+    onAdd: addBalanceAccount,
+    onUpdate: updateBalanceAccount,
+    onDelete: (summary) => {
+      deleteBalanceAccount(summary.account.id);
+      actionToast.show({
+        message: formatMessage(
+          "insights.accounts.deleted",
+          { name: accountDisplayName(summary.account, language) },
+          language,
+        ),
+      });
+    },
+  });
 
-  function deleteBalanceWithUndo(entry: { date: string; amount: number }) {
-    deleteBalanceCheckin(entry.date);
+  function deleteBalanceWithUndo(accountId: string, entry: { date: string; amount: number }) {
+    deleteAccountBalance({ accountId, date: entry.date });
     actionToast.show({
       message: t("insights.balance.deleted", language).replace(
         "{date}",
@@ -196,7 +222,7 @@ export function MoneyDashboard() {
       ),
       actionLabel: t("common.undo", language),
       onAction: () => {
-        recordBalance(entry);
+        recordAccountBalance({ accountId, ...entry });
         actionToast.dismiss();
       },
     });
@@ -528,12 +554,17 @@ export function MoneyDashboard() {
           provision={insights.provision}
         />
 
-        <BalanceLogSection
+        <AccountsSection
           language={language}
-          entries={balanceLog.entries}
-          trend={balanceLog.trend}
-          onRecord={balanceLog.openForm}
-          onDelete={deleteBalanceWithUndo}
+          monthId={activeMonthId}
+          summaries={accounts.summaries}
+          coverage={accounts.coverage}
+          savingsTarget={accounts.savingsTarget}
+          onAdd={accountEditor.openAdd}
+          onRecord={checkinForm.openForm}
+          onEdit={accountEditor.openEdit}
+          onMove={moveBalanceAccount}
+          onDeleteEntry={deleteBalanceWithUndo}
         />
 
         <AnnualPlanSection
@@ -685,19 +716,51 @@ export function MoneyDashboard() {
         />
       ) : null}
 
-      {balanceLog.formOpen ? (
+      {checkinForm.formOpen ? (
         <BalanceCheckinSheet
           language={language}
-          date={balanceLog.date}
-          amountText={balanceLog.amountText}
+          accountOptions={accounts.summaries.map((summary) => ({
+            value: summary.account.id,
+            label: accountDisplayName(summary.account, language),
+          }))}
+          accountId={checkinForm.accountId}
+          date={checkinForm.date}
+          amountText={checkinForm.amountText}
           maxDate={todayDateOnly}
-          replacesEntry={balanceLog.replacesEntry}
-          onDateChange={balanceLog.setDate}
-          onAmountChange={balanceLog.setAmountText}
-          onClose={balanceLog.closeForm}
-          onSubmit={balanceLog.submit}
+          replacesEntry={checkinForm.replacesEntry}
+          onAccountChange={checkinForm.selectAccount}
+          onDateChange={checkinForm.setDate}
+          onAmountChange={checkinForm.setAmountText}
+          onClose={checkinForm.closeForm}
+          onSubmit={checkinForm.submit}
         />
       ) : null}
+
+      {accountEditor.open ? (
+        <AccountEditorSheet
+          language={language}
+          isNew={accountEditor.isNew}
+          accountName={
+            accountEditor.editing
+              ? accountDisplayName(accountEditor.editing.account, language)
+              : undefined
+          }
+          name={accountEditor.name}
+          role={accountEditor.role}
+          onNameChange={accountEditor.setName}
+          onRoleChange={accountEditor.setRole}
+          onClose={accountEditor.close}
+          onSubmit={accountEditor.submit}
+          onDelete={accountEditor.requestDelete}
+        />
+      ) : null}
+
+      <DeleteAccountDialog
+        summary={accountEditor.confirmingDelete ? accountEditor.editing : null}
+        language={language}
+        onCancel={accountEditor.cancelDelete}
+        onConfirm={accountEditor.confirmDelete}
+      />
 
       <SkipOccurrenceDialog
         occurrence={skipDialog.occurrenceToSkip}

@@ -191,32 +191,130 @@ test("summarises the month before moving on and from Plan", async ({ page }) => 
   await expect(page.getByRole("dialog", { name: "Resumen de octubre" })).toBeVisible();
 });
 
-test("records the account balance, replaces it and undoes a delete", async ({ page }) => {
+test("records an account balance, replaces it and undoes a delete", async ({ page }) => {
   await seed(page, emptyStore, "2026-10-23T10:00:00");
   await page.goto("/money");
 
-  const section = page.getByRole("region", { name: "Saldo de la cuenta" });
+  const section = page.getByRole("region", { name: "Cuentas" });
   await section.scrollIntoViewIfNeeded();
-  await expect(section.getByText("Aún no has anotado ningún saldo.")).toBeVisible();
+  await expect(section.getByText("Aún no has añadido cuentas.")).toBeVisible();
 
-  await section.getByRole("button", { name: "Anotar saldo" }).click();
+  // La primera cuenta es la de los recibos por defecto.
+  await section.getByRole("button", { name: "Añadir cuenta" }).click();
+  const editor = page.getByRole("dialog", { name: "Nueva cuenta" });
+  await expect(editor.getByRole("radio", { name: /Recibos/ })).toHaveAttribute("aria-checked", "true");
+  await editor.getByLabel(/Nombre/).fill("Sabadell");
+  await editor.getByRole("button", { name: "Añadir cuenta" }).click();
+  await expect(editor).toHaveCount(0);
+  const account = section.getByRole("article", { name: "Sabadell" });
+  await expect(account.getByText("Aún no has anotado ningún saldo.")).toBeVisible();
+
+  await account.getByRole("button", { name: /Anotar saldo/ }).click();
   const form = page.getByRole("dialog", { name: "Anotar saldo" });
+  await expect(form.getByRole("button", { name: "Cuenta: Sabadell" })).toBeVisible();
   await form.getByLabel("Saldo").fill("1250,40");
   await form.getByRole("button", { name: "Guardar saldo" }).click();
   await expect(form).toHaveCount(0);
-  await expect(section.getByText(/1\.?250,40\s€/).first()).toBeVisible();
+  await expect(account.getByText(/1\.?250,40\s€/).first()).toBeVisible();
 
-  await section.getByRole("button", { name: "Anotar saldo" }).click();
+  await account.getByRole("button", { name: /Anotar saldo/ }).click();
   await expect(form.getByText("Ya hay un saldo anotado ese día: se sustituirá.")).toBeVisible();
   await form.getByLabel("Saldo").fill("-35");
   await form.getByRole("button", { name: "Guardar saldo" }).click();
-  await expect(section.getByText(/-35,00\s€/).first()).toBeVisible();
+  await expect(account.getByText(/-35,00\s€/).first()).toBeVisible();
 
-  await section.getByRole("button", { name: "Borrar el saldo del 23 oct" }).click();
-  await expect(section.getByText("Aún no has anotado ningún saldo.")).toBeVisible();
+  await account.getByRole("button", { name: "Ver historial" }).click();
+  await account.getByRole("button", { name: "Borrar el saldo del 23 oct" }).click();
+  await expect(account.getByText("Aún no has anotado ningún saldo.")).toBeVisible();
   const toast = page.getByRole("status").filter({ hasText: "Saldo del 23 oct borrado" });
   await toast.getByRole("button", { name: "Deshacer" }).click();
-  await expect(section.getByText(/-35,00\s€/).first()).toBeVisible();
+  await expect(account.getByText(/-35,00\s€/).first()).toBeVisible();
+});
+
+test("keeps separate accounts and tells whether the bills account covers what is left", async ({
+  page,
+}) => {
+  await seed(
+    page,
+    {
+      ...emptyStore,
+      templates: [
+        template("rent", "Alquiler", 700, "2026-10-01", 28),
+        template("gym", "Gimnasio", 30, "2026-10-01", 26),
+      ],
+      finance: {
+        ...emptyStore.finance,
+        monthlySavingsTargets: {
+          "2026-10": { amount: 300, updatedAt: "2026-10-01T00:00:00.000Z" },
+        },
+        // El registro de saldo de antes de las cuentas.
+        balanceCheckins: {
+          "2026-09-30": { amount: 900, updatedAt: "2026-09-30T10:00:00.000Z" },
+        },
+      },
+    },
+    "2026-10-23T10:00:00",
+  );
+  await page.goto("/money");
+
+  const section = page.getByRole("region", { name: "Cuentas" });
+  await section.scrollIntoViewIfNeeded();
+  // El saldo migrado es la cuenta de recibos: 900 € frente a los 730 € que
+  // quedan por pagar en octubre, con un saldo de septiembre.
+  const coverage = section.getByRole("group", { name: "Recibos de octubre" });
+  await expect(coverage).toContainText(/te sobran 170,00\s€/);
+  await expect(coverage).toContainText(/Es el saldo del 30 sep/);
+
+  await section.getByRole("button", { name: "Editar Cuenta de recibos" }).click();
+  const editor = page.getByRole("dialog", { name: "Editar cuenta" });
+  await editor.getByLabel(/Nombre/).fill("Sabadell");
+  await editor.getByRole("button", { name: "Guardar cuenta" }).click();
+  await expect(editor).toHaveCount(0);
+  const sabadell = section.getByRole("article", { name: "Sabadell" });
+  await expect(sabadell).toBeVisible();
+
+  await section.getByRole("button", { name: "Añadir cuenta" }).click();
+  const creator = page.getByRole("dialog", { name: "Nueva cuenta" });
+  await creator.getByLabel(/Nombre/).fill("BBVA ahorro");
+  await creator.getByRole("radio", { name: /Ahorro/ }).click();
+  await creator.getByRole("button", { name: "Añadir cuenta" }).click();
+  await expect(creator).toHaveCount(0);
+  const savings = section.getByRole("article", { name: "BBVA ahorro" });
+  await expect(savings).toContainText(/Objetivo de ahorro de octubre: 300,00\s€/);
+
+  await savings.getByRole("button", { name: /Anotar saldo/ }).click();
+  const form = page.getByRole("dialog", { name: "Anotar saldo" });
+  await form.getByLabel("Saldo").fill("5000");
+  await form.getByRole("button", { name: "Guardar saldo" }).click();
+  await expect(form).toHaveCount(0);
+  await expect(savings).toContainText(/5\.?000,00\s€/);
+
+  // La misma hoja anota en otra cuenta eligiéndola.
+  await savings.getByRole("button", { name: /Anotar saldo/ }).click();
+  await form.getByRole("button", { name: "Cuenta: BBVA ahorro" }).click();
+  await page.getByRole("option", { name: "Sabadell" }).click();
+  await expect(form.getByRole("button", { name: "Cuenta: Sabadell" })).toBeVisible();
+  await form.getByLabel("Saldo").fill("600");
+  await form.getByRole("button", { name: "Guardar saldo" }).click();
+  await expect(form).toHaveCount(0);
+  await expect(coverage).toContainText(/te faltan 130,00\s€/);
+  await expect(coverage).not.toContainText("puede que ya no esté al día");
+
+  await sabadell.getByRole("button", { name: /Anotar saldo/ }).click();
+  await form.getByLabel("Saldo").fill("1000");
+  await form.getByRole("button", { name: "Guardar saldo" }).click();
+  await expect(coverage).toContainText(
+    /Saldo 1\.?000,00\s€ · quedan 730,00\s€ por pagar · te sobran 270,00\s€/,
+  );
+  // Cada cuenta sigue con su saldo: el ahorro no cuenta para los recibos.
+  await expect(savings).toContainText(/5\.?000,00\s€/);
+
+  await page.reload();
+  const reloaded = page.getByRole("region", { name: "Cuentas" });
+  await expect(reloaded.getByRole("article", { name: "Sabadell" })).toContainText(/1\.?000,00\s€/);
+  await expect(reloaded.getByRole("article", { name: "BBVA ahorro" })).toContainText(
+    /5\.?000,00\s€/,
+  );
 });
 
 test("moves a bill due on a bank holiday to the next business day", async ({ page }) => {

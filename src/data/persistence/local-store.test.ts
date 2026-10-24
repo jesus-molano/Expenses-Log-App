@@ -13,6 +13,13 @@ import {
   reopenMonthInStore,
   updateBudgetCycleInStore,
 } from "@/stores/app/finance-commands";
+import {
+  addBalanceAccountInStore,
+  deleteAccountBalanceInStore,
+  deleteBalanceAccountInStore,
+  recordAccountBalanceInStore,
+  updateBalanceAccountInStore,
+} from "@/stores/app/account-commands";
 import { updateReminderPreferencesInStore } from "@/stores/app/preference-commands";
 import {
   EXPENSE_STORE_KEY,
@@ -270,6 +277,72 @@ describe("mergeExpenseStores", () => {
       });
     }
     expect("balanceCheckins" in mergeExpenseStores(emptyStore, emptyStore).finance).toBe(false);
+  });
+
+  it("merges the balances of each account day by day, deletions included", () => {
+    const at = (iso: string) => new Date(iso);
+    const base = recordAccountBalanceInStore(
+      addBalanceAccountInStore(emptyStore, { name: "Ahorro", role: "savings" }, at("2026-10-01T09:00:00.000Z"), "savings"),
+      { accountId: "savings", date: "2026-10-01", amount: 5000 },
+      at("2026-10-01T10:00:00.000Z"),
+    );
+    // El móvil borra el día 1 y anota el 20; el portátil anota el 20 antes y
+    // un saldo de la cuenta de recibos.
+    const phone = recordAccountBalanceInStore(
+      deleteAccountBalanceInStore(base, { accountId: "savings", date: "2026-10-01" }, at("2026-10-19T10:00:00.000Z")),
+      { accountId: "savings", date: "2026-10-20", amount: 5300 },
+      at("2026-10-20T12:00:00.000Z"),
+    );
+    const laptop = recordAccountBalanceInStore(
+      recordAccountBalanceInStore(base, { accountId: "savings", date: "2026-10-20", amount: 5250 }, at("2026-10-20T09:00:00.000Z")),
+      { accountId: "primary", date: "2026-10-20", amount: 1200 },
+      at("2026-10-20T09:00:00.000Z"),
+    );
+
+    for (const merged of [mergeExpenseStores(phone, laptop), mergeExpenseStores(laptop, phone)]) {
+      expect(merged.finance.accountCheckins).toEqual({
+        "savings:2026-10-01": {
+          amount: 5000,
+          updatedAt: "2026-10-19T10:00:00.000Z",
+          deletedAt: "2026-10-19T10:00:00.000Z",
+        },
+        "savings:2026-10-20": { amount: 5300, updatedAt: "2026-10-20T12:00:00.000Z" },
+      });
+      expect(merged.finance.balanceCheckins).toEqual({
+        "2026-10-20": { amount: 1200, updatedAt: "2026-10-20T09:00:00.000Z" },
+      });
+    }
+    expect("accountCheckins" in mergeExpenseStores(emptyStore, emptyStore).finance).toBe(false);
+  });
+
+  it("merges accounts by their latest edit, and a deleted account stays deleted", () => {
+    const at = (iso: string) => new Date(iso);
+    const base = addBalanceAccountInStore(
+      emptyStore,
+      { name: "BBVA", role: "spending" },
+      at("2026-10-01T09:00:00.000Z"),
+      "bbva",
+    );
+    const renamedEarly = updateBalanceAccountInStore(base, "primary", { name: "Sabadel" }, at("2026-10-10T09:00:00.000Z"));
+    const renamedLate = addBalanceAccountInStore(
+      updateBalanceAccountInStore(base, "primary", { name: "Sabadell" }, at("2026-10-11T09:00:00.000Z")),
+      { name: "Ahorro", role: "savings" },
+      at("2026-10-11T09:00:00.000Z"),
+      "savings",
+    );
+    // El móvil borra BBVA; el portátil, sin saberlo, la renombra después.
+    const phone = deleteBalanceAccountInStore(renamedEarly, "bbva", at("2026-10-12T09:00:00.000Z"));
+    const laptop = updateBalanceAccountInStore(renamedLate, "bbva", { name: "BBVA nómina" }, at("2026-10-13T09:00:00.000Z"));
+
+    for (const merged of [mergeExpenseStores(phone, laptop), mergeExpenseStores(laptop, phone)]) {
+      expect(merged.finance.balanceAccounts?.primary?.name).toBe("Sabadell");
+      expect(merged.finance.balanceAccounts?.bbva).toMatchObject({
+        name: "BBVA",
+        deletedAt: "2026-10-12T09:00:00.000Z",
+      });
+      expect(merged.finance.balanceAccounts?.savings?.role).toBe("savings");
+    }
+    expect("balanceAccounts" in mergeExpenseStores(emptyStore, emptyStore).finance).toBe(false);
   });
 
   it("keeps the latest reminder settings from either device", () => {

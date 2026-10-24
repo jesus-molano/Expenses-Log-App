@@ -139,8 +139,13 @@ en un mensual que se queda en su mes, como al arrastrar.
 - `monthClosures`: meses dados por terminados para pasar al siguiente.
 - `budgetCycle`: `{anchor, updatedAt}`, mes natural (`calendar`, por defecto)
   o desde el dia de cobro (`payday`). Se elige en Ajustes.
-- `balanceCheckins`: saldo de la cuenta anotado por fecha
-  (`{amount, updatedAt, deletedAt?}`).
+- `balanceCheckins`: saldos de la cuenta `primary` por fecha
+  (`{amount, updatedAt, deletedAt?}`). Es el registro de saldo de antes de las
+  cuentas, que los builds anteriores siguen leyendo y escribiendo.
+- `balanceAccounts`: cuentas por id (`{name, role, order, createdAt, updatedAt,
+  deletedAt?}`). La `primary` solo aparece aqui cuando se edita.
+- `accountCheckins`: saldos de las demas cuentas, uno por cuenta y dia, con la
+  clave `${accountId}:${YYYY-MM-DD}` y el mismo valor que `balanceCheckins`.
 
 La pantalla `/money` calcula un `MonthlyMoneyPlan` con ingresos, gastos
 planificados, ahorro reservado, capacidad, restante y faltantes.
@@ -171,6 +176,46 @@ Semantica de producto:
   del mes, el resumen del mes y el coste por categoria.
 - Un gasto creado con inicio en un mes pasado puede marcar sus cobros
   anteriores como pagados o saltados (`previousMonthsChargeDates`, M18).
+
+## Cuentas
+
+Las cuentas (`src/domain/balance-accounts.ts`) sirven para anotar a mano lo que
+dice el banco en cada una y compararlo con el plan. Cada una tiene nombre,
+papel y orden:
+
+- `bills` ("Recibos"): de ella salen los recibos. Su ultimo saldo se compara con
+  lo que queda por pagar en el mes activo, con la misma regla que "Por pagar"
+  de Gastos (`monthPendingSummary`, via `pendingInBudgetMonth`): "Saldo X ·
+  quedan Y por pagar · te sobran Z" o, si no llega, "te faltan Z" en color de
+  aviso. Con varias cuentas de recibos se suma el ultimo saldo de cada una
+  (`billsCoverage`). Si el saldo mas antiguo de los sumados es de antes del
+  primer dia del mes activo, se dice de que fecha es.
+- `savings` ("Ahorro"): su ultimo saldo junto al objetivo de ahorro del mes
+  activo (`getMonthlySavingsTarget`) y el cambio desde el saldo anterior.
+- `spending` ("Libre"): el dia a dia; su ultimo saldo y el cambio desde el
+  anterior.
+
+Lo que ensena cada papel sale de `accountInsight` y `billsCoverage`
+(`src/features/plan/lib/account-summary.ts`).
+
+Reglas:
+
+- Un saldo por cuenta y dia: anotar otro el mismo dia lo sustituye. Se admiten
+  saldos negativos.
+- La cuenta `primary` es el registro de saldo de antes de las cuentas. Sin
+  metadatos es una cuenta de recibos llamada "Cuenta de recibos" ("Bills
+  account"), la primera de la lista, y solo se muestra si tiene saldos; asi un
+  usuario nuevo empieza sin cuentas. Al renombrarla, cambiarle el papel o
+  moverla se guardan sus metadatos en `balanceAccounts.primary`, pero sus
+  saldos siguen en `balanceCheckins`.
+- Un nombre vacio es el nombre por defecto de su papel ("Cuenta de recibos",
+  "Cuenta de ahorro", "Cuenta del dia a dia").
+- El orden se cambia de uno en uno (subir o bajar). Las cuentas que cambian de
+  puesto se numeran de nuevo, asi que dos cuentas con el mismo orden (creadas a
+  la vez en dos dispositivos) se separan al mover una.
+- Borrar una cuenta pide confirmacion y deja `deletedAt` en la cuenta y en cada
+  uno de sus saldos. Ese borrado gana siempre al fusionar; una cuenta borrada no
+  admite saldos ni vuelve aunque otro dispositivo la edite.
 
 La normalizacion v3 acepta stores antiguos. Antes de descartar datos bancarios
 legacy convierte conciliaciones explícitas en overrides pagados. Si ya existe

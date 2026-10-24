@@ -5,8 +5,17 @@ import {
   occurrenceRecordId,
   salaryClearedTombstone,
 } from "@/domain/finance";
+import {
+  PRIMARY_ACCOUNT_DEFAULTS,
+  PRIMARY_ACCOUNT_ID,
+  accountCheckinKey,
+  listBalanceAccounts,
+  parseAccountCheckinKey,
+  storedBalanceAccount,
+} from "@/domain/balance-accounts";
 import { occurrenceKeyOf, overrideIdFor } from "@/domain/overrides";
 import type {
+  BalanceAccount,
   BalanceCheckin,
   BudgetCycleSetting,
   ExpenseOccurrenceOverride,
@@ -59,9 +68,10 @@ export function importStoreInStore(
 //   gastos que desaparecen) o se deja en estado neutro si es determinista
 //   (cobros, cierres de mes, respuestas a "¿Has cobrado?", sueldos, pagas
 //   extra), porque un tombstone de un id determinista bloquearía para siempre
-//   volver a usarlo.
+//   volver a usarlo. Las cuentas y sus saldos se borran con `deletedAt`.
 // - Lo importado cuyo id ya tiene tombstone (se borró aquí o en el archivo)
-//   entra con un id nuevo (`rekeyTombstonedIds`).
+//   entra con un id nuevo (`rekeyTombstonedIds`); una cuenta borrada aquí,
+//   también (`rekeyTombstonedAccounts`).
 // - Los objetivos de ahorro no tienen tombstone: un mes que solo estaba en los
 //   datos actuales podría volver en esa fusión.
 // Tema e idioma son del dispositivo y no se tocan; los avisos son de la cuenta
@@ -72,13 +82,21 @@ export function replaceStoreContents(
   { scope, now = new Date() }: { scope: ImportScope; now?: Date },
 ): ExpenseStore {
   const stamp = now.toISOString();
+  const suffix = `-r${now.getTime().toString(36)}`;
   const deleted = current.deleted ?? {};
   const importedDeleted = scope === "all" ? (file.deleted ?? {}) : {};
-  const imported = rekeyTombstonedIds(
+  const rekeyed = rekeyTombstonedIds(
     file,
     (key) => new Set([...(deleted[key] ?? []), ...(importedDeleted[key] ?? [])]),
-    { scope, suffix: `-r${now.getTime().toString(36)}` },
+    { scope, suffix },
   );
+  const imported =
+    scope === "all"
+      ? {
+          ...rekeyed,
+          finance: rekeyTombstonedAccounts(current.finance, rekeyed.finance, { suffix, stamp }),
+        }
+      : rekeyed;
   // Las categorías también: una copia antigua sin fecha perdería frente a la
   // versión con fecha de la nube (`latestUpdated`).
   const categories = imported.categories.map((category) => ({ ...category, updatedAt: stamp }));
@@ -253,6 +271,57 @@ function rekeyTombstonedIds(
   };
 }
 
+// El borrado de una cuenta gana siempre al fusionar (`mergeAccountRecord`):
+// una cuenta del archivo cuyo id está borrado aquí entra con un id nuevo, con
+// sus saldos, y el borrado se queda. La `primary` pasa entonces a ser una
+// cuenta más y sus saldos salen de `balanceCheckins` (que ya están borrados
+// aquí) a `accountCheckins`. El nombre vacío sigue siendo el de su papel.
+function rekeyTombstonedAccounts(
+  current: FinanceStore,
+  imported: FinanceStore,
+  { suffix, stamp }: { suffix: string; stamp: string },
+): FinanceStore {
+  const blocked = listBalanceAccounts(imported).filter(
+    (account) => current.balanceAccounts?.[account.id]?.deletedAt,
+  );
+  if (!blocked.length) return imported;
+
+  const accounts = { ...imported.balanceAccounts };
+  const checkins = { ...imported.accountCheckins };
+  let balanceCheckins = imported.balanceCheckins;
+  for (const { id } of blocked) {
+    // Sin acumular sufijos al restaurar varias veces.
+    const nextId = `${id.replace(/-r[0-9a-z]+$/, "")}${suffix}`;
+    const account = storedBalanceAccount(imported, id)!;
+    delete accounts[id];
+    accounts[nextId] = { ...account, createdAt: account.createdAt || stamp };
+    if (id === PRIMARY_ACCOUNT_ID) {
+      for (const [date, checkin] of Object.entries(balanceCheckins ?? {})) {
+        checkins[accountCheckinKey(nextId, date)] = checkin;
+      }
+      balanceCheckins = undefined;
+      continue;
+    }
+    for (const [key, checkin] of Object.entries(imported.accountCheckins ?? {})) {
+      const parsed = parseAccountCheckinKey(key);
+      if (parsed?.accountId !== id) continue;
+      delete checkins[key];
+      checkins[accountCheckinKey(nextId, parsed.date)] = checkin;
+    }
+  }
+
+  const finance: FinanceStore = { ...imported };
+  delete finance.balanceCheckins;
+  delete finance.balanceAccounts;
+  delete finance.accountCheckins;
+  return {
+    ...finance,
+    ...withNonEmpty("balanceCheckins", balanceCheckins ?? {}),
+    ...withNonEmpty("balanceAccounts", accounts),
+    ...withNonEmpty("accountCheckins", checkins),
+  };
+}
+
 // Tema e idioma se quedan: son de este dispositivo. Los avisos son de la
 // cuenta (los lee el cron), así que al sustituirlo todo vienen del archivo,
 // con la hora de ahora para ganar a las copias anteriores al fusionar. Un
@@ -336,6 +405,36 @@ function replaceFinance(
     ),
     ...restamp(imported.balanceCheckins),
   };
+  const accountCheckins: Record<string, BalanceCheckin> = {
+    // Igual con los saldos de las demás cuentas.
+    ...Object.fromEntries(
+      Object.entries(current.accountCheckins ?? {})
+        .filter(([key]) => !imported.accountCheckins?.[key])
+        .map(([key, checkin]) => [key, { ...checkin, deletedAt: stamp, updatedAt: stamp }]),
+    ),
+    ...restamp(imported.accountCheckins),
+  };
+  // Una cuenta que solo estaba en los datos actuales se borra. Excepción: si
+  // el archivo trae saldos de la `primary` sin sus metadatos (es de un build
+  // anterior a las cuentas), la `primary` vuelve a sus valores por defecto.
+  const importedHasPrimary = listBalanceAccounts(imported).some(
+    (account) => account.id === PRIMARY_ACCOUNT_ID,
+  );
+  const balanceAccounts: Record<string, BalanceAccount> = {
+    ...Object.fromEntries(
+      Object.entries(current.balanceAccounts ?? {})
+        .filter(([id]) => !imported.balanceAccounts?.[id])
+        .map(([id, account]): [string, BalanceAccount] => [
+          id,
+          account.deletedAt
+            ? account
+            : id === PRIMARY_ACCOUNT_ID && importedHasPrimary
+              ? { ...account, ...PRIMARY_ACCOUNT_DEFAULTS, updatedAt: stamp }
+              : { ...account, deletedAt: stamp, updatedAt: stamp },
+        ]),
+    ),
+    ...restamp(imported.balanceAccounts),
+  };
   // Sin ciclo en el archivo se vuelve al mes natural, también con hora: si no,
   // el ciclo de los datos actuales volvería al fusionar.
   const budgetCycle: BudgetCycleSetting | undefined = imported.budgetCycle
@@ -393,6 +492,8 @@ function replaceFinance(
     monthlySavingsContributions: restamp(imported.monthlySavingsContributions),
     ...withNonEmpty("monthClosures", closures),
     ...withNonEmpty("balanceCheckins", balanceCheckins),
+    ...withNonEmpty("balanceAccounts", balanceAccounts),
+    ...withNonEmpty("accountCheckins", accountCheckins),
     ...(budgetCycle ? { budgetCycle } : {}),
     ...withNonEmpty("salaryExtraPays", extraPays),
     ...withNonEmpty("salaryReceipts", receipts),

@@ -63,4 +63,15 @@ describe("store summary", () => {
       }),
     ).toBe(true);
   });
+
+  it("counts accounts and their balances as data worth a backup", () => {
+    const at = "2026-10-20T10:00:00.000Z";
+    for (const finance of [
+      { balanceCheckins: { "2026-10-20": { amount: 900, updatedAt: at } } },
+      { balanceAccounts: { a: { name: "BBVA", role: "spending" as const, order: 1, createdAt: at, updatedAt: at } } },
+      { accountCheckins: { "a:2026-10-20": { amount: 50, updatedAt: at } } },
+    ]) {
+      expect(hasUserData({ ...emptyStore, finance: { ...emptyStore.finance, ...finance } })).toBe(true);
+    }
+  });
 });
