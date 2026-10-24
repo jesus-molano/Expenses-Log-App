@@ -531,9 +531,15 @@ Estado:
     - Tildes.
     - Contraste de `--app-text-subtle`.
     - Además: los campos de compatibilidad de `MonthlyMoneyPlan`, `SectionCard`/`StatCard`, `createSupabaseBrowserClient`, `getMonthlySavingsTargetEntry`, `MONTHS_ES/EN`, `PlanEmptyLine` (vuelve con las secciones de previsiones de F3, que lo usan) y el `recurrenceLabel` del dominio (solo en español). Quedan los ternarios del dominio (`estimateChargeDate`) y del prompt de la IA, que no son texto de la interfaz.
+16. **Plan dividido en pestañas (hecho).** Cuatro pestañas, cada una con su cifra en la cabecera:
+    - Gastos (`/`): "Por pagar · <mes>".
+    - Mes (`/money`, la ruta de Plan): "Libre · <mes>". Barra de mes y la ecuación del mes; "Cambiar" en los ingresos abre la base del plan. Debajo, la línea de cobertura de la cuenta de recibos (solo en el mes activo), los recibos del mes plegados con los pendientes primero y "Resumen de <mes>".
+    - Cuentas (`/accounts`): "Te sobran · <cuenta>", el saldo total o un título neutro.
+    - Previsión (`/forecast`): "Aparta al mes".
+    - La revisión mensual desaparece: su comparación, los ingresos puntuales, "Editar ingreso fijo", "Editar ahorro" y el aviso del ahorro sin registrar viven en el resumen del mes (`MonthSummaryLayer`), el mismo que abre "Ver resumen" en Gastos. Ajustes tiene la fila "Sueldo y ahorro".
 
 **Diferido conscientemente** (ver [el informe](./research/2026-10-informe.md) §2 "Baja" y §3):
-- Navegación de Plan (selects y gráfico, §3.14).
+- Navegación del plan anual (select de año y gráfico, §3.14).
 - Feed ICS y hogar compartido.
 - CSP y Permissions-Policy.
 - Paginación del cron.

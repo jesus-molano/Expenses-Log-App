@@ -19,7 +19,7 @@ La app usa:
 - `orientation: portrait`.
 - `start_url` y `scope` en `/`.
 - Atajos al mantener pulsado el icono (Android): "Añadir gasto"
-  (`/expenses/new`), "Añadir por voz" (`/expenses/new?mode=voice`) y "Plan"
+  (`/expenses/new`), "Añadir por voz" (`/expenses/new?mode=voice`) y "Mes"
   (`/money`).
 - `theme-color` del tema elegido (`THEME_COLORS` en `src/shared/theme.ts`, que
   un test compara con `--noctalia-background` de cada tema): el layout pone el
@@ -50,7 +50,8 @@ de red, mensajes y caches obsoletas) viven en `src/pwa/cache-policy.ts`.
 - Todo `public/`, salvo `public/app-icon-1024.png` (no se usa) y el propio
   `sw.js`.
 - El HTML de las rutas prerenderizadas, con revision: `/`, `/money`,
-  `/settings`, `/login` y `/expenses/new`. No entran `_not-found`,
+  `/accounts`, `/forecast`, `/settings`, `/login` y `/expenses/new`
+  (`scripts/verify-sw.mjs` falla el build si falta alguna). No entran `_not-found`,
   `_global-error` ni las rutas dinamicas (`/expenses/[id]`, `/auth/callback`,
   `/api/*`).
 - Como mucho 5 MB por archivo. Hoy son unas 38 URLs (2,4 MB).
@@ -309,7 +310,7 @@ sin subir, la hoja avisa de que borrar los datos los perderia.
   analizarlo. Solo un "servicio no permitido" sin resultados (por ejemplo en
   Brave) oculta el microfono durante la sesion.
 - El manifest tiene atajos "Añadir gasto" (`/expenses/new`), "Añadir por voz"
-  (`/expenses/new?mode=voice`) y "Plan" (`/money`). `mode` se lee en cliente y el precache lo ignora,
+  (`/expenses/new?mode=voice`) y "Mes" (`/money`). `mode` se lee en cliente y el precache lo ignora,
   asi que la pagina sigue siendo estatica. Dictar siempre exige un toque. El
   atajo abre el formulario o la captura una sola vez por entrada del historial
   (`lib/new-expense-intent.ts`): volver a la pantalla con Atras no lo repite.

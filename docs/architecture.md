@@ -28,10 +28,22 @@ persistencia y servicios externos para que cada cambio tenga un lugar claro.
 
 ## Rutas y composicion
 
-- `/` renderiza `ExpenseDashboard`, la experiencia principal de gastos.
-- `/money` renderiza `MoneyDashboard`, que orquesta tres secciones de igual
-  nivel: mes actual, plan anual y revision mensual.
-- `/settings` renderiza `SettingsView`, preferencias, auth y notificaciones.
+- La navegacion inferior tiene cuatro pestañas (`src/shared/app-tabs.ts`),
+  cada una con su cifra en la cabecera de `DashboardShell`:
+  - `/` (Gastos) renderiza `ExpenseDashboard`, la experiencia principal de
+    gastos: "Por pagar · <mes>".
+  - `/money` (Mes) renderiza `MonthDashboard`: "Libre · <mes>", la barra de
+    mes compartida con Gastos, la ecuacion del mes, los recibos del mes
+    plegados y el resumen del mes (`MonthSummaryLayer`, que tambien abre
+    "Ver resumen" en Gastos) con las acciones de revision.
+  - `/accounts` (Cuentas) renderiza `AccountsDashboard`: los saldos y si la
+    cuenta de recibos llega a lo pendiente del mes activo.
+  - `/forecast` (Prevision) renderiza `ForecastDashboard`: recibos grandes,
+    provision, coste por categoria y plan anual.
+  Cuentas y Prevision miran siempre el mes activo y no tienen barra de mes.
+- `/settings` renderiza `SettingsView`, preferencias, auth y notificaciones,
+  y la fila "Sueldo y ahorro" con la misma hoja "Base del plan" que Mes.
+  `?from=<pestaña>` decide adonde vuelve "Atras".
 - `/login` renderiza `LoginView`.
 - `/expenses/new` y `/expenses/[id]` cubren creacion y detalle/edicion de
   gastos.
