@@ -210,8 +210,10 @@
   color: color-mix(in srgb, var(--app-success) 72%, var(--app-text));
 }
 
+/* Sin overflow: hidden: el panel puede llevar un SelectMenu (p. ej. "Pasar a"
+   al borrar una categoría) y su desplegable, en posición absoluta y a menudo
+   abierto hacia arriba, quedaría recortado y sin poder elegirse. */
 .app-inline-panel {
-  overflow: hidden;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-lg);
   background: color-mix(in srgb, var(--app-panel-soft-alpha) 58%, var(--app-surface));

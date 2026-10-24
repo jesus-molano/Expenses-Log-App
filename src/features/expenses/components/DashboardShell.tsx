@@ -73,7 +73,8 @@ export function DashboardShell({
               recorta el título ni cambia la altura de la cabecera. */}
           <OfflineStatusChip
             language={language}
-            className="app-chip-solid absolute left-7 top-[calc(max(0.65rem,env(safe-area-inset-top))-0.5rem)] z-20"
+            className="app-chip-solid"
+            regionClassName="absolute left-7 top-[calc(max(0.65rem,env(safe-area-inset-top))-0.5rem)] z-20"
           />
         </header>
 

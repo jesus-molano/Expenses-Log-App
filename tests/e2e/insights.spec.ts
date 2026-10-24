@@ -218,14 +218,17 @@ test("records the account balance, replaces it and undoes a delete", async ({ pa
 });
 
 test("moves a bill due on a bank holiday to the next business day", async ({ page }) => {
+  // La serie empieza en octubre: si empezara en septiembre sin pagar ese
+  // cobro, "Pendiente de septiembre" iría antes que el cobro del día 12.
   await seed(
     page,
-    { ...emptyStore, templates: [template("gym", "Gimnasio", 30, "2026-09-12", 12)] },
+    { ...emptyStore, templates: [template("gym", "Gimnasio", 30, "2026-10-01", 12)] },
     "2026-10-10T10:00:00",
   );
   await page.goto("/");
 
   // El lunes 12 de octubre es festivo nacional: el banco lo carga el martes.
   const row = page.locator('[data-expense-row="true"]').filter({ hasText: "Gimnasio" }).first();
+  await expect(row).toHaveAttribute("data-timeline-date", "2026-10-12");
   await expect(row).toContainText("estimado martes 13");
 });

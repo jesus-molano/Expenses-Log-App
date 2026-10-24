@@ -155,12 +155,14 @@ test("marks a pending receipt as paid directly from plan", async ({ page }) => {
   await page.goto("/money");
 
   // La revisión del mes también tiene botón de pagar: se usa el de pendientes.
-  const payButton = page
-    .getByRole("region", { name: "Recibos pendientes" })
-    .getByRole("button", { name: "Marcar Movistar como pagado" });
+  const pendingReceipts = page.getByRole("region", { name: "Recibos pendientes" });
+  const payButtonName = { name: "Marcar Movistar como pagado" };
+  const payButton = pendingReceipts.getByRole("button", payButtonName);
   await expect(payButton).toBeVisible();
-  const expenseRow = page.locator(".app-monthly-expense-row").filter({
-    has: payButton,
+  // `has` se busca dentro de cada fila: el localizador interno no puede
+  // empezar por la región, que está fuera de la fila.
+  const expenseRow = pendingReceipts.locator(".app-monthly-expense-row").filter({
+    has: page.getByRole("button", payButtonName),
   });
   const actionButtons = expenseRow.getByRole("button");
   await expect(actionButtons).toHaveCount(3);

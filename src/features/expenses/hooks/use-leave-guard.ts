@@ -6,8 +6,8 @@ import { afterLayerHistorySettles } from "@/components/ui/sheet-history";
 import { useHistoryLayer } from "@/components/ui/use-history-layer";
 
 const LIST_HREF = "/";
-// Si Atrás no sale de la página en este plazo (se abrió el detalle desde un
-// enlace directo y no hay entrada anterior), se va a la lista.
+// Sin Navigation API: si Atrás no sale de la página en este plazo (se abrió el
+// detalle desde un enlace directo y no hay entrada anterior), se va a la lista.
 const BACK_FALLBACK_MS = 500;
 
 // "list": a la lista sustituyendo la entrada (guardar o borrar), para que
@@ -20,7 +20,23 @@ type DiscardPrompt = "back" | "control";
 
 type AppRouter = ReturnType<typeof useRouter>;
 
+// Navigation API: la lib DOM de TypeScript aún no la declara.
+type WindowWithNavigation = Window & { navigation?: { canGoBack: boolean } };
+
+// ¿Hay una entrada anterior de la app a la que volver? La Navigation API solo
+// cuenta las entradas contiguas del mismo origen: si el detalle se abrió desde
+// un enlace directo (notificación, enlace compartido, pestaña nueva) no hay
+// ninguna, y Atrás saldría de la app. Sin la API no se sabe (null).
+function hasInAppBackEntry(): boolean | null {
+  const navigation = (window as WindowWithNavigation).navigation;
+  return navigation ? navigation.canGoBack : null;
+}
+
 function goBackOrToList(router: AppRouter) {
+  if (hasInAppBackEntry() === false) {
+    router.replace(LIST_HREF);
+    return;
+  }
   // popstate si la entrada anterior es de la app; pagehide si es otro
   // documento (y entonces el plazo puede reanudarse al volver desde la caché
   // del navegador: no debe navegar).

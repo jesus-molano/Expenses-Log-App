@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { emptyStore } from "../../src/domain/seed";
 import type { ExpenseStore, ExpenseTemplate } from "../../src/domain/types";
 
@@ -72,8 +72,10 @@ async function openTab(context: BrowserContext) {
   return page;
 }
 
-async function swipeToPay(page: Page, name: string) {
-  const row = page.locator('[data-expense-row="true"]').filter({ hasText: name }).first();
+// `scope` acota la fila: mirando noviembre, lo de octubre pagado hoy sigue a
+// la vista como resto y también se llama «Gimnasio».
+async function swipeToPay(page: Page, name: string, scope: Page | Locator = page) {
+  const row = scope.locator('[data-expense-row="true"]').filter({ hasText: name }).first();
   await row.scrollIntoViewIfNeeded();
   const box = await row.boundingBox();
   expect(box).not.toBeNull();
@@ -83,6 +85,16 @@ async function swipeToPay(page: Page, name: string) {
   await page.mouse.down();
   await page.mouse.move(startX - 240, y, { steps: 10 });
   await page.mouse.up();
+}
+
+// Deslizar paga dentro de una view transition, un frame después de soltar:
+// hay que ver el pago antes de leer lo guardado. "0,00 €" va exacto porque,
+// sin `exact`, también casa con "30,00 €" o "700,00 €" y no espera a nada.
+async function expectPaidWithNothingDue(page: Page, name: string, sectionId: string) {
+  await expect(
+    page.locator(`[data-section-id="${sectionId}"]`).getByRole("article", { name: `${name} Pagado` }),
+  ).toBeVisible();
+  await expect(page.getByText("0,00 €", { exact: true }).first()).toBeVisible();
 }
 
 async function storedOverrideIds(page: Page) {
@@ -125,8 +137,8 @@ test("edits made in two tabs are both kept", async ({ context }) => {
   // La segunda pestaña paga el gimnasio de noviembre sobre lo que ya trajo.
   await second.getByRole("button", { name: "Mes siguiente" }).click();
   await expect(second.getByText("Por pagar · noviembre")).toBeVisible();
-  await swipeToPay(second, "Gimnasio");
-  await expect(second.getByText("0,00 €").first()).toBeVisible();
+  await swipeToPay(second, "Gimnasio", second.locator('[data-section-id="future-2026-11-12"]'));
+  await expectPaidWithNothingDue(second, "Gimnasio", "paid-2026-11-12");
 
   const expected = [
     "ovr:gym:2026-09-12",
@@ -141,7 +153,7 @@ test("edits made in two tabs are both kept", async ({ context }) => {
   // La primera ve el pago de noviembre y ninguna recarga pierde nada.
   await first.getByRole("button", { name: "Mes siguiente" }).click();
   await expect(first.getByText("Por pagar · noviembre")).toBeVisible();
-  await expect(first.getByText("0,00 €").first()).toBeVisible();
+  await expectPaidWithNothingDue(first, "Gimnasio", "paid-2026-11-12");
   await first.reload();
   expect(await storedOverrideIds(first)).toEqual(expected);
 });

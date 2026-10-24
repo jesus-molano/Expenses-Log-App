@@ -10,15 +10,21 @@ type OfflineStatusChipProps = {
   language: AppLanguage;
   // Clases del chip visible (p. ej. su margen); la región vacía no ocupa sitio.
   className?: string;
+  // Clases de la región que lo contiene, p. ej. para colocarla fuera del flujo.
+  regionClassName?: string;
 };
 
 // La región role="status" existe siempre para que el lector de pantalla anuncie
 // el chip al perder la conexión; con conexión queda vacía y sin ancho.
-export function OfflineStatusChip({ language, className }: OfflineStatusChipProps) {
+export function OfflineStatusChip({
+  language,
+  className,
+  regionClassName,
+}: OfflineStatusChipProps) {
   const online = useOnlineStatus();
 
   return (
-    <span role="status" className="inline-flex shrink-0">
+    <span role="status" className={cn("inline-flex shrink-0", regionClassName)}>
       {online ? null : (
         <span
           className={cn(
