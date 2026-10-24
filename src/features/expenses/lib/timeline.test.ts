@@ -42,8 +42,6 @@ describe("timeline sections", () => {
 });
 
 describe("timeline for a viewed month", () => {
-  const paid = (item: ExpenseOccurrence): ExpenseOccurrence => ({ ...item, status: "paid" });
-
   it("titles days of another month with the month", () => {
     const sections = buildTimelineSections(
       [occurrence("gym", "2026-10-30", 30), occurrence("rent", "2026-11-03", 700)],

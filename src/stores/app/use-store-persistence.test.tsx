@@ -354,7 +354,7 @@ describe("useStorePersistence", () => {
       storeWithTemplate("previous-account", "00000000-0000-4000-8000-000000000097"),
     );
     vi.mocked(createClient).mockReturnValue(signedInClient(user));
-    vi.mocked(loadCloudStore).mockResolvedValue({ store: null, mode: "table" });
+    vi.mocked(loadCloudStore).mockResolvedValue({ store: null, mode: "table", revision: null });
     const onHydrate = vi.fn();
 
     const { result } = renderHook(() => useStorePersistence({ onHydrate }));
