@@ -1,6 +1,4 @@
-import { addDays, subDays } from "date-fns";
-import { daysBetween, toDateOnly } from "@/domain/calendar";
-import { generateOccurrences } from "@/domain/recurrence";
+import { buildOccurrenceReminders } from "@/domain/reminder-schedule";
 import type { ExpenseOccurrence, ExpenseStore } from "@/domain/types";
 
 export type LastChanceReminder = {
@@ -8,44 +6,14 @@ export type LastChanceReminder = {
   daysUntilCharge: number;
 };
 
+// Aviso dentro de la app: los cobros que aún no han llegado (hasta el mismo
+// día del cargo) con aviso activo, propio o por defecto, y sin "Entendido".
 export function buildLastChanceReminders(
   store: ExpenseStore,
   today = new Date(),
 ): LastChanceReminder[] {
-  const todayDate = toDateOnly(today);
-  const from = toDateOnly(subDays(today, 7));
-  const to = toDateOnly(addDays(today, 8));
-
-  return generateOccurrences(
-    store.templates,
-    store.overrides,
-    from,
-    to,
-    store.preferences?.language ?? "es",
-  )
-    .filter((occurrence) => occurrence.status === "due")
-    .map((occurrence) => ({
-      occurrence,
-      daysUntilCharge: daysBetween(todayDate, occurrence.estimatedChargeDate),
-    }))
-    .filter(({ occurrence, daysUntilCharge }) => {
-      const reminder = occurrence.template.reminder;
-      if (!reminder?.enabled) return false;
-      if (daysUntilCharge < 0 || daysUntilCharge > reminder.daysBeforeCharge) {
-        return false;
-      }
-
-      return (
-        occurrence.override?.reminderDismissedChargeDate !==
-        occurrence.estimatedChargeDate
-      );
-    })
+  return buildOccurrenceReminders(store, today)
+    .filter((reminder) => reminder.stage !== "charge_check")
+    .map(({ occurrence, daysUntilCharge }) => ({ occurrence, daysUntilCharge }))
     .sort((left, right) => left.daysUntilCharge - right.daysUntilCharge);
-}
-
-export function buildPushDueReminders(
-  store: ExpenseStore,
-  today = new Date(),
-): LastChanceReminder[] {
-  return buildLastChanceReminders(store, today);
 }

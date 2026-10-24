@@ -16,7 +16,7 @@ vi.mock("@/utils/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
-const endpoint = "https://push.example.test/subscription";
+const endpoint = "https://fcm.googleapis.com/fcm/send/subscription";
 const user = {
   id: "00000000-0000-4000-8000-000000000001",
 } as User;
@@ -72,12 +72,18 @@ describe("/api/push/test", () => {
     vi.unstubAllEnvs();
   });
 
-  it("rejects invalid endpoints before checking auth", async () => {
-    const response = await POST(pushTestRequest({ endpoint: "not-a-url" }));
+  it.each([
+    "not-a-url",
+    "https://push.example.test/subscription",
+    "https://127.0.0.1/admin",
+    "http://fcm.googleapis.com/fcm/send/subscription",
+  ])("rejects %s before checking auth", async (target) => {
+    const response = await POST(pushTestRequest({ endpoint: target }));
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "Suscripción push inválida." });
     expect(createClient).not.toHaveBeenCalled();
+    expect(webpush.sendNotification).not.toHaveBeenCalled();
   });
 
   it("requires configured authentication", async () => {
@@ -140,7 +146,21 @@ describe("/api/push/test", () => {
         keys: { p256dh: "stored-p256dh", auth: "stored-auth" },
       },
       expect.any(String),
+      { TTL: 300, timeout: 5_000, urgency: "normal" },
     );
+  });
+
+  it("writes the test notification in the user's language", async () => {
+    vi.stubEnv("VAPID_PUBLIC_KEY", "public-key");
+    vi.stubEnv("VAPID_PRIVATE_KEY", "private-key");
+    mockSupabase();
+
+    await POST(pushTestRequest({ endpoint, language: "en" }));
+
+    const payload = JSON.parse(
+      String(vi.mocked(webpush.sendNotification).mock.calls[0][1]),
+    );
+    expect(payload).toMatchObject({ title: "Notifications ready", url: "/", lang: "en" });
   });
 
   it("removes an expired stored subscription", async () => {

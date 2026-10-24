@@ -1,0 +1,38 @@
+name: Avisos push cada hora
+
+# La hora de los avisos es configurable, pero el cron de vercel.json corre una
+# vez al día (el plan Hobby de Vercel no permite más). Este workflow llama al
+# endpoint cada hora para que cada usuario reciba los suyos a la hora elegida.
+# Es opcional: no hace nada hasta definir en el repositorio la variable
+# PUSH_CRON_URL (p. ej. https://<dominio>/api/push/daily-reminders) y el
+# secreto CRON_SECRET (el mismo que en Vercel). Sin la variable el job se
+# salta y no consume minutos. Con Vercel Pro basta con poner "0 * * * *" en
+# vercel.json y no hace falta este workflow.
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: push-reminders
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    name: Llamar al cron de avisos
+    if: ${{ vars.PUSH_CRON_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST al endpoint
+        env:
+          PUSH_CRON_URL: ${{ vars.PUSH_CRON_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 240 \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PUSH_CRON_URL}"

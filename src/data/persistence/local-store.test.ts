@@ -8,13 +8,22 @@ import type {
 import {
   clearIncomeFromStore,
   closeMonthInStore,
+  deleteBalanceCheckinInStore,
+  recordBalanceInStore,
   reopenMonthInStore,
+  updateBudgetCycleInStore,
 } from "@/stores/app/finance-commands";
+import { updateReminderPreferencesInStore } from "@/stores/app/preference-commands";
 import {
+  EXPENSE_STORE_KEY,
   clearExpenseLocalData,
   loadExpenseStore,
+  markExpenseStoreSeen,
   mergeExpenseStores,
+  readExpenseStoreFromOtherTab,
+  saveExpenseStore,
 } from "./local-store";
+import { normalizeExpenseStore } from "./store-normalization";
 
 function template(id: string): ExpenseTemplate {
   return {
@@ -215,6 +224,80 @@ describe("mergeExpenseStores", () => {
       .toBe(false);
   });
 
+  it("keeps the most recent budget cycle choice from either store", () => {
+    const payday = updateBudgetCycleInStore(
+      emptyStore,
+      "payday",
+      new Date("2026-10-20T10:00:00.000Z"),
+    );
+    const backToCalendar = updateBudgetCycleInStore(
+      payday,
+      "calendar",
+      new Date("2026-10-21T10:00:00.000Z"),
+    );
+
+    expect(mergeExpenseStores(payday, backToCalendar).finance.budgetCycle).toEqual(
+      backToCalendar.finance.budgetCycle,
+    );
+    expect(mergeExpenseStores(backToCalendar, payday).finance.budgetCycle).toEqual(
+      backToCalendar.finance.budgetCycle,
+    );
+    // Solo uno de los dos lo ha elegido: se conserva.
+    expect(mergeExpenseStores(emptyStore, payday).finance.budgetCycle?.anchor).toBe("payday");
+    expect(mergeExpenseStores(payday, emptyStore).finance.budgetCycle?.anchor).toBe("payday");
+    expect("budgetCycle" in mergeExpenseStores(emptyStore, emptyStore).finance).toBe(false);
+  });
+
+  it("merges balance check-ins day by day, deletions included", () => {
+    const base = recordBalanceInStore(
+      recordBalanceInStore(emptyStore, { date: "2026-10-01", amount: 2100 }, new Date("2026-10-01T10:00:00.000Z")),
+      { date: "2026-10-11", amount: 1600 },
+      new Date("2026-10-11T10:00:00.000Z"),
+    );
+    // Un dispositivo borra el día 11; el otro anota el 23.
+    const phone = deleteBalanceCheckinInStore(base, "2026-10-11", new Date("2026-10-20T10:00:00.000Z"));
+    const laptop = recordBalanceInStore(base, { date: "2026-10-23", amount: 1250 }, new Date("2026-10-23T10:00:00.000Z"));
+
+    for (const merged of [mergeExpenseStores(phone, laptop), mergeExpenseStores(laptop, phone)]) {
+      expect(merged.finance.balanceCheckins).toEqual({
+        "2026-10-01": { amount: 2100, updatedAt: "2026-10-01T10:00:00.000Z" },
+        "2026-10-11": {
+          amount: 1600,
+          updatedAt: "2026-10-20T10:00:00.000Z",
+          deletedAt: "2026-10-20T10:00:00.000Z",
+        },
+        "2026-10-23": { amount: 1250, updatedAt: "2026-10-23T10:00:00.000Z" },
+      });
+    }
+    expect("balanceCheckins" in mergeExpenseStores(emptyStore, emptyStore).finance).toBe(false);
+  });
+
+  it("keeps the latest reminder settings from either device", () => {
+    const older = updateReminderPreferencesInStore(
+      emptyStore,
+      { defaultEnabled: true, pushHour: 9 },
+      new Date("2026-10-20T10:00:00.000Z"),
+    );
+    const newer = updateReminderPreferencesInStore(
+      emptyStore,
+      { defaultEnabled: false, pushHour: 20 },
+      new Date("2026-10-21T10:00:00.000Z"),
+    );
+
+    // El resto de preferencias gana la local; los avisos, la última edición.
+    expect(mergeExpenseStores(older, newer).preferences?.reminders).toMatchObject({
+      pushHour: 20,
+    });
+    expect(mergeExpenseStores(newer, older).preferences?.reminders).toMatchObject({
+      pushHour: 20,
+    });
+    expect(mergeExpenseStores(emptyStore, older).preferences?.reminders).toMatchObject({
+      pushHour: 9,
+    });
+    expect("reminders" in (mergeExpenseStores(emptyStore, emptyStore).preferences ?? {}))
+      .toBe(false);
+  });
+
   it("keeps fields it does not know from both stores", () => {
     const local = {
       ...emptyStore,
@@ -298,6 +381,56 @@ function occurrenceRecord(
   };
 }
 
+describe("mergeExpenseStores with categories and contract details", () => {
+  it("keeps the latest rename of a category and the latest edit of a series", () => {
+    const category = { id: "viajes", userId: "demo", icon: "Tag", tone: "rose" as const };
+    const local = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [{ ...category, name: "Viajes", updatedAt: "2026-10-20T00:00:00.000Z" }],
+    });
+    const cloud = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [{ ...category, name: "Vacaciones", updatedAt: "2026-10-22T00:00:00.000Z" }],
+    });
+
+    expect(mergeExpenseStores(local, cloud).categories).toEqual([
+      expect.objectContaining({ name: "Vacaciones" }),
+    ]);
+    expect(mergeExpenseStores(cloud, local).categories).toEqual([
+      expect.objectContaining({ name: "Vacaciones" }),
+    ]);
+  });
+
+  it("keeps a rename over an old copy of the category that never had an update time", () => {
+    const category = { id: "ocio", userId: "demo", icon: "Gamepad2", tone: "violet" as const };
+    const renamed = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [{ ...category, name: "Caprichos", updatedAt: "2026-10-22T00:00:00.000Z" }],
+    });
+    const stale = normalizeExpenseStore({ ...emptyStore, categories: [{ ...category, name: "Ocio" }] });
+
+    // El dispositivo con la copia antigua fusiona sus cambios con la nube.
+    expect(mergeExpenseStores(stale, renamed).categories).toEqual([
+      expect.objectContaining({ name: "Caprichos" }),
+    ]);
+    expect(mergeExpenseStores(renamed, stale).categories).toEqual([
+      expect.objectContaining({ name: "Caprichos" }),
+    ]);
+  });
+
+  it("does not bring back a category deleted on another device", () => {
+    const category = { id: "viajes", userId: "demo", name: "Viajes", icon: "Tag", tone: "rose" as const };
+    const local = normalizeExpenseStore({ ...emptyStore, categories: [category] });
+    const cloud = normalizeExpenseStore({
+      ...emptyStore,
+      categories: [],
+      deleted: { ...emptyStore.deleted, categories: ["viajes"] },
+    });
+
+    expect(mergeExpenseStores(local, cloud).categories).toEqual([]);
+  });
+});
+
 describe("loadExpenseStore", () => {
   it("keeps a copy of an unreadable store before falling back to empty", () => {
     window.localStorage.setItem("expense-log-store-v1", "{not json");
@@ -312,10 +445,14 @@ describe("loadExpenseStore", () => {
     window.localStorage.clear();
   });
 
-  it("removes corrupt-store copies together with the local data", () => {
+  it("removes corrupt-store copies and sync metadata together with the local data", () => {
     window.localStorage.setItem("expense-log-store-v1", "{}");
     window.localStorage.setItem("expense-log-store-v1.corrupt", "{a");
     window.localStorage.setItem("expense-log-store-v1.corrupt-1760000000000", "{b");
+    window.localStorage.setItem(
+      "expense-log-sync-v1",
+      JSON.stringify({ ownerId: "user-a", dirty: true, updatedAt: "" }),
+    );
     window.localStorage.setItem("expense-theme", "nord");
 
     clearExpenseLocalData();
@@ -323,5 +460,75 @@ describe("loadExpenseStore", () => {
     expect(window.localStorage.length).toBe(1);
     expect(window.localStorage.getItem("expense-theme")).toBe("nord");
     window.localStorage.clear();
+  });
+});
+
+describe("readExpenseStoreFromOtherTab", () => {
+  it("returns only what another tab wrote after this one", () => {
+    saveExpenseStore(storeWithTemplate("mine"));
+    expect(readExpenseStoreFromOtherTab()).toBeNull();
+
+    const raw = JSON.stringify(storeWithTemplate("other-tab"));
+    window.localStorage.setItem(EXPENSE_STORE_KEY, raw);
+    const other = readExpenseStoreFromOtherTab();
+    expect(other?.raw).toBe(raw);
+    expect(other?.store.templates.map((item) => item.id)).toEqual(["other-tab"]);
+
+    // Ya incorporado por esta pestaña: no vuelve a contar como ajeno.
+    markExpenseStoreSeen(raw);
+    expect(readExpenseStoreFromOtherTab()).toBeNull();
+    window.localStorage.clear();
+  });
+
+  it("ignores missing or unreadable stores", () => {
+    window.localStorage.removeItem(EXPENSE_STORE_KEY);
+    expect(readExpenseStoreFromOtherTab()).toBeNull();
+    window.localStorage.setItem(EXPENSE_STORE_KEY, "{not json");
+    expect(readExpenseStoreFromOtherTab()).toBeNull();
+    window.localStorage.clear();
+  });
+});
+
+describe("mergeExpenseStores categories", () => {
+  const category = {
+    id: "cat-1",
+    userId: "user",
+    name: "Casa",
+    icon: "Home",
+    tone: "green" as const,
+  };
+
+  it("keeps the most recently updated category", () => {
+    const newer = { ...category, icon: "House", updatedAt: "2026-10-23T11:00:00.000Z" };
+    const older = { ...category, icon: "Home", updatedAt: "2026-10-23T10:00:00.000Z" };
+
+    for (const [local, cloud] of [
+      [newer, older],
+      [older, newer],
+    ]) {
+      const merged = mergeExpenseStores(
+        { ...emptyStore, categories: [local] },
+        { ...emptyStore, categories: [cloud] },
+      );
+      expect(merged.categories).toEqual([newer]);
+    }
+  });
+
+  it("lets the local copy win when neither category has a timestamp", () => {
+    const merged = mergeExpenseStores(
+      { ...emptyStore, categories: [{ ...category, icon: "Local" }] },
+      { ...emptyStore, categories: [{ ...category, icon: "Cloud" }] },
+    );
+
+    expect(merged.categories[0].icon).toBe("Local");
+  });
+
+  it("prefers the copy with a timestamp over an older copy without one", () => {
+    const merged = mergeExpenseStores(
+      { ...emptyStore, categories: [{ ...category, icon: "Local" }] },
+      { ...emptyStore, categories: [{ ...category, icon: "Cloud", updatedAt: "2026-10-23T10:00:00.000Z" }] },
+    );
+
+    expect(merged.categories[0].icon).toBe("Cloud");
   });
 });

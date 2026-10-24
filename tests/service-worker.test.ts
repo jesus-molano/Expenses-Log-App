@@ -65,4 +65,26 @@ describe("service worker offline shell", () => {
     expect(config).toContain('globIgnores: ["public/app-icon-1024.png"]');
     expect(settingsPage).not.toContain("searchParams");
   });
+
+  it("renews push subscriptions and shows localized reminders", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src", "pwa", "sw.ts"),
+      "utf8",
+    );
+
+    // M12: el navegador renueva la suscripción y el servidor se entera.
+    expect(source).toContain('self.addEventListener("pushsubscriptionchange"');
+    expect(source).toContain('fetch("/api/push/subscribe"');
+    expect(source).toContain("previous?.options.applicationServerKey");
+    // El payload se valida, abre solo rutas del mismo origen y actualiza el
+    // número del icono.
+    expect(source).toContain("parsePushPayload(");
+    expect(source).toContain("resolveNotificationUrl(");
+    expect(source).toContain("setAppBadge");
+    expect(source).toContain('badge: "/badge-96.png?v=1"');
+    // Enfoca antes de navegar (la activación del usuario es de la ventana).
+    expect(source.indexOf("existingClient.focus()")).toBeLessThan(
+      source.indexOf("focused.navigate(targetUrl)"),
+    );
+  });
 });

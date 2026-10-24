@@ -34,6 +34,15 @@ Estado:
   - `/settings` estática y limpieza de cachés obsoletas.
   - `verify-sw.mjs` y harness `npm run e2e:offline`.
   - El harness reproduce el cuelgue con una red que acepta conexiones y no responde (el caso de los datos móviles sin cobertura real): falla antes de 1b y pasa con 1b.
+- **PR 1c: hecho.**
+  - `useOnlineStatus` (`src/shared/hooks`) y chip "Sin conexión" en las cabeceras de Gastos, Plan y Ajustes, con `role="status"` y sin mover la cabecera a 360 px (e2e con `setOffline`).
+  - Harness: escenario con un build hecho con `NEXT_DEPLOYMENT_ID` (assets con `?dpl=`), compilado en `.e2e-builds/` y reutilizado mientras no cambie el build base. Falla si el precache deja de ignorar `dpl` y pasa con él. Antes de abrir sin red se vacía la caché HTTP de Chromium, para que todo salga de las cachés del service worker.
+  - Proyecto `webkit-iphone` solo con `dead`/`blackhole`. Aquí se salta con el motivo: Playwright 1.62.1 y WebKit sin instalar.
+  - `docs/platform.md`: qué se precachea y cómo responde cada petición, según `sw.ts` y `serwist.config.mjs`.
+  - Pendiente de 1c:
+    - Correr WebKit de verdad: subir `@playwright/test` a 1.64 o más e instalar WebKit, también en CI.
+    - El build `dpl` solo cubre el arranque en frío con el servidor parado. La actualización entre dos builds `dpl` y la variante `blackhole` se dejan fuera por tiempo de ejecución; el cuelgue ya lo cubre el build base.
+  - Pendiente de 1b, documentado: las woff2 de `next/font` y los iconos con `?v=5` no están en el precache. Se guardan en runtime en la primera visita con el service worker al mando; si faltan, la app abre con la fuente del sistema.
 - **F0b-1, F0b-2 y F0b-3: hechos.**
   - Parser de importes y fechas imposibles (F0b-1).
   - Overrides con id determinista, upsert y rekey (F0b-2).
@@ -42,8 +51,13 @@ Estado:
   - "Atrasado" según el día de cargo estimado.
   - `ActionToast` con deshacer, por encima del FAB.
   - Mes activo con `monthClosures`, tarjeta "Octubre al día · Pasar a noviembre", aviso al pagar el último recibo y "Volver a octubre".
-  - Selector de mes en Gastos (un año atrás y el mes siguiente). Plan sigue al mes activo.
+  - Selector de mes en Gastos (un año atrás y el mes siguiente). Plan sigue al mes activo (desde F1a-3, al mes visto).
   - `monthClosures` se escribe sin esperar la semana de passthrough: si un build antiguo lo descarta, el mes activo vuelve al natural y no se pierde ningún dato.
+- **F1a-3: hecho.**
+  - `MonthCloseSheet`: tarjeta "Cierre de octubre · Quedan 2 recibos" tras el cobro (o en los 3 últimos días sin cobro) con resumen frente al plan, Pagado/Saltar/Mover por resto (con deshacer), ahorro real y "Empezar noviembre".
+  - Timeline con mes en los días de otro mes, "Ya pagado de noviembre" al final y "Hoy" solo en el mes natural.
+  - Plan sigue al mes visto, con su selector; la fase "actual" es el mes activo. Año siguiente en diciembre, pagar desde Revisión y "Hasta el cobro".
+  - M17 (en meses registrados el libre resta el ahorro real, aviso "Objetivo de ahorro no registrado") y M18 (cobros anteriores de un gasto nuevo: pagados, saltados o pendientes).
 - **F1b: hecho.**
   - Cliente Gemini con cabecera, esquema, thinking por modelo, respaldo y plazo de 10 s.
   - Normalizador común con el parser local, que se reescribe (NFD, día antes que importe, frecuencias y meses).
@@ -55,16 +69,73 @@ Estado:
   - Atajos del manifest "Añadir gasto" y "Añadir por voz" (`/expenses/new?mode=voice`).
   - Atrás cierra la hoja abierta (`src/components/ui/sheet-history.ts`).
   - Pendiente de F2a: `OccurrenceActionSheet`, `ConfirmActionDialog` con `useDialogA11y` y M22.
+- **F3 (7, 9, 10 y 11): hecho.**
+  - Primeros pasos con la app vacía: chips de alta rápida (alquiler, luz, agua, internet, móvil, Netflix, Spotify, gimnasio y seguros) y checklist (primer gasto, sueldo, avisos e instalar). Por dispositivo (`expense-onboarding-v1`).
+  - Catálogo «Todos» desde la cabecera de Gastos: todas las series con búsqueda (también en notas) y filtros de estado, frecuencia y categoría. Sustituye a la hoja de recurrentes.
+  - Campos de contrato (notas, enlace de baja, permanencia con aviso a 30 días, método de pago) en el formulario, el detalle y la normalización; categorías propias con gestor en Ajustes (crear, renombrar, color y borrar pasando los gastos a otra).
+  - Órdenes en la captura («marca la luz pagada 71,20», «salta el gimnasio este mes», «mueve Netflix al 10») con `intent` en el esquema de Gemini y en el parser local, siempre confirmadas y con deshacer.
+  - Integrado con F0c-2, F1a-3, F2a y F3-1: borrar una categoría confirma con `ConfirmActionDialog` (con gastos que la usan, antes se elige en la fila a cuál pasan); una categoría con `updatedAt` gana al fusionar a su copia sin fecha; exportar e importar llevan los datos de contrato y las categorías propias (el CSV con `category_tone`), y sustituir con una copia marca también las categorías como editadas ahora.
+  - Integrado con F2b, F3 dinero y el ciclo de presupuesto: el formulario y el detalle llevan el aviso, el precio, la pausa y el fin junto a los datos de contrato; el catálogo muestra el precio del cobro que toca y cuenta lo pagado; pagar con una orden sugiere la media y pregunta por el importe de la serie; mover con una orden sigue el ciclo de Ajustes, y el CSV lleva avisos, pausas, cambios de precio, datos de contrato y categorías propias.
 - **Cambios de importe de una serie: hecho.** Al editar el importe, lo ya pasado y lo ya pagado no cambian (meses anteriores como registros; mes cerrado con "Pasar al mes siguiente", cobros pagados y adelantados con override) y el editor pregunta "Desde este mes" o "Desde el mes que viene" (`keepAmountBeforeSeriesChange`). Para un solo mes, se edita el cobro.
   - Tocar un gasto abre sus acciones (`OccurrenceActionSheet`, M19): pagar o deshacer, pagar con otro importe, mover solo este cobro (no a un mes cerrado), saltar este mes con "Deshacer" y editar la serie. Deslizar o arrastrar no cuentan como toque.
   - Hoja de acciones revisada: "Editar la serie" navega (sustituye la entrada de la hoja en el historial), "Pagado con otro importe" solo apunta lo pagado (la fila pagada muestra lo pagado), mover solo toca el cobro y no se ofrece para lo pagado de un mes cerrado ni más allá del mes siguiente, Intro la abre desde el teclado y los clicks de lector de pantalla cuentan.
   - Cada mes del listado muestra solo sus cobros (más lo pendiente que arrastra); al final, "Noviembre empieza con N cobros en sus primeros días" con "Ver noviembre".
   - Pendiente de F2a: `ConfirmActionDialog` con `useDialogA11y` y M22.
+- **F2b (avisos 2.0 y pulido PWA): hecho.**
+  - Ajustes › Recordatorios (`preferences.reminders`, sincronizado y fusionado por `updatedAt`): aviso por defecto para los gastos sin ajuste propio, antelación de mensuales (1-5 días) y de trimestrales/anuales (7, 14 o 30), etapas "el día del cargo" y "¿se cobró?", avisos de mes al día y de día de cobro, y hora de los push en la zona del dispositivo.
+  - Campana en cada recibo pendiente (al principio de la segunda línea, lejos del toque que abre las acciones y del gesto de pagar) con aviso y "Deshacer"; el formulario ofrece hasta 30 días en trimestrales y anuales y "Usar el ajuste general".
+  - Cron (`src/app/api/push/daily-reminders`): día y hora en la zona del usuario, una notificación por etapa en su idioma con nombre, importe, fecha, `tag`, número del badge y enlace `/?occurrence=<id>`; `TTL` por tipo y `timeout` de 5 s. Cada etapa se reclama con su `kind` en el mismo RPC (`last_chance`, `charge_day`, `charge_check`, `month_close`, `payday`). Un usuario que falla no corta el envío al resto.
+  - El enlace se lee en cliente: cambia al mes del cobro, lo resalta y abre su hoja de acciones; si ya no existe, lo dice.
+  - M12: `pushsubscriptionchange` en el service worker, latido diario de la suscripción desde cualquier pantalla (renueva la suscripción si cambia la clave VAPID) y `failure_count` con poda al quinto fallo. La migración `20261023220000_push_subscription_health.sql` es solo aditiva y todo funciona antes de aplicarla.
+  - PWA: atajo "Plan", `setAppBadge` con los vencidos y los de hoy (también desde el push), `theme-color` por tema, iconos maskable con margen y badge monocromo (`scripts/generate-pwa-icons.mjs`), y guía de instalación en iPhone/iPad en Ajustes.
+  - Pendiente del dueño: aplicar la migración y, para que la hora elegida se respete, ejecutar el cron cada hora (Vercel Pro con `0 * * * *` en `vercel.json`, o el workflow `push-reminders.yml` con la variable `PUSH_CRON_URL` y el secreto `CRON_SECRET` en GitHub). Con el cron diario de las 08:00 UTC, los avisos llegan en esa ejecución si la hora elegida ya pasó.
+  - Integración con F0c-1 y F0c-2: un solo módulo de envío (`src/data/push/web-push-sender.ts`: lista de servicios push al enviar, `timeout` de 5 s y el TTL de cada tipo), el alta por `claim_push_subscription` (que con la migración de salud también pone `failure_count` a 0) con el upsert de salud como respaldo si el RPC no existe, y `toReminderStore` (`src/features/expenses/lib/reminder-store.ts`) delante del cron. Conserva todos los gastos bien formados, con o sin aviso propio: el aviso por defecto, el mes al día, el día de cobro y el número del icono los necesitan.
+  - Diferido: `renewal` y `weekly_digest` (§6 del informe, fuera del alcance de F2b) y acciones dentro de la notificación ("Pagado" sin abrir la app): necesitan que el service worker escriba en el store.
+- **F0c-1 (seguridad sin migración): hecho.**
+  - `/auth/callback` solo redirige a rutas de la app: rechaza controles, DEL y `\`, y comprueba el origen con `new URL` (M14).
+  - El cron procesa cada usuario en su propio `try/catch`, cierra siempre sus leases y cuenta `errors`; el store pasa por `toReminderStore` (M11).
+  - Lista de servicios push en `subscribe`, `test` y el propio envío, `{timeout: 5000, TTL}`, `Promise.allSettled` y máximo 10 suscripciones por usuario en la API (M13).
+  - Salir libera la suscripción push antes del `signOut` y ofrece borrar los datos del dispositivo; los datos sin metadatos de sync se atribuyen por su `userId` (M15).
+  - Diferido a F0c-2 (necesita migración): `claim_push_subscription`, el límite de 10 en la base de datos y quitar el INSERT directo en `push_subscriptions`.
+  - Pendiente de F2a: `OccurrenceActionSheet` (va en su propio PR).
+- **F2a (diálogos y M22): hecho.**
+  - `useDialogA11y` (`src/components/ui/use-dialog-a11y.ts`), extraído de `Sheet`: foco inicial, Tab atrapado, foco devuelto al cerrar, Escape y bloqueo del scroll. Solo la capa de encima atiende el teclado (una confirmación sobre una hoja no cierra también la hoja).
+  - `ConfirmActionDialog` (M21): centrado también en móvil, `alertdialog` con título y descripción, portal sobre `body`, foco en Cancelar, y Escape, Atrás o tocar fuera cancelan (nunca con la acción en curso). Tono `danger` con `app-button-danger`.
+  - Todas las confirmaciones dicen "Cancelar" en lugar de "Volver", y borrar un gasto nombra el gasto en el título. Quitar un ingreso puntual (antes, un toque sin confirmación ni deshacer) también pregunta.
+  - M22: el detalle cuenta los cambios sin guardar (`features/expenses/lib/expense-editor.ts`). Con cambios, Atrás y el control "Gastos" preguntan "¿Descartar los cambios en «Game Pass»?"; guardar, borrar o descartar salen sin preguntar. El control "Gastos" vuelve atrás en el historial en lugar de apilar otra vez la lista.
+  - Salir justo después de cerrar un diálogo espera a que las capas quiten su entrada del historial (`afterLayerHistorySettles`); si no, esa vuelta atrás desharía la navegación.
+  - Diferido: los selectores de fecha y de día de cobro siguen sin `useDialogA11y` (Escape con un selector abierto dentro de una hoja cierra la hoja, y el foco no queda atrapado en el selector). Se dejó fuera para no cambiar su comportamiento en este PR.
+  - Diferido: al borrar, durante un instante se ve "Gasto no encontrado" antes de llegar a la lista, como antes de este PR.
+- **F0c-2 (sync multi-dispositivo): hecho, falta aplicar la migración.**
+  - Migración aditiva `20261023120000_app_store_revision_cas.sql`: `revision` con trigger, RPC `save_app_store` con CAS, máximo 10 suscripciones push por usuario y RPC `claim_push_subscription` (M15). Probada sobre PostgreSQL (PGlite) con los stubs de Supabase.
+  - Cliente con CAS: ante un conflicto fusiona, hidrata y reintenta; sin la migración cae al upsert y lo registra una vez.
+  - Pull al volver a la app (cada 30 s como mucho) y sincronización entre pestañas por el evento `storage`.
+  - Overrides huérfanos reconciliados tras cada fusión y `updatedAt` en las categorías.
+  - Diferido: `ai_usage`/`consume_ai_quota`, porque la cuota durable sigue diferida mientras solo use la app el dueño (F1b). El contract (revocar la escritura directa en `app_stores`) va en un PR posterior.
+- **F3-1 (copias) y F3-15 (deuda técnica): hechos.**
+  - Ajustes › Copias y datos: exportar JSON (store completo) y CSV (gastos, cobros e histórico), importar con vista previa y elección entre combinar y sustituir, copias automáticas en IndexedDB (7 diarias y 5 de seguridad) con restaurar, y estado de `storage.persist()` con botón para pedirlo. Ver `docs/state-persistence-sync.md`.
+  - Sustituir aguanta una fusión posterior con la nube; los objetivos de ahorro, que no tienen tombstone, son el único dato que podría volver.
+  - Código muerto borrado, `planCopy` y los ternarios de idioma en i18n, tildes en los textos y en las categorías (sin cambiar el nombre guardado) y `--app-text-subtle` con contraste AA en los ocho temas, con tests que lo vigilan.
+- **F3 (4, 6, 12, 13 y 14): hecho.**
+  - Plan: "Próximos recibos grandes" (no mensuales y pagos únicos desde 50 € en 90 días), "Provisión para recibos no mensuales" ("Aparta X al mes" y cuánto apartar hasta cada cobro) y "Coste por categoría" (€/mes y €/año de los próximos 12 meses, por categoría y por gasto).
+  - Resumen del mes (previsto, pagado, pendiente, ahorrado y mayores cambios frente al mes anterior) desde "Octubre al día", desde la revisión mensual y ofrecido por Plan al cerrar o cambiar de mes. Registro de saldo con tendencia.
+  - Ajustes › "Mes del presupuesto": mes natural (por defecto) o desde el día de cobro, respetado por el mes activo, Gastos y Plan.
+  - Festivos bancarios en `estimateChargeDate` (nacionales, Jueves y Viernes Santo y cierres de TARGET2).
+  - Diferido: "te quedan ~X € hasta el cobro (≈ €/día)" a partir del saldo, que necesita el "Hasta el cobro" de F1a-3.
+  - Integrado sobre F1a-3: el ciclo anclado al cobro también decide los días del cierre con restos (restos y "Mover" al primer día del mes siguiente), de "Hasta el cobro" y del mes que Plan sigue desde Gastos, que sigue mostrando solo los días de su mes. Las previsiones miran desde el mes activo aunque se mire otro.
+- **F3 de dinero (puntos 2, 3, 5 y 8): hecho.**
+  - **Recibos variables (2):** previsto frente a pagado por cobro (`amountPaid`) en Gastos, Plan y el detalle. Al pagar otro importe (hoja de acciones del cobro, "Últimos cobros" del detalle o "Pagado" aparte de "Previsto" en el editor de Plan) se sugiere la media de los 3 últimos pagos (`suggestedPaidAmount`). Tras pagar otro importe se pregunta "¿Actualizar el importe desde ahora?", que aplica `setSeriesAmountInStore` (la regla de `keepAmountBeforeSeriesChange`, traída de `feat/amount-scope`): nunca reescribe lo pagado ni los meses cerrados.
+  - **Finalizar o pausar (3):** en el detalle, "Finalizar" elige el último cobro (`endDate`, nunca antes de uno pagado) y se puede reactivar; las pausas son rangos `pauses[]` en la plantilla que `generateTemplateDates` salta, con "Reanudar" (la pausa termina ayer) y "Quitar pausa".
+  - **Cambios de precio (5):** `amountChanges[]` (precio desde una fecha) que `generateOccurrences` aplica por fecha de cobro (`templateAmountOn`); "Programar cambio de precio" desde un mes posterior al activo, lista de programados con "Quitar" e historial de tramos en el detalle (`buildPriceHistory`).
+  - **Pagas extra y "¿Has cobrado?" (8):** `finance.salaryExtraPays` (meses y, opcional, importe; vigente desde su mes) en los ajustes del plan; "¿Has cobrado la nómina?" el día de cobro en Gastos y en Plan (`finance.salaryReceipts`: lo cobrado pasa a ser el sueldo del mes; "Aún no" la esconde hasta mañana en ese dispositivo). **M16:** "Editar ingreso fijo" pregunta "Solo este mes" (`onlyThisMonth`) o "Desde este mes".
+  - Tests de generación con pausas que cruzan meses, fin a mitad de mes, cambios de precio y registros de meses cerrados (`src/domain/series-changes.test.ts`), e2e en `tests/e2e/bills-and-salary.spec.ts`.
+  - Junto a F1a-3 y F3-1: las pausas, el fin y los cambios de precio también valen para los cobros de un gasto nuevo (`passedChargeThisMonth`, `previousMonthsChargeDates`), lo que arrastra el mes anterior y el cierre con restos. Lo cobrado en "¿Has cobrado?" es el sueldo del mes en Plan y en el resumen del cierre; la pregunta sale al mirar el mes natural o el activo, encima de "Hasta el cobro". El CSV lleva las columnas `pauses` y `price_changes`, y sustituir datos deshace las respuestas a "¿Has cobrado?" que no trae el archivo y reescribe las pagas extra que no trae con las que el archivo tiene vigentes ese mes, para que una fusión posterior no las devuelva.
+  - Integrado sobre F3 (4, 6, 12, 13 y 14) y F2b: "¿Has cobrado?", "Hasta el cobro" y el aviso push del día de cobro usan una sola regla de día de cobro (`salaryPaydayOf`, con `configuredPayday` y el ciclo del presupuesto). Con el ciclo anclado al cobro, la nómina que abre un mes es el sueldo de ese mes (la del 28 de octubre es la de "noviembre"), y lo cobrado cuenta en Plan, en el resumen del mes y en "Coste por categoría" (`getMonthSalary`). Los avisos se generan con las mismas ocurrencias que la app: un gasto en pausa o finalizado no avisa y el importe del push es el del propio cobro.
 - **Pendiente de confirmar en el dispositivo:** abrir con conexión, esperar a que "Uso sin conexión" diga "Lista", cerrar la app y abrirla sin conexión.
 - La operación de Gemini (cambiar el modelo en Vercel) depende del dueño.
 
 **Decisiones del dueño:**
-- **Mes:** mes activo con aviso "¿Pasamos a noviembre?" y selector de mes compartido por Gastos y Plan. El ciclo anclado al cobro queda como opción futura.
+- **Mes:** mes activo con aviso "¿Pasamos a noviembre?" y selector de mes compartido por Gastos y Plan. El ciclo anclado al cobro es una opción de Ajustes (F3-13), desactivada por defecto.
 - **Voz:** dictado del navegador (Web Speech API). Escribe en el textarea y luego se analiza como texto.
 - **Entrega:** por fases, un PR por bloque, cada uno con tests.
 - **Gemini:** nivel gratuito, modelo barato y sin enviar audio a Gemini.
@@ -189,7 +260,7 @@ Estado:
     - **S4:** el spec actual con `context.route` abortando también las peticiones del SW.
   - Correr primero sobre `main` y anotar qué escenarios fallan. Tras el fix, todos deben arrancar en menos de 5 s y sin `requestfailed` en `/_next/static`. Proyecto Chromium Pixel 7.
 
-### PR 1c — Offline: cierre
+### PR 1c — Offline: cierre (hecho, ver Estado)
 - Hook `use-online-status` y chip "Sin conexión" en las cabeceras.
 - Builds DPL (`NEXT_DEPLOYMENT_ID`) en el harness.
 - Proyecto WebKit, solo con `dead`/`blackhole`. Requiere Playwright 1.64 o superior; si no, `test.skip` con el motivo.
@@ -221,17 +292,33 @@ Estado:
 - Tombstones de sueldo: sin ellos el merge resucita datos. Implementados como lista de versiones borradas (`deleted.monthlySalary: string[]` con `<mes>@<updatedAt>`), que los builds con passthrough fusionan por unión.
 - Revertir es seguro: los builds anteriores ignoran los metadatos.
 
-### F0c-1 — Seguridad (sin migración)
+### F0c-1 — Seguridad (sin migración) — hecho
 - **M14.** Open redirect en `/auth/callback`: rechazar `[\u0000-\u001F\u007F\\]` y comprobar el origen con `new URL`.
+  - Hecho en `src/shared/safe-redirect.ts`: también cae al fallback una ruta que se normaliza a `//host` (`/.//evil.com`). Tests de `%09`/`%0A`/`%0D`, `//`, `/\`, URLs absolutas y segmentos `.`/`..`.
 - **M11.** try/catch por usuario en el cron, liberando los leases.
+  - Hecho: cada lease se cierra por separado (marcado o liberado) aunque falle una reclamación a medias o el envío, y la respuesta lleva `errors`, `invalidStoresSkipped` y `blockedEndpointsSkipped`.
+  - `toReminderStore` sustituye a `isExpenseStore`: solo gastos activos con aviso y bien formados, y overrides legibles. Con F2b vive en `src/features/expenses/lib/reminder-store.ts` y conserva todos los gastos bien formados (con o sin aviso propio), porque el aviso por defecto, el mes al día y el día de cobro los necesitan.
+  - El `CRON_SECRET` se compara en tiempo constante.
 - **M15.** En el sign-out, quitar la suscripción push y no fusionar los datos de otro owner.
+  - Hecho: `DELETE` + `unsubscribe()` antes del `signOut` (plazo de 4 s) y hoja "Salir y conservar los datos aquí" / "Salir y borrar los datos de este dispositivo", con aviso si hay cambios sin subir. Borrar la cuenta también anula la suscripción del navegador.
+  - Revisado el reparto de F0b-3 (`ownerId` y `localChangesFor`): faltaba el caso de los dispositivos sin metadatos de sync, que ahora se atribuyen por el `userId` de los datos (`inferStoreOwnerId`). Borrar los datos locales también borra los metadatos.
+  - Un endpoint registrado a nombre de otra cuenta devuelve 409 `PUSH_SUBSCRIPTION_IN_USE`; Activar pide una suscripción nueva y la guarda.
+  - **Diferido a F0c-2:** el RPC `claim_push_subscription`, que necesita migración.
 - **M13** (parte de la app): lista de hosts push permitidos, `{timeout:5000, TTL}` y `Promise.allSettled`.
+  - Hecho: FCM, autopush de Mozilla, `*.push.apple.com` y `*.notify.windows.com`, con forma estricta (`https`, sin usuario, puerto ni `\`) para que web-push, que usa `url.parse`, vea el mismo host. Se comprueba en `subscribe`, en `test` y en el envío, y el cron se salta las filas de otros hosts.
+  - TTL de 24 h para el recordatorio y de 5 minutos para la prueba. Con F2b, cada tipo de aviso lleva su propio TTL (`REMINDER_TTL_SECONDS`); la prueba sigue en 5 minutos.
+  - Máximo 10 suscripciones por usuario en la API (se borran las actualizadas hace más tiempo) y en el envío del cron.
+  - **Diferido a F0c-2:** el límite en la base de datos y revocar el INSERT directo del rol `authenticated` en `push_subscriptions` (ambos son migración).
+- Siguen diferidos, como bajos del informe: el error ignorado de `exchangeCodeForSession`, el sujeto VAPID por defecto y la paginación y `maxDuration` del cron.
 
 ### F0c-2 — Sync multi-dispositivo (A2, migración expand/contract)
+**Estado: hecho (expand y cliente).** Falta aplicar la migración en producción; `ai_usage` y el contract quedan diferidos (ver "Estado" arriba). Detalle en `docs/state-persistence-sync.md`.
+
 1. **Migración aditiva:**
    - `revision bigint default 0` y un trigger `BEFORE UPDATE` que incrementa `revision`, para que los upserts ciegos de clientes viejos invaliden el CAS.
    - RPC `save_app_store(p_store, p_expected_revision)`.
-   - Máximo 10 suscripciones push por usuario.
+   - Máximo 10 suscripciones push por usuario (la API ya lo aplica desde F0c-1).
+   - RPC `claim_push_subscription` para traspasar un endpoint que sigue a nombre de otra cuenta (M15), y revocar el INSERT/UPDATE directo del rol `authenticated` en `push_subscriptions` (M13). Viene de F0c-1.
    - Opcional: `ai_usage` con `consume_ai_quota` (ver F1b).
 2. **Cliente:**
    - CAS; ante conflicto, merge, hidratar y reintentar.
@@ -281,7 +368,17 @@ Estado:
   - Sin sueldo configurado: CTA "Configura tu día de cobro" → `PlanSettingsSheet`.
 - **Tests:** store vacío; sin sueldo; cerrar → deshacer; caducidad; merge de `monthClosures`.
 
-### F1a-3 — Cierre con restos, timeline y Plan
+### F1a-3 — Cierre con restos, timeline y Plan (hecho)
+- **Cómo quedó:**
+  - La tarjeta de cierre con restos sale el día de cobro si cae en los últimos 10 días del mes (quien cobra a primeros financia ese mes) o, sin sueldo configurado, en los 3 últimos días (`shouldSuggestCloseWithLeftovers`). Comparte el "Ahora no" por mes con la de "al día".
+  - La hoja muestra los cuatro pasos a la vez. Cada resto se guarda al momento (Pagado = `togglePaidInStore`, Saltar = `skipOccurrenceInStore`, Mover = al día 1 del mes siguiente) y se deshace en su fila; "Pagar todo" usa `markOccurrencesPaidInStore`. La lista y el mes se fijan al abrir: si pasa la medianoche con la hoja abierta no se cierra el mes nuevo.
+  - Fila propia (`MonthCloseLeftoverRow`) con botones con texto en lugar de `MonthlyExpenseRow`: sus cuatro iconos no caben a 360 px dentro de la hoja.
+  - El día de cobro se acota al último día del mes (un 31 cae el 30 en noviembre) también en `shouldSuggestAdvance`.
+  - "Ya pagado de noviembre" incluye todo lo pagado del mes siguiente, no solo su primera semana.
+  - "Hasta el cobro" cuenta lo pendiente que se carga antes del próximo sueldo (el día de cobro ya cuenta como cobrado), atrasos incluidos, solo en el mes activo y con sueldo configurado.
+  - En Plan la base (sueldo, día de cobro, objetivo) se sigue guardando desde el mes activo; el ahorro real y los ingresos extra van al mes visto.
+  - M18 pregunta también en la revisión de varios gastos y, por defecto, da los cobros anteriores por pagados (fechados el día de su cargo). El cobro de este mes que ya pasó se pregunta aunque el gasto empezara meses atrás.
+  - El foco inicial del timeline no se mueve al cambiar de mes, para no desplazar la barra de mes bajo el dedo.
 - `MonthCloseSheet`, cuando quedan restos tras el cobro:
   1. Resumen frente al plan.
   2. Restos con Pagado/Saltar/Mover (reutiliza `MonthlyExpenseRow`).
@@ -380,7 +477,7 @@ Estado:
 - **M22.** `router.replace` tras guardar en el detalle, más una guarda de cambios sin guardar.
 - Reutiliza el `ActionToast` de F1a-1.
 
-### F2b — Avisos 2.0 y pulido PWA
+### F2b — Avisos 2.0 y pulido PWA (hecho; ver Estado)
 - **Avisos:**
   - Aviso por defecto en Ajustes y campana en las filas.
   - Antelación de 7/14/30 días para anuales y trimestrales.
@@ -392,25 +489,47 @@ Estado:
 - **PWA:** shortcuts (Añadir gasto, Añadir por voz, Plan), `setAppBadge` con los vencidos y los de hoy, `theme-color` por tema, maskable con margen y guía de instalación en iOS.
 
 ### F3 — Backlog de valor (por impacto × esfuerzo)
-1. **Exportar e importar JSON/CSV**, snapshots locales y `storage.persist()`. Reutiliza `normalizeImportedExpenseStore` y `mergeExpenseStores`.
-2. **Recibos variables:** previsto frente a real, sugerencia con la media de los 3 últimos y "¿Actualizar el importe desde ahora?".
-3. **Finalizar o pausar una suscripción:** `endDate`; las pausas como rangos.
-4. **Provisión mensual para anuales** y "próximos recibos grandes (90 días)".
-5. **Cambios de precio programados** e historial de precio.
-6. **Coste por categoría y anualizado.**
-7. **Onboarding:** chips de alta rápida y checklist.
-8. **Pagas extra y "¿Has cobrado?"**; ámbito "solo este mes" al editar el sueldo (M16).
-9. **Catálogo "Todos"** con búsqueda y filtros.
-10. **Campos nuevos:** notas, URL de baja, permanencia, categorías propias y método de pago.
-11. **Comandos por voz o IA** ("marca la luz pagada 71,20").
-12. **Resumen del mes** y **registro de saldo**.
-13. **Ciclo anclado al día de cobro** (opción).
-14. **Festivos** en `estimateChargeDate`.
-15. **Deuda técnica:**
+1. **Exportar e importar JSON/CSV**, snapshots locales y `storage.persist()`. Reutiliza `normalizeImportedExpenseStore` y `mergeExpenseStores`. **Hecho.**
+2. **Recibos variables:** previsto frente a real, sugerencia con la media de los 3 últimos y "¿Actualizar el importe desde ahora?". **Hecho.**
+3. **Finalizar o pausar una suscripción:** `endDate`; las pausas como rangos. **Hecho.**
+4. **Provisión mensual para anuales** y "próximos recibos grandes (90 días)". **Hecho.**
+   - `features/plan/lib/bill-forecast.ts`: la provisión es el coste de los próximos 12 meses de lo que se repite con menos frecuencia que mensual, repartido en 12, y por recibo lo que hay que apartar al mes hasta su próximo cobro.
+   - Recibos grandes: no mensuales y pagos únicos de al menos 50 €, sin pagar, que vencen en los próximos 90 días, por día de cargo.
+5. **Cambios de precio programados** e historial de precio. **Hecho.**
+6. **Coste por categoría y anualizado.** **Hecho.**
+   - `features/plan/lib/recurring-costs.ts`: los próximos 12 meses de presupuesto desde el mes activo, sin pagos únicos ni lo quitado del mes; lo pagado cuenta por lo pagado. Media al mes, parte del sueldo y desglose por gasto.
+7. **Onboarding:** chips de alta rápida y checklist. **Hecho.**
+   - `features/expenses/lib/onboarding.ts` (presets, checklist y visibilidad), `use-onboarding` (permiso de avisos, modo instalado y `beforeinstallprompt`) y `OnboardingCard`.
+   - El sueldo se configura con la misma hoja que Plan (`PlanSettingsSheet`, con las pagas extra); los avisos enlazan a Ajustes; instalar usa el aviso del navegador o una pista (iOS: Compartir › Añadir a pantalla de inicio).
+   - No incluye datos demo relativos a hoy (no se pidió en este bloque).
+8. **Pagas extra y "¿Has cobrado?"**; ámbito "solo este mes" al editar el sueldo (M16). **Hecho** (el aviso push del día de cobro, tipo `payday`, es de F2b y usa el mismo día de cobro).
+9. **Catálogo "Todos"** con búsqueda y filtros. **Hecho.**
+   - `lib/expense-catalog.ts` (próximo cobro, atrasado, coste de los próximos 12 meses, permanencia) y `catalog/ExpenseCatalogSheet`.
+   - Sustituye a la hoja de series (`RecurringOverviewSheet`). El botón de la cabecera marca con un punto las permanencias que acaban. El importe de cada serie es el del cobro que toca, con sus cambios de precio, y el coste anual cuenta lo ya pagado por lo pagado. `buildRecurringOverview` queda sin uso en la UI.
+10. **Campos nuevos:** notas, URL de baja, permanencia, categorías propias y método de pago. **Hecho.**
+    - `domain/expense-details.ts` (`sanitizeExpenseDetails`, `commitmentStatus`) y normalización en `normalizeTemplates` y `normalizeCategories`.
+    - Categorías con `updatedAt` y comandos en `stores/app/category-commands.ts`. Ajustes › Categorías y «Nueva categoría» en el formulario.
+    - Se escriben ya: van dentro de plantillas y categorías, que los builds anteriores guardan tal cual (ver `docs/state-persistence-sync.md`).
+11. **Comandos por voz o IA** ("marca la luz pagada 71,20"). **Hecho.**
+    - `intent` (create, pay, skip, move) en el esquema y el prompt, con los nombres de los gastos del usuario como contexto; la ruta devuelve `commands` aparte.
+    - `parseCaptureTextLocally` entiende las mismas órdenes (español e inglés) sin IA ni conexión.
+    - `domain/capture-commands.ts` resuelve serie y cobro; `CaptureCommandReview` las confirma; `capture-command-actions.ts` las aplica con los comandos de siempre (el mismo `payOccurrenceInStore` que «Pagado con otro importe»; corregir lo pagado conserva la fecha del pago) y las deshace. Mover sigue los límites de la hoja de acciones (`canMoveOccurrence` y `occurrenceMoveRange`, con el ciclo de Ajustes): ni a un mes cerrado, ni lo pagado de un mes cerrado, ni más allá del mes siguiente. Pagar otro importe sugiere la media de los últimos pagos y, al aplicar, pregunta "¿Actualizar el importe desde ahora?" como las acciones del cobro; el aviso con "Deshacer" no se cierra mientras se responde.
+    - Pendiente: medir las órdenes con la clave real en `scripts/eval-ai-parse.mjs` (sin clave en este entorno, como en F1b).
+12. **Resumen del mes** y **registro de saldo**. **Hecho.**
+    - `features/plan/lib/month-summary.ts` y `MonthSummarySheet`. Plan lo ofrece al cerrar un mes, en la primera semana del siguiente y en los tres últimos días del propio.
+    - `finance.balanceCheckins` por fecha, con borrado por `deletedAt` (ver `docs/state-persistence-sync.md`).
+    - Diferido: el saldo disponible hasta el cobro (≈ €/día), pendiente de "Hasta el cobro" (F1a-3).
+13. **Ciclo anclado al día de cobro** (opción). **Hecho.**
+    - `src/domain/budget-cycle.ts` y `finance.budgetCycle`; el ciclo lleva el nombre del mes con más días (cobro ≥ 16: empieza el mes anterior). Ver `docs/domain-model.md`.
+    - Sin modelar: adelantar el inicio cuando el sueldo llega antes por caer el cobro en fin de semana. Al arrastrar, la expansión por días sigue el mes natural.
+14. **Festivos** en `estimateChargeDate`. **Hecho.**
+    - `src/domain/holidays.ts`: festivos nacionales fijos, Jueves y Viernes Santo y cierres de TARGET2. Sin festivos autonómicos ni locales ni traslados al lunes.
+15. **Deuda técnica (hecho):**
     - Borrar el código muerto (`use-current-month-plan.ts`, `annual-plan-summary.ts`, `timelineHorizons`).
     - Pasar `planCopy` y los ternarios a i18n.
     - Tildes.
     - Contraste de `--app-text-subtle`.
+    - Además: los campos de compatibilidad de `MonthlyMoneyPlan`, `SectionCard`/`StatCard`, `createSupabaseBrowserClient`, `getMonthlySavingsTargetEntry`, `MONTHS_ES/EN`, `PlanEmptyLine` (vuelve con las secciones de previsiones de F3, que lo usan) y el `recurrenceLabel` del dominio (solo en español). Quedan los ternarios del dominio (`estimateChargeDate`) y del prompt de la IA, que no son texto de la interfaz.
 
 **Diferido conscientemente** (ver [el informe](./research/2026-10-informe.md) §2 "Baja" y §3):
 - Navegación de Plan (selects y gráfico, §3.14).
@@ -465,9 +584,10 @@ Estado:
   - Tests de preservación de campos, dinero es/en, fechas inválidas, merge con ids deterministas y rekey 5→10→5, y sync dirty/CAS.
   - Migración en un proyecto Supabase de prueba, más el fallback PGRST202.
 - **F1a:** tests de dominio y e2e con `page.clock`. Flujo: pagar el último de octubre → tarjeta → "Pasar a noviembre" → deshacer → los totales cuadran entre pestañas → recargar mantiene el mes → caducidad.
+- **F1a-3:** `tests/e2e/month-close-leftovers.spec.ts` con el reloj el 28-oct a las 10:00 y el 1-nov a las 00:05: cerrar con restos (pagar, mover, ahorro, empezar), resto sin resolver como "Pendiente de octubre", Plan siguiendo al mes visto, pagar desde Revisión, año siguiente en diciembre y cobros anteriores de un gasto nuevo.
 - **F1b:** tests de la ruta; `scripts/eval-ai-parse.mjs` con los umbrales indicados. En el navegador: "Netflix 12,99 el 5 y gimnasio 35 al mes" → 2 tarjetas → guardar.
 - **F2a:** en Chrome Android, dictar → texto en vivo → análisis → revisión. Probar también en modo avión, con el permiso denegado y en Brave. En iOS, el micrófono está oculto. Tests con `SpeechRecognition` mockeado.
-- **F2b:** push de prueba y deep link a la ocurrencia.
+- **F2b:** push de prueba y deep link a la ocurrencia. Tests de dominio (etapas, antelación, zona horaria), del cron (kinds, hora, aislamiento por usuario, `failure_count`) y e2e (`tests/e2e/reminders.spec.ts`). En el dispositivo: activar avisos, "Probar", tocar la notificación y comprobar que abre el cobro; en iPhone, instalar con la guía de Ajustes.
 
 ## Pendiente de confirmar al implementar
 - Qué modelos da el nivel gratuito con la clave del dueño (PR 0).

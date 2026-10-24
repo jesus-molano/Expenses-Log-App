@@ -10,6 +10,8 @@ import { capitalize, formatMonthName } from "../lib/month-view";
 
 type MonthBarProps = {
   monthId: string;
+  // "28 oct – 27 nov" cuando el mes empieza el día de cobro.
+  rangeLabel?: string | null;
   activeMonthId: string;
   calendarMonthId: string;
   language: AppLanguage;
@@ -20,12 +22,15 @@ type MonthBarProps = {
   onReopen: () => void;
   // Destino del foco cuando desaparece o se desactiva el botón usado.
   headingRef: RefObject<HTMLHeadingElement | null>;
+  // En Plan el título de la página es otro: el mes no es un encabezado.
+  titleAs?: "h2" | "p";
 };
 
 // Selector del mes que se mira. Debajo ofrece volver al mes activo, o al
 // natural cuando el activo es el siguiente.
 export function MonthBar({
   monthId,
+  rangeLabel,
   activeMonthId,
   calendarMonthId,
   language,
@@ -35,6 +40,7 @@ export function MonthBar({
   onReset,
   onReopen,
   headingRef,
+  titleAs: Title = "h2",
 }: MonthBarProps) {
   const name = (id: string) => formatMonthName(id, language);
   const backRef = useRef<HTMLButtonElement>(null);
@@ -67,14 +73,17 @@ export function MonthBar({
       </IconButton>
 
       <div className="grid min-w-0 justify-items-center gap-0.5 text-center">
-        <h2
+        <Title
           ref={headingRef}
           tabIndex={-1}
           className="app-focus-ring rounded-[var(--app-radius-sm)] text-base font-semibold text-[var(--app-text)]"
           aria-live="polite"
         >
           {capitalize(formatMonthName(monthId, language, { withYear: true }))}
-        </h2>
+        </Title>
+        {rangeLabel ? (
+          <p className="text-xs text-[var(--app-text-muted)]">{rangeLabel}</p>
+        ) : null}
         {monthId !== activeMonthId ? (
           <Button variant="ghost" size="sm" onClick={onReset}>
             {t("expenses.goToMonth", language).replace("{month}", name(activeMonthId))}

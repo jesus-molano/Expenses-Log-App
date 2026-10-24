@@ -5,6 +5,7 @@ import { Field } from "@/components/ui/Field";
 import { Sheet } from "@/components/ui/Sheet";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
+import { ExtraPayFields } from "./ExtraPayFields";
 import { PlanPaydayField } from "./PlanPaydayField";
 import { PlanSettingsHeader } from "./PlanSettingsHeader";
 
@@ -14,6 +15,10 @@ type PlanSettingsSheetProps = {
   salaryDay: number;
   savingsTarget: string;
   dayPickerOpen: boolean;
+  extraPayMonths: number[];
+  extraPayAmount: string;
+  onToggleExtraPayMonth: (month: number) => void;
+  onExtraPayAmountChange: (value: string) => void;
   onSalaryAmountChange: (value: string) => void;
   onSalaryDayChange: (value: number) => void;
   onSavingsTargetChange: (value: string) => void;
@@ -28,6 +33,10 @@ export function PlanSettingsSheet({
   salaryDay,
   savingsTarget,
   dayPickerOpen,
+  extraPayMonths,
+  extraPayAmount,
+  onToggleExtraPayMonth,
+  onExtraPayAmountChange,
   onSalaryAmountChange,
   onSalaryDayChange,
   onSavingsTargetChange,
@@ -75,6 +84,14 @@ export function PlanSettingsSheet({
               invalidMessage={t("money.amountInvalid", language)}
             />
           </Field>
+
+          <ExtraPayFields
+            months={extraPayMonths}
+            amount={extraPayAmount}
+            language={language}
+            onToggleMonth={onToggleExtraPayMonth}
+            onAmountChange={onExtraPayAmountChange}
+          />
         </div>
 
         <Button type="submit" className="mt-5 w-full" variant="primary" size="lg">

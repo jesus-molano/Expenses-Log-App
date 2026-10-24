@@ -1,20 +1,24 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
-import { formatCurrency } from "@/domain/calendar";
+import { formatCurrency, toDateOnly } from "@/domain/calendar";
+import { resolveReminderPreferences } from "@/domain/reminder-schedule";
 import type {
   AppLanguage,
   ExpenseTemplate,
 } from "@/domain/types";
+import { SeriesDetailSections } from "@/features/expenses/components/detail/SeriesDetailSections";
 import { useExpenseEditor } from "@/features/expenses/hooks/use-expense-editor";
 import { localizedRecurrenceLabel } from "@/features/expenses/lib/recurrence-label";
 import type { SeriesAmountScope } from "@/stores/app/store-commands";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
+import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
+import { ExpenseContractSummary } from "@/features/expenses/components/ExpenseContractSummary";
 import { ExpenseForm } from "@/features/expenses/components/ExpenseForm";
+import { ExpenseDetailDialogs } from "@/features/expenses/components/ExpenseDetailDialogs";
 
 export function ExpenseDetail({ id }: { id: string }) {
   const expenseStore = useExpenseStore();
@@ -107,13 +111,23 @@ function ExpenseDetailForm({
   expenseStore: ReturnType<typeof useExpenseStore>;
   language: AppLanguage;
 }) {
-  const editor = useExpenseEditor({ template, expenseStore, language });
+  const now = useCurrentDate();
+  const editor = useExpenseEditor({ template, expenseStore, language, now });
+  const today = toDateOnly(now);
 
   return (
     <main className="app-page app-page-safe min-h-dvh px-4">
       <div className="mx-auto max-w-2xl">
+        {/* Vuelve atrás en el historial (a la lista); con cambios sin guardar,
+            pregunta antes. */}
         <Link
           href="/"
+          onClick={(event) => {
+            // Con Ctrl/Cmd/Mayús, el navegador abre la lista en otra pestaña.
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            editor.requestLeave();
+          }}
           className="app-button app-button-secondary app-button-sm inline-flex"
         >
           <ArrowLeft size={18} />
@@ -140,11 +154,16 @@ function ExpenseDetailForm({
             </p>
           </div>
 
+          <ExpenseContractSummary template={template} today={today} language={language} />
+
           <div className="mt-5">
             <ExpenseForm
               form={editor.form}
               amountText={editor.amountText}
               language={language}
+              reminderPreferences={resolveReminderPreferences(expenseStore.store)}
+              categories={expenseStore.store.categories}
+              onCreateCategory={expenseStore.createCategory}
               onFormChange={editor.setForm}
               onAmountTextChange={editor.setAmountText}
             />
@@ -172,19 +191,25 @@ function ExpenseDetailForm({
             </Button>
           </div>
         </form>
+
+        <SeriesDetailSections
+          template={template}
+          expenseStore={expenseStore}
+          language={language}
+          now={now}
+        />
       </div>
 
-      {editor.deleteOpen ? (
-        <ConfirmActionDialog
-          icon={<Trash2 size={18} />}
-          title={t("expenses.delete", language)}
-          body={`${t("expenses.deleteConfirm", language)} ${template.name}`}
-          cancelLabel={t("common.back", language)}
-          confirmLabel={t("expenses.delete", language)}
-          onCancel={() => editor.setDeleteOpen(false)}
-          onConfirm={editor.removeExpense}
-        />
-      ) : null}
+      <ExpenseDetailDialogs
+        expenseName={template.name}
+        language={language}
+        deleteOpen={editor.deleteOpen}
+        discardOpen={editor.discardPromptOpen}
+        onCancelDelete={() => editor.setDeleteOpen(false)}
+        onConfirmDelete={editor.removeExpense}
+        onKeepEditing={editor.keepEditing}
+        onDiscardChanges={editor.discardChanges}
+      />
     </main>
   );
 }

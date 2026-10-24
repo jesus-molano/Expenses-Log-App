@@ -2,12 +2,13 @@
 
 import { useRef, useState } from "react";
 import { toDateOnly } from "@/domain/calendar";
+import { sanitizeCaptureCommands, type CaptureCommand } from "@/domain/capture-commands";
 import {
   CAPTURE_TEXT_MAX_LENGTH,
   type CaptureField,
   type CapturedDraft,
 } from "@/domain/expense-capture";
-import { parseExpenseTextLocally } from "@/domain/parser";
+import { parseCaptureTextLocally } from "@/domain/parser";
 import type { AppLanguage, DraftExpense } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { captureReasonLabel, type CaptureReason } from "../lib/capture-labels";
@@ -19,6 +20,8 @@ export type { CaptureReason };
 
 export type CaptureResult = {
   drafts: CapturedDraft[];
+  // Órdenes sobre gastos existentes ("marca la luz pagada").
+  commands: CaptureCommand[];
   provider: "gemini" | "local";
   reason: CaptureReason | null;
 };
@@ -28,6 +31,7 @@ type ParseResponse = {
   reason?: CaptureReason;
   expenses?: DraftExpense[];
   review?: Array<{ missingFields?: CaptureField[]; inferredFields?: CaptureField[] }>;
+  commands?: unknown;
 };
 
 // El navegador espera algo más que el plazo del servidor (10 s) antes de
@@ -37,9 +41,12 @@ const CLIENT_TIMEOUT_MS = 12_000;
 export function useQuickExpenseParser({
   language,
   categories,
+  expenseNames = [],
 }: {
   language: AppLanguage;
   categories: string[];
+  // Gastos del usuario, para que la IA entienda órdenes sobre ellos.
+  expenseNames?: string[];
 }) {
   const [quickText, setQuickText] = useState("");
   const [status, setStatus] = useState<ParserStatus>("idle");
@@ -63,7 +70,7 @@ export function useQuickExpenseParser({
 
     const today = toDateOnly(new Date());
     const local = (reason: CaptureReason): CaptureResult => ({
-      drafts: parseExpenseTextLocally(text, { today, categories }),
+      ...parseCaptureTextLocally(text, { today, categories }),
       provider: "local",
       reason,
     });
@@ -81,7 +88,7 @@ export function useQuickExpenseParser({
       const response = await fetch("/api/ai/parse-expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, today, language, categories }),
+        body: JSON.stringify({ text, today, language, categories, expenseNames }),
         signal: controller.signal,
       });
       if (!response.ok) throw new Error("AI parse failed");
@@ -93,6 +100,7 @@ export function useQuickExpenseParser({
           missingFields: payload.review?.[index]?.missingFields ?? [],
           inferredFields: payload.review?.[index]?.inferredFields ?? [],
         })),
+        commands: sanitizeCaptureCommands(payload.commands),
         provider: payload.provider ?? "local",
         reason: payload.reason ?? null,
       });
@@ -122,20 +130,28 @@ export function useQuickExpenseParser({
     setResult(null);
   }
 
+  const found = result ? result.drafts.length + result.commands.length : 0;
   const statusLabel =
     status === "loading"
       ? t("expenses.analyzing", language)
       : status === "done" && result
         ? result.provider === "local"
           ? captureReasonLabel(result.reason, language)
-          : result.drafts.length === 0
+          : found === 0
             ? t("expenses.aiNothingFound", language)
-            : result.drafts.length > 1
-              ? t("expenses.aiFoundMany", language).replace("{count}", String(result.drafts.length))
-              : t("expenses.aiReady", language)
+            : result.drafts.length === 0
+              ? result.commands.length === 1
+                ? t("captureCommands.foundOne", language)
+                : t("captureCommands.foundMany", language).replace(
+                    "{count}",
+                    String(result.commands.length),
+                  )
+              : result.drafts.length > 1
+                ? t("expenses.aiFoundMany", language).replace("{count}", String(result.drafts.length))
+                : t("expenses.aiReady", language)
         : "";
   const statusTone: ParserStatusTone =
-    status === "done" && result?.provider === "gemini" && result.drafts.length > 0
+    status === "done" && result?.provider === "gemini" && found > 0
       ? "success"
       : status === "done"
         ? "warning"

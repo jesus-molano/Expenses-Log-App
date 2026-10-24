@@ -1,8 +1,10 @@
+import { THEME_COLORS } from "@/shared/theme";
+
 // Se ejecuta al parsear el <head>, sin depender del JavaScript de la app.
 // Next coloca antes sus preloads, CSS y chunks; los fallos previos al script
 // se recuperan de performance al cargar el documento. El script:
 // - aplica idioma y tema guardados en cookies para que la pantalla de carga
-//   no parpadee;
+//   no parpadee, también en la barra del sistema (`theme-color`);
 // - lista los recursos de /_next/static que no cargan en la pantalla de carga;
 // - a los 6 s, si la app sigue sin abrir, anuncia la ayuda a lectores de
 //   pantalla;
@@ -10,6 +12,7 @@
 //   cachés (nunca localStorage) para reparar una instalación atascada.
 export const BOOT_GUARD_SCRIPT = `(function () {
   var root = document.documentElement;
+  var themeColors = ${JSON.stringify(THEME_COLORS)};
   try {
     document.cookie.split("; ").forEach(function (cookie) {
       var parts = cookie.split("=");
@@ -21,6 +24,14 @@ export const BOOT_GUARD_SCRIPT = `(function () {
       }
     });
   } catch (error) {}
+  // La meta del layout llega después de este script: se ajusta al cargar.
+  document.addEventListener("DOMContentLoaded", function () {
+    var color = themeColors[root.getAttribute("data-theme") || ""];
+    if (!color) return;
+    document.querySelectorAll('meta[name="theme-color"]').forEach(function (meta) {
+      meta.setAttribute("content", color);
+    });
+  });
 
   var failed = (window.__bootErrors = []);
   function record(source) {

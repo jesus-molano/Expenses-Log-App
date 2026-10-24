@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  createPushSubscription,
   fetchPushHealth,
   PushApiError,
+  releasePushSubscription,
+  renewPushSubscription,
+  savePushSubscription,
   sendPushTest,
   urlBase64ToUint8Array,
 } from "./push-notifications";
@@ -11,8 +15,29 @@ const subscription = {
 } as PushSubscription;
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
+  Reflect.deleteProperty(navigator, "serviceWorker");
 });
+
+function browserSubscription(endpoint = "https://fcm.googleapis.com/fcm/send/device") {
+  return {
+    endpoint,
+    unsubscribe: vi.fn().mockResolvedValue(true),
+  } as unknown as PushSubscription & { unsubscribe: ReturnType<typeof vi.fn> };
+}
+
+function stubRegistration(current: PushSubscription | null) {
+  const pushManager = {
+    getSubscription: vi.fn().mockResolvedValue(current),
+    subscribe: vi.fn(),
+  };
+  Object.defineProperty(navigator, "serviceWorker", {
+    configurable: true,
+    value: { getRegistration: vi.fn().mockResolvedValue({ pushManager }) },
+  });
+  return pushManager;
+}
 
 describe("urlBase64ToUint8Array", () => {
   it("decodes URL-safe base64 values", () => {
@@ -95,5 +120,170 @@ describe("push API client", () => {
         status: 409,
       }),
     );
+  });
+});
+
+describe("push subscription lifecycle", () => {
+  const publicKey = "SGVsbG8td29ybGQ";
+
+  function registration(existing: Partial<PushSubscription> | null) {
+    const subscribe = vi.fn().mockResolvedValue({ endpoint: "https://push.example.test/new" });
+    return {
+      subscribe,
+      value: {
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(existing),
+          subscribe,
+        },
+      } as unknown as ServiceWorkerRegistration,
+    };
+  }
+
+  it("reuses a subscription created with the current key", async () => {
+    const existing = {
+      endpoint: "https://push.example.test/device",
+      options: { applicationServerKey: urlBase64ToUint8Array(publicKey).buffer },
+    } as unknown as PushSubscription;
+    const { value, subscribe } = registration(existing);
+
+    await expect(createPushSubscription(value, publicKey)).resolves.toBe(existing);
+    expect(subscribe).not.toHaveBeenCalled();
+  });
+
+  it("replaces a subscription created with an old VAPID key", async () => {
+    const unsubscribe = vi.fn().mockResolvedValue(true);
+    const existing = {
+      endpoint: "https://push.example.test/old",
+      options: { applicationServerKey: urlBase64ToUint8Array("T3RoZXIta2V5").buffer },
+      unsubscribe,
+    } as unknown as PushSubscription;
+    const { value, subscribe } = registration(existing);
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(createPushSubscription(value, publicKey)).resolves.toEqual({
+      endpoint: "https://push.example.test/new",
+    });
+    expect(unsubscribe).toHaveBeenCalled();
+    expect(subscribe).toHaveBeenCalledWith(
+      expect.objectContaining({ userVisibleOnly: true }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/push/subscribe",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("tells the server which endpoint a renewal replaces", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const renewed = {
+      endpoint: "https://push.example.test/new",
+      toJSON: () => ({ endpoint: "https://push.example.test/new", keys: { p256dh: "p", auth: "a" } }),
+    } as unknown as PushSubscription;
+
+    await savePushSubscription(renewed, { previousEndpoint: "https://push.example.test/old" });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      endpoint: "https://push.example.test/new",
+      keys: { p256dh: "p", auth: "a" },
+      previousEndpoint: "https://push.example.test/old",
+    });
+  });
+});
+
+describe("releasePushSubscription", () => {
+  it("does nothing without a browser subscription", async () => {
+    stubRegistration(null);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(releasePushSubscription()).resolves.toBe("none");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("deletes the remote registration before unsubscribing the browser", async () => {
+    const order: string[] = [];
+    const subscription = browserSubscription();
+    subscription.unsubscribe.mockImplementation(async () => {
+      order.push("unsubscribe");
+      return true;
+    });
+    stubRegistration(subscription);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        order.push("delete");
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }),
+    );
+
+    await expect(releasePushSubscription()).resolves.toBe("released");
+    expect(order).toEqual(["delete", "unsubscribe"]);
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/push/subscribe",
+      expect.objectContaining({
+        method: "DELETE",
+        body: JSON.stringify({ endpoint: subscription.endpoint }),
+      }),
+    );
+  });
+
+  it("still unsubscribes the browser when the remote delete fails", async () => {
+    const subscription = browserSubscription();
+    stubRegistration(subscription);
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    await expect(releasePushSubscription()).resolves.toBe("incomplete");
+    expect(subscription.unsubscribe).toHaveBeenCalled();
+  });
+
+  it("does not wait for a server that never answers", async () => {
+    vi.useFakeTimers();
+    const subscription = browserSubscription();
+    stubRegistration(subscription);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () =>
+              reject(new DOMException("Aborted", "AbortError")),
+            );
+          }),
+      ),
+    );
+
+    const released = releasePushSubscription({ timeoutMs: 4000 });
+    await vi.advanceTimersByTimeAsync(4000);
+
+    await expect(released).resolves.toBe("incomplete");
+    expect(subscription.unsubscribe).toHaveBeenCalled();
+  });
+});
+
+describe("renewPushSubscription", () => {
+  it("replaces the browser subscription with a new endpoint", async () => {
+    const atobSpy = vi
+      .spyOn(window, "atob")
+      .mockImplementation((value) => Buffer.from(value, "base64").toString("binary"));
+    const current = browserSubscription();
+    const fresh = browserSubscription("https://fcm.googleapis.com/fcm/send/fresh");
+    const pushManager = {
+      getSubscription: vi.fn().mockResolvedValue(current),
+      subscribe: vi.fn().mockResolvedValue(fresh),
+    };
+
+    await expect(
+      renewPushSubscription(
+        { pushManager } as unknown as ServiceWorkerRegistration,
+        "SGVsbG8",
+      ),
+    ).resolves.toBe(fresh);
+    expect(current.unsubscribe).toHaveBeenCalled();
+    expect(pushManager.subscribe).toHaveBeenCalledWith(
+      expect.objectContaining({ userVisibleOnly: true }),
+    );
+    atobSpy.mockRestore();
   });
 });

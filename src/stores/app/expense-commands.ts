@@ -1,15 +1,25 @@
-import { endOfMonth, startOfMonth } from "date-fns";
-import { addMonthId, resolveActiveMonth } from "@/domain/budget-month";
+import { startOfMonth } from "date-fns";
+import { periodIdOf, periodRange } from "@/domain/budget-cycle";
+import { activeBudgetMonth, addMonthId } from "@/domain/budget-month";
 import { normalizeDateOnly, toDateOnly } from "@/domain/calendar";
 import { generateStoreOccurrences } from "@/domain/finance";
 import { occurrenceKeyOf, overrideIdFor } from "@/domain/overrides";
-import { firstChargeAlreadyPassed, firstOccurrenceDate } from "@/domain/recurrence";
+import {
+  firstChargeAlreadyPassed,
+  firstOccurrenceDate,
+  generateOccurrences,
+  passedChargeThisMonth,
+  previousMonthsChargeDates,
+  templateAmountOn,
+} from "@/domain/recurrence";
 import type {
   CreateExpenseOptions,
   DraftExpense,
   ExpenseOccurrence,
+  ExpenseReminderSettings,
   ExpenseStore,
   ExpenseTemplate,
+  PreviousChargesResolution,
 } from "@/domain/types";
 import {
   buildTemplateFromDraft,
@@ -34,8 +44,11 @@ export function addExpenseToStore(
     categoryResult.categoryId,
     startDate,
   );
-  // El pago inicial va al primer cobro real (en un anual, su mes).
-  const occurrenceDate = firstOccurrenceDate(template) ?? startDate;
+  const today = toDateOnly(new Date());
+  // El pago inicial va al cobro de este mes que ya pasó o, si no hay, al
+  // primer cobro real (en un anual, su mes).
+  const occurrenceDate =
+    passedChargeThisMonth(template, today) ?? firstOccurrenceDate(template) ?? startDate;
   const now = new Date().toISOString();
   const initialOverrides =
     options.initialStatus === "paid"
@@ -47,18 +60,48 @@ export function addExpenseToStore(
             occurrenceDate,
             status: "paid" as const,
             paidAt: now,
-            amountPaid: template.amount,
+            amountPaid: templateAmountOn(template, occurrenceDate),
             updatedAt: now,
             statusUpdatedAt: now,
           },
         ]
       : [];
 
-  return {
+  const created: ExpenseStore = {
     ...categoryResult.store,
     templates: [...categoryResult.store.templates, template],
     overrides: [...categoryResult.store.overrides, ...initialOverrides],
   };
+
+  return options.previousCharges
+    ? resolvePreviousCharges(created, template, options.previousCharges, today)
+    : created;
+}
+
+// Cobros de meses anteriores de un gasto recién creado con inicio pasado
+// (M18): pagados, fechados el día de su cargo, o saltados. Sin esto quedarían
+// como impagados en cada mes ya cerrado.
+function resolvePreviousCharges(
+  store: ExpenseStore,
+  template: ExpenseTemplate,
+  resolution: PreviousChargesResolution,
+  today: string,
+): ExpenseStore {
+  const dates = previousMonthsChargeDates(template, today);
+  if (!dates.length) return store;
+  const occurrences = generateOccurrences(
+    [template],
+    store.overrides,
+    dates[0],
+    dates[dates.length - 1],
+    store.preferences?.language,
+  );
+
+  return resolution === "paid"
+    ? markOccurrencesPaidInStore(store, occurrences, {
+        paidAt: (occurrence) => `${occurrence.estimatedChargeDate}T12:00:00.000Z`,
+      })
+    : skipOccurrencesInStore(store, occurrences);
 }
 
 function normalizeDraftStartDate(draft: DraftExpense, startDate: string): DraftExpense {
@@ -92,6 +135,7 @@ export function addExpensesToStore(
             options.initialStatus === "paid" && firstChargeAlreadyPassed(draft, today)
               ? "paid"
               : "due",
+          previousCharges: options.previousCharges,
         }),
       store,
     );
@@ -159,20 +203,36 @@ export function clearExpensesFromStore(store: ExpenseStore): ExpenseStore {
   };
 }
 
-// Pagado con otro importe: se apunta lo pagado; lo previsto del cobro y de la
-// serie no cambia, y "Marcar como pendiente" lo deshace del todo.
+// Marca un cobro como pagado (siempre pagado, no alterna) con lo pagado de
+// verdad, que puede ser otro importe: lo previsto del cobro y de la serie no
+// cambia, y "Marcar como pendiente" lo deshace del todo. Si ya estaba pagado
+// conserva la fecha del pago y solo corrige el importe.
 export function payOccurrenceInStore(
   store: ExpenseStore,
   occurrence: ExpenseOccurrence,
   amountPaid: number,
+  now: Date = new Date(),
 ): ExpenseStore {
   if (!Number.isFinite(amountPaid) || amountPaid <= 0) return store;
-  const now = new Date().toISOString();
+  const key = keyOf(occurrence);
+  const existing = store.overrides.find(
+    (override) => occurrenceKeyOf(override) === occurrenceKeyOf(key),
+  );
+  const previousPaidAt =
+    existing?.status === "paid"
+      ? existing.paidAt
+      : !existing && occurrence.record?.status === "paid"
+        ? occurrence.record.paidAt
+        : undefined;
   return upsertOccurrenceOverride(
     store,
-    keyOf(occurrence),
-    { status: "paid", paidAt: now, amountPaid: Math.round(amountPaid * 100) / 100 },
-    { now },
+    key,
+    {
+      status: "paid",
+      paidAt: previousPaidAt ?? now.toISOString(),
+      amountPaid: Math.round(amountPaid * 100) / 100,
+    },
+    { now: now.toISOString() },
   );
 }
 
@@ -207,6 +267,46 @@ function mergeDeletedIds(
   next: string[],
 ): string[] {
   return Array.from(new Set([...(current ?? []), ...next]));
+}
+
+// Marca pagados varios cobros en un solo cambio del store; los que ya lo
+// estaban no se tocan. `paidAt` permite fechar pagos atrasados.
+export function markOccurrencesPaidInStore(
+  store: ExpenseStore,
+  occurrences: ExpenseOccurrence[],
+  { paidAt }: { paidAt?: (occurrence: ExpenseOccurrence) => string } = {},
+): ExpenseStore {
+  const now = new Date().toISOString();
+  return occurrences
+    .filter((occurrence) => occurrence.status !== "paid")
+    .reduce(
+      (current, occurrence) =>
+        upsertOccurrenceOverride(
+          current,
+          keyOf(occurrence),
+          {
+            status: "paid",
+            paidAt: paidAt?.(occurrence) ?? now,
+            amountPaid: occurrence.template.amount,
+          },
+          { now },
+        ),
+      store,
+    );
+}
+
+export function skipOccurrencesInStore(
+  store: ExpenseStore,
+  occurrences: ExpenseOccurrence[],
+): ExpenseStore {
+  const now = new Date().toISOString();
+  return occurrences
+    .filter((occurrence) => occurrence.status !== "skipped")
+    .reduce(
+      (current, occurrence) =>
+        upsertOccurrenceOverride(current, keyOf(occurrence), { status: "skipped" }, { now }),
+      store,
+    );
 }
 
 export function skipOccurrenceInStore(
@@ -286,8 +386,6 @@ export function moveOccurrenceSeriesInStore(
     : moved;
 }
 
-// Cambia la serie y recoloca los overrides de los meses abiertos si cambia su
-// calendario, para que el pago o el movimiento de este mes no se pierda.
 // Desde cuándo vale un importe nuevo de la serie.
 export type SeriesAmountScope = "current" | "next";
 
@@ -296,6 +394,8 @@ export type SeriesAmountScope = "current" | "next";
 // registros, y aquí se fijan con un override los cobros de un mes cerrado con
 // "Pasar al mes siguiente", los ya pagados (también los adelantados del mes
 // que viene) y, si el cambio vale desde el mes que viene, los del mes activo.
+// Cada cobro conserva el importe que tenía (con sus cambios de precio
+// programados) y solo se fija si el nuevo lo cambiaría.
 export function keepAmountBeforeSeriesChange(
   store: ExpenseStore,
   templateId: string,
@@ -303,12 +403,13 @@ export function keepAmountBeforeSeriesChange(
   { scope = "current", today = new Date() }: { scope?: SeriesAmountScope; today?: Date } = {},
 ): ExpenseStore {
   const template = store.templates.find((item) => item.id === templateId);
-  if (!template || template.amount === nextAmount) return store;
+  if (!template) return store;
 
   const todayId = toDateOnly(today);
-  const activeMonthId = resolveActiveMonth(todayId, store.finance?.monthClosures);
+  // El mes activo y los demás, con el ciclo del presupuesto (como en Gastos).
+  const { monthId: activeMonthId, cycle } = activeBudgetMonth(store.finance, todayId);
   const from = `${todayId.slice(0, 7)}-01`;
-  const to = toDateOnly(endOfMonth(new Date(`${addMonthId(activeMonthId, 1)}-01T00:00:00`)));
+  const to = periodRange(addMonthId(activeMonthId, 1), cycle).end;
   const now = today.toISOString();
 
   return generateStoreOccurrences(store, from, to)
@@ -316,10 +417,11 @@ export function keepAmountBeforeSeriesChange(
       (occurrence) =>
         occurrence.template.id === templateId &&
         !occurrence.record &&
-        occurrence.override?.amount === undefined,
+        occurrence.override?.amount === undefined &&
+        occurrence.template.amount !== nextAmount,
     )
     .filter((occurrence) => {
-      const monthId = occurrence.dueDate.slice(0, 7);
+      const monthId = periodIdOf(occurrence.dueDate, cycle);
       return (
         occurrence.status === "paid" ||
         monthId < activeMonthId ||
@@ -331,13 +433,15 @@ export function keepAmountBeforeSeriesChange(
         upsertOccurrenceOverride(
           current,
           keyOf(occurrence),
-          { amount: template.amount },
+          { amount: occurrence.template.amount },
           { defaults: { status: occurrence.status }, now },
         ),
       store,
     );
 }
 
+// Cambia la serie y recoloca los overrides de los meses abiertos si cambia su
+// calendario, para que el pago o el movimiento de este mes no se pierda.
 export function updateExpenseTemplateInStore(
   store: ExpenseStore,
   templateId: string,
@@ -366,6 +470,16 @@ export function updateExpenseTemplateInStore(
   );
 }
 
+// Aviso propio de un gasto (la campana de la fila). undefined lo devuelve al
+// aviso por defecto de Ajustes.
+export function setTemplateReminderInStore(
+  store: ExpenseStore,
+  templateId: string,
+  reminder: ExpenseReminderSettings | undefined,
+): ExpenseStore {
+  return updateExpenseTemplateInStore(store, templateId, { reminder });
+}
+
 export function updateMonthlyExpenseOccurrenceInStore(
   store: ExpenseStore,
   input: MonthlyExpenseOverrideInput,
@@ -381,6 +495,11 @@ export function updateMonthlyExpenseOccurrenceInStore(
   const now = new Date().toISOString();
   const amount = Number(input.amount);
   if (!Number.isFinite(amount) || amount <= 0) return store;
+  // Lo pagado puede diferir de lo previsto; sin dato, se pagó lo previsto.
+  const amountPaid =
+    input.amountPaid !== undefined && Number.isFinite(input.amountPaid) && input.amountPaid > 0
+      ? input.amountPaid
+      : amount;
 
   return upsertOccurrenceOverride(
     categoryResult.store,
@@ -392,7 +511,7 @@ export function updateMonthlyExpenseOccurrenceInStore(
       amount,
       categoryId: categoryResult.categoryId,
       paidAt: input.status === "paid" ? existing?.paidAt ?? now : undefined,
-      amountPaid: input.status === "paid" ? amount : undefined,
+      amountPaid: input.status === "paid" ? amountPaid : undefined,
     },
     { now },
   );

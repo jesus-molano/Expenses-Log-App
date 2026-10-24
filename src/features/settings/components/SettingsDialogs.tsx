@@ -2,6 +2,7 @@
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { t } from "@/shared/i18n";
 import type { SettingsController } from "../types";
+import { SignOutSheet } from "./SignOutSheet";
 
 export function SettingsDialogs({
   settings,
@@ -10,12 +11,22 @@ export function SettingsDialogs({
 }) {
   return (
     <>
+      {settings.signOutOpen ? (
+        <SignOutSheet
+          language={settings.currentLanguage}
+          hasPendingChanges={settings.signOutHasPendingChanges}
+          busy={settings.isSigningOut}
+          onClose={settings.closeSignOutDialog}
+          onSignOut={settings.handleSignOut}
+        />
+      ) : null}
+
       {settings.clearExpensesOpen ? (
         <ConfirmActionDialog
           icon={<Trash2 size={18} />}
           title={t("settings.clearExpenses", settings.currentLanguage)}
           body={t("settings.clearExpensesConfirm", settings.currentLanguage)}
-          cancelLabel={t("common.back", settings.currentLanguage)}
+          cancelLabel={t("common.cancel", settings.currentLanguage)}
           confirmLabel={t("settings.clearExpensesAction", settings.currentLanguage)}
           loading={settings.isClearingExpenses}
           onCancel={() => {
@@ -30,7 +41,7 @@ export function SettingsDialogs({
           icon={<Trash2 size={18} />}
           title={t("settings.clearIncome", settings.currentLanguage)}
           body={t("settings.clearIncomeConfirm", settings.currentLanguage)}
-          cancelLabel={t("common.back", settings.currentLanguage)}
+          cancelLabel={t("common.cancel", settings.currentLanguage)}
           confirmLabel={t("settings.clearIncomeAction", settings.currentLanguage)}
           loading={settings.isClearingIncome}
           onCancel={() => {
@@ -45,7 +56,7 @@ export function SettingsDialogs({
           icon={<UserX size={18} />}
           title={t("settings.deleteAccount", settings.currentLanguage)}
           body={t("settings.deleteAccountConfirm", settings.currentLanguage)}
-          cancelLabel={t("common.back", settings.currentLanguage)}
+          cancelLabel={t("common.cancel", settings.currentLanguage)}
           confirmLabel={t("settings.delete", settings.currentLanguage)}
           confirmPhrase={settings.deleteAccountPhrase}
           confirmPhraseLabel={t(

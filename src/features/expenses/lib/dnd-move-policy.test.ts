@@ -111,6 +111,24 @@ describe("resolveDragMove", () => {
       }),
     ).toBe("single");
   });
+
+  it("uses the first open day of a payday cycle as the floor", () => {
+    const bill = occurrence("2026-11-05");
+    const viewing = { currentMonth: "2026-11", openMonth: "2026-10", floorDate: "2026-10-28" };
+
+    expect(isDropTargetAllowed({ date: "2026-10-30" }, "2026-11", "2026-10", "2026-10-28")).toBe(
+      true,
+    );
+    expect(isDropTargetAllowed({ date: "2026-10-27" }, "2026-11", "2026-10", "2026-10-28")).toBe(
+      false,
+    );
+    expect(
+      resolveDragMove({ occurrence: bill, target: { date: "2026-10-30", rowId: undefined }, ...viewing }),
+    ).not.toBe("ignore");
+    expect(
+      resolveDragMove({ occurrence: bill, target: { date: "2026-10-20", rowId: undefined }, ...viewing }),
+    ).toBe("ignore");
+  });
 });
 
 describe("canMoveOccurrence", () => {

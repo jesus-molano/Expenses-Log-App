@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
+import { AppBadgeSync } from "@/app/providers/AppBadgeSync";
 import { AppBootShell } from "@/app/providers/AppBootShell";
 import { BOOT_GUARD_SCRIPT } from "@/app/providers/boot-guard-script";
 import { OrphanLayerGuard } from "@/app/providers/OrphanLayerGuard";
+import { PushHeartbeat } from "@/app/providers/PushHeartbeat";
 import { PwaRegister } from "@/app/providers/PwaRegister";
 import { ThemeApplier } from "@/app/providers/ThemeApplier";
+import { DEFAULT_THEME, THEME_COLORS } from "@/shared/theme";
 import { ExpenseStoreProvider } from "@/stores/app/use-expense-store";
 import "./globals.css";
 
@@ -22,7 +25,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Expense Reminders",
   description: "Seguimiento inteligente de gastos recurrentes",
-  manifest: "/manifest.webmanifest?v=6",
+  manifest: "/manifest.webmanifest?v=7",
   appleWebApp: {
     capable: true,
     title: "Expense Log",
@@ -53,6 +56,9 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-visual",
+  // Color del tema por defecto; `boot-guard` y `ThemeApplier` lo cambian al
+  // del tema elegido.
+  themeColor: THEME_COLORS[DEFAULT_THEME],
 };
 
 export default function RootLayout({
@@ -77,8 +83,10 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ThemeApplier />
         <PwaRegister />
+        <PushHeartbeat />
         <OrphanLayerGuard />
         <ExpenseStoreProvider fallback={<AppBootShell />}>
+          <AppBadgeSync />
           {children}
         </ExpenseStoreProvider>
       </body>

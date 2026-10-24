@@ -4,6 +4,7 @@ import {
   isValidMoneyInput,
   isValidPositiveMoneyInput,
   parseMoneyInput,
+  parseSignedMoneyInput,
 } from "./money";
 
 describe("parseMoneyInput", () => {
@@ -74,5 +75,28 @@ describe("isValidMoneyInput", () => {
     expect(isValidMoneyInput("0")).toBe(false);
     expect(isValidMoneyInput("", { allowZero: true })).toBe(false);
     expect(isValidMoneyInput("abc", { allowZero: true })).toBe(false);
+  });
+});
+
+describe("parseSignedMoneyInput", () => {
+  it.each([
+    ["1.234,56", 1234.56],
+    ["-35", -35],
+    ["− 1.200,50", -1200.5],
+    ["-0", 0],
+    ["0", 0],
+    ["  -12,5 €", -12.5],
+  ])("reads %s as %d", (input, expected) => {
+    expect(parseSignedMoneyInput(input)).toBe(expected);
+  });
+
+  it.each(["", "-", "--5", "5-", "abc", "-1,2,3"])("rejects %j", (input) => {
+    expect(parseSignedMoneyInput(input)).toBeNull();
+  });
+
+  it("lets a balance field accept negatives and zero", () => {
+    expect(isValidMoneyInput("-35", { allowNegative: true })).toBe(true);
+    expect(isValidMoneyInput("0", { allowNegative: true })).toBe(true);
+    expect(isValidMoneyInput("-35")).toBe(false);
   });
 });

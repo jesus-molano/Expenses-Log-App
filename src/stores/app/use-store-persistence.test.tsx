@@ -2,12 +2,22 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { AuthRetryableFetchError, type User } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppSupabaseClient } from "@/data/supabase/database.types";
-import { saveExpenseStore } from "@/data/persistence/local-store";
-import { loadCloudStore, saveCloudStore } from "@/data/persistence/cloud-store";
+import {
+  EXPENSE_STORE_KEY,
+  loadExpenseStore,
+  saveExpenseStore,
+} from "@/data/persistence/local-store";
+import {
+  loadCloudStore,
+  saveCloudStore,
+  type CloudStoreResult,
+  type CloudStoreSaveResult,
+} from "@/data/persistence/cloud-store";
 import { readSyncMeta, writeSyncMeta } from "@/data/persistence/sync-meta-store";
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore } from "@/domain/types";
 import { createClient } from "@/utils/supabase/client";
+import { CLOUD_PULL_THROTTLE_MS } from "./sync-policy";
 import { useStorePersistence } from "./use-store-persistence";
 
 vi.mock("@/utils/supabase/client", () => ({
@@ -23,13 +33,15 @@ vi.mock("@/data/persistence/cloud-store", () => ({
   saveCloudStore: vi.fn(),
 }));
 
-function storeWithTemplate(id: string): ExpenseStore {
+// Por defecto, datos creados sin sesión ("demo"): son de la primera cuenta que
+// entra.
+function storeWithTemplate(id: string, userId = "demo"): ExpenseStore {
   return {
     ...emptyStore,
     templates: [
       {
         id,
-        userId: "user",
+        userId,
         name: id,
         description: "",
         amount: 1,
@@ -58,9 +70,37 @@ function signedInClient(user: User) {
 }
 
 const stableOnHydrate = vi.fn();
+const SAVED: CloudStoreSaveResult = { status: "saved", mode: "table", revision: 4 };
 
 function templateIds(store: ExpenseStore) {
   return store.templates.map((item) => item.id);
+}
+
+function storeWithTemplates(...ids: string[]): ExpenseStore {
+  return {
+    ...emptyStore,
+    templates: ids.flatMap((id) => storeWithTemplate(id).templates),
+  };
+}
+
+// Otra pestaña escribe en el dispositivo y el navegador avisa a esta.
+function writeFromOtherTab(store: ExpenseStore, { notify = true } = {}) {
+  window.localStorage.setItem(EXPENSE_STORE_KEY, JSON.stringify(store));
+  if (notify) {
+    window.dispatchEvent(new StorageEvent("storage", { key: EXPENSE_STORE_KEY }));
+  }
+}
+
+function returnToApp() {
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    value: "visible",
+  });
+  document.dispatchEvent(new Event("visibilitychange"));
+}
+
+function savedTemplateIds(call: number) {
+  return templateIds(vi.mocked(saveCloudStore).mock.calls[call][2]);
 }
 
 function deferred<T>() {
@@ -139,7 +179,7 @@ describe("useStorePersistence", () => {
     const initialStore = storeWithTemplate("initial");
     const latestStore = storeWithTemplate("latest");
     const cloudStore = storeWithTemplate("cloud");
-    const cloudLoad = deferred<{ store: ExpenseStore; mode: "table" }>();
+    const cloudLoad = deferred<CloudStoreResult>();
     const user = {
       id: "00000000-0000-4000-8000-000000000001",
     } as User;
@@ -164,7 +204,7 @@ describe("useStorePersistence", () => {
     saveExpenseStore(initialStore);
     vi.mocked(createClient).mockReturnValue(supabase);
     vi.mocked(loadCloudStore).mockReturnValue(cloudLoad.promise);
-    vi.mocked(saveCloudStore).mockResolvedValue({ mode: "table" });
+    vi.mocked(saveCloudStore).mockResolvedValue(SAVED);
 
     const { result } = renderHook(() => useStorePersistence({ onHydrate }));
 
@@ -174,7 +214,7 @@ describe("useStorePersistence", () => {
       result.current.persist(latestStore, onPersist);
     });
 
-    cloudLoad.resolve({ store: cloudStore, mode: "table" });
+    cloudLoad.resolve({ store: cloudStore, mode: "table", revision: 3 });
 
     await waitFor(() => expect(saveCloudStore).toHaveBeenCalled());
 
@@ -225,8 +265,12 @@ describe("useStorePersistence", () => {
 
     saveExpenseStore(localStore);
     vi.mocked(createClient).mockReturnValue(supabase);
-    vi.mocked(loadCloudStore).mockResolvedValue({ store: cloudStore, mode: "table" });
-    vi.mocked(saveCloudStore).mockResolvedValue({ mode: "table" });
+    vi.mocked(loadCloudStore).mockResolvedValue({
+      store: cloudStore,
+      mode: "table",
+      revision: 3,
+    });
+    vi.mocked(saveCloudStore).mockResolvedValue(SAVED);
 
     renderHook(() => useStorePersistence({ onHydrate }));
 
@@ -266,8 +310,9 @@ describe("useStorePersistence", () => {
     vi.mocked(loadCloudStore).mockResolvedValue({
       store: storeWithTemplate("cloud"),
       mode: "table",
+      revision: 3,
     });
-    vi.mocked(saveCloudStore).mockResolvedValue({ mode: "table" });
+    vi.mocked(saveCloudStore).mockResolvedValue(SAVED);
     const onHydrate = vi.fn();
 
     const { result } = renderHook(() => useStorePersistence({ onHydrate }));
@@ -290,6 +335,7 @@ describe("useStorePersistence", () => {
     vi.mocked(loadCloudStore).mockResolvedValue({
       store: storeWithTemplate("cloud"),
       mode: "table",
+      revision: 3,
     });
     const onHydrate = vi.fn();
 
@@ -301,12 +347,31 @@ describe("useStorePersistence", () => {
     expect(readSyncMeta()).toMatchObject({ ownerId: user.id, dirty: false });
   });
 
+  it("does not upload data another account synced before the sync metadata existed", async () => {
+    const user = { id: "00000000-0000-4000-8000-000000000010" } as User;
+    // Sin `expense-log-sync-v1`: el dueño sale de los ids de los propios datos.
+    saveExpenseStore(
+      storeWithTemplate("previous-account", "00000000-0000-4000-8000-000000000097"),
+    );
+    vi.mocked(createClient).mockReturnValue(signedInClient(user));
+    vi.mocked(loadCloudStore).mockResolvedValue({ store: null, mode: "table", revision: null });
+    const onHydrate = vi.fn();
+
+    const { result } = renderHook(() => useStorePersistence({ onHydrate }));
+
+    await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+    expect(saveCloudStore).not.toHaveBeenCalled();
+    expect(templateIds(onHydrate.mock.lastCall?.[0])).toEqual([]);
+    expect(readSyncMeta()).toMatchObject({ ownerId: user.id, dirty: false });
+  });
+
   it("after a failed save, merges with the cloud again instead of replaying the old copy", async () => {
     const user = { id: "00000000-0000-4000-8000-000000000005" } as User;
     vi.mocked(createClient).mockReturnValue(signedInClient(user));
     vi.mocked(loadCloudStore).mockResolvedValue({
       store: storeWithTemplate("cloud"),
       mode: "table",
+      revision: 3,
     });
     const onHydrate = vi.fn();
     const { result } = renderHook(() => useStorePersistence({ onHydrate }));
@@ -336,8 +401,9 @@ describe("useStorePersistence", () => {
         ],
       },
       mode: "table",
+      revision: 3,
     });
-    vi.mocked(saveCloudStore).mockResolvedValue({ mode: "table" });
+    vi.mocked(saveCloudStore).mockResolvedValue(SAVED);
     act(() => {
       window.dispatchEvent(new Event("online"));
     });
@@ -357,8 +423,16 @@ describe("useStorePersistence", () => {
     saveExpenseStore(storeWithTemplate("offline-edit"));
     writeSyncMeta({ ownerId: user.id, dirty: true });
     vi.mocked(createClient).mockReturnValue(signedInClient(user));
-    vi.mocked(loadCloudStore).mockResolvedValue({ store: null, mode: "unavailable" });
-    vi.mocked(saveCloudStore).mockResolvedValue({ mode: "unavailable" });
+    vi.mocked(loadCloudStore).mockResolvedValue({
+      store: null,
+      mode: "unavailable",
+      revision: null,
+    });
+    vi.mocked(saveCloudStore).mockResolvedValue({
+      status: "saved",
+      mode: "unavailable",
+      revision: null,
+    });
 
     const { result } = renderHook(() =>
       useStorePersistence({ onHydrate: stableOnHydrate }),
@@ -374,7 +448,7 @@ describe("useStorePersistence", () => {
     saveExpenseStore(storeWithTemplate("previous-account"));
     writeSyncMeta({ ownerId: "00000000-0000-4000-8000-000000000098", dirty: true });
     vi.mocked(createClient).mockReturnValue(signedInClient(user));
-    vi.mocked(loadCloudStore).mockResolvedValue({ store: null, mode: "table" });
+    vi.mocked(loadCloudStore).mockResolvedValue({ store: null, mode: "table", revision: null });
     const onHydrate = vi.fn();
 
     const { result } = renderHook(() => useStorePersistence({ onHydrate }));
@@ -419,8 +493,9 @@ describe("useStorePersistence", () => {
     vi.mocked(loadCloudStore).mockResolvedValue({
       store: storeWithTemplate("cloud"),
       mode: "table",
+      revision: 3,
     });
-    vi.mocked(saveCloudStore).mockResolvedValue({ mode: "table" });
+    vi.mocked(saveCloudStore).mockResolvedValue(SAVED);
     act(() => {
       window.dispatchEvent(new Event("online"));
     });
@@ -430,5 +505,232 @@ describe("useStorePersistence", () => {
       "cloud",
       "offline-edit",
     ]);
+  });
+
+  describe("multi-device sync", () => {
+    const user = { id: "00000000-0000-4000-8000-000000000010" } as User;
+
+    async function renderSignedIn(cloud: CloudStoreResult) {
+      vi.mocked(createClient).mockReturnValue(signedInClient(user));
+      vi.mocked(loadCloudStore).mockResolvedValue(cloud);
+      vi.mocked(saveCloudStore).mockResolvedValue(SAVED);
+      const onHydrate = vi.fn();
+      const rendered = renderHook(() => useStorePersistence({ onHydrate }));
+      await waitFor(() => expect(rendered.result.current.syncStatus).toBe("synced"));
+      return { ...rendered, onHydrate };
+    }
+
+    it("saves on top of the cloud revision it loaded", async () => {
+      saveExpenseStore(storeWithTemplate("offline-edit"));
+      writeSyncMeta({ ownerId: user.id, dirty: true });
+
+      await renderSignedIn({ store: storeWithTemplate("cloud"), mode: "table", revision: 3 });
+
+      expect(vi.mocked(saveCloudStore).mock.calls[0][3]).toBe(3);
+      expect(readSyncMeta().dirty).toBe(false);
+    });
+
+    it("merges with the newer cloud and retries when another device saved first", async () => {
+      const { result, onHydrate } = await renderSignedIn({
+        store: storeWithTemplate("cloud"),
+        mode: "table",
+        revision: 3,
+      });
+
+      // El portátil guardó mientras tanto: el CAS de este dispositivo choca.
+      vi.mocked(saveCloudStore)
+        .mockResolvedValueOnce({ status: "conflict", revision: 5 })
+        .mockResolvedValue({ status: "saved", mode: "table", revision: 6 });
+      vi.mocked(loadCloudStore).mockResolvedValue({
+        store: storeWithTemplates("cloud", "laptop"),
+        mode: "table",
+        revision: 5,
+      });
+      act(() => {
+        result.current.persist(storeWithTemplates("cloud", "phone"), vi.fn());
+        window.dispatchEvent(new Event("pagehide"));
+      });
+
+      await waitFor(() => expect(saveCloudStore).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+      expect(vi.mocked(saveCloudStore).mock.calls[0][3]).toBe(3);
+      expect(vi.mocked(saveCloudStore).mock.calls[1][3]).toBe(5);
+      expect(savedTemplateIds(1)).toEqual(["cloud", "laptop", "phone"]);
+      expect(templateIds(onHydrate.mock.lastCall?.[0])).toEqual(["cloud", "laptop", "phone"]);
+      expect(templateIds(loadExpenseStore())).toEqual(["cloud", "laptop", "phone"]);
+      expect(readSyncMeta()).toMatchObject({ ownerId: user.id, dirty: false });
+
+      // El siguiente guardado parte de la revisión que confirmó la nube.
+      act(() => {
+        result.current.persist(storeWithTemplates("cloud", "laptop", "phone", "next"), vi.fn());
+        window.dispatchEvent(new Event("pagehide"));
+      });
+      await waitFor(() => expect(saveCloudStore).toHaveBeenCalledTimes(3));
+      expect(vi.mocked(saveCloudStore).mock.calls[2][3]).toBe(6);
+    });
+
+    it("keeps working before the migration, without revisions", async () => {
+      saveExpenseStore(storeWithTemplate("offline-edit"));
+      writeSyncMeta({ ownerId: user.id, dirty: true });
+      vi.mocked(createClient).mockReturnValue(signedInClient(user));
+      vi.mocked(loadCloudStore).mockResolvedValue({
+        store: storeWithTemplate("cloud"),
+        mode: "table",
+        revision: null,
+      });
+      vi.mocked(saveCloudStore).mockResolvedValue({
+        status: "saved",
+        mode: "table",
+        revision: null,
+      });
+
+      const { result } = renderHook(() => useStorePersistence({ onHydrate: stableOnHydrate }));
+
+      await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+      expect(vi.mocked(saveCloudStore).mock.calls[0][3]).toBeNull();
+      expect(savedTemplateIds(0)).toEqual(["cloud", "offline-edit"]);
+      expect(readSyncMeta().dirty).toBe(false);
+    });
+
+    it("pulls changes from other devices when returning to the app", async () => {
+      const { result, onHydrate } = await renderSignedIn({
+        store: storeWithTemplate("cloud"),
+        mode: "table",
+        revision: 3,
+      });
+      const now = Date.now();
+      vi.mocked(loadCloudStore).mockResolvedValue({
+        store: storeWithTemplates("cloud", "laptop"),
+        mode: "table",
+        revision: 4,
+      });
+
+      // Recién sincronizado: volver a la app no vuelve a pedir la nube.
+      act(() => returnToApp());
+      expect(loadCloudStore).toHaveBeenCalledTimes(1);
+
+      vi.spyOn(Date, "now").mockReturnValue(now + CLOUD_PULL_THROTTLE_MS + 1);
+      act(() => returnToApp());
+
+      await waitFor(() =>
+        expect(templateIds(onHydrate.mock.lastCall?.[0])).toEqual(["cloud", "laptop"]),
+      );
+      expect(loadCloudStore).toHaveBeenCalledTimes(2);
+      expect(saveCloudStore).not.toHaveBeenCalled();
+      expect(result.current.syncMessage).toBe(
+        "Sincronizado · con cambios de otro dispositivo",
+      );
+      expect(templateIds(loadExpenseStore())).toEqual(["cloud", "laptop"]);
+    });
+
+    it("does not rehydrate when the cloud revision has not changed", async () => {
+      const { onHydrate } = await renderSignedIn({
+        store: storeWithTemplate("cloud"),
+        mode: "table",
+        revision: 3,
+      });
+      const hydrations = onHydrate.mock.calls.length;
+      vi.spyOn(Date, "now").mockReturnValue(Date.now() + CLOUD_PULL_THROTTLE_MS + 1);
+
+      act(() => returnToApp());
+
+      await waitFor(() => expect(loadCloudStore).toHaveBeenCalledTimes(2));
+      expect(onHydrate).toHaveBeenCalledTimes(hydrations);
+    });
+
+    it("merges and uploads unsynced local changes found when pulling", async () => {
+      const { onHydrate } = await renderSignedIn({
+        store: storeWithTemplate("cloud"),
+        mode: "table",
+        revision: 3,
+      });
+      // Otra pestaña dejó cambios sin subir (el estado de sync es compartido).
+      writeFromOtherTab(storeWithTemplates("cloud", "tab"), { notify: false });
+      writeSyncMeta({ ownerId: user.id, dirty: true });
+      vi.mocked(loadCloudStore).mockResolvedValue({
+        store: storeWithTemplates("cloud", "laptop"),
+        mode: "table",
+        revision: 4,
+      });
+      vi.spyOn(Date, "now").mockReturnValue(Date.now() + CLOUD_PULL_THROTTLE_MS + 1);
+
+      act(() => returnToApp());
+
+      await waitFor(() => expect(saveCloudStore).toHaveBeenCalled());
+      expect(vi.mocked(saveCloudStore).mock.calls[0][3]).toBe(4);
+      expect(savedTemplateIds(0)).toEqual(["cloud", "laptop", "tab"]);
+      expect(templateIds(onHydrate.mock.lastCall?.[0])).toEqual(["cloud", "laptop", "tab"]);
+    });
+  });
+
+  describe("between tabs", () => {
+    beforeEach(() => {
+      vi.mocked(createClient).mockReturnValue(null);
+    });
+
+    it("shows what another tab saved without writing it back", async () => {
+      saveExpenseStore(storeWithTemplate("a"));
+      const onHydrate = vi.fn();
+      const { result } = renderHook(() => useStorePersistence({ onHydrate }));
+      await waitFor(() => expect(result.current.isHydrated).toBe(true));
+
+      const fromOtherTab = storeWithTemplates("a", "b");
+      act(() => writeFromOtherTab(fromOtherTab));
+
+      expect(templateIds(onHydrate.mock.lastCall?.[0])).toEqual(["a", "b"]);
+      expect(window.localStorage.getItem(EXPENSE_STORE_KEY)).toBe(
+        JSON.stringify(fromOtherTab),
+      );
+
+      // La siguiente edición de esta pestaña lleva lo de la otra.
+      act(() => result.current.persist(storeWithTemplates("a", "b", "c"), vi.fn()));
+      expect(templateIds(loadExpenseStore())).toEqual(["a", "b", "c"]);
+    });
+
+    it("does not lose another tab's save that arrives just before an edit", async () => {
+      saveExpenseStore(storeWithTemplate("a"));
+      const { result } = renderHook(() => useStorePersistence({ onHydrate: stableOnHydrate }));
+      await waitFor(() => expect(result.current.isHydrated).toBe(true));
+
+      // La otra pestaña guarda y esta edita antes de recibir el aviso.
+      writeFromOtherTab(storeWithTemplates("a", "x"), { notify: false });
+      const onPersist = vi.fn();
+      act(() => result.current.persist(storeWithTemplates("a", "c"), onPersist));
+
+      expect(templateIds(onPersist.mock.lastCall?.[0])).toEqual(["a", "x", "c"]);
+      expect(templateIds(loadExpenseStore())).toEqual(["a", "x", "c"]);
+    });
+
+    it("ignores the data of another account written by another tab", async () => {
+      saveExpenseStore(storeWithTemplate("mine"));
+      writeSyncMeta({ ownerId: "00000000-0000-4000-8000-000000000001", dirty: false });
+      const onHydrate = vi.fn();
+      const { result } = renderHook(() => useStorePersistence({ onHydrate }));
+      await waitFor(() => expect(result.current.isHydrated).toBe(true));
+      const hydrations = onHydrate.mock.calls.length;
+
+      writeSyncMeta({ ownerId: "00000000-0000-4000-8000-000000000002", dirty: false });
+      act(() => writeFromOtherTab(storeWithTemplate("someone-else")));
+
+      expect(onHydrate).toHaveBeenCalledTimes(hydrations);
+    });
+
+    it("ignores storage events for other keys", async () => {
+      saveExpenseStore(storeWithTemplate("a"));
+      const onHydrate = vi.fn();
+      const { result } = renderHook(() => useStorePersistence({ onHydrate }));
+      await waitFor(() => expect(result.current.isHydrated).toBe(true));
+      const hydrations = onHydrate.mock.calls.length;
+
+      window.localStorage.setItem(
+        EXPENSE_STORE_KEY,
+        JSON.stringify(storeWithTemplates("a", "b")),
+      );
+      act(() => {
+        window.dispatchEvent(new StorageEvent("storage", { key: "expense-theme" }));
+      });
+
+      expect(onHydrate).toHaveBeenCalledTimes(hydrations);
+    });
   });
 });

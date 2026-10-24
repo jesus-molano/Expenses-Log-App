@@ -16,6 +16,9 @@ type SelectMenuProps<T extends string | number> = {
   onChange: (value: T) => void;
   label?: string;
   align?: "left" | "right";
+  // Respeta el orden recibido (p. ej. "Todas" primero) en vez de ordenar por
+  // nombre.
+  keepOrder?: boolean;
 };
 
 export function SelectMenu<T extends string | number>({
@@ -26,14 +29,17 @@ export function SelectMenu<T extends string | number>({
   onChange,
   label,
   align,
+  keepOrder = false,
 }: SelectMenuProps<T>) {
   const selected = options.find((option) => option.value === value);
-  const sortedOptions = [...options].sort((left, right) =>
-    left.label.localeCompare(right.label, undefined, {
-      numeric: true,
-      sensitivity: "base",
-    }),
-  );
+  const sortedOptions = keepOrder
+    ? options
+    : [...options].sort((left, right) =>
+        left.label.localeCompare(right.label, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      );
 
   function selectOption(nextValue: T, restoreFocus: boolean) {
     onChange(nextValue);

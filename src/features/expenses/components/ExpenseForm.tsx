@@ -1,6 +1,11 @@
-import { BellRing } from "lucide-react";
-import { Surface } from "@/components/ui/Surface";
-import type { AppLanguage, DraftExpense } from "@/domain/types";
+import type { CategoryInput } from "@/domain/categories";
+import { DEFAULT_REMINDER_PREFERENCES } from "@/domain/reminder-schedule";
+import type {
+  AppLanguage,
+  DraftExpense,
+  ExpenseCategory,
+  ReminderPreferences,
+} from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { isValidPositiveMoneyInput } from "@/shared/money";
 import {
@@ -8,11 +13,18 @@ import {
   ExpenseField,
   ExpenseSchedulePicker,
 } from "./ExpenseFormControls";
+import { ExpenseDetailsFields } from "./form/ExpenseDetailsFields";
+import { ReminderControls } from "./form/ReminderControls";
 
 type ExpenseFormProps = {
   form: DraftExpense;
   amountText: string;
   language: AppLanguage;
+  // Aviso por defecto de Ajustes, para mostrar el de un gasto sin ajuste propio.
+  reminderPreferences?: ReminderPreferences;
+  // Categorías guardadas (propias y colores) y alta de una nueva.
+  categories?: ExpenseCategory[];
+  onCreateCategory?: (input: CategoryInput) => string | null;
   onFormChange: (form: DraftExpense) => void;
   onAmountTextChange: (value: string) => void;
 };
@@ -21,6 +33,9 @@ export function ExpenseForm({
   form,
   amountText,
   language,
+  reminderPreferences = DEFAULT_REMINDER_PREFERENCES,
+  categories,
+  onCreateCategory,
   onFormChange,
   onAmountTextChange,
 }: ExpenseFormProps) {
@@ -74,6 +89,8 @@ export function ExpenseForm({
       <CategoryPicker
         value={form.categoryName}
         language={language}
+        categories={categories}
+        onCreateCategory={onCreateCategory}
         onChange={(categoryName) => onFormChange({ ...form, categoryName })}
       />
 
@@ -85,88 +102,12 @@ export function ExpenseForm({
 
       <ReminderControls
         value={form}
+        preferences={reminderPreferences}
         language={language}
         onChange={onFormChange}
       />
+
+      <ExpenseDetailsFields value={form} language={language} onChange={onFormChange} />
     </div>
-  );
-}
-
-function ReminderControls({
-  value,
-  language,
-  onChange,
-}: {
-  value: DraftExpense;
-  language: AppLanguage;
-  onChange: (form: DraftExpense) => void;
-}) {
-  const reminder = value.reminder ?? { enabled: false, daysBeforeCharge: 3 };
-
-  function setEnabled(enabled: boolean) {
-    onChange({
-      ...value,
-      reminder: {
-        enabled,
-        daysBeforeCharge: reminder.daysBeforeCharge,
-      },
-    });
-  }
-
-  function setDaysBeforeCharge(daysBeforeCharge: number) {
-    onChange({
-      ...value,
-      reminder: {
-        enabled: true,
-        daysBeforeCharge,
-      },
-    });
-  }
-
-  return (
-    <Surface as="section" variant="section" padding="sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--app-text)]">
-            <BellRing size={17} className="text-[var(--app-warning)]" />
-            {t("expenses.lastChanceReminder", language)}
-          </div>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--app-text-muted)]">
-            {t("expenses.lastChanceReminderHelp", language)}
-          </p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={reminder.enabled}
-          onClick={() => setEnabled(!reminder.enabled)}
-          className="app-switch"
-          data-state={reminder.enabled ? "on" : "off"}
-        >
-          <span className="sr-only">
-            {t("expenses.lastChanceReminder", language)}
-          </span>
-        </button>
-      </div>
-
-      {reminder.enabled ? (
-        <div className="mt-3 grid grid-cols-5 gap-2">
-          {[1, 2, 3, 4, 5].map((day) => (
-            <button
-              key={day}
-              type="button"
-              aria-pressed={reminder.daysBeforeCharge === day}
-              onClick={() => setDaysBeforeCharge(day)}
-              className="app-control h-11 rounded-[var(--app-radius-md)] text-sm font-semibold"
-              data-selected={
-                reminder.daysBeforeCharge === day ? "true" : "false"
-              }
-            >
-              {day}d
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </Surface>
   );
 }

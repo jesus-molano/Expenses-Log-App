@@ -12,10 +12,15 @@ import {
   buildMonthContext,
   paymentSettlesMonth,
   shouldSuggestAdvance,
+  shouldSuggestCloseWithLeftovers,
 } from "@/domain/budget-month";
 import { toDateOnly } from "@/domain/calendar";
 import type { AppLanguage, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
-import { clampViewMonth, viewMonthBounds } from "../lib/month-view";
+import {
+  clampViewMonth,
+  cycleDropFloorDate,
+  viewMonthBounds,
+} from "../lib/month-view";
 
 type UseActiveMonthOptions = {
   store: ExpenseStore;
@@ -26,7 +31,8 @@ type UseActiveMonthOptions = {
 };
 
 // Mes activo (el natural, o el siguiente si el natural está cerrado), mes que
-// se mira y propuesta de pasar de mes cuando el natural ya está al día.
+// se mira y propuesta de pasar de mes: directa cuando el natural ya está al
+// día, o con la hoja de cierre si tras el cobro quedan recibos.
 export function useActiveMonth({
   store,
   language,
@@ -57,9 +63,19 @@ export function useActiveMonth({
     writeViewMonth(next);
   }
 
+  const paydayCycle = context.cycle.anchor === "payday";
+
   return {
     ...context,
     viewMonthId,
+    dropFloorDate: paydayCycle
+      ? cycleDropFloorDate({
+          viewMonthId,
+          calendarMonthId,
+          today: context.today,
+          cycle: context.cycle,
+        })
+      : undefined,
     canBrowseBack: viewMonthId > bounds.min,
     canBrowseForward: viewMonthId < bounds.max,
     suggestAdvance:
@@ -68,11 +84,22 @@ export function useActiveMonth({
         status: context.closeStatus,
         today: context.today,
         payday: context.payday,
+        cycle: context.cycle,
+      }),
+    suggestCloseWithLeftovers:
+      canSuggest &&
+      shouldSuggestCloseWithLeftovers({
+        status: context.closeStatus,
+        today: context.today,
+        payday: context.payday,
+        cycle: context.cycle,
       }),
     settlesMonth: (occurrence: ExpenseOccurrence) =>
       canSuggest && paymentSettlesMonth(context, occurrence),
     browse: (delta: number) =>
       setView(clampViewMonth(addMonthId(viewMonthId, delta), activeMonthId)),
+    // Mirar un mes concreto (el de un cobro abierto desde un aviso).
+    show: (monthId: string) => setView(clampViewMonth(monthId, activeMonthId)),
     reset: () => setView(null),
     advance: () => {
       closeMonth(calendarMonthId);

@@ -11,8 +11,9 @@ import type {
   IncomeEvent,
   MonthlyMoneyPlan,
   MonthlySavingsContribution,
-  MonthlySavingsTarget,
   MonthlySalarySettings,
+  SalaryExtraPaySettings,
+  SalaryReceipt,
 } from "./types";
 
 const DEFAULT_PAYDAY = 28;
@@ -69,7 +70,7 @@ export function toMonthId(monthDate: Date | string | null | undefined): string {
 }
 
 export function getMonthlySalarySettings(
-  finance: FinanceStore,
+  finance: Pick<FinanceStore, "monthlySalary">,
   monthDate: Date | string,
 ): MonthlySalarySettings {
   const monthId = toMonthId(monthDate);
@@ -77,8 +78,74 @@ export function getMonthlySalarySettings(
     amount: 0,
     dayOfMonth: DEFAULT_PAYDAY,
   };
+  // Un sueldo de "solo este mes" no se arrastra a los meses siguientes.
+  const candidates = Object.entries(finance.monthlySalary ?? {})
+    .filter(
+      ([key, salary]) =>
+        /^\d{4}-\d{2}$/.test(key) &&
+        (key === monthId || (key < monthId && !salary.onlyThisMonth)),
+    )
+    .sort(([a], [b]) => b.localeCompare(a));
 
-  return latestRecordValue(finance.monthlySalary, monthId, fallback);
+  return candidates[0]?.[1] ?? fallback;
+}
+
+// Configuración de pagas extra vigente en el mes (la última desde ese mes).
+export function getSalaryExtraPaySettings(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): SalaryExtraPaySettings | null {
+  return latestRecordValue<SalaryExtraPaySettings | null>(
+    finance.salaryExtraPays,
+    toMonthId(monthDate),
+    null,
+  );
+}
+
+// Paga extra que llega ese mes (0 si no toca): la configuración vigente en el
+// mes dice en qué meses hay paga y, si no fija importe, es un sueldo más.
+export function getSalaryExtraPay(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): number {
+  const monthId = toMonthId(monthDate);
+  const settings = getSalaryExtraPaySettings(finance, monthId);
+  if (!settings?.months.includes(Number(monthId.slice(5, 7)))) return 0;
+  return Math.max(
+    settings.amount ?? getMonthlySalarySettings(finance, monthId).amount,
+    0,
+  );
+}
+
+// Sueldo previsto del mes: el fijo más la paga extra si toca.
+export function getExpectedSalary(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): number {
+  return (
+    Math.max(Number(getMonthlySalarySettings(finance, monthDate).amount), 0) +
+    getSalaryExtraPay(finance, monthDate)
+  );
+}
+
+// Cobro confirmado en "¿Has cobrado?" (uno deshecho no cuenta).
+export function getSalaryReceipt(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): SalaryReceipt | null {
+  const receipt = finance.salaryReceipts?.[toMonthId(monthDate)];
+  return receipt && !receipt.undone ? receipt : null;
+}
+
+// Sueldo del mes: lo cobrado de verdad en cuanto se confirma en "¿Has
+// cobrado?" y, hasta entonces, lo previsto (el fijo más la paga extra si
+// toca). Es el que leen Plan, el resumen del mes y el coste por categoría.
+export function getMonthSalary(
+  finance: FinanceStore,
+  monthDate: Date | string,
+): number {
+  const receipt = getSalaryReceipt(finance, monthDate);
+  return receipt ? Math.max(receipt.amount, 0) : getExpectedSalary(finance, monthDate);
 }
 
 // Tombstones de sueldo: "<mes>@<hora>" o "*@<hora>" (todos los meses). Al
@@ -113,16 +180,6 @@ export function getMonthlySavingsTarget(
   );
 }
 
-export function getMonthlySavingsTargetEntry(
-  finance: FinanceStore,
-  monthDate: Date | string,
-): MonthlySavingsTarget | null {
-  const monthId = toMonthId(monthDate);
-  const value = latestRecordValue(finance.monthlySavingsTargets, monthId, 0);
-  if (typeof value === "number") return null;
-  return value ?? null;
-}
-
 export function getMonthlySavingsContribution(
   finance: FinanceStore,
   monthDate: Date | string,
@@ -142,24 +199,44 @@ function latestRecordValue<T>(
   return candidates[0]?.[1] ?? fallback;
 }
 
+// Fase de un mes respecto al activo (el natural, o el siguiente si el natural
+// está cerrado): el activo es el "actual", lo anterior queda registrado y lo
+// posterior es proyección.
+export function planPhaseFor(
+  monthId: string,
+  activeMonthId: string,
+): MonthlyMoneyPlan["phase"] {
+  if (monthId === activeMonthId) return "current";
+  return monthId < activeMonthId ? "registered" : "projected";
+}
+
+// `range` son los días del mes de presupuesto cuando no es el natural (ciclo
+// anclado al cobro); `activeMonthId`, el mes activo según ese mismo ciclo.
 export function buildMonthlyMoneyPlan({
   monthDate,
   finance,
   occurrences,
   today = new Date(),
+  activeMonthId = toMonthId(today),
   includeExtraIncome = true,
+  range,
 }: {
   monthDate: Date;
   finance: FinanceStore;
   occurrences: ExpenseOccurrence[];
   today?: Date;
+  // Mes activo; por defecto, el natural de `today`.
+  activeMonthId?: string;
   includeExtraIncome?: boolean;
+  range?: { start: string; end: string };
 }): MonthlyMoneyPlan {
-  const monthStart = toDateOnly(startOfMonth(monthDate));
-  const monthEnd = toDateOnly(endOfMonth(monthDate));
-  const month = monthStart.slice(0, 7);
-  const salarySettings = getMonthlySalarySettings(finance, month);
-  const salaryIncomeTotal = Math.max(Number(salarySettings.amount), 0);
+  const month = toMonthId(monthDate);
+  const monthStart = range?.start ?? toDateOnly(startOfMonth(monthDate));
+  const monthEnd = range?.end ?? toDateOnly(endOfMonth(monthDate));
+  const phase = planPhaseFor(month, activeMonthId);
+  const salaryExtraPayTotal = getSalaryExtraPay(finance, month);
+  const salaryReceipt = getSalaryReceipt(finance, month);
+  const salaryIncomeTotal = getMonthSalary(finance, month);
   const monthlySavingsTarget = getMonthlySavingsTarget(finance, month);
   const extraIncomeTotal = includeExtraIncome
     ? finance.incomeEvents
@@ -180,7 +257,10 @@ export function buildMonthlyMoneyPlan({
   const paidOccurrences = relevantOccurrences.filter(
     (occurrence) => occurrence.status === "paid",
   );
-  const pendingSummary = monthPendingSummary(relevantOccurrences, month);
+  const pendingSummary = monthPendingSummary(relevantOccurrences, month, {
+    start: monthStart,
+    end: monthEnd,
+  });
   const pendingOccurrences = pendingSummary.items;
   const plannedExpensesTotal = relevantOccurrences.reduce(
     (sum, occurrence) => sum + occurrence.template.amount,
@@ -194,7 +274,12 @@ export function buildMonthlyMoneyPlan({
   const expectedExpensesTotal = paidExpensesTotal + pendingExpensesTotal;
   const contribution = getMonthlySavingsContribution(finance, month);
   const savingsActual = Math.max(Number(contribution?.amount ?? 0), 0);
-  const savingsReserved = Math.max(monthlySavingsTarget, savingsActual);
+  // Un mes ya registrado reserva lo que de verdad se ahorró: un objetivo que no
+  // se cumplió no puede restar del libre de ese mes.
+  const savingsReserved =
+    phase === "registered"
+      ? savingsActual
+      : Math.max(monthlySavingsTarget, savingsActual);
   const maxSavingsCapacity = Math.max(incomeTotal - expectedExpensesTotal, 0);
   const freeAccordingToPlan = Math.max(
     incomeTotal - expectedExpensesTotal - savingsReserved,
@@ -205,13 +290,6 @@ export function buildMonthlyMoneyPlan({
     monthlySavingsTarget - maxSavingsCapacity,
     0,
   );
-  const currentMonthId = toMonthId(today);
-  const phase =
-    month < currentMonthId
-      ? "registered"
-      : month > currentMonthId
-        ? "projected"
-        : "current";
   const todayDateOnly = toDateOnly(today);
   const nextOccurrence = [...pendingOccurrences].sort((a, b) =>
     a.dueDate.localeCompare(b.dueDate),
@@ -233,6 +311,8 @@ export function buildMonthlyMoneyPlan({
     incomeTotal,
     fixedIncomeTotal: salaryIncomeTotal,
     salaryIncomeTotal,
+    salaryExtraPayTotal,
+    ...(salaryReceipt ? { salaryReceipt } : {}),
     extraIncomeTotal,
     plannedExpensesTotal,
     paidExpensesTotal,
@@ -250,17 +330,17 @@ export function buildMonthlyMoneyPlan({
     billsShortfall,
     savingsGoalShortfall,
     nextPending,
-    expensesContribution: Math.min(incomeTotal, expectedExpensesTotal),
-    savingsContribution: savingsActual,
-    remainingContribution: freeAccordingToPlan,
-    investmentContribution: 0,
-    shortfall: billsShortfall,
   };
 }
 
 // Lo que se pagó de un cobro (puede diferir de lo previsto).
 export function paidAmount(occurrence: ExpenseOccurrence) {
   return occurrence.override?.amountPaid ?? occurrence.record?.amountPaid ?? occurrence.template.amount;
+}
+
+// Lo que cuesta un cobro: lo pagado si ya se pagó y, si no, lo previsto.
+export function occurrenceAmount(occurrence: ExpenseOccurrence) {
+  return occurrence.status === "paid" ? paidAmount(occurrence) : occurrence.template.amount;
 }
 
 export function generateStoreOccurrences(
@@ -493,7 +573,9 @@ function occurrenceFromRecord(
   };
 }
 
-function earliestOccurrenceDate(store: ExpenseStore): string | null {
+// Primera fecha con algo en el store: el inicio de un gasto, un override o un
+// registro del histórico.
+export function earliestOccurrenceDate(store: ExpenseStore): string | null {
   const dates = [
     ...store.templates.map((template) => template.startDate),
     ...store.overrides.map((override) => override.occurrenceDate),

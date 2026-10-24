@@ -51,4 +51,27 @@ describe("sync meta store", () => {
       foreign: false,
     });
   });
+
+  it("falls back to the owner written in the data when there is no metadata", () => {
+    const legacy = { ownerId: null, dirty: false, updatedAt: "" };
+
+    // Un dispositivo que sincronizó como user-1 antes de los metadatos.
+    expect(localChangesFor(legacy, "user-2", "user-1")).toEqual({
+      dirty: false,
+      foreign: true,
+    });
+    expect(localChangesFor(legacy, "user-1", "user-1")).toEqual({
+      dirty: false,
+      foreign: false,
+    });
+    // Cambios sin cuenta encima de datos de user-1: siguen siendo de user-1.
+    expect(localChangesFor({ ...legacy, dirty: true }, "user-2", "user-1")).toEqual({
+      dirty: false,
+      foreign: true,
+    });
+    // El ownerId de los metadatos manda sobre lo que digan los datos.
+    expect(
+      localChangesFor({ ...legacy, ownerId: "user-2" }, "user-2", "user-1"),
+    ).toEqual({ dirty: false, foreign: false });
+  });
 });

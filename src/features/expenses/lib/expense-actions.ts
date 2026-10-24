@@ -1,5 +1,7 @@
-﻿import { daysBetween } from "@/domain/calendar";
+import { daysBetween } from "@/domain/calendar";
 import { resolvePresetCategory } from "@/domain/categories";
+import { sanitizeExpenseDetails } from "@/domain/expense-details";
+import { foldText } from "@/domain/text";
 import { format, parseISO } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import type {
@@ -10,30 +12,32 @@ import type {
   ExpenseStore,
   ExpenseTemplate,
 } from "@/domain/types";
-import { t } from "@/shared/i18n";
+import { formatMessage, t } from "@/shared/i18n";
 
 export function createId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+// La categoría del usuario con ese nombre (también las propias, sin tildes ni
+// mayúsculas) o, si no existe, la preset equivalente (General si no hay).
 export function findOrCreateCategory(
   store: ExpenseStore,
   categoryName: string,
 ): { store: ExpenseStore; categoryId: string } {
-  const presetCategory = resolvePresetCategory(categoryName);
-  const normalizedName = presetCategory.name;
-  const existing = store.categories.find(
-    (category) => category.name.toLowerCase() === normalizedName.toLowerCase(),
-  );
+  const sameName = findCategoryByName(store.categories, categoryName);
+  if (sameName) return { store, categoryId: sameName.id };
 
+  const presetCategory = resolvePresetCategory(categoryName);
+  const existing = findCategoryByName(store.categories, presetCategory.name);
   if (existing) return { store, categoryId: existing.id };
 
   const category: ExpenseCategory = {
     id: createId("cat"),
     userId: "demo",
-    name: normalizedName,
+    name: presetCategory.name,
     icon: presetCategory.icon,
     tone: presetCategory.tone,
+    updatedAt: new Date().toISOString(),
   };
 
   return {
@@ -43,6 +47,13 @@ export function findOrCreateCategory(
       categories: [...store.categories, category],
     },
   };
+}
+
+export function findCategoryByName(categories: ExpenseCategory[], name: string) {
+  const folded = foldText(name);
+  return folded
+    ? categories.find((category) => foldText(category.name) === folded)
+    : undefined;
 }
 
 export function buildTemplateFromDraft(
@@ -65,6 +76,7 @@ export function buildTemplateFromDraft(
     dueDay: draft.dueDay,
     recurrence: draft.recurrence,
     reminder: draft.reminder,
+    ...sanitizeExpenseDetails(draft),
     active: true,
     createdAt: now,
     updatedAt: now,
@@ -91,20 +103,27 @@ export function statusLabel(
 
   const delta = daysBetween(today, occurrence.dueDate);
   if (delta === 0) return t("expenses.statusDueToday", language);
-  if (delta < 0) {
-    const days = Math.abs(delta);
-    return language === "en"
-      ? `${days} ${days === 1 ? t("expenses.day", language) : t("expenses.days", language)} ago`
-      : `${t("expenses.daysAgo", language)} ${days} ${days === 1 ? t("expenses.day", language) : t("expenses.days", language)}`;
-  }
+  if (delta < 0) return dayCountLabel("expenses.daysAgoLabel", -delta, language);
   if (occurrence.estimatedChargeDate !== occurrence.dueDate) {
     const locale = language === "en" ? enUS : es;
+    // Un cargo que se va al mes siguiente lleva el mes: "estimado lunes 2 nov".
+    const otherMonth =
+      occurrence.estimatedChargeDate.slice(0, 7) !== occurrence.dueDate.slice(0, 7);
     return `${t("expenses.estimated", language).toLowerCase()} ${format(
       parseISO(occurrence.estimatedChargeDate),
-      "EEEE d",
+      otherMonth ? "EEEE d MMM" : "EEEE d",
       { locale },
     )}`;
   }
-  return `${t("expenses.daysAhead", language)} ${delta} ${delta === 1 ? t("expenses.day", language) : t("expenses.days", language)}`;
+  return dayCountLabel("expenses.daysAheadLabel", delta, language);
+}
+
+function dayCountLabel(
+  key: "expenses.daysAgoLabel" | "expenses.daysAheadLabel",
+  count: number,
+  language: AppLanguage,
+) {
+  const unit = t(count === 1 ? "expenses.day" : "expenses.days", language);
+  return formatMessage(key, { count, unit }, language);
 }
 

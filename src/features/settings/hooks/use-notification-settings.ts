@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { t } from "@/shared/i18n";
+import { readActiveLanguage, t } from "@/shared/i18n";
 import {
   createPushSubscription,
   deletePushSubscription,
@@ -10,6 +10,7 @@ import {
   getCurrentPushSubscription,
   PushApiError,
   type PushHealth,
+  renewPushSubscription,
   savePushSubscription,
   sendPushTest,
 } from "../lib/push-notifications";
@@ -45,8 +46,20 @@ function pushErrorMessage(error: unknown) {
   if (error.code === "PUSH_SUBSCRIPTION_EXPIRED") {
     return t("settings.notificationsExpired");
   }
+  if (error.code === "PUSH_ENDPOINT_NOT_ALLOWED") {
+    return t("settings.notificationsUnsupportedService");
+  }
+  if (error.code === "PUSH_SUBSCRIPTION_IN_USE") {
+    return t("settings.notificationsInUse");
+  }
 
   return t("settings.notificationsVerificationError");
+}
+
+function isSubscriptionInUse(error: unknown) {
+  return (
+    error instanceof PushApiError && error.code === "PUSH_SUBSCRIPTION_IN_USE"
+  );
 }
 
 export function useNotificationSettings(setMessage: (message: string) => void) {
@@ -57,11 +70,25 @@ export function useNotificationSettings(setMessage: (message: string) => void) {
   const [isTestingNotification, setIsTestingNotification] = useState(false);
   const [lastTestSentAt, setLastTestSentAt] = useState<string | null>(null);
 
+  // `renew` solo llega desde la acción de activar (con gesto del usuario): si
+  // el endpoint es de otra cuenta, se pide uno nuevo y se guarda ese.
   const synchronizeSubscription = useCallback(
-    async (subscription: PushSubscription, announce: boolean) => {
+    async (
+      initialSubscription: PushSubscription,
+      announce: boolean,
+      renew?: () => Promise<PushSubscription>,
+    ) => {
       setNotificationState("syncing");
+      let subscription = initialSubscription;
       try {
-        const saved = await savePushSubscription(subscription);
+        let saved;
+        try {
+          saved = await savePushSubscription(subscription);
+        } catch (error) {
+          if (!renew || !isSubscriptionInUse(error)) throw error;
+          subscription = await renew();
+          saved = await savePushSubscription(subscription);
+        }
         if (saved.mode === "demo") {
           setNotificationHealth({ mode: "demo", registered: false });
           setNotificationState("local-only");
@@ -171,7 +198,9 @@ export function useNotificationSettings(setMessage: (message: string) => void) {
         updateViaCache: "none",
       });
       const subscription = await createPushSubscription(registration, publicKey);
-      await synchronizeSubscription(subscription, true);
+      await synchronizeSubscription(subscription, true, () =>
+        renewPushSubscription(registration, publicKey),
+      );
     } catch (error) {
       setNotificationState("error");
       setNotificationHealth(null);
@@ -223,7 +252,7 @@ export function useNotificationSettings(setMessage: (message: string) => void) {
         return;
       }
 
-      const result = await sendPushTest(subscription);
+      const result = await sendPushTest(subscription, readActiveLanguage());
       setLastTestSentAt(result.sentAt);
       setMessage(t("settings.notificationsTestSent"));
     } catch (error) {

@@ -3,26 +3,29 @@
 import { format } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import { Check, Pencil, WalletCards, X } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DatePickerField } from "@/components/ui/DatePickerField";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { IconButton } from "@/components/ui/IconButton";
 import { SelectMenu } from "@/components/ui/SelectMenu";
+import type { PaidAmountAverage } from "@/domain/amount-history";
 import { formatCurrency } from "@/domain/calendar";
-import { PRESET_EXPENSE_CATEGORIES } from "@/domain/categories";
+import { buildCategoryOptions } from "@/domain/categories";
+import { paidAmount } from "@/domain/finance";
 import { isOccurrenceOverdue } from "@/domain/pending";
 import type {
   AppLanguage,
   ExpenseCategory,
   ExpenseOccurrence,
 } from "@/domain/types";
+import { PaidAmountSuggestion } from "@/features/expenses/components/PaidAmountSuggestion";
 import { categoryIconMap } from "@/features/expenses/lib/expense-form-options";
 import {
   useMonthlyExpenseRowEditor,
   type MonthlyExpenseUpdateInput,
 } from "@/features/plan/hooks/use-monthly-expense-row-editor";
 import { categoryLabel } from "@/shared/category-labels";
-import { t } from "@/shared/i18n";
+import { formatMessage, t } from "@/shared/i18n";
 
 export function MonthlyExpenseRow({
   occurrence,
@@ -33,6 +36,7 @@ export function MonthlyExpenseRow({
   onSkip,
   onTogglePaid,
   onUpdate,
+  suggestPaidAmount,
 }: {
   occurrence: ExpenseOccurrence;
   categories: ExpenseCategory[];
@@ -42,6 +46,8 @@ export function MonthlyExpenseRow({
   onSkip: () => void;
   onTogglePaid?: () => void;
   onUpdate: (input: MonthlyExpenseUpdateInput) => void;
+  // Media de los últimos pagos de la serie, para un recibo variable.
+  suggestPaidAmount?: (occurrence: ExpenseOccurrence) => PaidAmountAverage | null;
 }) {
   const locale = language === "en" ? enUS : es;
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
@@ -51,7 +57,16 @@ export function MonthlyExpenseRow({
     language,
     onUpdate,
   });
-  const categoryOptions = PRESET_EXPENSE_CATEGORIES.map((category) => {
+  // La media de los últimos pagos solo se calcula al editar un cobro pagado.
+  const suggestion = useMemo(
+    () =>
+      editor.editing && editor.status === "paid"
+        ? (suggestPaidAmount?.(occurrence) ?? null)
+        : null,
+    [editor.editing, editor.status, occurrence, suggestPaidAmount],
+  );
+  // Las preset con el color del usuario y sus categorías propias.
+  const categoryOptions = buildCategoryOptions(categories).map((category) => {
     const Icon = categoryIconMap[category.icon] ?? WalletCards;
 
     return {
@@ -104,7 +119,11 @@ export function MonthlyExpenseRow({
             onValueChange={editor.setAmount}
             invalidMessage={t("expenses.amountInvalid", language)}
             blockSubmit={false}
-            aria-label={t("expenses.amount", language)}
+            aria-label={
+              editor.status === "paid"
+                ? t("bills.plannedField", language)
+                : t("expenses.amount", language)
+            }
             className="h-11 min-w-0"
           />
           <DatePickerField
@@ -148,11 +167,41 @@ export function MonthlyExpenseRow({
             );
           })}
         </div>
+        {editor.status === "paid" ? (
+          <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-end gap-2">
+            <label className="grid gap-1 text-xs font-semibold text-[var(--app-text-muted)]">
+              {t("bills.paidField", language)}
+              <MoneyInput
+                value={editor.paidAmount}
+                onValueChange={editor.setPaidAmount}
+                invalidMessage={t("bills.payInvalid", language)}
+                blockSubmit={false}
+                className="h-11 min-w-0"
+              />
+            </label>
+            {suggestion ? (
+              <PaidAmountSuggestion
+                suggestion={suggestion}
+                language={language}
+                onUse={editor.setPaidAmount}
+              />
+            ) : null}
+          </div>
+        ) : null}
       </div>
     );
   }
 
   const isPaid = occurrence.status === "paid";
+  // Pagado con otro importe: se ve lo pagado y lo previsto al lado.
+  const shownAmount = isPaid ? paidAmount(occurrence) : occurrence.template.amount;
+  const plannedNote =
+    isPaid && shownAmount !== occurrence.template.amount
+      ? ` - ${t("bills.plannedHint", language).replace(
+          "{amount}",
+          formatCurrency(occurrence.template.amount),
+        )}`
+      : "";
   const isOverdue = isOccurrenceOverdue(occurrence, today);
   const status = isPaid
     ? t("common.paid", language)
@@ -185,6 +234,7 @@ export function MonthlyExpenseRow({
             locale,
           })}{" "}
           - {categoryLabel(editor.categoryName, language)} - {status}
+          {plannedNote}
         </p>
       </div>
       <p
@@ -194,19 +244,19 @@ export function MonthlyExpenseRow({
             : "text-[var(--app-text)]"
         }`}
       >
-        {formatCurrency(occurrence.template.amount)}
+        {formatCurrency(shownAmount)}
       </p>
       <div className="col-[2/4] row-start-2 flex shrink-0 items-center gap-1 justify-self-end sm:col-auto sm:row-auto sm:justify-self-auto">
         {onTogglePaid ? (
           <IconButton
             type="button"
             onClick={onTogglePaid}
-            aria-label={
-              language === "es"
-                ? `Marcar ${occurrence.template.name} como pagado`
-                : `Mark ${occurrence.template.name} as paid`
-            }
-            title={language === "es" ? "Marcar como pagado" : "Mark as paid"}
+            aria-label={formatMessage(
+              "plan.markPaidNamed",
+              { name: occurrence.template.name },
+              language,
+            )}
+            title={t("plan.markPaid", language)}
             size="touch"
             className="text-[var(--app-success)]"
           >

@@ -85,6 +85,8 @@ export function CompactMenu({
   function handleTriggerKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
     if (event.key === "Escape" && open) {
       event.preventDefault();
+      // Cierra solo el menú, no la hoja que lo contiene.
+      event.stopPropagation();
       onOpenChange(false);
       focusTrigger();
       return;
@@ -99,6 +101,7 @@ export function CompactMenu({
   function handleMenuKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
       onOpenChange(false);
       focusTrigger();
       return;

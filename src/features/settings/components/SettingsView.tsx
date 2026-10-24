@@ -4,15 +4,21 @@ import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { OfflineLink } from "@/components/ui/OfflineLink";
+import { OfflineStatusChip } from "@/components/ui/OfflineStatusChip";
 import { t } from "@/shared/i18n";
 import { useSettingsController } from "../hooks/use-settings-controller";
 import { SettingsDialogs } from "./SettingsDialogs";
 import {
   AccountRow,
+  BackupRows,
+  BudgetCycleRow,
+  CategoriesRow,
   DangerRows,
+  InstallRow,
   LanguageRow,
   NotificationsRow,
   OfflineRow,
+  RemindersRow,
   ThemeRow,
 } from "./SettingsRows";
 
@@ -33,9 +39,12 @@ export function SettingsView() {
 
         <Card variant="section" className="app-settings-card mt-4 p-4">
           <header>
-            <h1 className="text-2xl font-semibold text-[var(--app-text)]">
-              {t("settings.title")}
-            </h1>
+            <div className="flex items-center justify-between gap-3">
+              <h1 className="text-2xl font-semibold text-[var(--app-text)]">
+                {t("settings.title")}
+              </h1>
+              <OfflineStatusChip language={settings.currentLanguage} />
+            </div>
             <p className="mt-1 text-xs font-medium text-[var(--app-text-muted)]">
               {t("settings.subtitle")}
             </p>
@@ -44,17 +53,24 @@ export function SettingsView() {
           <div className="mt-4 grid gap-2">
             <AccountRow settings={settings} />
             <NotificationsRow settings={settings} />
+            <RemindersRow settings={settings} />
+            <InstallRow language={settings.currentLanguage} />
             <OfflineRow language={settings.currentLanguage} />
+            <BudgetCycleRow settings={settings} />
+            <CategoriesRow language={settings.currentLanguage} />
             <ThemeRow settings={settings} />
             <LanguageRow settings={settings} />
+            <BackupRows language={settings.currentLanguage} />
             <DangerRows settings={settings} />
           </div>
 
-          {settings.message ? (
-            <p className="mt-3 rounded-2xl bg-[var(--app-panel-soft-alpha)] p-3 text-sm leading-relaxed text-[var(--app-text)] ring-1 ring-[var(--app-border)]">
-              {settings.message}
-            </p>
-          ) : null}
+          <div role="status" aria-live="polite">
+            {settings.message ? (
+              <p className="mt-3 rounded-2xl bg-[var(--app-panel-soft-alpha)] p-3 text-sm leading-relaxed text-[var(--app-text)] ring-1 ring-[var(--app-border)]">
+                {settings.message}
+              </p>
+            ) : null}
+          </div>
         </Card>
       </div>
 

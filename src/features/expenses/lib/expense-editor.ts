@@ -1,0 +1,118 @@
+import { EXPENSE_DETAIL_KEYS, sanitizeExpenseDetails } from "@/domain/expense-details";
+import type {
+  AppLanguage,
+  DraftExpense,
+  ExpenseReminderSettings,
+  ExpenseTemplate,
+  RecurrenceRule,
+} from "@/domain/types";
+import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
+
+// Estado del editor del detalle: el formulario y el importe tal como se
+// escribe.
+export type ExpenseEditorValues = {
+  form: DraftExpense;
+  amountText: string;
+};
+
+// `amount` es el importe que se edita: el que rige ahora, con sus cambios de
+// precio (por defecto, el de la plantilla).
+export function expenseEditorValues(
+  template: ExpenseTemplate,
+  categoryName: string | undefined,
+  language: AppLanguage,
+  amount: number = template.amount,
+): ExpenseEditorValues {
+  return {
+    amountText: formatMoneyInput(amount, language),
+    form: {
+      name: template.name,
+      description: template.description,
+      amount,
+      // El nombre tal cual: una categoría propia no debe volver a General.
+      categoryName: categoryName ?? "General",
+      startDate: template.startDate,
+      dueDay: template.dueDay,
+      endDate: template.endDate,
+      recurrence: template.recurrence,
+      reminder: template.reminder,
+      notes: template.notes,
+      cancellationUrl: template.cancellationUrl,
+      commitmentEndDate: template.commitmentEndDate,
+      paymentMethod: template.paymentMethod,
+      paymentMethodDetail: template.paymentMethodDetail,
+    },
+  };
+}
+
+// El formulario tal como se guarda (la categoría se resuelve después contra
+// el store y el importe sale de `amountText`). Los datos de contrato van
+// saneados en `details`: lo vacío o inválido no está.
+export function normalizeEditorDraft(form: DraftExpense, fallbackStartDate: string) {
+  return {
+    name: form.name.trim(),
+    description: form.description.trim(),
+    categoryName: form.categoryName,
+    startDate: form.startDate || fallbackStartDate,
+    dueDay: Math.min(Math.max(Number(form.dueDay), 1), 31),
+    endDate: form.endDate || undefined,
+    recurrence: form.recurrence,
+    reminder: form.reminder,
+    details: sanitizeExpenseDetails(form),
+  };
+}
+
+function sameRecurrence(left: RecurrenceRule, right: RecurrenceRule) {
+  return (
+    left.frequency === right.frequency &&
+    (left.interval ?? null) === (right.interval ?? null) &&
+    (left.unit ?? null) === (right.unit ?? null) &&
+    (left.rrule ?? null) === (right.rrule ?? null) &&
+    (left.annualMonth ?? null) === (right.annualMonth ?? null)
+  );
+}
+
+// Sin aviso propio el gasto sigue el aviso por defecto de Ajustes, que puede
+// estar encendido: pasar de ese a uno propio (también apagado), o volver, sí
+// cambia algo. Con el aviso propio apagado da igual con cuántos días se
+// avisaría.
+function sameReminder(
+  left: ExpenseReminderSettings | undefined,
+  right: ExpenseReminderSettings | undefined,
+) {
+  if (!left || !right) return !left && !right;
+  if (!left.enabled && !right.enabled) return true;
+  return (
+    left.enabled === right.enabled &&
+    left.daysBeforeCharge === right.daysBeforeCharge
+  );
+}
+
+// Hay cambios sin guardar si guardar cambiaría algo: espacios al final,
+// "12,5" frente a "12,50" o un aviso apagado con otros días no cuentan.
+export function hasUnsavedExpenseChanges(
+  initial: ExpenseEditorValues,
+  current: ExpenseEditorValues,
+  fallbackStartDate: string,
+): boolean {
+  const initialAmount = parseMoneyInput(initial.amountText);
+  const currentAmount = parseMoneyInput(current.amountText);
+  if (initialAmount !== currentAmount) return true;
+  if (currentAmount === null && initial.amountText.trim() !== current.amountText.trim()) {
+    return true;
+  }
+
+  const before = normalizeEditorDraft(initial.form, fallbackStartDate);
+  const after = normalizeEditorDraft(current.form, fallbackStartDate);
+  return !(
+    before.name === after.name &&
+    before.description === after.description &&
+    before.categoryName === after.categoryName &&
+    before.startDate === after.startDate &&
+    before.dueDay === after.dueDay &&
+    before.endDate === after.endDate &&
+    sameRecurrence(before.recurrence, after.recurrence) &&
+    sameReminder(before.reminder, after.reminder) &&
+    EXPENSE_DETAIL_KEYS.every((key) => before.details[key] === after.details[key])
+  );
+}

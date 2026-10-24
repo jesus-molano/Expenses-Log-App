@@ -1,4 +1,5 @@
 ﻿import { TrendingDown } from "lucide-react";
+import type { PaidAmountAverage } from "@/domain/amount-history";
 import type {
   AppLanguage,
   ExpenseCategory,
@@ -17,6 +18,8 @@ type MonthlyExpenseBreakdownProps = {
   expanded: boolean;
   onToggleExpanded: () => void;
   onSkipOccurrence: (occurrence: ExpenseOccurrence) => void;
+  // Pagar desde la revisión sin abrir el editor (solo los pendientes).
+  onTogglePaid?: (occurrence: ExpenseOccurrence) => void;
   onUpdateMonthlyExpense: (input: {
     templateId: string;
     occurrenceDate: string;
@@ -26,7 +29,9 @@ type MonthlyExpenseBreakdownProps = {
     categoryId?: string;
     categoryName?: string;
     status: ExpenseOccurrence["status"];
+    amountPaid?: number;
   }) => void;
+  suggestPaidAmount?: (occurrence: ExpenseOccurrence) => PaidAmountAverage | null;
 };
 
 export function MonthlyExpenseBreakdown({
@@ -38,7 +43,9 @@ export function MonthlyExpenseBreakdown({
   expanded,
   onToggleExpanded,
   onSkipOccurrence,
+  onTogglePaid,
   onUpdateMonthlyExpense,
+  suggestPaidAmount,
 }: MonthlyExpenseBreakdownProps) {
   return (
     <PlanSectionList
@@ -63,7 +70,13 @@ export function MonthlyExpenseBreakdown({
                 today={today}
                 skipLabel={t("money.skipMonthExpense", language)}
                 onSkip={() => onSkipOccurrence(occurrence)}
+                onTogglePaid={
+                  onTogglePaid && occurrence.status === "due"
+                    ? () => onTogglePaid(occurrence)
+                    : undefined
+                }
                 onUpdate={onUpdateMonthlyExpense}
+                suggestPaidAmount={suggestPaidAmount}
               />
             ))
           ) : (

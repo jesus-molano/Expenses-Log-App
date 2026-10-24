@@ -10,53 +10,130 @@ La metadata PWA se define en `src/app/layout.tsx` y `src/app/manifest.ts`.
 La app usa:
 
 - `manifest.webmanifest`.
-- Iconos versionados en `public/`.
+- Iconos versionados en `public/`. Los maskable (`icon-maskable-192.png` y
+  `icon-maskable-512.png`) llevan el dibujo dentro de la zona segura y el
+  badge de las notificaciones (`badge-96.png`) es una silueta blanca con
+  transparencia; los genera `scripts/generate-pwa-icons.mjs` (sharp) a partir
+  de `app-icon-1024.png`.
 - `display: standalone`.
 - `orientation: portrait`.
 - `start_url` y `scope` en `/`.
+- Atajos al mantener pulsado el icono (Android): "Añadir gasto"
+  (`/expenses/new`), "Añadir por voz" (`/expenses/new?mode=voice`) y "Plan"
+  (`/money`).
+- `theme-color` del tema elegido (`THEME_COLORS` en `src/shared/theme.ts`, que
+  un test compara con `--noctalia-background` de cada tema): el layout pone el
+  del tema por defecto, `boot-guard` el de la cookie al cargar y
+  `setThemeDom` el del tema al cambiarlo.
+- Número en el icono (`navigator.setAppBadge`) con los recibos vencidos y los
+  que vencen hoy desde el mes anterior (`countAttentionOccurrences`):
+  `AppBadgeSync` lo actualiza en cualquier pantalla y cada push trae el suyo.
+- Ajustes muestra en iPhone/iPad sin instalar la fila "Instalar en el iPhone"
+  con los pasos (Compartir › Añadir a pantalla de inicio): en iOS los push
+  solo funcionan con la app instalada (16.4 o posterior).
 - Registro del service worker desde `PwaRegister`.
 
 ## Service worker
 
-Serwist genera `public/sw.js` desde `src/pwa/sw.ts` durante el build. El archivo
-generado no se versiona.
+`npm run build` ejecuta `serwist build serwist.config.mjs`, que compila
+`src/pwa/sw.ts` en `public/sw.js` e inyecta el manifiesto del precache. El
+archivo generado no se versiona. Las reglas puras (parametros ignorados, cortes
+de red, mensajes y caches obsoletas) viven en `src/pwa/cache-policy.ts`.
 
-La app precachea los recursos del build y las rutas prerenderizadas (`/`,
-`/money`, `/settings`, `/login`, `/expenses/new`).
+### Que se precachea
 
-Navegacion y red:
+`serwist.config.mjs` usa los valores por defecto de `@serwist/next`:
 
-- Las rutas precacheadas se sirven desde cache sin esperar a la red. El
-  navigation preload esta desactivado (`navigationPreload: false` mas
-  `disableNavigationPreload()`, porque la preferencia vive en el registro).
-  Con preload, una red que acepta la conexion pero no responde dejaba la app
-  colgada al abrirla sin cobertura real.
-- `ignoreURLParametersMatching` ignora `utm_*`, `fbclid`, `dpl` (Skew
-  Protection de Vercel), `from`, `mode` y `occurrence`. Asi
-  `/settings?from=money` usa `/settings`. Esos parametros se leen siempre en
-  cliente: una pagina que lea `searchParams` en servidor deja de ser estatica y
-  sale del precache.
-- El resto de navegaciones usan `NetworkFirst` (3 s) y caen a `/`.
-- Las estrategias con cache (`next-static`, `pages`, `app-assets`,
-  `same-origin`) abortan la peticion si no llegan cabeceras en 6 s. `pages-rsc`
-  corta a los 3 s: si el RSC de un cambio de pestaña no llega, Next recarga el
-  documento y lo sirve el precache al momento. `/api`, `/auth/` (callback de
-  OAuth con codigo de un solo uso) y los origenes externos usan solo red, sin
-  corte.
-- `next-static` y `app-assets` guardan los assets sin el parametro `dpl`.
-- Al activar una version nueva se borran las caches `pages`, `pages-rsc` y la
-  antigua `expense-reminders-*`.
-- `scripts/verify-sw.mjs` corre al final de `npm run build`. Falla si falta una
-  ruta principal, hay entradas duplicadas o con query, o no hay assets de
-  `/_next/static`.
-- Los enlaces entre Gastos, Plan y Ajustes hacen una navegacion de documento si
-  el navegador esta offline, por lo que no dependen de una respuesta RSC nueva.
-- API, origenes externos y peticiones no GET usan solo red.
+- Los assets del build en `.next/static/` con extension js, css, html, ico,
+  imagen, json o webmanifest. Llevan el hash en el nombre y entran sin
+  `__WB_REVISION__`.
+- Todo `public/`, salvo `public/app-icon-1024.png` (no se usa) y el propio
+  `sw.js`.
+- El HTML de las rutas prerenderizadas, con revision: `/`, `/money`,
+  `/settings`, `/login` y `/expenses/new`. No entran `_not-found`,
+  `_global-error` ni las rutas dinamicas (`/expenses/[id]`, `/auth/callback`,
+  `/api/*`).
+- Como mucho 5 MB por archivo. Hoy son unas 38 URLs (2,4 MB).
+
+No entran las fuentes de `next/font` (`.next/static/media/*.woff2`, fuera del
+glob), `/manifest.webmanifest` (lo genera una ruta, no es HTML) ni los iconos
+pedidos con `?v=5`. Se guardan en las caches de runtime la primera vez que se
+piden con el service worker al mando. Si se abre sin red antes de eso (justo
+tras la primera visita), la app carga igual, con la fuente del sistema y sin
+esos iconos.
+
+`scripts/verify-sw.mjs` corre al final de `npm run build` y falla si falta una
+ruta principal, hay entradas duplicadas o con query, o no hay assets de
+`/_next/static`.
+
+### Como responde
+
+Serwist prueba primero el precache y despues las reglas de `runtimeCaching` en
+orden; responde la primera que encaja. Solo intercepta GET: el resto va a la
+red sin pasar por el.
+
+| Peticion | Estrategia | Cache |
+| --- | --- | --- |
+| URL del precache | Cache, sin esperar a la red (solo pide a la red si falta la copia) | `serwist-precache-v2-*` |
+| `/api/*` | Solo red, sin corte | ninguna |
+| `/auth/*` (callback de OAuth, codigo de un solo uso) | Solo red, sin corte | ninguna |
+| Otro origen (Supabase) | Solo red, sin corte | ninguna |
+| `/_next/static/*` fuera del precache | `CacheFirst`, corte a 6 s | `next-static` (128, 30 dias) |
+| Navegacion | `NetworkFirst`: 3 s de red y luego la copia; corte a 6 s | `pages` (16, 7 dias) |
+| Fuente, imagen, script o estilo | `StaleWhileRevalidate`, corte a 6 s | `app-assets` (128, 30 dias) |
+| RSC (`?_rsc` o cabecera `RSC: 1`) | `NetworkFirst`: 3 s y corte a 3 s | `pages-rsc` (32, 1 dia) |
+| Resto del mismo origen | `NetworkFirst`: 3 s; corte a 6 s | `same-origin` (64, 1 dia) |
+
+Las caducidades cuentan desde el ultimo uso.
+
+- **Precache sin esperas.** El navigation preload esta desactivado
+  (`navigationPreload: false` mas `disableNavigationPreload()`, porque la
+  preferencia vive en el registro). Con preload, una ruta precacheada esperaba
+  la respuesta de red precargada y una red que acepta la conexion pero no
+  responde dejaba la app colgada.
+- **Parametros ignorados.** Al buscar en el precache se quitan `utm_*`,
+  `fbclid`, `dpl`, `from`, `mode` y `occurrence`. Asi `/settings?from=money`
+  usa `/settings` y `chunk.js?dpl=<id>` usa `chunk.js`. `from`, `mode` y
+  `occurrence` se leen siempre en cliente: una pagina que lea `searchParams` en
+  servidor deja de ser estatica y sale del precache.
+- **`dpl`.** Con Skew Protection, Vercel compila con `NEXT_DEPLOYMENT_ID` y Next
+  pide todos los assets (chunks, CSS y fuentes) con `?dpl=<id>`, mientras que
+  el precache los guarda sin el. Ademas de ignorarlo en el precache,
+  `next-static` y `app-assets` lo quitan de la clave con que guardan.
+- **Cortes.** `abortIfNoResponse` aborta la peticion si no llegan cabeceras a
+  tiempo; un cuerpo lento no se corta. En `NetworkFirst` sin copia en cache se
+  sigue esperando a la red tras los 3 s, hasta el corte. `pages-rsc` corta a
+  los 3 s: si el RSC de un cambio de pestaña no llega, Next recarga el
+  documento y lo sirve el precache al momento.
+- **Fallback a `/`.** Si una regla de runtime falla en una peticion de
+  documento (sin red y sin copia), responde el `/` precacheado. Serwist añade
+  el fallback a todas las reglas de runtime, tambien a `/auth/*`: un callback
+  de OAuth sin red abre la app en `/` sin iniciar sesion. Las peticiones de
+  datos (`/api`, RSC) no tienen fallback.
+- **Ciclo de vida.** `skipWaiting` y `clientsClaim`: una version nueva se activa
+  en cuanto termina de instalarse y toma el control de las pestañas abiertas.
+  Al activarse quita del precache las entradas que ya no estan en su manifiesto
+  (`cleanupOutdatedCaches` borra ademas las caches de formatos de precache
+  antiguos) y borra las caches `pages`, `pages-rsc` y la antigua
+  `expense-reminders-*`, que pueden apuntar a chunks de otro build.
+- Los enlaces entre Gastos, Plan y Ajustes (`OfflineLink`) hacen una
+  navegacion de documento si el navegador esta offline, por lo que no dependen
+  de una respuesta RSC nueva.
 
 El service worker tambien maneja:
 
-- `push`: muestra notificacion con titulo, cuerpo, icono y URL.
-- `notificationclick`: cierra la notificacion y abre la URL asociada.
+- `push`: valida el payload (`src/pwa/push-payload.ts`) y muestra la
+  notificacion con titulo, cuerpo, icono, badge monocromo, idioma, `tag` (una
+  nueva con la misma etiqueta sustituye a la anterior) y URL. Si trae
+  `badgeCount`, actualiza el numero del icono.
+- `notificationclick`: cierra la notificacion, enfoca la ventana abierta y la
+  lleva a la URL (solo rutas del mismo origen); si la ventana no esta
+  controlada o no hay ninguna, abre otra.
+- `pushsubscriptionchange`: el navegador renueva o invalida la suscripcion.
+  Se vuelve a suscribir con la misma clave (o la pide a
+  `/api/push/subscribe`) y la manda al servidor con `previousEndpoint`, que
+  borra la antigua. Sin sesion responde 401 y el latido de la app la registra
+  al abrirla.
 - `message` `GET_OFFLINE_STATUS`: responde por `MessageChannel` cuantas
   entradas del precache espera y cuantas tiene ya en cache.
 
@@ -87,7 +164,10 @@ reparar:
     `sw.js` escrito a mano anterior a Serwist (cache `expense-reminders-*`).
   - No preparada / no soportado.
 - `PwaRegister` llama a `registration.update()` al volver a primer plano (como
-  mucho una vez por minuto) y pide `navigator.storage.persist()`.
+  mucho una vez por minuto) y pide `navigator.storage.persist()`. Ajustes ›
+  Copias y datos ensena si el navegador lo ha concedido y permite pedirlo a
+  mano; las copias automaticas del store van a IndexedDB (ver
+  `docs/state-persistence-sync.md`, "Copias, exportar e importar").
 - Sin navigation preload, abrir la app con conexion arranca el build que ya
   estaba en cache; el nuevo se instala y activa en segundo plano. Cuando cambia
   el controlador, `PwaRegister` recarga la pagina la siguiente vez que pasa a
@@ -125,6 +205,33 @@ y chunks. El script:
 
 `src/app/global-error.tsx` cubre los errores del layout raiz.
 
+### Aviso "Sin conexion"
+
+Las cabeceras de Gastos y Plan (`DashboardShell`) y de Ajustes muestran el chip
+"Sin conexion" (`src/components/ui/OfflineStatusChip.tsx`) mientras el
+navegador esta offline:
+
+- `useOnlineStatus` (`src/shared/hooks/use-online-status.ts`) escucha `online` y
+  `offline` con `useSyncExternalStore`. En el servidor y al hidratar devuelve
+  `true`, asi que el HTML prerenderizado nunca lleva el chip.
+- Es solo un aviso: `navigator.onLine` dice si hay red local, no si llega a
+  internet. En iOS, o en una red sin salida, puede seguir en `true` sin
+  conexion real; nada decide si guardar o sincronizar a partir de el.
+- La region `role="status"` existe siempre (vacia y sin ancho con conexion),
+  para que el lector de pantalla anuncie el chip al perder la conexion.
+- No mueve la cabecera: en Gastos y Plan va en la linea del titulo, de alto
+  fijo, y a 360 px recorta el titulo (el mes sigue en la barra de mes); en
+  Ajustes va junto al `h1`.
+
+### Pruebas del modo sin conexion
+
+`npm run e2e:offline` (ver `docs/testing-quality.md`) abre cada ruta principal
+en un arranque en frio contra un `next start` real: con el servidor parado, con
+un servidor que acepta conexiones y nunca responde, y desde un build con
+`NEXT_DEPLOYMENT_ID` cuyos assets llevan `?dpl=`. Antes de volver a abrir sin
+red vacia la cache HTTP de Chromium, como cuando iOS la libera: todo lo que
+carga tiene que salir de las caches del service worker.
+
 ## Supabase Auth
 
 `proxy.ts` refresca sesion mediante `updateSession`, pero excluye:
@@ -138,13 +245,49 @@ y chunks. El script:
 
 Esto evita meter Supabase Auth en cada request API.
 
-`/auth/callback` intercambia el codigo por sesion y sanitiza `next`:
+`/auth/callback` intercambia el codigo por sesion y valida `next` con
+`resolveSafeRedirectPath` (`src/shared/safe-redirect.ts`):
 
-- Acepta solo rutas internas relativas que empiezan por `/`.
-- Rechaza URLs absolutas externas.
-- Rechaza valores tipo `//evil.com`.
-- Rechaza backslashes y caracteres nulos.
+- Rechaza cualquier caracter de control (tab, saltos de linea, NUL...), DEL y
+  la barra invertida. El parser de URL quita los controles sin avisar y trata
+  `\` como `/`: antes `/%09/evil.com`, `/%0A/evil.com` o `/\evil.com`
+  pasaban el filtro y acababan en `//evil.com`, otro host.
+- Solo acepta valores que empiezan por `/`. Los resuelve con `new URL` contra
+  el origen de la peticion, exige el mismo origen y devuelve la ruta
+  normalizada, que nunca empieza por `//` (`/.//evil.com` tambien cae al
+  fallback).
+- `next` llega decodificado una vez por `URLSearchParams` y no se vuelve a
+  decodificar.
 - Usa `/settings` como fallback.
+
+### Cerrar sesion y datos de otra cuenta
+
+Ajustes › Salir abre una hoja con dos opciones: salir y conservar los datos en
+el dispositivo, o salir y borrarlos (un equipo compartido). Si quedan cambios
+sin subir, la hoja avisa de que borrar los datos los perderia.
+
+- Antes del `signOut`, siempre: `DELETE /api/push/subscribe` del endpoint del
+  navegador (necesita la sesion; plazo de 4 s) y `unsubscribe()`. Anular la
+  suscripcion invalida el endpoint aunque falle el borrado remoto, y el cron
+  poda esa fila con el 404/410. Asi la siguiente cuenta no hereda los avisos
+  ni choca con la fila de la anterior.
+- Borrar los datos quita `expense-log-store-v1`, sus copias `.corrupt` y los
+  metadatos `expense-log-sync-v1`, y recarga para descartar el store en
+  memoria. Borrar la cuenta hace lo mismo y tambien anula la suscripcion del
+  navegador.
+- Sin red, `signOut` quita igualmente la sesion local; solo se da por fallido
+  si la sesion sigue ahi.
+- Los datos locales de una cuenta nunca se fusionan ni se suben a otra: el
+  dueño es `expense-log-sync-v1.ownerId` y, en dispositivos sin esos metadatos
+  (sincronizados antes de F0b-3), el `userId` que llevan los propios datos
+  (`inferStoreOwnerId`; `demo` es lo creado sin sesion). Lo creado sin sesion
+  despues de salir sigue siendo de la cuenta anterior. La cuenta que entra
+  carga su nube, o empieza vacia si no tiene.
+- Si un navegador quedo registrado a nombre de otra cuenta (salio antes de
+  este cambio), guardar la suscripcion devuelve 409
+  `PUSH_SUBSCRIPTION_IN_USE`. Al pulsar Activar, la app pide una suscripcion
+  nueva (otro endpoint) y la guarda. El traspaso en el servidor
+  (`claim_push_subscription`) necesita una migracion y queda para F0c-2.
 
 ## Voz y atajos
 
@@ -165,8 +308,8 @@ Esto evita meter Supabase Auth en cada request API.
   ella el microfono avisa. Un error (red, permiso) deja lo oido en el campo sin
   analizarlo. Solo un "servicio no permitido" sin resultados (por ejemplo en
   Brave) oculta el microfono durante la sesion.
-- El manifest tiene atajos "Añadir gasto" (`/expenses/new`) y "Añadir por voz"
-  (`/expenses/new?mode=voice`). `mode` se lee en cliente y el precache lo ignora,
+- El manifest tiene atajos "Añadir gasto" (`/expenses/new`), "Añadir por voz"
+  (`/expenses/new?mode=voice`) y "Plan" (`/money`). `mode` se lee en cliente y el precache lo ignora,
   asi que la pagina sigue siendo estatica. Dictar siempre exige un toque. El
   atajo abre el formulario o la captura una sola vez por entrada del historial
   (`lib/new-expense-intent.ts`): volver a la pantalla con Atras no lo repite.
@@ -178,6 +321,19 @@ Esto evita meter Supabase Auth en cada request API.
   abierta) se salta al llegar a ella o al arrancar la app en ella
   (`OrphanLayerGuard`) y, mientras hay capas, el scroll no se restaura al
   volver.
+- Las confirmaciones (`ConfirmActionDialog`) también son capas: Atrás cancela.
+  Hojas y diálogos comparten `useDialogA11y` (foco, Tab, Escape y bloqueo del
+  scroll); solo la capa de encima atiende el teclado.
+- Para navegar justo después de cerrar capas (salir del detalle tras guardar,
+  borrar o descartar) se usa `afterLayerHistorySettles`: navega cuando las
+  capas cerradas han quitado su entrada del historial, porque esa vuelta atrás
+  pendiente desharía la navegación.
+- Detalle de un gasto (`/expenses/[id]`): mientras hay cambios sin guardar, una
+  capa intercepta Atrás y pregunta si descartarlos; el control "Gastos" también
+  pregunta (`use-leave-guard.ts`). Guardar y borrar sustituyen la entrada por la
+  lista (Atrás no reabre el editor); el control "Gastos" y descartar tras Atrás
+  vuelven a la entrada anterior, o a la lista si se abrió el detalle desde un
+  enlace directo.
 
 ## APIs internas
 
@@ -188,10 +344,19 @@ Endpoints principales:
   local. Solo llama a Gemini cuando el usuario esta autenticado.
 - `/api/auth/clear-sync-metadata`: POST autenticado para limpiar metadata legacy
   sobredimensionada de Supabase Auth. GET responde 405.
-- `/api/push/subscribe`: guarda suscripciones push.
-- `/api/push/test`: prueba notificaciones.
+- `/api/push/subscribe`: guarda suscripciones push (solo de los servicios
+  permitidos, como mucho 10 por usuario) y las borra con `DELETE`. Guarda con
+  el RPC `claim_push_subscription`, que pasa el endpoint a la cuenta actual
+  aunque lo registrara otra en el mismo navegador; sin la migracion usa el
+  upsert directo. Tambien es el latido del dispositivo: renueva `updated_at` y
+  pone `failure_count` a 0. Con `previousEndpoint` borra la suscripcion que
+  sustituye, que no cuenta para el limite de 10.
+- `/api/push/test`: envia una notificacion de prueba a una suscripcion
+  guardada del propio usuario, en el idioma que manda la app y con TTL de 5
+  minutos.
 - `/api/push/status`: verifica que el endpoint actual sigue registrado y muestra
-  el ultimo envio programado completado.
+  el ultimo envio programado completado (de cualquier tipo) y los fallos
+  seguidos del dispositivo.
 - `/api/push/daily-reminders`: endpoint llamado por cron para recordatorios.
 - `/api/account`: borra el usuario autenticado; las filas dependientes se
   eliminan mediante claves foraneas `ON DELETE CASCADE`.
@@ -208,9 +373,11 @@ Peticion (`src/data/ai/gemini-client.ts`, REST `generateContent`):
 - Clave en la cabecera `x-goog-api-key`, nunca en la URL.
 - `systemInstruction` por peticion (`src/data/ai/expense-capture-prompt.ts`):
   fecha de hoy con dia de la semana (la manda el cliente y se acepta a ±2 dias
-  de la del servidor), idioma, categorias permitidas, reglas y ejemplos.
+  de la del servidor), idioma, categorias permitidas, nombres de los gastos del
+  usuario (`expenseNames`, hasta 50, solo como pista), reglas y ejemplos.
 - `responseJsonSchema` escrito a mano (categorias como enum, campos `null`
-  cuando no aparecen), sin `temperature`, `maxOutputTokens: 1024`.
+  cuando no aparecen, `intent` en cada elemento), sin `temperature`,
+  `maxOutputTokens: 1024`.
 - Razonamiento por modelo: Flash-Lite con `MINIMAL`, Flash 3.x con `LOW`
   (rechazan `MINIMAL`), 2.5 con `thinkingBudget: 0`. Si el modelo rechaza el
   ajuste, se repite sin el.
@@ -227,6 +394,20 @@ no aparece queda a 0 y se marca como pendiente (nunca se inventa); el dia, la
 fecha, la frecuencia o la categoria deducidos se marcan para revisar. Un
 elemento invalido se descarta sin perder el resto (`droppedCount`). El cliente
 abre el formulario si hay un gasto o una revision con todos si hay varios.
+
+Ordenes sobre gastos existentes: cada elemento lleva `intent` (`create`,
+`pay`, `skip` o `move`). Sin `intent` (modelos o respuestas anteriores) es un
+alta. "Marca la luz pagada 71,20", "salta el gimnasio este mes" o "mueve
+Netflix al 10" llegan en `commands` (`{intent, target, amount, day, date,
+month}`, `normalizeCaptureCommand` en `src/domain/capture-commands.ts`), aparte
+de `expenses`; un cliente anterior las ignora. El parser local
+(`parseCaptureTextLocally`) entiende las mismas ordenes en español e ingles,
+asi que funcionan sin sesion y sin conexion. Nunca se aplican solas:
+`resolveCaptureCommand` busca la serie por parecido del nombre y el cobro del
+mes que se mira (o del mes nombrado), la hoja "Confirma los cambios" deja
+elegir la serie si es ambigua, corregir lo pagado y, al mover un mensual, si
+cambia solo ese cobro o tambien los siguientes; se aplican con los comandos de
+siempre y el aviso permite deshacerlas.
 
 Motivos de fallback (`reason`): `missing_key`, `unauthenticated`,
 `rate_limited`, `auth_failed`, `model_unavailable`, `quota_exhausted`,
@@ -257,36 +438,186 @@ esta disponible.
 
 Las notificaciones usan Web Push con VAPID. `vercel.json` programa
 `/api/push/daily-reminders` cada dia a las `08:00 UTC`. El endpoint usa
-credenciales server-side y debe protegerse con `CRON_SECRET`.
+credenciales server-side y debe protegerse con `CRON_SECRET` (comparado en
+tiempo constante).
 
 Las suscripciones push se guardan en Supabase y el cron consulta stores de
 usuario para enviar recordatorios de cobro.
+
+Endpoints permitidos (`src/data/push/push-endpoints.ts`). El servidor hace
+peticiones a la URL que manda el cliente, asi que solo acepta la forma
+`https://<host>/...` (sin usuario, puerto, espacios, controles ni `\`) de estos
+servicios:
+
+- `fcm.googleapis.com`: Chrome, Edge en Android, Samsung Internet, Opera y
+  Brave.
+- `updates.push.services.mozilla.com`: Firefox.
+- Cualquier subdominio de `push.apple.com` (hoy `web.push.apple.com`): Safari
+  en macOS e iOS/iPadOS. Es lo que pide Apple.
+- Cualquier subdominio de `notify.windows.com`: Edge en Windows (WNS).
+
+`/api/push/subscribe` y `/api/push/test` rechazan el resto con 400 (`subscribe`
+con `PUSH_ENDPOINT_NOT_ALLOWED`, que Ajustes explica). El envio
+(`src/data/push/web-push-sender.ts`) vuelve a comprobarlo, y el cron se salta
+las filas de otros hosts (`blockedEndpointsSkipped`): el rol `authenticated`
+puede insertar en `push_subscriptions` sin pasar por la API. `DELETE` acepta
+cualquier URL para poder limpiar filas antiguas.
+
+Cada usuario tiene como mucho 10 suscripciones. Tras guardar una nueva por
+encima del limite, `/api/push/subscribe` borra las actualizadas hace mas
+tiempo (Ajustes actualiza la fecha cada vez que se abre en ese dispositivo); si
+el guardado falla no se borra ninguna. El cron solo envia a las 10 mas
+recientes. Dos altas simultaneas pueden pasarse por una: la restriccion en la
+base de datos llega con la migracion de F0c-2.
+
+Cada envio (un solo modulo, `src/data/push/web-push-sender.ts`) lleva
+`timeout` de 5 s (de socket) y `TTL`: el de cada tipo de aviso (ver "Cuando y
+como se envia") y 5 minutos para la prueba. Antes era el de web-push, 4
+semanas.
 
 Ajustes diferencia permiso local, suscripcion del navegador y registro remoto.
 Puede resincronizar el dispositivo y enviar una notificacion de prueba. La
 configuracion se considera disponible solo cuando existen las dos claves VAPID.
 
-El cron envia recordatorios pendientes cuando:
+### Que se avisa
 
-- El gasto tiene `reminder.enabled`.
-- La ocurrencia sigue `due`.
-- Faltan entre 0 y `daysBeforeCharge` dias para `estimatedChargeDate`; esta
-  ventana permite recuperar una ejecucion diaria perdida.
-- El usuario no descarto el aviso para esa `estimatedChargeDate`.
-- Hay al menos una suscripcion push guardada para el usuario.
+Los ajustes viven en `preferences.reminders` (Ajustes › Recordatorios) y la
+logica pura en `src/domain/reminder-schedule.ts`:
 
-El endpoint reclama cada ocurrencia en `push_reminder_deliveries` con una clave
-por usuario, template y fechas. La reclamacion es un lease atomico de 15 minutos:
-otra ejecucion no puede enviar a la vez, pero puede recuperar el trabajo si el
-proceso anterior cae. La fila solo pasa a `delivered` cuando al menos un
-dispositivo acepta el push. Si todos fallan, se libera inmediatamente. Esta
-estrategia prioriza no perder avisos; una caida posterior a la aceptacion del
-proveedor y anterior al marcado final puede producir un duplicado excepcional.
+- Aviso de cada gasto: el suyo (`template.reminder`, la campana de la fila o
+  el formulario) o, sin el, el aviso por defecto. La antelacion por defecto
+  es de 1 a 5 dias para mensuales y de 7, 14 o 30 para trimestrales, anuales
+  y personalizados de 3 meses o mas.
+- Etapas de un cobro `due` con aviso:
+  - Antes (`last_chance`): faltan entre 1 y la antelacion dias para
+    `estimatedChargeDate` (desde 0 si la etapa del dia del cargo esta
+    apagada). La ventana recupera una ejecucion perdida. "Entendido" en el
+    aviso de la app la calla para ese cargo. `estimatedChargeDate` salta fines
+    de semana y festivos bancarios (`src/domain/holidays.ts`): un recibo del
+    lunes 12 de octubre se avisa contando hasta el martes 13.
+  - El dia del cargo (`charge_day`).
+  - "¿Se cobro?" (`charge_check`): el cargo paso hace 1 a 3 dias y sigue
+    pendiente. No la calla "Entendido".
+- Avisos del mes (apagados por defecto): `month_close` con el criterio de la
+  tarjeta "Octubre al dia" (una vez por mes) y `payday` el dia de cobro
+  configurado (el ultimo del mes si es mas corto) con lo que queda por pagar.
+  El "Ahora no" de la tarjeta es por dispositivo y el push no lo ve.
+- Se usan las mismas ocurrencias que la app (`occurrencesDueBetween`, con
+  registros de meses cerrados y recibos movidos). Un gasto borrado o inactivo
+  no avisa.
+- Solo a usuarios con al menos una suscripcion push guardada de un servicio
+  permitido (como mucho las 10 actualizadas mas recientemente).
+
+### Cuando y como se envia
+
+- El dia y la hora se calculan en la zona guardada en los ajustes (la del
+  dispositivo que los cambio; por defecto Atlantic/Canary). Un usuario recibe
+  lo del dia en la primera ejecucion a partir de su hora (por defecto las 8).
+- Con el cron diario de Vercel (08:00 UTC, las 8 o las 9 en Canarias) solo se
+  respetan horas de hasta esa ejecucion. Para cualquier hora, el cron tiene
+  que correr cada hora: en Vercel Pro, `0 * * * *` en `vercel.json`; en Hobby
+  (solo un cron diario), el workflow `.github/workflows/push-reminders.yml`,
+  que no hace nada hasta definir la variable `PUSH_CRON_URL`
+  (`https://<dominio>/api/push/daily-reminders`) y el secreto `CRON_SECRET`
+  en GitHub.
+- Una notificacion por etapa, en el idioma del usuario
+  (`src/features/expenses/lib/reminder-notifications.ts`). Un cobro suelto
+  dice nombre, importe y fecha y abre `/?occurrence=<id>`; varios se resumen
+  ("Hoy se cobran 2 recibos · Luz y Agua · 80,00 €") y abren el primero.
+  `month_close` abre `/` y `payday`, `/money`.
+- `/?occurrence=<id>` se lee en cliente (el precache ignora el parametro):
+  cambia al mes en que se ve el cobro, lo resalta y abre su hoja de acciones;
+  si ya no existe, lo dice. El parametro se quita de la URL.
+- TTL por tipo (20 h los avisos previos, la pregunta y el mes al dia; 12 h el
+  dia del cargo y el de cobro), `timeout` de 5 s y envio en paralelo a todos
+  los dispositivos.
+- El cron no confia en el jsonb de cada store: `toReminderStore`
+  (`src/features/expenses/lib/reminder-store.ts`) se queda con los gastos,
+  overrides y registros bien formados (fechas, recurrencia, dia, importe) y
+  normaliza el resto como la app (`normalizeExpenseStore`). No filtra por el
+  aviso: el de cada gasto se lee con las reglas de la app y, sin el, manda el
+  aviso por defecto; ademas el mes al dia, el dia de cobro y el badge cuentan
+  todos los recibos. A un override con la fecha movida ilegible se le quita
+  esa fecha en lugar de descartarlo, para no avisar de un recibo pagado. Un
+  valor que no parece un store se cuenta en `invalidStoresSkipped`.
+- Cada usuario va en su propio `try/catch`: un store roto o un error del RPC o
+  de la base de datos se cuenta en `errors` y la ejecucion sigue con el
+  siguiente. Lo ya reclamado se cierra siempre (marcado si el push llego a
+  algun dispositivo, liberado si no), cada lease por separado; uno que no se
+  pudo cerrar caduca a los 15 minutos.
+- La respuesta resume la ejecucion: `usersChecked`, `usersWithReminders`,
+  `notificationsSent`, `notificationsFailed`, `duplicateDeliveriesSkipped`,
+  `invalidSubscriptionsRemoved`, `invalidStoresSkipped`,
+  `blockedEndpointsSkipped` y `errors`.
+
+### Entregas
+
+El endpoint reclama cada aviso en `push_reminder_deliveries` con una clave
+por usuario, tipo (`kind`) y aviso: para un cobro, template y fechas (cambia
+si se mueve el cargo o si los festivos cambian `estimatedChargeDate`, asi que
+ese recibo puede avisarse una vez mas); para los del mes, el mes. Los cinco tipos usan el mismo
+RPC `claim_push_reminder_delivery`, sin cambio de esquema, y `last_chance`
+mantiene el nombre anterior para no repetir lo ya entregado. La reclamacion es
+un lease atomico de 15 minutos: otra ejecucion no puede enviar a la vez, pero
+puede recuperar el trabajo si el proceso anterior cae. La fila solo pasa a
+`delivered` cuando al menos un dispositivo acepta el push. Si todos fallan, se
+libera inmediatamente. Esta estrategia prioriza no perder avisos; una caida
+posterior a la aceptacion del proveedor y anterior al marcado final puede
+producir un duplicado excepcional.
 
 La funcion SQL `claim_push_reminder_delivery` usa `security invoker`. Solo
 `service_role` tiene permiso de ejecucion. La migracion
 `20260823215337_push_delivery_leases.sql` añade estado, token y tiempo de claim;
 debe aplicarse antes de desplegar el route handler nuevo.
+
+Cada usuario tiene como maximo 10 suscripciones push: un trigger rechaza la
+undecima (tambien en inserciones directas) y `claim_push_subscription` hace
+sitio borrando las que llevan mas tiempo sin renovarse.
+
+### Salud de las suscripciones (M12)
+
+- Latido (`PushHeartbeat` en el layout, `src/features/settings/lib/push-heartbeat.ts`):
+  con permiso y suscripcion, una vez al dia por dispositivo (o si cambia el
+  endpoint) y al volver a la app, confirma la suscripcion en
+  `/api/push/subscribe`. Si la suscripcion se creo con otra clave VAPID, crea
+  otra y borra la antigua. Nunca pide permiso.
+- Activar los avisos tampoco reutiliza una suscripcion de otra clave VAPID.
+- `failure_count` (migracion `20261023220000_push_subscription_health.sql`,
+  solo aditiva): un 404/410 borra la suscripcion al momento; otros fallos
+  (403 de clave, 5xx, tiempo agotado) suman uno y al quinto se borra. Un envio
+  correcto lo pone a 0. Ajustes avisa si los ultimos envios a ese dispositivo
+  fallaron. Sin la migracion, el cron y la app siguen funcionando: el cron lee
+  las filas con `select("*")` y no cuenta fallos, y el alta repite el upsert
+  sin las columnas nuevas.
+- El alta (`savePushSubscription` en `src/data/push/push-subscriptions.ts`)
+  tiene un solo camino: primero `claim_push_subscription`, que con esta
+  migracion tambien pone `failure_count` a 0; si el RPC no existe (PGRST202),
+  el upsert que olvida los fallos.
+
+## Migraciones de Supabase
+
+Se aplican en el SQL Editor del proyecto (o con `supabase db push`) en orden de
+nombre y son idempotentes. `supabase/schema.sql` refleja el estado final para
+proyectos nuevos.
+
+`20261023120000_app_store_revision_cas.sql` (F0c-2, solo aditiva):
+
+- `app_stores.revision` con el trigger que la incrementa en cada `UPDATE`.
+- RPC `save_app_store(p_store, p_expected_revision)` para el guardado con CAS
+  (`security invoker`, ejecutable por `authenticated`).
+- Limite de 10 suscripciones push por usuario y RPC `claim_push_subscription`
+  (`security definer`, ejecutable por `authenticated`).
+
+Conviene aplicarla en produccion antes de mergear, porque las previews
+comparten la base de datos, pero el cliente funciona sin ella: cae al upsert y
+lo registra una vez en consola. Para comprobarla: con dos dispositivos abiertos,
+editar en uno y volver al otro; la fila de `app_stores` sube de `revision` con
+cada guardado.
+
+`20261023220000_push_subscription_health.sql` (F2b, solo aditiva, ya aplicada
+en produccion): `failure_count`, `last_failure_at` y `last_success_at` en
+`push_subscriptions`, y `claim_push_subscription` redefinida para que tambien
+ponga `failure_count` a 0. Va despues de la de F0c-2 porque redefine su RPC.
 
 ## Variables de entorno
 
@@ -312,6 +643,10 @@ No documentar valores reales de `.env.local`. Mantener ejemplos en
 ## Seguridad a preservar
 
 - No permitir open redirects en auth callback.
+- Enviar push solo a endpoints de la lista (`isAllowedPushEndpoint`), tambien
+  desde el cron.
+- Liberar la suscripcion push del navegador antes de cerrar sesion.
+- No fusionar ni subir los datos locales de una cuenta a otra.
 - No aceptar GET para acciones que mutan estado server-side.
 - No llamar AI externa para usuarios anonimos.
 - Mantener `/api` fuera del proxy matcher salvo razon explicita.

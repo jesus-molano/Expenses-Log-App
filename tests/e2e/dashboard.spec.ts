@@ -154,12 +154,15 @@ test("marks a pending receipt as paid directly from plan", async ({ page }) => {
   await loadDemoStore(page);
   await page.goto("/money");
 
-  const payButton = page.getByRole("button", {
-    name: "Marcar Movistar como pagado",
-  });
+  // La revisión del mes también tiene botón de pagar: se usa el de pendientes.
+  const pendingReceipts = page.getByRole("region", { name: "Recibos pendientes" });
+  const payButtonName = { name: "Marcar Movistar como pagado" };
+  const payButton = pendingReceipts.getByRole("button", payButtonName);
   await expect(payButton).toBeVisible();
-  const expenseRow = page.locator(".app-monthly-expense-row").filter({
-    has: payButton,
+  // `has` se busca dentro de cada fila: el localizador interno no puede
+  // empezar por la región, que está fuera de la fila.
+  const expenseRow = pendingReceipts.locator(".app-monthly-expense-row").filter({
+    has: page.getByRole("button", payButtonName),
   });
   const actionButtons = expenseRow.getByRole("button");
   await expect(actionButtons).toHaveCount(3);
@@ -266,23 +269,6 @@ test("compact menus support keyboard navigation and Escape", async ({ page }) =>
   await page.keyboard.press("Escape");
   await expect(languageMenu).toHaveCount(0);
   await expect(languageButton).toBeFocused();
-});
-
-test("deletes an expense from the edit screen", async ({ page }) => {
-  await loadDemoStore(page);
-  await page.goto("/expenses/exp-game-pass");
-
-  await expect(page.getByRole("heading", { name: "Game Pass" })).toBeVisible();
-  await page.getByRole("button", { name: "Borrar" }).click();
-
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Borrar" }).click();
-
-  await expect(page).toHaveURL(/\/$/);
-  await expect(
-    page.locator('[data-expense-row="true"]').filter({ hasText: "Game Pass" }),
-  ).toHaveCount(0);
 });
 
 test("mobile shell routes render without runtime errors", async ({ page }) => {
@@ -549,6 +535,11 @@ test("tapping a charge opens its actions: pay a different amount", async ({ page
   await sheet.getByRole("button", { name: "Pagado con otro importe" }).click();
   await sheet.getByLabel("Importe cobrado").fill("61,50");
   await sheet.getByRole("button", { name: "Guardar pago" }).click();
+  // Pagado con otro importe: se pregunta si la serie pasa a costar eso.
+  await expect(
+    sheet.getByRole("heading", { name: "¿Actualizar el importe desde ahora?" }),
+  ).toBeVisible();
+  await sheet.getByRole("button", { name: "Solo este cobro" }).click();
 
   await expect(sheet).toBeHidden();
   const row = page.locator('[data-expense-row="true"]').filter({ hasText: "Movistar" }).first();

@@ -1,14 +1,13 @@
 import {
-  addDays,
   differenceInCalendarDays,
   format,
-  isSaturday,
-  isSunday,
   parseISO,
 } from "date-fns";
 import { enUS, es } from "date-fns/locale";
+import { nextBankBusinessDay } from "./holidays";
 import type { AppLanguage } from "./types";
 
+// Zona por defecto de los avisos push (ajustable en Ajustes > Recordatorios).
 export const APP_TIME_ZONE = "Atlantic/Canary";
 export const DEFAULT_CURRENCY = "EUR";
 
@@ -44,34 +43,27 @@ export function buildDateWithDay(baseDate: Date, dueDay: number): Date {
   return new Date(year, month, Math.min(Math.max(dueDay, 1), lastDay));
 }
 
+// Día en que el banco carga el recibo: el propio vencimiento o, si cae en fin
+// de semana o festivo bancario (`holidays.ts`), el siguiente día hábil.
 export function estimateChargeDate(dueDate: string, language: AppLanguage = "es"): {
   date: string;
   label: string;
 } {
-  const date = parseISO(dueDate);
   const locale = language === "en" ? enUS : es;
-  const estimatedPrefix = language === "en" ? "estimated" : "estimado";
+  const chargeDate = nextBankBusinessDay(dueDate);
+
+  if (chargeDate !== dueDate) {
+    const estimatedPrefix = language === "en" ? "estimated" : "estimado";
+    return {
+      date: chargeDate,
+      label: `${estimatedPrefix} ${format(parseISO(chargeDate), "EEEE d", { locale })}`,
+    };
+  }
+
   const chargePrefix = language === "en" ? "charges" : "cobro";
-
-  if (isSaturday(date)) {
-    const estimated = addDays(date, 2);
-    return {
-      date: toDateOnly(estimated),
-      label: `${estimatedPrefix} ${format(estimated, "EEEE d", { locale })}`,
-    };
-  }
-
-  if (isSunday(date)) {
-    const estimated = addDays(date, 1);
-    return {
-      date: toDateOnly(estimated),
-      label: `${estimatedPrefix} ${format(estimated, "EEEE d", { locale })}`,
-    };
-  }
-
   return {
     date: dueDate,
-    label: `${chargePrefix} ${format(date, "EEEE d", { locale })}`,
+    label: `${chargePrefix} ${format(parseISO(dueDate), "EEEE d", { locale })}`,
   };
 }
 
@@ -82,10 +74,41 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function formatShortDate(date: string): string {
-  return format(parseISO(date), "d MMM", { locale: es });
-}
-
 export function daysBetween(from: string, to: string): number {
   return differenceInCalendarDays(parseISO(to), parseISO(from));
+}
+
+export function isValidTimeZone(value: unknown): value is string {
+  if (typeof value !== "string" || !value) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Fecha (YYYY-MM-DD) y hora (0-23) de un instante en una zona horaria, sin
+// depender de la zona del proceso: el servidor corre en UTC y el usuario no.
+export function zonedDateParts(
+  instant: Date,
+  timeZone: string,
+): { date: string; hour: number } {
+  const zone = isValidTimeZone(timeZone) ? timeZone : APP_TIME_ZONE;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: zone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(instant);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+
+  return {
+    date: `${part("year")}-${part("month")}-${part("day")}`,
+    // Algunos motores devuelven "24" a medianoche aun con h23.
+    hour: Number(part("hour")) % 24,
+  };
 }

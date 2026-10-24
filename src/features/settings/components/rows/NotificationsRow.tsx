@@ -1,6 +1,7 @@
 ﻿import { Bell, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { t } from "@/shared/i18n";
+import { detectInstallGuide, readInstallEnvironment } from "../../lib/install-guide";
 import type { SettingsController } from "../../types";
 import { SettingRow } from "../SettingRow";
 
@@ -18,7 +19,10 @@ function notificationDescription(settings: SettingsController) {
   const { notificationState, notificationHealth, lastTestSentAt } = settings;
 
   if (notificationState === "unsupported") {
-    return t("settings.browserNoNotifications", language);
+    // En iOS sin instalar no es que no haya avisos: falta instalar la app.
+    return detectInstallGuide(readInstallEnvironment())
+      ? t("reminders.notificationsIosInstall", language)
+      : t("settings.browserNoNotifications", language);
   }
   if (notificationState === "permission-denied") {
     return t("settings.notificationsBlocked", language);
@@ -33,6 +37,9 @@ function notificationDescription(settings: SettingsController) {
     return t("settings.notificationsVerificationError", language);
   }
   if (notificationState === "ready") {
+    if (notificationHealth?.failureCount) {
+      return t("reminders.pushDeviceFailing", language);
+    }
     if (notificationHealth?.lastScheduledDeliveryAt) {
       return t("settings.notificationsLastDelivery", language).replace(
         "{date}",
@@ -74,6 +81,7 @@ export function NotificationsRow({
       icon={ready ? <CheckCircle2 size={18} /> : <Bell size={18} />}
       title={t("settings.notificationsPwa", settings.currentLanguage)}
       description={notificationDescription(settings)}
+      wrapDescription
       action={
         <span className="flex items-center gap-1">
           {ready ? (

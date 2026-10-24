@@ -11,6 +11,8 @@ type MoneyInputProps = Omit<
   onValueChange: (value: string) => void;
   invalidMessage: string;
   allowZero?: boolean;
+  // Para saldos: acepta un signo menos delante (y el cero).
+  allowNegative?: boolean;
   // En editores sin <form> propio no debe bloquear el formulario que lo
   // contenga: solo se marca como inválido.
   blockSubmit?: boolean;
@@ -24,18 +26,20 @@ export function MoneyInput({
   onValueChange,
   invalidMessage,
   allowZero = false,
+  allowNegative = false,
   blockSubmit = true,
   className,
   ...props
 }: MoneyInputProps) {
   const empty = value.trim() === "";
-  const valid = isValidMoneyInput(value, { allowZero });
+  const valid = isValidMoneyInput(value, { allowZero, allowNegative });
 
   return (
     <input
       {...props}
       value={value}
-      inputMode="decimal"
+      // El teclado decimal de algunos móviles no tiene signo menos.
+      inputMode={allowNegative ? "text" : "decimal"}
       required={blockSubmit}
       onChange={(event) => onValueChange(event.target.value)}
       ref={(input) =>

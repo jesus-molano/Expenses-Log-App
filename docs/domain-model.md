@@ -29,6 +29,16 @@ Un `ExpenseTemplate` representa la serie:
 - Regla de recurrencia.
 - `reminder`: recordatorio opcional antes del cobro, con `enabled` y
   `daysBeforeCharge` de 1 a 5.
+- `amountChanges`: precios con fecha (`{from, amount}`). Cada cobro cuesta el
+  precio del ultimo cambio que ya habia empezado en su fecha
+  (`templateAmountOn`); antes del primero rige `amount`.
+- `pauses`: rangos de fechas (`{from, to?}`, ambos incluidos; sin `to`, hasta
+  reanudar) en los que no se generan cobros.
+- Datos de contrato opcionales (`ExpenseDetails`, `src/domain/expense-details.ts`):
+  `notes`, `cancellationUrl` (solo http/https), `commitmentEndDate` (fin de la
+  permanencia; `commitmentStatus` avisa en los ultimos 30 dias),
+  `paymentMethod` (`card`, `direct_debit`, `transfer`, `cash`, `bizum`,
+  `paypal`, `other`) y `paymentMethodDetail`.
 - Estado `active`.
 - Timestamps de creacion y actualizacion.
 
@@ -45,6 +55,20 @@ Una `ExpenseOccurrence` no es una entidad persistida por si misma. Se deriva de
 un template, una fecha de ocurrencia y sus overrides. Incluye fecha estimada de
 cobro, estado y orden visual.
 
+La fecha estimada de cobro (`estimateChargeDate`) es el vencimiento o, si cae
+en fin de semana o festivo bancario, el siguiente dia habil. Los festivos salen
+de `src/domain/holidays.ts`, una tabla pura: los nueve nacionales de fecha fija,
+Jueves y Viernes Santo (desde el domingo de Pascua) y los cierres de TARGET2
+(Lunes de Pascua y 26 de diciembre), que liquida los adeudos SEPA. No incluye
+festivos autonomicos ni locales ni traslados al lunes. "Atrasado" se mide
+contra esta fecha.
+
+Finalizar una suscripcion fija `endDate` en su ultimo cobro (incluido) y
+pausarla añade un rango a `pauses`; ninguno de los dos tapa un cobro ya pagado.
+Cambiar el importe de la serie desde un mes fija con override el importe que
+tenian los cobros pagados y los del mes cerrado, y quita los cambios de precio
+que empezaban antes; los meses anteriores ya son registros y no cambian.
+
 ## Overrides
 
 `ExpenseOccurrenceOverride` guarda excepciones para una ocurrencia concreta:
@@ -53,7 +77,9 @@ cobro, estado y orden visual.
 - Fecha movida (`dueDate`) cuando cambia respecto a la ocurrencia original.
 - Orden manual (`sortOrder`).
 - Cambios puntuales de nombre, importe o categoria.
-- Datos de pago (`paidAt`, `amountPaid`).
+- Datos de pago (`paidAt`, `amountPaid`). `amountPaid` es lo que costo de
+  verdad: un recibo variable conserva lo previsto (`amount` de la serie o del
+  override) y se ve la diferencia.
 - Metadata de recordatorio descartado:
   `reminderDismissedAt` y `reminderDismissedChargeDate`.
 - Nota opcional.
@@ -64,21 +90,57 @@ ocurrencia crea o actualiza un override.
 
 ## Categorias
 
-Las categorias tienen `id`, `userId`, `name`, `icon` y `tone`. Los tonos validos
-son `blue`, `green`, `orange`, `rose`, `violet` y `slate`. El color real lo
-resuelve el design system mediante tokens de categoria.
+Las categorias tienen `id`, `userId`, `name`, `icon`, `tone` y `updatedAt`. Los
+tonos validos son `blue`, `green`, `orange`, `rose`, `violet` y `slate`. El
+color real lo resuelve el design system mediante tokens de categoria.
 
-Cuando se crea un gasto desde texto o formulario, la app reutiliza una categoria
-existente o crea una nueva segun el nombre normalizado.
+Hay quince preset (`PRESET_EXPENSE_CATEGORIES`) y el usuario puede crear las
+suyas (icono `Tag`), renombrarlas, cambiarles el color o borrarlas pasando sus
+gastos a otra. `buildCategoryOptions` da la lista que se elige: las preset con
+el color del usuario y despues las propias.
+
+Cuando se crea un gasto desde texto o formulario, la app reutiliza la
+categoria guardada con ese nombre (sin tildes ni mayusculas) o crea la preset
+equivalente (General si no hay ninguna).
+
+Los nombres guardados son los de las categorias preset y no llevan tildes
+(`Alimentacion`, `Vehiculo`, `Educacion/Trabajo`). No se renombran para no romper
+los stores existentes: `resolvePresetCategory` compara sin tildes y
+`categoryLabel` (`src/shared/category-labels.ts`) muestra la etiqueta con tildes
+y traducida. `resolveCategoryName` hace el camino inverso (de la etiqueta, en
+cualquiera de los dos idiomas, al nombre guardado) para la importacion CSV.
+
+## Ordenes de la captura
+
+`src/domain/capture-commands.ts`: una `CaptureCommand` (`pay`, `skip` o
+`move`) se refiere a un gasto existente por su nombre. `resolveCaptureCommand`
+elige la serie mas parecida (`rankTemplatesForTarget`; si empatan, el usuario
+elige), el cobro del mes que se mira o del mes nombrado, y detecta lo que no se
+puede aplicar (ya pagado, ya saltado, sin fecha, a un mes cerrado). El mes que
+se mira y el mes abierto siguen el ciclo de Ajustes, y mover usa los mismos
+limites que la hoja de acciones del cobro (`occurrenceMoveRange` y
+`canMoveOccurrence` en `budget-month.ts`). Mover toda la serie solo se ofrece
+en un mensual que se queda en su mes, como al arrastrar.
 
 ## Finanzas
 
 `FinanceStore` contiene:
 
 - `incomeEvents`: ingresos puntuales con importe, fecha y nota.
-- `monthlySalary`: salario por mes, indexado por `YYYY-MM`.
+- `monthlySalary`: salario por mes, indexado por `YYYY-MM`. Vale desde su mes
+  hasta el siguiente con sueldo propio; uno con `onlyThisMonth` ("solo este
+  mes") solo vale para su mes.
+- `salaryExtraPays`: pagas extra vigentes desde su mes (meses 1-12 y, si no es
+  un sueldo mas, su importe).
+- `salaryReceipts`: respuesta a "¿Has cobrado?" por mes. Lo cobrado sustituye
+  al sueldo previsto (fijo mas paga extra) de ese mes.
 - `monthlySavingsTargets`: objetivo habitual efectivo desde un mes.
 - `monthlySavingsContributions`: transferencia real registrada para cada mes.
+- `monthClosures`: meses dados por terminados para pasar al siguiente.
+- `budgetCycle`: `{anchor, updatedAt}`, mes natural (`calendar`, por defecto)
+  o desde el dia de cobro (`payday`). Se elige en Ajustes.
+- `balanceCheckins`: saldo de la cuenta anotado por fecha
+  (`{amount, updatedAt, deletedAt?}`).
 
 La pantalla `/money` calcula un `MonthlyMoneyPlan` con ingresos, gastos
 planificados, ahorro reservado, capacidad, restante y faltantes.
@@ -92,12 +154,55 @@ Semantica de producto:
   incluye los gastos pequeños del dia a dia.
 - La capacidad maxima es ingreso previsto menos gasto recurrente previsto; no
   presupone que todo ese importe vaya a ahorrarse.
+- Cada cobro cuenta en el mes de su `dueDate`. La fase de un mes se mide contra
+  el mes activo (el natural, o el siguiente si el natural esta cerrado en
+  `monthClosures`): el activo es `current`, lo anterior `registered` y lo
+  posterior `projected`.
+- En un mes `registered` el ahorro reservado es solo la aportacion real: un
+  objetivo que no se cumplio no resta del libre (M17).
+- El dia de cobro solo cuenta con un sueldo configurado y se acota al ultimo
+  dia del mes. "Hasta el cobro" (`buildPaydayOutlook`) suma lo pendiente que se
+  carga antes del proximo cobro, atrasos incluidos.
+- Hay una sola regla de dia de cobro (`salaryPaydayOf`): en el mes natural, su
+  dia de cobro; con el ciclo anclado al cobro, el dia que abre el mes. La usan
+  "Hasta el cobro", "¿Has cobrado?" y el aviso push del dia de cobro.
+- El sueldo de un mes (`getMonthSalary`) es lo cobrado si se confirmo en
+  "¿Has cobrado?" y, si no, el fijo mas la paga extra si toca. Lo leen el plan
+  del mes, el resumen del mes y el coste por categoria.
+- Un gasto creado con inicio en un mes pasado puede marcar sus cobros
+  anteriores como pagados o saltados (`previousMonthsChargeDates`, M18).
 
 La normalizacion v3 acepta stores antiguos. Antes de descartar datos bancarios
 legacy convierte conciliaciones explícitas en overrides pagados. Si ya existe
 un pago persistido para la misma ocurrencia, conserva su correccion manual y no
 la reemplaza con el movimiento antiguo. No conserva movimientos, alias ni
 cuentas que la app ya no usa.
+
+## Mes del presupuesto
+
+Gastos y Plan reparten los recibos por meses de presupuesto con id `YYYY-MM`
+(`src/domain/budget-cycle.ts`). Por defecto son meses naturales. Con el ciclo
+anclado al cobro, cada mes empieza el dia de cobro configurado para ese mes y
+termina el dia antes del siguiente inicio, y lleva el nombre del mes que tiene
+la mayor parte de sus dias:
+
+- Cobro del 16 al 31: "noviembre" empieza el dia de cobro de octubre (cobro el
+  28: del 28 de octubre al 27 de noviembre).
+- Cobro del 1 al 15: "noviembre" empieza el dia de cobro de noviembre (cobro el
+  5: del 5 de noviembre al 4 de diciembre).
+- Un cobro el 29, 30 o 31 cae el ultimo dia de los meses mas cortos.
+- Un mes sin sueldo configurado es natural, pero termina donde empieza el
+  siguiente: los meses se encadenan sin huecos ni solapes aunque cambie el dia
+  de cobro.
+
+El mes activo, los cierres (tambien el cierre con restos), el "Por pagar",
+"Hasta el cobro", la timeline, el plan del mes, el anual, la revision y el
+cambio de importe de una serie "desde este mes" o "desde el mes que viene"
+(`activeBudgetMonth`) usan esos dias. El sueldo, el ahorro y los cierres siguen
+indexados por el id del mes; con el ciclo anclado al cobro, la nomina que abre
+un mes es el sueldo de ese mes (la del 28 de octubre es la de "noviembre"), y
+"¿Has cobrado?" la guarda en ese mes. El historial que se congela en
+`occurrenceRecords` se cierra siempre por mes natural.
 
 ## Preferencias
 

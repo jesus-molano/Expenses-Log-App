@@ -19,11 +19,15 @@ export function mergeLatestById<T extends { id: string }>(
   return Array.from(map.values());
 }
 
+// Gana la versión editada más tarde. Una con fecha de edición gana a otra sin
+// ella (p. ej. una categoría renombrada frente a su copia antigua, que nunca
+// tuvo updatedAt); sin fecha en ninguna, gana `incoming`.
 export function latestUpdated<T>(base: T | undefined, incoming: T): T {
   if (!base) return incoming;
   const baseUpdatedAt = updatedAtOf(base);
   const incomingUpdatedAt = updatedAtOf(incoming);
-  if (!baseUpdatedAt || !incomingUpdatedAt) return incoming;
+  if (!incomingUpdatedAt) return baseUpdatedAt ? base : incoming;
+  if (!baseUpdatedAt) return incoming;
   return incomingUpdatedAt >= baseUpdatedAt ? incoming : base;
 }
 

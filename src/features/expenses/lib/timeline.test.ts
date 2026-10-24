@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { BudgetCycle } from "@/domain/budget-cycle";
 import type { ExpenseOccurrence } from "@/domain/types";
+import { statusLabel } from "./expense-actions";
 import { buildTimelineSections } from "./timeline";
 
 describe("timeline sections", () => {
@@ -36,6 +38,115 @@ describe("timeline sections", () => {
     expect(sectionOn("2026-11-01").id).toBe("future-2026-10-31");
     expect(sectionOn("2026-11-02").id).toBe("today");
     expect(sectionOn("2026-11-03").id).toBe("carry-over-2026-10");
+  });
+});
+
+describe("timeline for a viewed month", () => {
+  it("titles days of another month with the month", () => {
+    const sections = buildTimelineSections(
+      [occurrence("gym", "2026-10-30", 30), occurrence("rent", "2026-11-03", 700)],
+      "2026-10-28",
+      "es",
+      "2026-10",
+    );
+
+    expect(sections.map((section) => section.title)).toEqual([
+      "Hoy",
+      "viernes 30",
+      "martes 3 nov",
+    ]);
+  });
+
+  it("shows Today only in the calendar month", () => {
+    // Septiembre visto el 3 de octubre: lo de hoy es un día más, con su mes.
+    const september = buildTimelineSections(
+      [occurrence("rent", "2026-10-03", 700)],
+      "2026-10-03",
+      "es",
+      "2026-09",
+    );
+    expect(september.some((section) => section.id === "today")).toBe(false);
+    expect(september[0].title).toBe("sábado 3 oct");
+
+    // Noviembre visto el 28 de octubre: en lugar de Hoy, cuánto falta.
+    const november = buildTimelineSections([], "2026-10-28", "es", "2026-11");
+    // La cabecera pone la mayúscula inicial.
+    expect(november.map((section) => section.title)).toEqual(["noviembre empieza en 4 días"]);
+  });
+
+  it("groups last month's unpaid bills as carry-over when looking ahead", () => {
+    const sections = buildTimelineSections(
+      [occurrence("internet", "2026-10-20", 30), occurrence("rent", "2026-11-01", 700)],
+      "2026-10-28",
+      "es",
+      "2026-11",
+    );
+
+    expect(sections[0]).toMatchObject({
+      id: "carry-over-2026-10",
+      title: "Pendiente de octubre",
+    });
+  });
+
+  it("keeps the month's own overdue bills as overdue in a past month", () => {
+    const sections = buildTimelineSections(
+      [occurrence("internet", "2026-09-20", 30)],
+      "2026-10-28",
+      "es",
+      "2026-09",
+    );
+
+    expect(sections.map((section) => section.id)).toEqual(["overdue"]);
+  });
+
+  it("adds the month to a weekend estimate that falls in the next month", () => {
+    const weekend = {
+      ...occurrence("gym", "2026-10-31", 30),
+      estimatedChargeDate: "2026-11-02",
+    };
+
+    expect(statusLabel(weekend, "2026-10-28", "es")).toBe("estimado lunes 2 nov");
+    // El domingo 1 se carga el lunes 2: mismo mes, sin repetirlo.
+    expect(statusLabel({ ...weekend, dueDate: "2026-11-01" }, "2026-10-28", "es")).toBe(
+      "estimado lunes 2",
+    );
+  });
+});
+
+describe("timeline with a payday-anchored month", () => {
+  // Cobro el 28: "noviembre" va del 28 de octubre al 27 de noviembre.
+  const cycle: BudgetCycle = {
+    anchor: "payday",
+    monthlySalary: { "2026-01": { amount: 2000, dayOfMonth: 28 } },
+  };
+
+  it("shows Today in the current cycle even before the calendar month starts", () => {
+    const sections = buildTimelineSections([], "2026-10-29", "es", "2026-11", cycle);
+    expect(sections.map((section) => section.id)).toEqual(["today"]);
+  });
+
+  it("counts the days until the next cycle starts on payday", () => {
+    const [placeholder] = buildTimelineSections([], "2026-10-20", "es", "2026-11", cycle);
+    expect(placeholder).toMatchObject({
+      id: "month-start",
+      title: "noviembre empieza en 8 días",
+      anchorDate: "2026-10-28",
+    });
+  });
+
+  it("groups what the previous cycle left unpaid under its name", () => {
+    // El 20 de octubre pertenece al ciclo de octubre (28 sep - 27 oct).
+    const sections = buildTimelineSections(
+      [occurrence("gym", "2026-10-20", 30)],
+      "2026-10-29",
+      "es",
+      "2026-11",
+      cycle,
+    );
+    expect(sections[0]).toMatchObject({
+      id: "carry-over-2026-10",
+      title: "Pendiente de octubre",
+    });
   });
 });
 

@@ -12,10 +12,19 @@ import {
   STORE_KEYS,
   normalizeExpenseStore,
   unknownEntries,
+  withBudgetCycle,
   withMonthClosures,
+  withNonEmpty,
+  withReminderPreferences,
 } from "./store-normalization";
+import { SYNC_META_KEY } from "./sync-meta-store";
 
 const STORAGE_KEY = "expense-log-store-v1";
+export const EXPENSE_STORE_KEY = STORAGE_KEY;
+
+// Último contenido que esta pestaña escribió o ya incorporó. Si localStorage
+// guarda otro, lo escribió otra pestaña después.
+let lastKnownRaw: string | null = null;
 
 export function loadExpenseStore(): ExpenseStore {
   let raw: string | null = null;
@@ -48,17 +57,43 @@ function backupCorruptStore(raw: string) {
 export function saveExpenseStore(store: ExpenseStore): void {
   try {
     if (!window.localStorage) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    const raw = JSON.stringify(store);
+    window.localStorage.setItem(STORAGE_KEY, raw);
+    lastKnownRaw = raw;
     window.dispatchEvent(new Event("expense-store-updated"));
   } catch {
     window.dispatchEvent(new Event("expense-store-updated"));
   }
 }
 
+// Store que otra pestaña guardó después de la última escritura (o fusión) de
+// esta. null si no hay nada nuevo o no se puede leer.
+export function readExpenseStoreFromOtherTab(): {
+  store: ExpenseStore;
+  raw: string;
+} | null {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return null;
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw || raw === lastKnownRaw) return null;
+    return { store: normalizeExpenseStore(JSON.parse(raw)), raw };
+  } catch {
+    return null;
+  }
+}
+
+// Esta pestaña ya incorporó ese contenido: no hace falta volver a fusionarlo.
+export function markExpenseStoreSeen(raw: string): void {
+  lastKnownRaw = raw;
+}
+
+// Borra los datos de gastos de este dispositivo y sus metadatos de sync: sin
+// datos, un dueño o unos cambios pendientes antiguos no significan nada.
 export function clearExpenseLocalData(): void {
   try {
     if (typeof window === "undefined" || !window.localStorage) return;
     window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(SYNC_META_KEY);
     // También las copias con fecha que guardaban builds anteriores.
     const storage = window.localStorage;
     Array.from({ length: storage.length }, (_, index) => storage.key(index))
@@ -137,6 +172,38 @@ export function mergeExpenseStores(
           normalizedLocalStore.finance.monthClosures,
         ),
       ),
+      // La elección más reciente, sea de este dispositivo o de otro.
+      ...withBudgetCycle(
+        normalizedLocalStore.finance.budgetCycle
+          ? latestUpdated(
+              normalizedCloudStore.finance.budgetCycle,
+              normalizedLocalStore.finance.budgetCycle,
+            )
+          : normalizedCloudStore.finance.budgetCycle,
+      ),
+      // Por día, el cambio más reciente (borrar también es un cambio).
+      ...withNonEmpty(
+        "balanceCheckins",
+        mergeMonthlyRecord(
+          normalizedCloudStore.finance.balanceCheckins,
+          normalizedLocalStore.finance.balanceCheckins,
+        ),
+      ),
+      // Por mes, la versión editada más tarde (pagas extra y "¿Has cobrado?").
+      ...withNonEmpty(
+        "salaryExtraPays",
+        mergeMonthlyRecord(
+          normalizedCloudStore.finance.salaryExtraPays,
+          normalizedLocalStore.finance.salaryExtraPays,
+        ),
+      ),
+      ...withNonEmpty(
+        "salaryReceipts",
+        mergeMonthlyRecord(
+          normalizedCloudStore.finance.salaryReceipts,
+          normalizedLocalStore.finance.salaryReceipts,
+        ),
+      ),
     },
     preferences: {
       ...mergeUnknownEntries(
@@ -152,6 +219,14 @@ export function mergeExpenseStores(
         normalizedLocalStore.preferences?.language ??
         normalizedCloudStore.preferences?.language ??
         "es",
+      // Los ajustes de avisos los lee el cron: gana la última edición, de
+      // cualquier dispositivo, en lugar de la copia local.
+      ...withReminderPreferences(
+        latestUpdatedOptional(
+          normalizedCloudStore.preferences?.reminders,
+          normalizedLocalStore.preferences?.reminders,
+        ),
+      ),
     },
     deleted,
   };
@@ -209,6 +284,11 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 
 function isStringList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function latestUpdatedOptional<T>(cloud: T | undefined, local: T | undefined) {
+  if (local === undefined) return cloud;
+  return latestUpdated(cloud, local);
 }
 
 function mergeIdLists(

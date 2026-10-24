@@ -31,6 +31,11 @@ import {
   type OfflineStatusResponse,
   type PrecacheFailedMessage,
 } from "./cache-policy";
+import { parsePushPayload, resolveNotificationUrl } from "./push-payload";
+import {
+  buildSubscriptionRenewal,
+  urlBase64ToUint8Array,
+} from "./push-subscription";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -73,8 +78,9 @@ const runtimeCaching: RuntimeCaching[] = [
       sameOrigin && url.pathname.startsWith("/api/"),
     handler: new NetworkOnly(),
   },
-  // El callback de OAuth lleva un código de un solo uso: sin caché, sin corte
-  // por tiempo y sin el fallback a "/".
+  // El callback de OAuth lleva un código de un solo uso: sin caché ni corte por
+  // tiempo. Como toda regla de runtime, si la red falla en la navegación
+  // responde el fallback "/" (la app abre sin iniciar sesión).
   {
     matcher: ({ sameOrigin, url }) =>
       sameOrigin && url.pathname.startsWith("/auth/"),
@@ -316,37 +322,58 @@ self.addEventListener("message", (event) => {
 
 function readPushPayload(event: PushEvent) {
   try {
-    return event.data?.json() as
-      | { title?: string; body?: string; url?: string }
-      | undefined;
+    return parsePushPayload(event.data?.json());
   } catch {
-    return undefined;
+    return parsePushPayload(undefined);
+  }
+}
+
+type BadgeNavigator = WorkerNavigator & {
+  setAppBadge?: (contents?: number) => Promise<void>;
+  clearAppBadge?: () => Promise<void>;
+};
+
+// El número del icono (vencidos y de hoy) llega con cada aviso: así se
+// actualiza aunque la app lleve días sin abrirse.
+async function updateAppBadge(count: number | undefined) {
+  const badgeNavigator = self.navigator as BadgeNavigator;
+  if (count === undefined || !badgeNavigator.setAppBadge) return;
+  try {
+    if (count > 0) await badgeNavigator.setAppBadge(count);
+    else await badgeNavigator.clearAppBadge?.();
+  } catch {
+    // Sin permiso de badge (o sin instalar) no hay nada que hacer.
   }
 }
 
 self.addEventListener("push", (event) => {
-  const data = readPushPayload(event);
-  const title = data?.title ?? "Expense Reminders";
+  const payload = readPushPayload(event);
 
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body: data?.body ?? "Tienes gastos por revisar.",
-      icon: "/icon-192.png?v=5",
-      badge: "/icon-192.png?v=5",
-      data: { url: data?.url ?? "/" },
-    }),
+    Promise.all([
+      self.registration.showNotification(payload.title, {
+        body: payload.body,
+        icon: "/icon-192.png?v=5",
+        // Silueta blanca con transparencia: Android la pinta en la barra de
+        // estado (un PNG opaco sale como un cuadrado).
+        badge: "/badge-96.png?v=1",
+        lang: payload.lang,
+        tag: payload.tag,
+        data: { url: payload.url },
+      }),
+      updateAppBadge(payload.badgeCount),
+    ]),
   );
 });
 
+// Enfoca la app si ya está abierta y la lleva a la URL del aviso; si no, abre
+// una ventana. `navigate` solo funciona en ventanas que controla este worker.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-
-  const requestedUrl = String(event.notification.data?.url ?? "/");
-  const parsedUrl = new URL(requestedUrl, self.location.origin);
-  const targetUrl =
-    parsedUrl.origin === self.location.origin
-      ? parsedUrl.href
-      : new URL("/", self.location.origin).href;
+  const targetUrl = resolveNotificationUrl(
+    event.notification.data?.url,
+    self.location.origin,
+  );
 
   event.waitUntil(
     self.clients
@@ -357,11 +384,65 @@ self.addEventListener("notificationclick", (event) => {
         );
 
         if (existingClient) {
-          await existingClient.navigate(targetUrl);
-          return existingClient.focus();
+          const focused = await existingClient.focus().catch(() => existingClient);
+          try {
+            await focused.navigate(targetUrl);
+            return;
+          } catch {
+            // Ventana sin controlar: se abre otra con la URL.
+          }
         }
 
-        return self.clients.openWindow(targetUrl);
+        await self.clients.openWindow(targetUrl);
       }),
   );
 });
+
+// El navegador renueva o invalida la suscripción (caducidad, cambio del
+// servicio push). Se vuelve a suscribir con la misma clave y se avisa al
+// servidor para que no siga enviando a la antigua.
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    renewPushSubscription(event.oldSubscription, event.newSubscription).catch(
+      (error: unknown) => {
+        console.error("Push subscription renewal failed", error);
+      },
+    ),
+  );
+});
+
+async function renewPushSubscription(
+  previous: PushSubscription | null,
+  next: PushSubscription | null,
+) {
+  let subscription = next;
+  if (!subscription) {
+    const applicationServerKey =
+      previous?.options.applicationServerKey ?? (await fetchPublicKey());
+    if (!applicationServerKey) return;
+    subscription = await self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey,
+    });
+  }
+
+  const renewal = buildSubscriptionRenewal(subscription.toJSON(), previous?.endpoint);
+  if (!renewal) return;
+  // Con la cookie de sesión: sin sesión responde 401 y el latido de la app
+  // la registrará al volver a abrirla.
+  await fetch("/api/push/subscribe", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(renewal),
+  });
+}
+
+async function fetchPublicKey() {
+  const response = await fetch("/api/push/subscribe", { credentials: "same-origin" });
+  if (!response.ok) return null;
+  const payload = (await response.json().catch(() => null)) as { publicKey?: unknown } | null;
+  return typeof payload?.publicKey === "string"
+    ? urlBase64ToUint8Array(payload.publicKey)
+    : null;
+}

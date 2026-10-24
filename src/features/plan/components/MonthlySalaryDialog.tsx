@@ -1,10 +1,12 @@
 ﻿import type { FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Field } from "@/components/ui/Field";
 import { Sheet } from "@/components/ui/Sheet";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
+import type { SalaryScope } from "@/stores/app/store-types";
 import { PlanPaydayField } from "./PlanPaydayField";
 
 type MonthlySalaryDialogProps = {
@@ -13,6 +15,8 @@ type MonthlySalaryDialogProps = {
   amount: string;
   salaryDay: number;
   dayPickerOpen: boolean;
+  scope: SalaryScope;
+  onScopeChange: (scope: SalaryScope) => void;
   onAmountChange: (value: string) => void;
   onSalaryDayChange: (value: number) => void;
   onDayPickerOpenChange: (open: boolean) => void;
@@ -26,6 +30,8 @@ export function MonthlySalaryDialog({
   amount,
   salaryDay,
   dayPickerOpen,
+  scope,
+  onScopeChange,
   onAmountChange,
   onSalaryDayChange,
   onDayPickerOpenChange,
@@ -78,6 +84,17 @@ export function MonthlySalaryDialog({
             open={dayPickerOpen}
             onOpenChange={onDayPickerOpenChange}
             onSalaryDayChange={onSalaryDayChange}
+          />
+
+          <ChoiceGroup
+            label={t("salary.scopeTitle", language)}
+            hint={t("salary.scopeHint", language)}
+            value={scope}
+            options={[
+              { value: "month", label: t("salary.scopeMonth", language) },
+              { value: "fromMonth", label: t("salary.scopeFrom", language) },
+            ]}
+            onChange={onScopeChange}
           />
         </div>
 

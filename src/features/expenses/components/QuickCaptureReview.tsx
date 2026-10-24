@@ -5,14 +5,20 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Sheet } from "@/components/ui/Sheet";
 import { formatCurrency, toDateOnly } from "@/domain/calendar";
-import { foldText } from "@/domain/expense-capture";
-import { firstChargeAlreadyPassed } from "@/domain/recurrence";
+import {
+  firstChargeAlreadyPassed,
+  previousMonthsChargeDates,
+} from "@/domain/recurrence";
+import { foldText } from "@/domain/text";
 import type { AppLanguage, CreateExpenseOptions } from "@/domain/types";
+import { categoryLabel } from "@/shared/category-labels";
 import { t } from "@/shared/i18n";
 import type { ReviewItem } from "../hooks/use-expense-capture-flow";
 import { inferredFieldsLabel, type CaptureReason } from "../lib/capture-labels";
 import { localizedRecurrenceLabel } from "../lib/recurrence-label";
+import type { PreviousChargesChoiceValue } from "../types";
 import { CaptureNotice } from "./CaptureNotice";
+import { PreviousChargesChoice } from "./form/PreviousChargesChoice";
 
 type InitialStatus = NonNullable<CreateExpenseOptions["initialStatus"]>;
 
@@ -20,11 +26,13 @@ type QuickCaptureReviewProps = {
   items: ReviewItem[];
   excludedIds: Set<string>;
   initialStatus: InitialStatus;
+  previousCharges: PreviousChargesChoiceValue;
   notice: CaptureReason | null;
   existingNames: string[];
   language: AppLanguage;
   onToggle: (id: string) => void;
   onInitialStatusChange: (status: InitialStatus) => void;
+  onPreviousChargesChange: (value: PreviousChargesChoiceValue) => void;
   onEdit: (id: string) => void;
   onSave: () => void;
   onClose: () => void;
@@ -36,11 +44,13 @@ export function QuickCaptureReview({
   items,
   excludedIds,
   initialStatus,
+  previousCharges,
   notice,
   existingNames,
   language,
   onToggle,
   onInitialStatusChange,
+  onPreviousChargesChange,
   onEdit,
   onSave,
   onClose,
@@ -51,6 +61,11 @@ export function QuickCaptureReview({
   // Como en el formulario de uno: si alguno ya se cobró este mes, se pregunta.
   const today = toDateOnly(new Date());
   const asksPaid = selected.some((item) => firstChargeAlreadyPassed(item.draft, today));
+  // Y si alguno empezó en un mes pasado, qué hacer con sus cobros anteriores.
+  const previousCount = selected.reduce(
+    (count, item) => count + previousMonthsChargeDates(item.draft, today).length,
+    0,
+  );
 
   return (
     <Sheet ariaLabel={t("expenses.captureReviewTitle", language)} onBackdropClick={onClose}>
@@ -113,7 +128,7 @@ export function QuickCaptureReview({
                       {[
                         localizedRecurrenceLabel(draft.recurrence, language),
                         t("expenses.captureDay", language).replace("{day}", String(draft.dueDay)),
-                        draft.categoryName,
+                        categoryLabel(draft.categoryName, language),
                       ].join(" · ")}
                     </span>
                   </label>
@@ -152,6 +167,18 @@ export function QuickCaptureReview({
             );
           })}
         </ul>
+
+        {previousCount > 0 ? (
+          <div className="px-5 pt-4">
+            <PreviousChargesChoice
+              count={previousCount}
+              monthId={today.slice(0, 7)}
+              value={previousCharges}
+              language={language}
+              onChange={onPreviousChargesChange}
+            />
+          </div>
+        ) : null}
 
         {asksPaid ? (
           <div className="px-5 pt-4">

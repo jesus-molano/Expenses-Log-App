@@ -60,6 +60,59 @@ describe("useQuickExpenseParser", () => {
     expect(result.current.statusTone).toBe("success");
   });
 
+  it("understands orders offline with the local parser", async () => {
+    setOnline(false);
+    const { result } = renderHook(() =>
+      useQuickExpenseParser({ language: "es", categories: [] }),
+    );
+
+    act(() => result.current.setQuickText("mueve Netflix al 10"));
+    let parsed: Awaited<ReturnType<typeof result.current.parse>> = null;
+    await act(async () => {
+      parsed = await result.current.parse();
+    });
+
+    expect(parsed).toMatchObject({
+      drafts: [],
+      commands: [{ intent: "move", target: "Netflix", day: 10 }],
+    });
+  });
+
+  it("sends the existing expense names and keeps only valid orders from the server", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          provider: "gemini",
+          expenses: [],
+          review: [],
+          commands: [
+            { intent: "pay", target: "Luz", amount: 71.2, day: null, date: null, month: null },
+            { intent: "explode", target: "Luz" },
+            { intent: "skip", target: "" },
+            "nope",
+          ],
+        }),
+      ),
+    );
+    const { result } = renderHook(() =>
+      useQuickExpenseParser({ language: "es", categories: [], expenseNames: ["Luz", "Netflix"] }),
+    );
+
+    act(() => result.current.setQuickText("marca la luz pagada 71,20"));
+    let parsed: Awaited<ReturnType<typeof result.current.parse>> = null;
+    await act(async () => {
+      parsed = await result.current.parse();
+    });
+
+    const body = JSON.parse(String((fetchSpy.mock.calls[0][1] as RequestInit).body));
+    expect(body.expenseNames).toEqual(["Luz", "Netflix"]);
+    expect(parsed!.commands).toEqual([
+      { intent: "pay", target: "Luz", amount: 71.2, day: null, date: null, month: null },
+    ]);
+    expect(result.current.statusLabel).toBe("1 cambio encontrado.");
+    expect(result.current.statusTone).toBe("success");
+  });
+
   it("returns nothing when the user cancels", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(
       (_input, init) =>

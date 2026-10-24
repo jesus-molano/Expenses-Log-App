@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { emptyStore } from "@/domain/seed";
 import {
   assignExpenseStoreOwner,
+  inferStoreOwnerId,
   normalizeExpenseStore,
   normalizeImportedExpenseStore,
 } from "./store-normalization";
@@ -126,6 +128,67 @@ describe("normalizeExpenseStore", () => {
     });
   });
 
+  it("keeps a valid budget cycle choice and drops a malformed one", () => {
+    const withCycle = normalizeExpenseStore({
+      schemaVersion: 3,
+      finance: {
+        budgetCycle: { anchor: "payday", updatedAt: "2026-10-20T10:00:00.000Z", extra: 1 },
+      },
+    });
+    expect(withCycle.finance.budgetCycle).toEqual({
+      anchor: "payday",
+      updatedAt: "2026-10-20T10:00:00.000Z",
+    });
+
+    for (const budgetCycle of [
+      { anchor: "weekly", updatedAt: "2026-10-20T10:00:00.000Z" },
+      { anchor: "payday" },
+      { anchor: "payday", updatedAt: "yesterday" },
+      "payday",
+    ]) {
+      const store = normalizeExpenseStore({ schemaVersion: 3, finance: { budgetCycle } });
+      expect("budgetCycle" in store.finance).toBe(false);
+    }
+  });
+
+  it("loads stores written before the budget cycle existed on the calendar month", () => {
+    const store = normalizeExpenseStore({ schemaVersion: 3, finance: { monthlySalary: {} } });
+    expect("budgetCycle" in store.finance).toBe(false);
+  });
+
+  it("keeps valid balance check-ins and drops malformed ones", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      finance: {
+        balanceCheckins: {
+          "2026-10-23": { amount: 1250.404, updatedAt: "2026-10-23T10:00:00.000Z" },
+          "2026-10-20": {
+            amount: -35,
+            updatedAt: "2026-10-21T10:00:00.000Z",
+            deletedAt: "2026-10-21T10:00:00.000Z",
+          },
+          "2026-10-21": { amount: "12", updatedAt: "2026-10-21T10:00:00.000Z" },
+          "2026-10-22": { amount: 12 },
+          "2026-02-30": { amount: 12, updatedAt: "2026-10-21T10:00:00.000Z" },
+          yesterday: { amount: 12, updatedAt: "2026-10-21T10:00:00.000Z" },
+        },
+      },
+    });
+
+    expect(store.finance.balanceCheckins).toEqual({
+      "2026-10-23": { amount: 1250.4, updatedAt: "2026-10-23T10:00:00.000Z" },
+      "2026-10-20": {
+        amount: -35,
+        updatedAt: "2026-10-21T10:00:00.000Z",
+        deletedAt: "2026-10-21T10:00:00.000Z",
+      },
+    });
+    expect(
+      "balanceCheckins" in
+        normalizeExpenseStore({ schemaVersion: 3, finance: { balanceCheckins: { x: 1 } } }).finance,
+    ).toBe(false);
+  });
+
   it("falls back to a safe empty shape for invalid payloads", () => {
     expect(normalizeExpenseStore(null)).toMatchObject({
       categories: [],
@@ -151,6 +214,77 @@ describe("normalizeExpenseStore", () => {
     expect(() => normalizeImportedExpenseStore({})).toThrow(
       "Invalid expense store export.",
     );
+  });
+
+  it("drops imported entities that would break the app and keeps the rest", () => {
+    const store = normalizeImportedExpenseStore({
+      schemaVersion: 3,
+      categories: [{ id: "cat", name: "Casa" }, { name: "Sin id" }],
+      templates: [
+        {
+          id: "rent",
+          name: "Alquiler",
+          amount: 700,
+          startDate: "2026-10-01",
+          dueDay: 1,
+          recurrence: { frequency: "monthly" },
+        },
+        { id: "no-rule", name: "Sin regla", amount: 10, startDate: "2026-10-01", dueDay: 1 },
+        { id: "bad-amount", name: "Importe", amount: "mucho" },
+        { name: "Sin id", amount: 5 },
+        "texto",
+      ],
+      overrides: [
+        { id: "ok", templateId: "rent", occurrenceDate: "2026-10-01", status: "paid" },
+        { id: "bad-date", templateId: "rent", occurrenceDate: "2026-13-45", status: "paid" },
+        { id: "bad-status", templateId: "rent", occurrenceDate: "2026-10-01", status: "lost" },
+      ],
+      occurrenceRecords: [{ id: "record:x", templateId: "x", occurrenceDate: "nunca" }],
+      finance: {
+        incomeEvents: [
+          { id: "evt", name: "Extra", amount: 40, receivedAt: "2026-10-10" },
+          { id: "evt-bad", name: "Extra", amount: 40, receivedAt: "ayer" },
+        ],
+      },
+    });
+
+    expect(store.categories.map((category) => category.id)).toEqual(["cat"]);
+    expect(store.templates.map((template) => template.id)).toEqual(["rent", "no-rule"]);
+    expect(store.templates[1].recurrence).toEqual({ frequency: "monthly" });
+    expect(store.overrides.map((override) => override.templateId)).toEqual(["rent"]);
+    expect(store.overrides[0].status).toBe("paid");
+    expect(store.occurrenceRecords?.some((record) => record.id === "record:x")).toBe(false);
+    expect(store.finance.incomeEvents.map((event) => event.id)).toEqual(["evt"]);
+  });
+
+  it("loads a valid store the same way through import and normal load", () => {
+    const value = {
+      schemaVersion: 3,
+      categories: [{ id: "cat", userId: "demo", name: "Casa", icon: "Home", tone: "green" }],
+      templates: [
+        {
+          id: "rent",
+          userId: "demo",
+          name: "Alquiler",
+          description: "",
+          amount: 700,
+          currency: "EUR",
+          categoryId: "cat",
+          startDate: "2026-10-01",
+          dueDay: 1,
+          recurrence: { frequency: "monthly" },
+          active: true,
+          createdAt: "2026-10-01T00:00:00.000Z",
+          updatedAt: "2026-10-01T00:00:00.000Z",
+        },
+      ],
+      overrides: [],
+      finance: { incomeEvents: [], monthlySalary: {}, monthlySavingsTargets: {} },
+      futureField: { kept: true },
+    };
+    const today = new Date();
+
+    expect(normalizeImportedExpenseStore(value)).toEqual(normalizeExpenseStore(value, today));
   });
 
   it("assigns the authenticated user id to nested store entities", () => {
@@ -180,6 +314,29 @@ describe("normalizeExpenseStore", () => {
     expect(ownedStore.finance.incomeEvents[0].userId).toBe(
       "11111111-1111-4111-8111-111111111111",
     );
+  });
+
+  it("infers the account that owns local data from its ids", () => {
+    const ownerId = "11111111-1111-4111-8111-111111111111";
+    const anonymous = normalizeExpenseStore({
+      schemaVersion: 3,
+      templates: [{ id: "tpl", userId: "demo", name: "Luz" }],
+      overrides: [{ id: "ovr", userId: "demo", templateId: "tpl" }],
+    });
+
+    expect(inferStoreOwnerId(emptyStore)).toBeNull();
+    expect(inferStoreOwnerId(anonymous)).toBeNull();
+    expect(inferStoreOwnerId(assignExpenseStoreOwner(anonymous, ownerId))).toBe(
+      ownerId,
+    );
+    // Lo creado sin sesión encima de datos sincronizados sigue siendo de esa
+    // cuenta.
+    expect(
+      inferStoreOwnerId({
+        ...anonymous,
+        overrides: [{ ...anonymous.overrides[0], userId: ownerId }],
+      }),
+    ).toBe(ownerId);
   });
 
   it("repairs imported paid overrides stored on bank booked dates", () => {
@@ -483,6 +640,152 @@ describe("normalizeExpenseStore", () => {
       { id: "clamped", startDate: "2026-11-30", dueDay: 31 },
       { id: "garbage", startDate: "2026-10-05", endDate: undefined, dueDay: 5 },
       { id: "ended", startDate: "2026-06-01", endDate: "2026-06-01" },
+    ]);
+  });
+
+  it("keeps valid reminder settings and repairs malformed ones", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      categories: [],
+      overrides: [],
+      templates: [
+        { id: "own", startDate: "2026-10-01", dueDay: 1, reminder: { enabled: true, daysBeforeCharge: 14 } },
+        { id: "broken", startDate: "2026-10-01", dueDay: 1, reminder: { enabled: "yes", daysBeforeCharge: 90 } },
+        { id: "null", startDate: "2026-10-01", dueDay: 1, reminder: null },
+      ],
+      preferences: {
+        theme: "nord",
+        language: "es",
+        reminders: {
+          defaultEnabled: true,
+          defaultDaysBefore: 2,
+          pushHour: 99,
+          timeZone: "Europe/Madrid",
+          updatedAt: "2026-10-20T10:00:00.000Z",
+        },
+      },
+    });
+
+    expect(store.templates[0].reminder).toEqual({ enabled: true, daysBeforeCharge: 14 });
+    expect(store.templates[1].reminder).toEqual({ enabled: false, daysBeforeCharge: 30 });
+    expect("reminder" in store.templates[2]).toBe(false);
+    expect(store.preferences?.reminders).toMatchObject({
+      defaultEnabled: true,
+      defaultDaysBefore: 2,
+      longCycleDaysBefore: 14,
+      pushHour: 23,
+      timeZone: "Europe/Madrid",
+      updatedAt: "2026-10-20T10:00:00.000Z",
+    });
+  });
+
+  it("does not add reminder settings to stores without them", () => {
+    const template = { id: "plain", startDate: "2026-10-01", dueDay: 1 };
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      templates: [template],
+      preferences: { theme: "nord", language: "es", reminders: "bad" },
+    });
+
+    expect(store.preferences).toEqual({ theme: "nord", language: "es" });
+    // Un gasto sin cambios se conserva tal cual.
+    expect(store.templates[0]).toBe(template);
+  });
+
+  it("keeps valid contract details and drops broken ones from old or edited stores", () => {
+    const base = {
+      startDate: "2026-09-01",
+      dueDay: 5,
+      createdAt: "2026-09-01T00:00:00.000Z",
+    };
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      categories: [],
+      overrides: [],
+      templates: [
+        // Un store anterior sin los campos nuevos se carga igual.
+        { id: "old", ...base },
+        {
+          id: "full",
+          ...base,
+          notes: " Permanencia con Vodafone ",
+          cancellationUrl: "vodafone.es/baja",
+          commitmentEndDate: "2027-03-15",
+          paymentMethod: "direct_debit",
+          paymentMethodDetail: "ES12 ···· 3456",
+        },
+        {
+          id: "broken",
+          ...base,
+          notes: 42,
+          cancellationUrl: "javascript:alert(1)",
+          commitmentEndDate: "nunca",
+          paymentMethod: "gold",
+        },
+      ],
+    });
+
+    const [old, full, broken] = store.templates;
+    expect(old).toEqual({ id: "old", ...base });
+    expect(full).toMatchObject({
+      notes: "Permanencia con Vodafone",
+      cancellationUrl: "https://vodafone.es/baja",
+      commitmentEndDate: "2027-03-15",
+      paymentMethod: "direct_debit",
+      paymentMethodDetail: "ES12 ···· 3456",
+    });
+    for (const key of ["notes", "cancellationUrl", "commitmentEndDate", "paymentMethod"]) {
+      expect(key in broken).toBe(false);
+    }
+    expect(broken).toMatchObject({ id: "broken", startDate: "2026-09-01" });
+  });
+
+  it("repairs categories and keeps their update time and unknown fields", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      templates: [],
+      overrides: [],
+      categories: [
+        { id: "casa", userId: "u1", name: "Casa", icon: "Home", tone: "green" },
+        { id: "viajes", name: " Viajes ", tone: "pink", updatedAt: "2026-10-20T00:00:00.000Z", future: 1 },
+        { id: "ocio", name: "Ocio", updatedAt: "ayer" },
+        { id: "", name: "Sin id" },
+        { id: "sin-nombre", name: "  " },
+        "texto",
+      ],
+    });
+
+    expect(store.categories).toEqual([
+      { id: "casa", userId: "u1", name: "Casa", icon: "Home", tone: "green" },
+      {
+        id: "viajes",
+        userId: "demo",
+        name: "Viajes",
+        icon: "Tag",
+        tone: "slate",
+        updatedAt: "2026-10-20T00:00:00.000Z",
+        future: 1,
+      },
+      { id: "ocio", userId: "demo", name: "Ocio", icon: "Gamepad2", tone: "violet" },
+      { id: "sin-nombre", userId: "demo", name: "General", icon: "WalletCards", tone: "slate" },
+    ]);
+  });
+
+  it("keeps category timestamps and still loads categories written without them", () => {
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      categories: [
+        { id: "new", name: "Casa", icon: "Home", tone: "green", updatedAt: "2026-10-23T10:00:00.000Z" },
+        { id: "old", name: "Ocio", icon: "Gamepad2", tone: "violet" },
+        { id: "broken", name: "Salud", icon: "HeartPulse", tone: "rose", updatedAt: "ayer" },
+        null,
+      ],
+    });
+
+    expect(store.categories).toEqual([
+      { id: "new", userId: "demo", name: "Casa", icon: "Home", tone: "green", updatedAt: "2026-10-23T10:00:00.000Z" },
+      { id: "old", userId: "demo", name: "Ocio", icon: "Gamepad2", tone: "violet" },
+      { id: "broken", userId: "demo", name: "Salud", icon: "HeartPulse", tone: "rose" },
     ]);
   });
 });

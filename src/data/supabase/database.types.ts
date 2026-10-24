@@ -17,6 +17,8 @@ export type Database = {
         Row: {
           user_id: UUID;
           store: Json;
+          // Solo existe con la migración 20261023120000 aplicada.
+          revision?: number;
           created_at: string;
           updated_at: string;
         };
@@ -62,6 +64,9 @@ export type Database = {
         Relationships: [];
       };
       push_subscriptions: {
+        // failure_count, last_failure_at y last_success_at llegan con la
+        // migración 20261023220000_push_subscription_health: hasta aplicarla
+        // no existen, por eso son opcionales también en Row.
         Row: {
           id: UUID;
           user_id: UUID;
@@ -70,6 +75,9 @@ export type Database = {
           auth: string;
           created_at: string;
           updated_at: string;
+          failure_count?: number;
+          last_failure_at?: string | null;
+          last_success_at?: string | null;
         };
         Insert: {
           id?: UUID;
@@ -79,6 +87,9 @@ export type Database = {
           auth: string;
           created_at?: string;
           updated_at?: string;
+          failure_count?: number;
+          last_failure_at?: string | null;
+          last_success_at?: string | null;
         };
         Update: {
           id?: UUID;
@@ -88,6 +99,9 @@ export type Database = {
           auth?: string;
           created_at?: string;
           updated_at?: string;
+          failure_count?: number;
+          last_failure_at?: string | null;
+          last_success_at?: string | null;
         };
         Relationships: [];
       };
@@ -138,6 +152,21 @@ export type Database = {
           p_lease_seconds?: number;
         };
         Returns: UUID | null;
+      };
+      save_app_store: {
+        Args: {
+          p_store: Json;
+          p_expected_revision: number | null;
+        };
+        Returns: Json;
+      };
+      claim_push_subscription: {
+        Args: {
+          p_endpoint: string;
+          p_p256dh: string;
+          p_auth: string;
+        };
+        Returns: UUID;
       };
     };
     Enums: Record<string, never>;

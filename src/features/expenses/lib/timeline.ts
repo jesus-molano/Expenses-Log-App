@@ -1,5 +1,11 @@
 ﻿import { addDays, format, isSameDay, isWeekend, parseISO } from "date-fns";
 import { enUS, es } from "date-fns/locale";
+import {
+  CALENDAR_CYCLE,
+  periodIdOf,
+  periodStart,
+  type BudgetCycle,
+} from "@/domain/budget-cycle";
 import { daysBetween } from "@/domain/calendar";
 import type { AppLanguage, ExpenseOccurrence } from "@/domain/types";
 import { t } from "@/shared/i18n";
@@ -17,17 +23,30 @@ export type TimelineSection = {
   total: number;
   items: ExpenseOccurrence[];
   anchorDate: string;
+  // Se pinta atenuado: lo pagado de otro mes que ya no pide atención.
+  muted?: boolean;
 };
 
 function sectionMeta(
   occurrence: ExpenseOccurrence,
   today: string,
   language: AppLanguage,
-): Pick<TimelineSection, "id" | "title" | "subtitle" | "tone" | "priority"> {
+  monthId: string,
+  cycle: BudgetCycle,
+): Pick<TimelineSection, "id" | "title" | "subtitle" | "tone" | "priority" | "muted"> {
   const dueDate = parseISO(occurrence.dueDate);
   const locale = language === "en" ? enUS : es;
-  const dayLabel = (date: Date) => format(date, "EEEE d", { locale });
+  // Un día de otro mes lleva el mes: "domingo 1 nov" mirando octubre.
+  const dayLabel = (date: Date) =>
+    format(date, format(date, "yyyy-MM") === monthId ? "EEEE d" : "EEEE d MMM", {
+      locale,
+    });
+  const monthName = (id: string) =>
+    format(parseISO(`${id}-01`), "LLLL", { locale });
   const visualState = resolveExpenseVisualState(occurrence, today);
+  // Mes de presupuesto del cobro: el natural o, con el ciclo anclado al cobro,
+  // el ciclo en que cae.
+  const dueMonthId = periodIdOf(occurrence.dueDate, cycle);
 
   if (visualState === "paid") {
     return {
@@ -39,13 +58,12 @@ function sectionMeta(
     };
   }
 
-  const dueMonthId = occurrence.dueDate.slice(0, 7);
-  if (visualState === "overdue" && dueMonthId < today.slice(0, 7)) {
+  if (visualState === "overdue" && dueMonthId < monthId) {
     return {
       id: `carry-over-${dueMonthId}`,
       title: t("expenses.carryOverTitle", language).replace(
         "{month}",
-        format(parseISO(`${dueMonthId}-01`), "LLLL", { locale }),
+        monthName(dueMonthId),
       ),
       subtitle: t("expenses.carryOverSubtitle", language),
       tone: visualState,
@@ -63,7 +81,12 @@ function sectionMeta(
     };
   }
 
-  if (occurrence.dueDate === today || occurrence.estimatedChargeDate === today) {
+  // "Hoy" solo existe en el mes en curso (el natural o el ciclo de hoy):
+  // mirando otro mes, lo de hoy es un día más con su fecha.
+  if (
+    monthId === periodIdOf(today, cycle) &&
+    (occurrence.dueDate === today || occurrence.estimatedChargeDate === today)
+  ) {
     return {
       id: "today",
       title: t("expenses.today", language),
@@ -96,16 +119,19 @@ function sectionMeta(
   };
 }
 
+// `monthId` es el mes de presupuesto que se mira y `cycle`, cómo se reparten
+// los días en meses (natural o desde el día de cobro).
 export function buildTimelineSections(
   occurrences: ExpenseOccurrence[],
   today: string,
   language: AppLanguage = "es",
   monthId: string = today.slice(0, 7),
+  cycle: BudgetCycle = CALENDAR_CYCLE,
 ): TimelineSection[] {
   const sections = new Map<string, TimelineSection>();
 
   for (const occurrence of occurrences) {
-    const meta = sectionMeta(occurrence, today, language);
+    const meta = sectionMeta(occurrence, today, language, monthId, cycle);
     const existing = sections.get(meta.id);
 
     if (existing) {
@@ -135,7 +161,7 @@ export function buildTimelineSections(
     }))
     .sort((a, b) => sortSections(a, b, today));
 
-  const placeholder = placeholderSection(today, monthId, language);
+  const placeholder = placeholderSection(today, monthId, language, cycle);
   if (
     placeholder &&
     !timelineSections.some((section) => section.id === placeholder.id)
@@ -152,9 +178,11 @@ function placeholderSection(
   today: string,
   monthId: string,
   language: AppLanguage,
+  cycle: BudgetCycle,
 ): TimelineSection | null {
   const base = { tone: "pending" as const, priority: 2, total: 0, items: [] };
-  if (monthId === today.slice(0, 7)) {
+  const todayMonthId = periodIdOf(today, cycle);
+  if (monthId === todayMonthId) {
     return {
       ...base,
       id: "today",
@@ -163,11 +191,11 @@ function placeholderSection(
       anchorDate: today,
     };
   }
-  if (monthId < today.slice(0, 7)) return null;
+  if (monthId < todayMonthId) return null;
 
-  const monthStart = `${monthId}-01`;
+  const monthStart = periodStart(monthId, cycle);
   const days = daysBetween(today, monthStart);
-  const month = format(parseISO(monthStart), "LLLL", {
+  const month = format(parseISO(`${monthId}-01`), "LLLL", {
     locale: language === "en" ? enUS : es,
   });
   return {
@@ -177,7 +205,7 @@ function placeholderSection(
       ? t("expenses.monthStartsTomorrow", language)
       : t("expenses.monthStartsIn", language).replace("{days}", String(days))
     ).replace("{month}", month),
-    subtitle: t("expenses.monthStartsSubtitle", language),
+    subtitle: "",
     anchorDate: monthStart,
   };
 }

@@ -1,18 +1,28 @@
+import { isValidDateOnly } from "@/domain/calendar";
 import {
   createIncomeEvent,
   getMonthlySalarySettings,
   getMonthlySavingsTarget,
+  getSalaryExtraPaySettings,
   salaryClearedTombstone,
   toMonthId,
   updateIncomeEvent,
 } from "@/domain/finance";
-import type { ExpenseStore, MonthClosure } from "@/domain/types";
+import type {
+  BudgetCycleAnchor,
+  ExpenseStore,
+  FinanceStore,
+  MonthClosure,
+  MonthlySalarySettings,
+} from "@/domain/types";
 import type {
   IncomeEventInput,
   MoneySettingsInput,
   MonthlySalaryInput,
   MonthlySavingsContributionInput,
   MonthlySavingsTargetInput,
+  SalaryExtraPayInput,
+  SalaryReceiptInput,
 } from "./store-types";
 
 export function updateMoneySettingsInStore(
@@ -143,6 +153,41 @@ export function updateMonthlySalaryInStore(
   const updatedAt = new Date().toISOString();
   const nextMonth = nextMonthId(monthId);
   const nextSalary = { ...store.finance.monthlySalary };
+  const salary: MonthlySalarySettings = {
+    amount: Math.max(Number(input.salaryAmount), 0),
+    dayOfMonth: Math.min(Math.max(Number(input.salaryDay), 1), 31),
+    updatedAt,
+  };
+
+  if (input.scope === "month") {
+    // Solo este mes (la paga extra, un mes con horas extra...): los
+    // siguientes siguen con lo que tenían. Si este mes empezaba un sueldo
+    // nuevo, ese sueldo pasa a empezar el mes siguiente.
+    const followingBefore = getMonthlySalarySettings(store.finance, nextMonth);
+    nextSalary[monthId] = { ...salary, onlyThisMonth: true };
+    const followingAfter = getMonthlySalarySettings(
+      { ...store.finance, monthlySalary: nextSalary },
+      nextMonth,
+    );
+    if (
+      !(nextMonth in store.finance.monthlySalary) &&
+      (followingAfter.amount !== followingBefore.amount ||
+        followingAfter.dayOfMonth !== followingBefore.dayOfMonth)
+    ) {
+      nextSalary[nextMonth] = {
+        amount: followingBefore.amount,
+        dayOfMonth: followingBefore.dayOfMonth,
+        updatedAt,
+      };
+    }
+    return withMonthlySalary(store, nextSalary);
+  }
+
+  if (input.scope === "fromMonth") {
+    // Desde este mes: los meses con su propio sueldo lo conservan.
+    return withMonthlySalary(store, { ...nextSalary, [monthId]: salary });
+  }
+
   if (
     monthId < toMonthId(new Date()) &&
     !(nextMonth in nextSalary)
@@ -165,6 +210,100 @@ export function updateMonthlySalaryInStore(
           updatedAt,
         },
       },
+    },
+  };
+}
+
+function withMonthlySalary(
+  store: ExpenseStore,
+  monthlySalary: FinanceStore["monthlySalary"],
+): ExpenseStore {
+  return { ...store, finance: { ...store.finance, monthlySalary } };
+}
+
+// Pagas extra vigentes desde un mes. Sin cambios no se escribe nada.
+export function updateSalaryExtraPayInStore(
+  store: ExpenseStore,
+  input: SalaryExtraPayInput,
+): ExpenseStore {
+  const monthId = toMonthId(input.monthId);
+  const months = Array.from(
+    new Set(input.months.filter((month) => Number.isInteger(month) && month >= 1 && month <= 12)),
+  ).sort((a, b) => a - b);
+  const amount =
+    input.amount !== undefined && Number.isFinite(input.amount) && input.amount > 0
+      ? input.amount
+      : undefined;
+  const current = getSalaryExtraPaySettings(store.finance, monthId);
+  if (
+    (current?.months ?? []).join(",") === months.join(",") &&
+    current?.amount === amount
+  ) {
+    return store;
+  }
+
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      salaryExtraPays: {
+        ...store.finance.salaryExtraPays,
+        [monthId]: {
+          months,
+          ...(amount !== undefined ? { amount } : {}),
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    },
+  };
+}
+
+// "¿Has cobrado?" → sí, con lo cobrado de verdad.
+export function recordSalaryReceiptInStore(
+  store: ExpenseStore,
+  input: SalaryReceiptInput,
+  now: Date = new Date(),
+): ExpenseStore {
+  const monthId = toMonthId(input.monthId);
+  const amount = Number(input.amount);
+  if (!Number.isFinite(amount) || amount < 0 || !isValidDateOnly(input.receivedOn)) {
+    return store;
+  }
+  const previous = store.finance.salaryReceipts?.[monthId];
+
+  return withSalaryReceipt(store, monthId, {
+    amount,
+    receivedOn: input.receivedOn,
+    updatedAt: timestampAfter(previous?.updatedAt, now),
+  });
+}
+
+// Deshacer no borra la respuesta: un borrado no sobreviviría al merge.
+export function undoSalaryReceiptInStore(
+  store: ExpenseStore,
+  monthId: string,
+  now: Date = new Date(),
+): ExpenseStore {
+  const id = toMonthId(monthId);
+  const previous = store.finance.salaryReceipts?.[id];
+  if (!previous || previous.undone) return store;
+  return withSalaryReceipt(store, id, {
+    ...previous,
+    undone: true,
+    updatedAt: timestampAfter(previous.updatedAt, now),
+  });
+}
+
+function withSalaryReceipt(
+  store: ExpenseStore,
+  monthId: string,
+  receipt: NonNullable<FinanceStore["salaryReceipts"]>[string],
+): ExpenseStore {
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      salaryReceipts: { ...store.finance.salaryReceipts, [monthId]: receipt },
     },
   };
 }
@@ -229,6 +368,20 @@ export function clearIncomeFromStore(store: ExpenseStore): ExpenseStore {
   const incomeEventIds = store.finance.incomeEvents.map((event) => event.id);
   // Sin tombstone, fusionar con la nube devolvería los sueldos borrados.
   const clearedAt = new Date().toISOString();
+  // Pagas extra y cobros se vacían con una versión nueva (no se borran), que
+  // gana al fusionar.
+  const clearedExtraPays = Object.fromEntries(
+    Object.keys(store.finance.salaryExtraPays ?? {}).map((monthId) => [
+      monthId,
+      { months: [], updatedAt: clearedAt },
+    ]),
+  );
+  const clearedReceipts = Object.fromEntries(
+    Object.entries(store.finance.salaryReceipts ?? {}).map(([monthId, receipt]) => [
+      monthId,
+      { ...receipt, undone: true, updatedAt: timestampAfter(receipt.updatedAt, new Date(clearedAt)) },
+    ]),
+  );
 
   return {
     ...store,
@@ -236,6 +389,8 @@ export function clearIncomeFromStore(store: ExpenseStore): ExpenseStore {
       ...store.finance,
       incomeEvents: [],
       monthlySalary: {},
+      ...(store.finance.salaryExtraPays ? { salaryExtraPays: clearedExtraPays } : {}),
+      ...(store.finance.salaryReceipts ? { salaryReceipts: clearedReceipts } : {}),
     },
     deleted: {
       ...store.deleted,
@@ -262,7 +417,10 @@ export function closeMonthInStore(
   monthId: string,
   now: Date = new Date(),
 ): ExpenseStore {
-  const timestamp = afterPreviousChange(store.finance.monthClosures?.[monthId], now);
+  const timestamp = timestampAfter(
+    lastClosureChange(store.finance.monthClosures?.[monthId]),
+    now,
+  );
   return withMonthClosure(store, monthId, {
     closedAt: timestamp,
     updatedAt: timestamp,
@@ -277,7 +435,7 @@ export function reopenMonthInStore(
 ): ExpenseStore {
   const closure = store.finance.monthClosures?.[monthId];
   if (!closure) return store;
-  const timestamp = afterPreviousChange(closure, now);
+  const timestamp = timestampAfter(lastClosureChange(closure), now);
   return withMonthClosure(store, monthId, {
     ...closure,
     reopenedAt: timestamp,
@@ -285,18 +443,18 @@ export function reopenMonthInStore(
   });
 }
 
-// Cada cierre o reapertura queda después del cambio anterior aunque el reloj
-// de este dispositivo vaya atrasado: si no, reabrir no surtiría efecto y el
-// merge se quedaría con la versión vieja.
-function afterPreviousChange(closure: MonthClosure | undefined, now: Date) {
-  const previous = closure
-    ? Math.max(
-        Date.parse(closure.updatedAt),
-        Date.parse(closure.closedAt),
-        Date.parse(closure.reopenedAt ?? closure.closedAt),
-      )
-    : -Infinity;
-  return new Date(Math.max(now.getTime(), previous + 1)).toISOString();
+// Último cambio de un cierre (cerrar, reabrir o editar). Cada cierre o
+// reapertura queda después de él aunque el reloj de este dispositivo vaya
+// atrasado (`timestampAfter`): si no, reabrir no surtiría efecto y el merge se
+// quedaría con la versión vieja.
+function lastClosureChange(closure: MonthClosure | undefined) {
+  if (!closure) return undefined;
+  const latest = Math.max(
+    Date.parse(closure.updatedAt),
+    Date.parse(closure.closedAt),
+    Date.parse(closure.reopenedAt ?? closure.closedAt),
+  );
+  return Number.isNaN(latest) ? undefined : new Date(latest).toISOString();
 }
 
 function withMonthClosure(
@@ -311,4 +469,80 @@ function withMonthClosure(
       monthClosures: { ...store.finance.monthClosures, [monthId]: closure },
     },
   };
+}
+
+// Mes natural o ciclo desde el día de cobro. Se guarda con hora para que gane
+// la elección más reciente al fusionar dispositivos.
+export function updateBudgetCycleInStore(
+  store: ExpenseStore,
+  anchor: BudgetCycleAnchor,
+  now: Date = new Date(),
+): ExpenseStore {
+  const current = store.finance.budgetCycle;
+  if ((current?.anchor ?? "calendar") === anchor) return store;
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      budgetCycle: { anchor, updatedAt: timestampAfter(current?.updatedAt, now) },
+    },
+  };
+}
+
+// Anota el saldo de la cuenta un día. Un segundo saldo el mismo día sustituye
+// al primero; anotar un día borrado lo recupera.
+export function recordBalanceInStore(
+  store: ExpenseStore,
+  input: { date: string; amount: number },
+  now: Date = new Date(),
+): ExpenseStore {
+  if (!isValidDateOnly(input.date) || !Number.isFinite(input.amount)) return store;
+  const existing = store.finance.balanceCheckins?.[input.date];
+  return withBalanceCheckin(store, input.date, {
+    amount: Math.round(input.amount * 100) / 100,
+    updatedAt: timestampAfter(existing?.updatedAt, now),
+  });
+}
+
+// Borrar guarda `deletedAt` en vez de quitar la entrada: si no, el merge con
+// otro dispositivo la devolvería.
+export function deleteBalanceCheckinInStore(
+  store: ExpenseStore,
+  date: string,
+  now: Date = new Date(),
+): ExpenseStore {
+  const existing = store.finance.balanceCheckins?.[date];
+  if (!existing || existing.deletedAt) return store;
+  const timestamp = timestampAfter(existing.updatedAt, now);
+  return withBalanceCheckin(store, date, {
+    ...existing,
+    deletedAt: timestamp,
+    updatedAt: timestamp,
+  });
+}
+
+function withBalanceCheckin(
+  store: ExpenseStore,
+  date: string,
+  checkin: NonNullable<ExpenseStore["finance"]["balanceCheckins"]>[string],
+): ExpenseStore {
+  return {
+    ...store,
+    finance: {
+      ...store.finance,
+      balanceCheckins: { ...store.finance.balanceCheckins, [date]: checkin },
+    },
+  };
+}
+
+// La hora de un cambio queda siempre después de la del anterior aunque el
+// reloj de este dispositivo vaya atrasado: si no, el merge se quedaría con la
+// versión vieja.
+export function timestampAfter(previous: string | undefined, now: Date) {
+  const previousTime = previous ? Date.parse(previous) : Number.NaN;
+  return new Date(
+    Number.isNaN(previousTime)
+      ? now.getTime()
+      : Math.max(now.getTime(), previousTime + 1),
+  ).toISOString();
 }

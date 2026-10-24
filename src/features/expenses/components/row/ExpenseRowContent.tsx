@@ -2,6 +2,7 @@
 import { paidAmount } from "@/domain/finance";
 import type { AppLanguage, ExpenseCategory, ExpenseOccurrence } from "@/domain/types";
 import { categoryLabel } from "@/shared/category-labels";
+import { t } from "@/shared/i18n";
 import { categoryToneClass, statusLabel } from "../../lib/expense-actions";
 import { expenseStatusToneClass } from "../../lib/expense-visual-state";
 
@@ -10,6 +11,10 @@ type ExpenseRowContentProps = {
   category?: ExpenseCategory;
   today: string;
   language: AppLanguage;
+  // Control al principio de la segunda línea (la campana de aviso en la
+  // lista): lejos del centro de la fila, que abre las acciones, y del borde
+  // derecho, donde empieza el gesto de pagar.
+  metaAccessory?: React.ReactNode;
 };
 
 export function ExpenseRowContent({
@@ -17,9 +22,13 @@ export function ExpenseRowContent({
   category,
   today,
   language,
+  metaAccessory,
 }: ExpenseRowContentProps) {
   const paid = occurrence.status === "paid";
   const statusToneClass = expenseStatusToneClass(occurrence, today);
+  // Pagado con otro importe: se ve lo pagado y, junto a la categoría, lo previsto.
+  const amount = paid ? paidAmount(occurrence) : occurrence.template.amount;
+  const differsFromPlan = paid && amount !== occurrence.template.amount;
 
   // Todo se lee completo y alineado. Arriba, el nombre (salta de linea si no
   // cabe) y el importe a la derecha. Debajo, la categoria y el estado: el
@@ -41,11 +50,12 @@ export function ExpenseRowContent({
             paid ? "app-row-paid" : "text-[var(--app-text)]"
           }`}
         >
-          {formatCurrency(paid ? paidAmount(occurrence) : occurrence.template.amount)}
+          {formatCurrency(amount)}
         </p>
       </div>
 
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+        {metaAccessory}
         {category ? (
           <span
             className={`app-expense-row-category min-w-0 max-w-full break-words px-2 py-0.5 text-[11px] font-medium leading-tight ${categoryToneClass(
@@ -53,6 +63,14 @@ export function ExpenseRowContent({
             )}`}
           >
             {categoryLabel(category.name, language)}
+          </span>
+        ) : null}
+        {differsFromPlan ? (
+          <span className="app-money whitespace-nowrap text-[11px] text-[var(--app-text-muted)]">
+            {t("bills.plannedHint", language).replace(
+              "{amount}",
+              formatCurrency(occurrence.template.amount),
+            )}
           </span>
         ) : null}
         <p

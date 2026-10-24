@@ -35,6 +35,7 @@ export function PlanSectionList({
   );
 }
 
+// Línea de "no hay nada" de las secciones de previsiones del Plan.
 export function PlanEmptyLine({ children }: { children: ReactNode }) {
   return (
     <Surface variant="empty" className="px-3 py-2 text-sm font-medium">

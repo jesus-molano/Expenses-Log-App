@@ -2,20 +2,38 @@ import {
   materializeClosedOccurrenceRecords,
   toMonthId,
 } from "@/domain/finance";
+import {
+  CATEGORY_NAME_MAX_LENGTH,
+  isCategoryTone,
+  newCategoryFields,
+} from "@/domain/categories";
+import { EXPENSE_DETAIL_KEYS, sanitizeExpenseDetails } from "@/domain/expense-details";
 import { dedupeOverrides } from "@/domain/overrides";
+import { normalizeAmountChanges, normalizePauses } from "@/domain/recurrence";
+import {
+  sanitizeReminderPreferences,
+  sanitizeTemplateReminder,
+} from "@/domain/reminder-schedule";
 import {
   buildDateWithDay,
+  isValidDateOnly,
   normalizeDateOnly,
   toDateOnly,
 } from "@/domain/calendar";
 import type {
+  BalanceCheckin,
+  BudgetCycleSetting,
+  ExpenseCategory,
   ExpenseOccurrenceOverride,
   ExpenseStore,
   ExpenseTemplate,
   FinanceStore,
   MonthClosure,
+  MonthlySalarySettings,
   MonthlySavingsContribution,
   MonthlySavingsTarget,
+  SalaryExtraPaySettings,
+  SalaryReceipt,
 } from "@/domain/types";
 import { normalizeAppLanguage } from "@/shared/i18n";
 import { normalizeAppTheme } from "@/shared/theme";
@@ -37,6 +55,10 @@ export const FINANCE_KEYS = [
   "monthlySavingsTargets",
   "monthlySavingsContributions",
   "monthClosures",
+  "budgetCycle",
+  "balanceCheckins",
+  "salaryExtraPays",
+  "salaryReceipts",
 ] as const;
 
 export const DELETED_KEYS = [
@@ -49,7 +71,7 @@ export const DELETED_KEYS = [
   "monthlySalary",
 ] as const;
 
-export const PREFERENCE_KEYS = ["theme", "language"] as const;
+export const PREFERENCE_KEYS = ["theme", "language", "reminders"] as const;
 
 // Datos de versiones antiguas que la normalización v3 descarta a propósito.
 const RETIRED_KEYS = [
@@ -144,7 +166,109 @@ function normalizeFinanceStore(
     monthlySavingsTargets,
     monthlySavingsContributions,
     ...withMonthClosures(normalizeMonthClosures(finance.monthClosures)),
+    ...withBudgetCycle(normalizeBudgetCycle(finance.budgetCycle)),
+    ...withNonEmpty("balanceCheckins", normalizeBalanceCheckins(finance.balanceCheckins)),
+    ...withNonEmpty("salaryExtraPays", normalizeSalaryExtraPays(finance.salaryExtraPays)),
+    ...withNonEmpty("salaryReceipts", normalizeSalaryReceipts(finance.salaryReceipts)),
   };
+}
+
+// Las claves nuevas solo se escriben cuando tienen algo, para no añadirlas a
+// todos los stores.
+export function withNonEmpty<K extends string, T>(
+  key: K,
+  record: Record<string, T>,
+): Partial<Record<K, Record<string, T>>> {
+  return Object.keys(record).length > 0
+    ? ({ [key]: record } as Record<K, Record<string, T>>)
+    : {};
+}
+
+// Un saldo por fecha YYYY-MM-DD con importe y hora de cambio; lo ilegible se
+// descarta sin tocar el resto.
+function normalizeBalanceCheckins(value: unknown): Record<string, BalanceCheckin> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([date, entry]) => {
+      if (
+        !isValidDateOnly(date) ||
+        !isRecord(entry) ||
+        typeof entry.amount !== "number" ||
+        !Number.isFinite(entry.amount) ||
+        !isTimestamp(entry.updatedAt)
+      ) {
+        return [];
+      }
+      const checkin: BalanceCheckin = {
+        amount: Math.round(entry.amount * 100) / 100,
+        updatedAt: entry.updatedAt,
+      };
+      if (isTimestamp(entry.deletedAt)) checkin.deletedAt = entry.deletedAt;
+      return [[date, checkin]];
+    }),
+  );
+}
+
+// Un ciclo ilegible vuelve al mes natural, que es el valor por defecto.
+function normalizeBudgetCycle(value: unknown): BudgetCycleSetting | undefined {
+  if (
+    !isRecord(value) ||
+    (value.anchor !== "calendar" && value.anchor !== "payday") ||
+    !isTimestamp(value.updatedAt)
+  ) {
+    return undefined;
+  }
+  return { anchor: value.anchor, updatedAt: value.updatedAt };
+}
+
+// Solo se escribe cuando alguien lo ha elegido en Ajustes.
+export function withBudgetCycle(setting: BudgetCycleSetting | undefined) {
+  return setting ? { budgetCycle: setting } : {};
+}
+
+function normalizeSalaryExtraPays(
+  value: unknown,
+): Record<string, SalaryExtraPaySettings> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
+      if (!/^\d{4}-\d{2}$/.test(monthId) || !isRecord(entry)) return [];
+      const months = Array.isArray(entry.months)
+        ? Array.from(
+            new Set(
+              entry.months
+                .map(Number)
+                .filter((month) => Number.isInteger(month) && month >= 1 && month <= 12),
+            ),
+          ).sort((a, b) => a - b)
+        : [];
+      const amount = Number(entry.amount);
+      const settings: SalaryExtraPaySettings = {
+        months,
+        updatedAt: isTimestamp(entry.updatedAt) ? entry.updatedAt : monthTimestamp(monthId),
+      };
+      if (entry.amount !== undefined && Number.isFinite(amount) && amount > 0) {
+        settings.amount = amount;
+      }
+      return [[monthId, settings]];
+    }),
+  );
+}
+
+function normalizeSalaryReceipts(value: unknown): Record<string, SalaryReceipt> {
+  return Object.fromEntries(
+    Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
+      if (!/^\d{4}-\d{2}$/.test(monthId) || !isRecord(entry)) return [];
+      const amount = Number(entry.amount);
+      const receivedOn = normalizeDateOnly(entry.receivedOn);
+      if (!Number.isFinite(amount) || amount < 0 || !receivedOn) return [];
+      const receipt: SalaryReceipt = {
+        amount,
+        receivedOn,
+        updatedAt: isTimestamp(entry.updatedAt) ? entry.updatedAt : monthTimestamp(monthId),
+      };
+      if (entry.undone === true) receipt.undone = true;
+      return [[monthId, receipt]];
+    }),
+  );
 }
 
 function normalizeMonthClosures(value: unknown): Record<string, MonthClosure> {
@@ -167,10 +291,17 @@ function normalizeMonthClosures(value: unknown): Record<string, MonthClosure> {
   );
 }
 
+// Los ajustes de avisos solo se escriben cuando el usuario los cambia: un store
+// sin ellos sigue los valores por defecto.
+export function withReminderPreferences(value: unknown) {
+  const reminders = sanitizeReminderPreferences(value);
+  return reminders ? { reminders } : {};
+}
+
 // Solo se escribe cuando hay algún cierre, para no añadir la clave a todos los
 // stores.
 export function withMonthClosures(closures: Record<string, MonthClosure>) {
-  return Object.keys(closures).length > 0 ? { monthClosures: closures } : {};
+  return withNonEmpty("monthClosures", closures);
 }
 
 function isTimestamp(value: unknown): value is string {
@@ -183,22 +314,19 @@ function normalizeMonthlySalary(
   return Object.fromEntries(
     Object.entries(recordOrEmpty<unknown>(value)).flatMap(([monthId, entry]) => {
       if (!/^\d{4}-\d{2}$/.test(monthId) || !isRecord(entry)) return [];
-      return [
-        [
-          monthId,
-          {
-            amount: Math.max(Number(entry.amount ?? 0), 0),
-            dayOfMonth: Math.min(
-              Math.max(Number(entry.dayOfMonth ?? 28), 1),
-              31,
-            ),
-            updatedAt:
-              typeof entry.updatedAt === "string"
-                ? entry.updatedAt
-                : monthTimestamp(monthId),
-          },
-        ],
-      ];
+      const salary: MonthlySalarySettings = {
+        amount: Math.max(Number(entry.amount ?? 0), 0),
+        dayOfMonth: Math.min(
+          Math.max(Number(entry.dayOfMonth ?? 28), 1),
+          31,
+        ),
+        updatedAt:
+          typeof entry.updatedAt === "string"
+            ? entry.updatedAt
+            : monthTimestamp(monthId),
+      };
+      if (entry.onlyThisMonth === true) salary.onlyThisMonth = true;
+      return [[monthId, salary]];
     }),
   );
 }
@@ -308,9 +436,7 @@ export function normalizeExpenseStore(
   const base: ExpenseStore = {
     ...(keepUnknownKeys ? unknownEntries(store, STORE_KEYS) : {}),
     schemaVersion: 3,
-    categories: Array.isArray(store.categories)
-      ? (store.categories as ExpenseStore["categories"])
-      : [],
+    categories: normalizeCategories(store.categories),
     templates: Array.isArray(store.templates)
       ? normalizeTemplates(store.templates, today)
       : [],
@@ -332,6 +458,7 @@ export function normalizeExpenseStore(
       ...(keepUnknownKeys ? unknownEntries(preferences, PREFERENCE_KEYS) : {}),
       theme: normalizeAppTheme(preferences.theme),
       language: normalizeAppLanguage(preferences.language),
+      ...withReminderPreferences(preferences.reminders),
     },
   };
   const normalized = needsBankMigration
@@ -361,17 +488,97 @@ function normalizeTemplates(value: unknown[], today: Date): ExpenseTemplate[] {
     const dueDay = Number.isInteger(Number(template.dueDay))
       ? Math.min(Math.max(Number(template.dueDay), 1), 31)
       : Number(startDate.slice(8, 10));
+    // Un aviso ilegible se descarta: el gasto pasa a seguir el de Ajustes.
+    const reminder = sanitizeTemplateReminder(template.reminder);
+    const amountChanges = normalizeAmountChanges(template.amountChanges);
+    const pauses = normalizePauses(template.pauses);
+    // Notas, enlace de baja, permanencia y método de pago: lo ilegible se
+    // descarta sin tocar el resto del gasto.
+    const details = sanitizeExpenseDetails(template);
+    const detailsChanged = EXPENSE_DETAIL_KEYS.some((key) => details[key] !== template[key]);
 
     if (
       startDate === template.startDate &&
       endDate === template.endDate &&
-      dueDay === template.dueDay
+      dueDay === template.dueDay &&
+      sameReminder(reminder, template.reminder) &&
+      sameJson(amountChanges, template.amountChanges) &&
+      sameJson(pauses, template.pauses) &&
+      !detailsChanged
     ) {
       return template;
     }
 
-    return { ...template, startDate, endDate, dueDay };
+    const repaired: ExpenseTemplate = { ...template, startDate, endDate, dueDay };
+    delete repaired.reminder;
+    delete repaired.amountChanges;
+    delete repaired.pauses;
+    for (const key of EXPENSE_DETAIL_KEYS) delete repaired[key];
+    if (reminder) repaired.reminder = reminder;
+    if (amountChanges) repaired.amountChanges = amountChanges;
+    if (pauses) repaired.pauses = pauses;
+    return { ...repaired, ...details };
   });
+}
+
+// Una categoría sin id no se puede referenciar: se descarta. Sin nombre pasa
+// a General, y un color o icono desconocido vuelve al de una categoría nueva
+// con ese nombre (`newCategoryFields`: el de su preset o el neutro). Llevan
+// `updatedAt` para fusionarse por entidad; las de stores
+// antiguos no lo tienen y cargan igual. Uno ilegible se quita y la categoría
+// queda sin fecha: al fusionar pierde frente a una copia con fecha
+// (`latestUpdated`).
+function normalizeCategories(value: unknown): ExpenseCategory[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord).flatMap((raw) => {
+    const category = raw as ExpenseCategory;
+    if (typeof category.id !== "string" || !category.id) return [];
+
+    const rawName = typeof category.name === "string" ? category.name.trim() : "";
+    const name = (rawName || "General").slice(0, CATEGORY_NAME_MAX_LENGTH);
+    const defaults = newCategoryFields(
+      name,
+      isCategoryTone(category.tone) ? category.tone : undefined,
+    );
+    const tone = defaults.tone;
+    const icon =
+      typeof category.icon === "string" && category.icon ? category.icon : defaults.icon;
+    const userId = typeof category.userId === "string" ? category.userId : "demo";
+    const updatedAt = isTimestamp(category.updatedAt) ? category.updatedAt : undefined;
+
+    if (
+      name === category.name &&
+      tone === category.tone &&
+      icon === category.icon &&
+      userId === category.userId &&
+      updatedAt === category.updatedAt
+    ) {
+      return [category];
+    }
+
+    const next: ExpenseCategory = { ...category, name, tone, icon, userId };
+    if (updatedAt) next.updatedAt = updatedAt;
+    else delete next.updatedAt;
+    return [next];
+  });
+}
+
+function sameReminder(
+  sanitized: ExpenseTemplate["reminder"],
+  original: unknown,
+) {
+  if (!sanitized || !original || typeof original !== "object") {
+    return !sanitized && original === undefined;
+  }
+  const raw = original as Record<string, unknown>;
+  return (
+    raw.enabled === sanitized.enabled &&
+    raw.daysBeforeCharge === sanitized.daysBeforeCharge
+  );
+}
+
+function sameJson(a: unknown, b: unknown) {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function normalizeOccurrenceRecords(
@@ -392,7 +599,106 @@ export function normalizeImportedExpenseStore(value: unknown): ExpenseStore {
     throw new Error("Invalid expense store export.");
   }
 
-  return normalizeExpenseStore(value);
+  return normalizeExpenseStore(sanitizeImportedEntities(value));
+}
+
+const RECURRENCE_FREQUENCIES = ["once", "monthly", "quarterly", "yearly", "custom", "rrule"];
+const OCCURRENCE_STATUSES = ["due", "paid", "skipped"];
+
+// Un archivo importado puede venir editado a mano o de otra app: se quitan
+// las entidades a las que les falta lo imprescindible para pintarlas (id,
+// nombre, importe, fechas válidas), que de otro modo romperían la app al
+// generar ocurrencias o formatear fechas. Lo que sí se puede leer pasa tal
+// cual a la normalización de siempre.
+function sanitizeImportedEntities(store: Record<string, unknown>) {
+  const sanitized: Record<string, unknown> = { ...store };
+  if (Array.isArray(store.categories)) {
+    sanitized.categories = store.categories.filter(
+      (category) => isRecord(category) && isText(category.id) && isText(category.name),
+    );
+  }
+  if (Array.isArray(store.templates)) {
+    sanitized.templates = store.templates
+      .filter(
+        (template) =>
+          isRecord(template) &&
+          isText(template.id) &&
+          typeof template.name === "string" &&
+          isAmount(template.amount),
+      )
+      .map((template) => {
+        const recurrence = (template as Record<string, unknown>).recurrence;
+        return isRecord(recurrence) &&
+          RECURRENCE_FREQUENCIES.includes(String(recurrence.frequency))
+          ? template
+          : { ...(template as Record<string, unknown>), recurrence: { frequency: "monthly" } };
+      });
+  }
+  if (Array.isArray(store.overrides)) {
+    sanitized.overrides = store.overrides.filter(
+      (override) =>
+        isRecord(override) &&
+        isText(override.templateId) &&
+        normalizeDateOnly(override.occurrenceDate) === override.occurrenceDate &&
+        (override.dueDate === undefined ||
+          normalizeDateOnly(override.dueDate) === override.dueDate) &&
+        OCCURRENCE_STATUSES.includes(String(override.status)),
+    );
+  }
+  if (Array.isArray(store.occurrenceRecords)) {
+    sanitized.occurrenceRecords = store.occurrenceRecords.filter(
+      (record) =>
+        isRecord(record) &&
+        isText(record.id) &&
+        isText(record.templateId) &&
+        normalizeDateOnly(record.occurrenceDate) === record.occurrenceDate &&
+        normalizeDateOnly(record.dueDate) === record.dueDate &&
+        isAmount(record.plannedAmount) &&
+        OCCURRENCE_STATUSES.includes(String(record.status)),
+    );
+  }
+  if (isRecord(store.finance) && Array.isArray(store.finance.incomeEvents)) {
+    sanitized.finance = {
+      ...store.finance,
+      incomeEvents: store.finance.incomeEvents.filter(
+        (event) =>
+          isRecord(event) &&
+          isText(event.id) &&
+          isAmount(event.amount) &&
+          normalizeDateOnly(event.receivedAt) === event.receivedAt,
+      ),
+    };
+  }
+  return sanitized;
+}
+
+function isText(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+function isAmount(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+// Usuario provisional de lo creado sin sesión.
+const ANONYMOUS_USER_ID = "demo";
+
+// Cuenta a la que pertenecen unos datos locales según los ids que les puso
+// `assignExpenseStoreOwner` al sincronizar; null si todo se creó sin sesión.
+export function inferStoreOwnerId(store: ExpenseStore): string | null {
+  const owners = [
+    ...store.templates,
+    ...store.overrides,
+    ...store.categories,
+    ...store.finance.incomeEvents,
+  ].map((entity) => entity.userId);
+
+  return (
+    owners.find(
+      (userId): userId is string =>
+        typeof userId === "string" && userId !== "" && userId !== ANONYMOUS_USER_ID,
+    ) ?? null
+  );
 }
 
 export function assignExpenseStoreOwner(

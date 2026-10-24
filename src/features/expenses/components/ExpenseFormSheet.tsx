@@ -4,19 +4,30 @@ import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { toDateOnly } from "@/domain/calendar";
+import type { CategoryInput } from "@/domain/categories";
 import type { CapturedDraft } from "@/domain/expense-capture";
-import { firstChargeAlreadyPassed } from "@/domain/recurrence";
+import {
+  firstChargeAlreadyPassed,
+  previousMonthsChargeDates,
+} from "@/domain/recurrence";
 import type {
   AppLanguage,
   CreateExpenseOptions,
   DraftExpense,
+  ExpenseCategory,
   OccurrenceStatus,
+  ReminderPreferences,
 } from "@/domain/types";
 import { t } from "@/shared/i18n";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
 import { inferredFieldsLabel, type CaptureReason } from "../lib/capture-labels";
 import { CaptureNotice } from "./CaptureNotice";
 import { ExpenseForm } from "./ExpenseForm";
+import {
+  previousChargesOption,
+  type PreviousChargesChoiceValue,
+} from "../types";
+import { PreviousChargesChoice } from "./form/PreviousChargesChoice";
 
 type ExpenseFormSheetProps = {
   open: boolean;
@@ -26,6 +37,9 @@ type ExpenseFormSheetProps = {
   // Por qué el borrador viene del análisis local, si es el caso.
   notice?: CaptureReason | null;
   language?: AppLanguage;
+  reminderPreferences?: ReminderPreferences;
+  categories?: ExpenseCategory[];
+  onCreateCategory?: (input: CategoryInput) => string | null;
   onClose: () => void;
   onSave: (draft: DraftExpense, options?: CreateExpenseOptions) => void;
 };
@@ -36,6 +50,9 @@ export function ExpenseFormSheet({
   review = null,
   notice = null,
   language = "es",
+  reminderPreferences,
+  categories,
+  onCreateCategory,
   onClose,
   onSave,
 }: ExpenseFormSheetProps) {
@@ -47,9 +64,15 @@ export function ExpenseFormSheet({
   const toReview = inferredFieldsLabel(review?.inferredFields ?? [], language);
   const [initialStatus, setInitialStatus] =
     useState<Extract<OccurrenceStatus, "due" | "paid">>("due");
-  // Se pregunta por el primer cobro real, no por la fecha de inicio: un
+  // Se pregunta por el cobro real de este mes, no por la fecha de inicio: un
   // mensual que empieza el día 1 y se cobra el 25 aún no ha pasado el 23.
-  const isPastCurrentMonthDay = firstChargeAlreadyPassed(form, toDateOnly(new Date()));
+  const today = toDateOnly(new Date());
+  const isPastCurrentMonthDay = firstChargeAlreadyPassed(form, today);
+  // Con un inicio en un mes pasado, sus cobros anteriores (M18). Por defecto
+  // se dan por pagados: es lo habitual al apuntar un gasto que ya existía.
+  const previousCharges = previousMonthsChargeDates(form, today);
+  const [previousChoice, setPreviousChoice] =
+    useState<PreviousChargesChoiceValue>("paid");
 
   if (!open) return null;
 
@@ -65,6 +88,8 @@ export function ExpenseFormSheet({
       },
       {
         initialStatus: isPastCurrentMonthDay ? initialStatus : "due",
+        previousCharges:
+          previousCharges.length > 0 ? previousChargesOption(previousChoice) : undefined,
       },
     );
   }
@@ -116,9 +141,22 @@ export function ExpenseFormSheet({
             form={form}
             amountText={amountText}
             language={language}
+            reminderPreferences={reminderPreferences}
+            categories={categories}
+            onCreateCategory={onCreateCategory}
             onFormChange={setForm}
             onAmountTextChange={setAmountText}
           />
+
+          {previousCharges.length > 0 ? (
+            <PreviousChargesChoice
+              count={previousCharges.length}
+              monthId={today.slice(0, 7)}
+              value={previousChoice}
+              language={language}
+              onChange={setPreviousChoice}
+            />
+          ) : null}
 
           {isPastCurrentMonthDay ? (
             <div className="app-section-card border-[color-mix(in_srgb,var(--app-warning)_28%,transparent)] p-3">

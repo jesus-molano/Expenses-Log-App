@@ -1,11 +1,16 @@
 import { buildDateWithDay, normalizeDateOnly, toDateOnly } from "./calendar";
+import type { CaptureIntent } from "./capture-commands";
 import { PRESET_EXPENSE_CATEGORIES } from "./categories";
+import { foldText, hasWord } from "./text";
 import type {
   CustomRecurrenceUnit,
   DraftExpense,
   RecurrenceFrequency,
   RecurrenceRule,
 } from "./types";
+
+// Se sigue exportando desde aquí para los imports que ya lo usan.
+export { foldText };
 
 // Lo que se acepta analizar de una vez (el campo de texto lo limita igual).
 export const CAPTURE_TEXT_MAX_LENGTH = 2000;
@@ -25,6 +30,8 @@ export type CapturedExpenseItem = {
   description?: string | null;
   // El parser local eligió el importe entre varios números: hay que revisarlo.
   amountGuessed?: boolean;
+  // Alta (por defecto) u orden sobre un gasto existente.
+  intent?: CaptureIntent | null;
 };
 
 export type CaptureField = "amount" | "dueDay" | "startDate" | "categoryName" | "frequency";
@@ -69,19 +76,6 @@ const CATEGORY_HINTS: Array<[string, string[]]> = [
   ["Educacion/Trabajo", ["curso", "software", "formacion", "academia", "universidad"]],
   ["Deudas", ["prestamo", "tarjeta", "financiacion", "cuota"]],
 ];
-
-// Sin tildes ni mayúsculas, para comparar lo que dice el usuario o la IA.
-export function foldText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .trim();
-}
-
-function hasWord(text: string, phrase: string) {
-  return new RegExp(`(^|[^\\p{L}\\p{N}])${phrase}($|[^\\p{L}\\p{N}])`, "u").test(text);
-}
 
 export function detectCategoryFromText(text: string) {
   const folded = foldText(text);
