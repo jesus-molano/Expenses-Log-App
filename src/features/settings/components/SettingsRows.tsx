@@ -7,5 +7,6 @@ export { InstallRow } from "./rows/InstallRow";
 export { LanguageRow } from "./rows/LanguageRow";
 export { NotificationsRow } from "./rows/NotificationsRow";
 export { OfflineRow } from "./rows/OfflineRow";
+export { PlanBaseRow } from "./rows/PlanBaseRow";
 export { RemindersRow } from "./rows/RemindersRow";
 export { ThemeRow } from "./rows/ThemeRow";

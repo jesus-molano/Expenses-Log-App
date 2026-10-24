@@ -6,6 +6,7 @@ import { PlanEmptyTableRow, PlanSectionList } from "./PlanSectionList";
 
 type MonthlyIncomeEventsListProps = {
   language: AppLanguage;
+  className?: string;
   incomeEvents: IncomeEvent[];
   onDeleteIncomeEvent: (id: string) => void;
   onUpdateIncomeEvent: (
@@ -16,6 +17,7 @@ type MonthlyIncomeEventsListProps = {
 
 export function MonthlyIncomeEventsList({
   language,
+  className,
   incomeEvents,
   onDeleteIncomeEvent,
   onUpdateIncomeEvent,
@@ -25,6 +27,7 @@ export function MonthlyIncomeEventsList({
       title={t("money.oneOffForMonth", language)}
       icon={TrendingUp}
       tone="success"
+      className={className}
     >
       <div className="app-monthly-table" data-tone="success">
         <div className="app-monthly-table-head">

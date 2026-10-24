@@ -5,11 +5,11 @@ import { DEFAULT_THEME, THEME_COLORS } from "@/shared/theme";
 import manifest from "./manifest";
 
 describe("web app manifest", () => {
-  it("offers the add, voice and plan shortcuts", () => {
+  it("offers the add, voice and month shortcuts", () => {
     expect(manifest().shortcuts?.map((shortcut) => [shortcut.name, shortcut.url])).toEqual([
       ["Añadir gasto", "/expenses/new"],
       ["Añadir por voz", "/expenses/new?mode=voice"],
-      ["Plan", "/money"],
+      ["Mes", "/money"],
     ]);
   });
 

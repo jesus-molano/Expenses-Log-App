@@ -199,7 +199,7 @@ test("paints the system bar with the chosen theme", async ({ page }) => {
   );
 });
 
-test("lists the Plan shortcut and maskable icons in the manifest", async ({ request }) => {
+test("lists the Mes shortcut and maskable icons in the manifest", async ({ request }) => {
   const response = await request.get("/manifest.webmanifest");
   const manifest = await response.json();
 

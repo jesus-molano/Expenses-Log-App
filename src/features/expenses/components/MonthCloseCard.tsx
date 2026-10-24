@@ -5,6 +5,7 @@ import { Surface } from "@/components/ui/Surface";
 import type { MonthCloseStatus } from "@/domain/budget-month";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage } from "@/domain/types";
+import { settingsHrefFrom } from "@/shared/app-tabs";
 import { t } from "@/shared/i18n";
 import { capitalize, formatMonthName } from "../lib/month-view";
 
@@ -85,7 +86,7 @@ export function MonthCloseCard({
           <p className="text-xs text-[var(--app-text-muted)]">{summary}</p>
           {!hasPayday && !leftovers ? (
             <OfflineLink
-              href="/money"
+              href={settingsHrefFrom("expenses")}
               className="text-xs text-[var(--app-text-muted)] underline underline-offset-2"
             >
               {t("expenses.setPaydayHint", language)}

@@ -486,14 +486,6 @@
   padding: 0.5rem 0.25rem 0.25rem;
 }
 
-.app-plan-page-title {
-  font-size: clamp(1.35rem, 5vw, 1.55rem);
-  font-weight: 720;
-  letter-spacing: -0.035em;
-  line-height: 1.15;
-  text-wrap: balance;
-}
-
 .app-plan-section-title {
   font-size: clamp(1.25rem, 4.6vw, 1.5rem);
   font-weight: 740;

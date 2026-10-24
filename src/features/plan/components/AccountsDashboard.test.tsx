@@ -5,7 +5,7 @@ import { emptyFinanceStore } from "@/domain/finance";
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore } from "@/domain/types";
 import { ExpenseStoreProvider } from "@/stores/app/use-expense-store";
-import { MoneyDashboard } from "./MoneyDashboard";
+import { AccountsDashboard } from "./AccountsDashboard";
 
 vi.mock("@/utils/supabase/client", () => ({
   createClient: () => {
@@ -14,7 +14,7 @@ vi.mock("@/utils/supabase/client", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/money",
+  usePathname: () => "/accounts",
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() }),
 }));
@@ -51,7 +51,7 @@ const store: ExpenseStore = {
 async function renderDashboard() {
   render(
     <ExpenseStoreProvider>
-      <MoneyDashboard />
+      <AccountsDashboard />
     </ExpenseStoreProvider>,
   );
   return screen.findByRole("region", { name: "Cuentas" });
@@ -61,7 +61,7 @@ function sheet(name: string) {
   return screen.getByRole("dialog", { name });
 }
 
-describe("MoneyDashboard accounts", () => {
+describe("AccountsDashboard", () => {
   beforeEach(() => {
     window.localStorage.clear();
     saveExpenseStore(store);
@@ -141,6 +141,27 @@ describe("MoneyDashboard accounts", () => {
     });
   });
 
+  it("heads the tab with what is left over in the bills account", async () => {
+    const section = await renderDashboard();
+    await waitFor(() =>
+      expect(screen.getByText("Te sobran · Cuenta de recibos")).toBeInTheDocument(),
+    );
+    expect(document.querySelector("header [class*='app-money']")).toHaveTextContent(
+      /200,00\s€/,
+    );
+    // Sin barra de mes: Cuentas mira siempre el mes activo.
+    expect(screen.queryByRole("navigation", { name: "Cambiar de mes" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Cuentas" })).toHaveAttribute("aria-current", "page");
+
+    // Con un saldo que no llega, lo que falta.
+    fireEvent.click(within(section).getByRole("button", { name: /Anotar saldo/ }));
+    fireEvent.change(within(sheet("Anotar saldo")).getByLabelText("Saldo"), {
+      target: { value: "500" },
+    });
+    fireEvent.click(within(sheet("Anotar saldo")).getByRole("button", { name: "Guardar saldo" }));
+    expect(screen.getByText("Te faltan · Cuenta de recibos")).toBeInTheDocument();
+  });
+
   it("deletes an account after confirming", async () => {
     const section = await renderDashboard();
 
@@ -152,6 +173,8 @@ describe("MoneyDashboard accounts", () => {
 
     expect(within(section).getByText("Aún no has añadido cuentas.")).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Editar cuenta" })).not.toBeInTheDocument();
+    // Sin cuentas ni saldos, una cabecera neutra.
+    expect(screen.getByText("Sin saldo anotado")).toBeInTheDocument();
     expect(loadExpenseStore().finance.balanceAccounts?.primary?.deletedAt).toBeTruthy();
   });
 });

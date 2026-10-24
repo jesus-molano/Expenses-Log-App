@@ -104,7 +104,7 @@ test("anchors the budget month to payday from settings", async ({ page }) => {
   // El alquiler de octubre quedó sin pagar en el ciclo anterior.
   await expect(page.getByText("Pendiente de octubre")).toBeVisible();
 
-  await page.getByRole("link", { name: "Plan" }).click();
+  await page.getByRole("link", { name: "Mes" }).click();
   await expect(page.getByRole("heading", { level: 1, name: /Plan de noviembre/ })).toBeVisible();
   await expect(page.getByText("28 oct – 27 nov")).toBeVisible();
 
@@ -133,7 +133,11 @@ test("shows large upcoming bills, the monthly set-aside and cost by category", a
     },
     "2026-11-02T10:00:00",
   );
-  await page.goto("/money");
+  await page.goto("/forecast");
+
+  // Previsión: lo que hay que apartar al mes, en la cabecera.
+  await expect(page.getByText("Aparta al mes", { exact: true })).toBeVisible();
+  await expect(page.locator("header[data-app-chrome]")).toContainText(/110,00\s€/);
 
   const largeBills = page.getByRole("region", { name: "Próximos recibos grandes" });
   await expect(largeBills.getByText(/1\.?050,00\s€ en total/)).toBeVisible();
@@ -154,7 +158,7 @@ test("shows large upcoming bills, the monthly set-aside and cost by category", a
   await expect(costs.getByText(/600,00\s€\/año/).first()).toBeVisible();
 });
 
-test("summarises the month before moving on and from Plan", async ({ page }) => {
+test("summarises the month before moving on and from Mes", async ({ page }) => {
   await seed(
     page,
     {
@@ -180,20 +184,30 @@ test("summarises the month before moving on and from Plan", async ({ page }) => 
   const summary = page.getByRole("dialog", { name: "Resumen de octubre" });
   await expect(summary).toBeVisible();
   await expect(summary.getByText("2 de 2 recibos")).toBeVisible();
+  // El mismo resumen que en Mes, con las acciones de la revisión.
+  await expect(summary.getByRole("button", { name: "Editar ingreso fijo" })).toBeVisible();
+  await expect(summary.getByRole("button", { name: "Editar ahorro" })).toBeVisible();
   await summary.getByRole("button", { name: "Cerrar" }).click();
   await expect(summary).toHaveCount(0);
 
   await page.getByRole("button", { name: "Pasar a noviembre" }).click();
   await expect(page.getByText("Por pagar · noviembre")).toBeVisible();
 
-  await page.getByRole("link", { name: "Plan" }).click();
-  await page.getByRole("button", { name: /Resumen de octubre/ }).click();
+  // Mes mira noviembre; octubre, recién cerrado, tiene su resumen resaltado.
+  await page.getByRole("link", { name: "Mes" }).click();
+  await expect(page.getByRole("button", { name: /Resumen de noviembre/ })).toBeVisible();
+  await page.getByRole("button", { name: "Mes anterior" }).click();
+  const octoberSummary = page.getByRole("button", { name: /Resumen de octubre/ });
+  await expect(octoberSummary).toContainText("Para revisar");
+  await octoberSummary.click();
   await expect(page.getByRole("dialog", { name: "Resumen de octubre" })).toBeVisible();
 });
 
 test("records an account balance, replaces it and undoes a delete", async ({ page }) => {
   await seed(page, emptyStore, "2026-10-23T10:00:00");
-  await page.goto("/money");
+  await page.goto("/accounts");
+  const headline = page.locator("header[data-app-chrome]");
+  await expect(headline).toContainText("Sin saldo anotado");
 
   const section = page.getByRole("region", { name: "Cuentas" });
   await section.scrollIntoViewIfNeeded();
@@ -216,12 +230,16 @@ test("records an account balance, replaces it and undoes a delete", async ({ pag
   await form.getByRole("button", { name: "Guardar saldo" }).click();
   await expect(form).toHaveCount(0);
   await expect(account.getByText(/1\.?250,40\s€/).first()).toBeVisible();
+  // Nada por pagar: le sobra todo el saldo.
+  await expect(headline).toContainText("Te sobran · Sabadell");
+  await expect(headline).toContainText(/1\.?250,40\s€/);
 
   await account.getByRole("button", { name: /Anotar saldo/ }).click();
   await expect(form.getByText("Ya hay un saldo anotado ese día: se sustituirá.")).toBeVisible();
   await form.getByLabel("Saldo").fill("-35");
   await form.getByRole("button", { name: "Guardar saldo" }).click();
   await expect(account.getByText(/-35,00\s€/).first()).toBeVisible();
+  await expect(headline).toContainText("Te faltan · Sabadell");
 
   await account.getByRole("button", { name: "Ver historial" }).click();
   await account.getByRole("button", { name: "Borrar el saldo del 23 oct" }).click();
@@ -255,7 +273,7 @@ test("keeps separate accounts and tells whether the bills account covers what is
     },
     "2026-10-23T10:00:00",
   );
-  await page.goto("/money");
+  await page.goto("/accounts");
 
   const section = page.getByRole("region", { name: "Cuentas" });
   await section.scrollIntoViewIfNeeded();

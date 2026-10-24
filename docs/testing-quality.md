@@ -48,8 +48,8 @@ Hay tests de:
 - API de parseo AI/local.
 - Limpieza de sync metadata.
 - Service worker y fallback offline.
-- Navegacion interna entre Gastos, Plan y Ajustes sin red, incluidas las dos
-  procedencias de Ajustes.
+- Navegacion interna entre las cuatro pestañas y Ajustes sin red, incluida la
+  vuelta de Ajustes a la pestaña de la que se vino.
 - Chip "Sin conexion" en las cabeceras: aparece con `setOffline(true)`,
   desaparece al volver la red y no mueve la cabecera a 360 px.
 - Persistencia local y normalizacion de store.

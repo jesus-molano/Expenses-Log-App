@@ -62,7 +62,7 @@ export function SeriesAmountQuestion({
 }
 
 // La misma pregunta en su propia hoja, para cuando el pago se hizo en otro
-// sitio (el editor de Plan).
+// sitio (la lista de recibos de Mes).
 export function SeriesAmountPromptSheet({
   prompt,
   language,

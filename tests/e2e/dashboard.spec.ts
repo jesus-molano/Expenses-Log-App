@@ -45,7 +45,7 @@ test("starts empty for a new local user", async ({ page }) => {
   await expect(page.getByText("0,00 €").first()).toBeVisible();
   await expect(page.getByText("Sin cargos previstos hoy")).toBeVisible();
 
-  await page.getByRole("link", { name: "Plan" }).click();
+  await page.getByRole("link", { name: "Mes" }).click();
   await expect(page.getByText("Ingresos").first()).toBeVisible();
   await expect(page.getByText("0,00 €").first()).toBeVisible();
   await expect(page.getByText("Ahorro").first()).toBeVisible();
@@ -121,15 +121,15 @@ test("edits plan settings and monthly savings without losing either value", asyn
   await loadDemoStore(page);
   await page.goto("/");
 
-  await page.getByRole("link", { name: "Plan" }).click();
+  await page.getByRole("link", { name: "Mes" }).click();
   await expect(page).toHaveURL(/\/money$/);
   await expect(
     page.getByRole("heading", { level: 1, name: /Plan de/ }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Resumen del mes" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Recibos pendientes" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Recibos de/ })).toBeVisible();
 
-  await page.getByRole("button", { name: "Configurar" }).click();
+  await page.getByRole("button", { name: "Cambiar base del plan" }).click();
   await expect(page.getByRole("heading", { name: "Base del plan" })).toBeVisible();
 
   await page.getByLabel("Sueldo").fill("3000");
@@ -154,8 +154,9 @@ test("marks a pending receipt as paid directly from plan", async ({ page }) => {
   await loadDemoStore(page);
   await page.goto("/money");
 
-  // La revisión del mes también tiene botón de pagar: se usa el de pendientes.
-  const pendingReceipts = page.getByRole("region", { name: "Recibos pendientes" });
+  // Los recibos del mes, plegados de entrada: los pendientes van primero.
+  await page.getByRole("button", { name: /^Recibos de/ }).click();
+  const pendingReceipts = page.getByRole("region", { name: /^Recibos de/ });
   const payButtonName = { name: "Marcar Movistar como pagado" };
   const payButton = pendingReceipts.getByRole("button", payButtonName);
   await expect(payButton).toBeVisible();
@@ -178,7 +179,7 @@ test("marks a pending receipt as paid directly from plan", async ({ page }) => {
 test("shows a color marker for every annual chart series", async ({ page }) => {
   await page.setViewportSize({ width: 481, height: 881 });
   await loadDemoStore(page);
-  await page.goto("/money");
+  await page.goto("/forecast");
 
   const chart = page.locator(".recharts-wrapper");
   await expect(chart).toBeVisible();
@@ -274,7 +275,7 @@ test("compact menus support keyboard navigation and Escape", async ({ page }) =>
 test("mobile shell routes render without runtime errors", async ({ page }) => {
   await loadDemoStore(page);
 
-  for (const route of ["/", "/money", "/settings", "/expenses/new"]) {
+  for (const route of ["/", "/money", "/accounts", "/forecast", "/settings", "/expenses/new"]) {
     await page.goto(route);
     await expect(page.locator("main").first()).toBeVisible();
     await expect(page.locator("body")).not.toContainText("Unhandled Runtime Error");
@@ -507,7 +508,7 @@ test("the add expense shortcut opens the form only once", async ({ page }) => {
   await form.getByRole("button", { name: "Cerrar" }).click();
   await expect(form).toHaveCount(0);
 
-  await page.getByRole("link", { name: "Plan" }).click();
+  await page.getByRole("link", { name: "Mes" }).click();
   await expect(page).toHaveURL(/\/money$/);
   await page.goBack();
   await expect(page).toHaveURL(/\/expenses\/new$/);

@@ -4,7 +4,7 @@ import { t } from "@/shared/i18n";
 import type { SettingsController } from "../../types";
 import { SettingRow } from "../SettingRow";
 
-// Mes natural o ciclo que empieza el día de cobro. Gastos y Plan cuentan los
+// Mes natural o ciclo que empieza el día de cobro. Gastos y Mes cuentan los
 // recibos según lo que se elija aquí.
 export function BudgetCycleRow({ settings }: { settings: SettingsController }) {
   const { budgetCycle } = settings;

@@ -118,3 +118,5 @@ export function usePlanSettingsForm({
     submitSettings,
   };
 }
+
+export type PlanSettingsForm = ReturnType<typeof usePlanSettingsForm>;

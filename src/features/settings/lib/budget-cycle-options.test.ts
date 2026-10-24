@@ -49,7 +49,7 @@ describe("describeBudgetCycle", () => {
     );
 
     expect(cycle.payday).toBeNull();
-    expect(cycle.summary).toBe("Configura antes tu sueldo y día de cobro en Plan");
+    expect(cycle.summary).toBe("Configura antes tu sueldo y día de cobro en «Sueldo y ahorro»");
     expect(cycle.options[1].description).toBe(cycle.summary);
   });
 });

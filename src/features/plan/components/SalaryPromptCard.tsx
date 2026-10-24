@@ -26,7 +26,7 @@ type SalaryPromptCardProps = {
 };
 
 // "¿Has cobrado la nómina de octubre?" el día de cobro. Lo cobrado pasa a ser
-// el sueldo real del mes en Plan.
+// el sueldo real del mes en Mes.
 export function SalaryPromptCard({
   prompt,
   editing,

@@ -1,5 +1,5 @@
 // Preferencias de vista del mes que no se sincronizan:
-// - el mes que se está mirando, por pestaña y compartido entre Gastos y Plan;
+// - el mes que se está mirando, por pestaña y compartido entre Gastos y Mes;
 // - el "Ahora no" a pasar de mes, por dispositivo y por mes.
 const VIEW_MONTH_KEY = "expense-view-month";
 const CLOSE_DISMISSED_PREFIX = "plan-close-dismissed:";

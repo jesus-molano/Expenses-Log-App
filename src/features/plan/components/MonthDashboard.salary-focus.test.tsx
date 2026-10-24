@@ -5,7 +5,7 @@ import { emptyFinanceStore } from "@/domain/finance";
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore } from "@/domain/types";
 import { ExpenseStoreProvider } from "@/stores/app/use-expense-store";
-import { MoneyDashboard } from "./MoneyDashboard";
+import { MonthDashboard } from "./MonthDashboard";
 
 vi.mock("@/utils/supabase/client", () => ({
   createClient: () => {
@@ -49,13 +49,13 @@ const store: ExpenseStore = {
 async function renderOnPayday() {
   render(
     <ExpenseStoreProvider>
-      <MoneyDashboard />
+      <MonthDashboard />
     </ExpenseStoreProvider>,
   );
   const card = await screen.findByRole("region", {
     name: "¿Has cobrado la nómina de octubre?",
   });
-  // En Plan el mes no es un encabezado: un párrafo que recibe el foco.
+  // En Mes el mes no es un encabezado: un párrafo que recibe el foco.
   const monthTitle = screen
     .getByRole("navigation", { name: "Cambiar de mes" })
     .querySelector<HTMLElement>('[tabindex="-1"]');
@@ -63,14 +63,14 @@ async function renderOnPayday() {
   return { card, monthTitle };
 }
 
-describe("MoneyDashboard salary prompt focus", () => {
+describe("MonthDashboard salary prompt focus", () => {
   beforeEach(() => {
     window.localStorage.clear();
     saveExpenseStore(store);
     // Solo la fecha: el día de cobro. Los frames y temporizadores, reales.
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-28T10:00:00"));
-    // Lo que jsdom no trae y usan los gráficos de Plan.
+    // Lo que jsdom no trae.
     vi.stubGlobal(
       "matchMedia",
       (query: string) =>

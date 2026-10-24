@@ -7,6 +7,7 @@ import { resolveReminderPreferences } from "@/domain/reminder-schedule";
 import type { AppLanguage } from "@/domain/types";
 import { clearDeviceData } from "@/data/persistence/device-data";
 import { readSyncMeta } from "@/data/persistence/sync-meta-store";
+import { appTabHref, appTabLabelKey, type AppTab } from "@/shared/app-tabs";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
 import { DEFAULT_THEME } from "@/shared/theme";
@@ -23,7 +24,7 @@ import { SETTINGS_LANGUAGES, SETTINGS_THEMES } from "../lib/settings-options";
 export function useSettingsController({
   from = "expenses",
 }: {
-  from?: "money" | "expenses";
+  from?: AppTab;
 } = {}) {
   const expenseStore = useExpenseStore();
   const {
@@ -79,10 +80,9 @@ export function useSettingsController({
     () => describeBudgetCycle(store.finance, todayDateOnly, currentLanguage),
     [currentLanguage, store.finance, todayDateOnly],
   );
-  const backTab = from === "money" ? "money" : "expenses";
-  const backHref = backTab === "money" ? "/money" : "/";
-  const backLabel =
-    backTab === "money" ? t("common.plan") : t("common.expenses");
+  // Atrás vuelve a la pestaña desde la que se abrió Ajustes.
+  const backHref = appTabHref(from);
+  const backLabel = t(appTabLabelKey(from), currentLanguage);
   const deleteAccountPhrase = t("settings.deleteAccountPhrase", currentLanguage);
   const reminderPreferences = resolveReminderPreferences(store);
   const hasPayday =

@@ -6,7 +6,7 @@ import type { AppLanguage, ExpenseStore } from "@/domain/types";
 import { buildLargeUpcomingBills, buildProvisionPlan } from "../lib/bill-forecast";
 import { buildRecurringCostInsights } from "../lib/recurring-costs";
 
-// Previsiones del Plan a partir del mes activo: recibos grandes de los
+// Previsiones (pestaña Previsión) a partir del mes activo: recibos grandes de los
 // próximos 90 días, provisión para los no mensuales y coste por categoría.
 export function usePlanInsights({
   store,

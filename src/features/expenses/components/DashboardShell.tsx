@@ -1,17 +1,38 @@
 "use client";
 
-import { Landmark, Settings, WalletCards } from "lucide-react";
+import {
+  CalendarDays,
+  ChartNoAxesColumn,
+  Landmark,
+  Settings,
+  WalletCards,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect } from "react";
 import { OfflineLink } from "@/components/ui/OfflineLink";
 import { OfflineStatusChip } from "@/components/ui/OfflineStatusChip";
 import type { AppLanguage } from "@/domain/types";
 import type { PanelChromeState } from "@/features/expenses/lib/scroll-chrome-state";
+import {
+  APP_TABS,
+  appTabHref,
+  appTabLabelKey,
+  settingsHrefFrom,
+  type AppTab,
+} from "@/shared/app-tabs";
 import { t } from "@/shared/i18n";
+
+const TAB_ICONS: Record<AppTab, LucideIcon> = {
+  expenses: WalletCards,
+  money: CalendarDays,
+  accounts: Landmark,
+  forecast: ChartNoAxesColumn,
+};
 
 type DashboardShellProps = {
   headlineLabel: string;
   headlineTitle: string;
-  activeTab: "expenses" | "money";
+  activeTab: AppTab;
   language: AppLanguage;
   panelChrome: PanelChromeState;
   headerAction?: React.ReactNode;
@@ -60,7 +81,7 @@ export function DashboardShell({
               <div className="flex shrink-0 items-center gap-2">
                 {headerAction}
                 <OfflineLink
-                  href={`/settings?from=${activeTab}`}
+                  href={settingsHrefFrom(activeTab)}
                   aria-label={t("common.settings", language)}
                   className="app-icon-button size-10 min-h-10 min-w-10 shrink-0"
                 >
@@ -87,19 +108,20 @@ export function DashboardShell({
         aria-label={t("common.sections", language)}
         className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2"
       >
-        <div className="app-bottom-nav mx-auto grid max-w-md grid-cols-2 gap-2 p-1.5 text-sm font-semibold">
-          <ChromeTab
-            href="/"
-            active={activeTab === "expenses"}
-            icon={<WalletCards size={18} />}
-            label={t("common.expenses", language)}
-          />
-          <ChromeTab
-            href="/money"
-            active={activeTab === "money"}
-            icon={<Landmark size={18} />}
-            label={t("common.plan", language)}
-          />
+        {/* Cuatro pestañas a 360 px: icono encima y etiqueta corta, sin cortar. */}
+        <div className="app-bottom-nav mx-auto grid max-w-md grid-cols-4 gap-1 p-1.5 text-xs font-semibold">
+          {APP_TABS.map((tab) => {
+            const Icon = TAB_ICONS[tab];
+            return (
+              <ChromeTab
+                key={tab}
+                href={appTabHref(tab)}
+                active={activeTab === tab}
+                icon={<Icon size={18} aria-hidden="true" />}
+                label={t(appTabLabelKey(tab), language)}
+              />
+            );
+          })}
         </div>
       </nav>
     </main>
@@ -121,10 +143,11 @@ function ChromeTab({
     <OfflineLink
       href={href}
       data-active={active ? "true" : "false"}
-      className="app-bottom-nav-tab inline-flex items-center justify-center gap-2"
+      aria-current={active ? "page" : undefined}
+      className="app-bottom-nav-tab flex min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 py-1"
     >
       {icon}
-      <span>{label}</span>
+      <span className="max-w-full whitespace-nowrap leading-tight">{label}</span>
     </OfflineLink>
   );
 }

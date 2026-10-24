@@ -28,10 +28,22 @@ persistencia y servicios externos para que cada cambio tenga un lugar claro.
 
 ## Rutas y composicion
 
-- `/` renderiza `ExpenseDashboard`, la experiencia principal de gastos.
-- `/money` renderiza `MoneyDashboard`, que orquesta tres secciones de igual
-  nivel: mes actual, plan anual y revision mensual.
-- `/settings` renderiza `SettingsView`, preferencias, auth y notificaciones.
+- La navegacion inferior tiene cuatro pestañas (`src/shared/app-tabs.ts`),
+  cada una con su cifra en la cabecera de `DashboardShell`:
+  - `/` (Gastos) renderiza `ExpenseDashboard`, la experiencia principal de
+    gastos: "Por pagar · <mes>".
+  - `/money` (Mes) renderiza `MonthDashboard`: "Libre · <mes>", la barra de
+    mes compartida con Gastos, la ecuacion del mes, los recibos del mes
+    plegados y el resumen del mes (`MonthSummaryLayer`, que tambien abre
+    "Ver resumen" en Gastos) con las acciones de revision.
+  - `/accounts` (Cuentas) renderiza `AccountsDashboard`: los saldos y si la
+    cuenta de recibos llega a lo pendiente del mes activo.
+  - `/forecast` (Prevision) renderiza `ForecastDashboard`: recibos grandes,
+    provision, coste por categoria y plan anual.
+  Cuentas y Prevision miran siempre el mes activo y no tienen barra de mes.
+- `/settings` renderiza `SettingsView`, preferencias, auth y notificaciones,
+  y la fila "Sueldo y ahorro" con la misma hoja "Base del plan" que Mes.
+  `?from=<pestaña>` decide adonde vuelve "Atras".
 - `/login` renderiza `LoginView`.
 - `/expenses/new` y `/expenses/[id]` cubren creacion y detalle/edicion de
   gastos.
@@ -85,20 +97,28 @@ Dashboard de gastos:
    "Empezar noviembre"). La logica vive en `domain/budget-month.ts`,
    `features/expenses/lib/month-close.ts` y `use-month-close-sheet.ts`.
 
-Pantalla de dinero:
+Pestañas del plan (Mes, Cuentas y Prevision):
 
-1. `CurrentMonthPlanSection` responde que queda por pagar, que ya esta pagado y
-   cuanto queda libre segun el plan del mes que se mira en Gastos (con su
-   mismo selector). La fase "actual" es el mes activo; en el, "Hasta el cobro"
-   suma lo pendiente antes del proximo sueldo.
-2. `AnnualPlanSection` muestra gasto recurrente, pagado, ahorro real y capacidad
-   maxima de los doce meses del año seleccionado.
-3. `MonthlyReviewSection` compara un mes con el anterior y permite editar sus
-   ingresos y ahorro real.
-4. `MoneyDashboard` compone las secciones; los calculos puros viven en dominio y
-   `features/plan/lib`.
-5. La base del plan guarda sueldo fijo, dia de cobro y objetivo habitual. La
-   transferencia real de ahorro pertenece a cada mes y no cambia ese objetivo.
+1. `MonthDashboard` (Mes) responde cuanto queda libre segun el plan del mes
+   que se mira en Gastos (con la misma barra de mes, `useMonthPlan`), que
+   falta por pagar y lo ya pagado. La fase "actual" es el mes activo; en el,
+   "Hasta el cobro" suma lo pendiente antes del proximo sueldo. "Recibos de
+   <mes>" (`MonthReceiptsList`) es la unica lista para pagar, corregir lo
+   pagado o quitar del mes cada recibo.
+2. `MonthSummaryLayer` abre "Resumen de <mes>" con lo que antes era la
+   revision mensual: editar el ingreso fijo y el ahorro, el aviso del ahorro
+   sin registrar y los ingresos puntuales. Lo abren la fila del resumen en Mes
+   y "Ver resumen" en Gastos.
+3. `AccountsDashboard` (Cuentas) y `ForecastDashboard` (Prevision) miran el
+   mes activo (`useActiveBudgetMonth`); Prevision tiene `AnnualPlanSection`
+   con gasto recurrente, pagado, ahorro real y capacidad maxima de los doce
+   meses del año elegido (`useAnnualPlan`).
+4. Los calculos puros viven en dominio y `features/plan/lib`; el estado y las
+   hojas compartidas, en `features/plan/hooks` y en componentes pequeños.
+5. La base del plan guarda sueldo fijo, dia de cobro y objetivo habitual
+   (`usePlanBaseSettings`, la misma hoja desde Mes, la guia de Gastos y
+   Ajustes). La transferencia real de ahorro pertenece a cada mes y no cambia
+   ese objetivo.
 
 Ajustes:
 

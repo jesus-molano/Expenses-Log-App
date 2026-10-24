@@ -5,11 +5,14 @@ export function PlanSectionList({
   title,
   icon: Icon,
   tone = "default",
+  className = "mt-10",
   children,
 }: {
   title: string;
   icon?: ComponentType<{ size?: number; className?: string }>;
   tone?: "default" | "success" | "danger";
+  // Margen superior: menos dentro de una hoja.
+  className?: string;
   children: ReactNode;
 }) {
   const iconTone = {
@@ -19,7 +22,7 @@ export function PlanSectionList({
   }[tone];
 
   return (
-    <section className="mt-10">
+    <section className={className}>
       <h3 className="app-plan-subsection-title inline-flex items-center gap-2 text-[var(--app-text)]">
         <span>{title}</span>
         {Icon ? (

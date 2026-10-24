@@ -30,9 +30,10 @@ export default function manifest(): MetadataRoute.Manifest {
         url: "/expenses/new?mode=voice",
         icons: shortcutIcons,
       },
+      // La pestaña Mes: cuánto queda libre y qué falta por pagar este mes.
       {
-        name: "Plan",
-        short_name: "Plan",
+        name: "Mes",
+        short_name: "Mes",
         url: "/money",
         icons: shortcutIcons,
       },
