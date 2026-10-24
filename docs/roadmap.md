@@ -118,7 +118,7 @@ Estado:
   - Código muerto borrado, `planCopy` y los ternarios de idioma en i18n, tildes en los textos y en las categorías (sin cambiar el nombre guardado) y `--app-text-subtle` con contraste AA en los ocho temas, con tests que lo vigilan.
 - **F3 (4, 6, 12, 13 y 14): hecho.**
   - Plan: "Próximos recibos grandes" (no mensuales y pagos únicos desde 50 € en 90 días), "Provisión para recibos no mensuales" ("Aparta X al mes" y cuánto apartar hasta cada cobro) y "Coste por categoría" (€/mes y €/año de los próximos 12 meses, por categoría y por gasto).
-  - Resumen del mes (previsto, pagado, pendiente, ahorrado y mayores cambios frente al mes anterior) desde "Octubre al día", desde la revisión mensual y ofrecido por Plan al cerrar o cambiar de mes. Registro de saldo con tendencia.
+  - Resumen del mes (previsto, pagado, pendiente, ahorrado y mayores cambios frente al mes anterior) desde "Octubre al día", desde la revisión mensual y ofrecido por Plan al cerrar o cambiar de mes. Registro de saldo con tendencia, ahora por cuentas separadas con su papel (recibos, ahorro y libre).
   - Ajustes › "Mes del presupuesto": mes natural (por defecto) o desde el día de cobro, respetado por el mes activo, Gastos y Plan.
   - Festivos bancarios en `estimateChargeDate` (nacionales, Jueves y Viernes Santo y cierres de TARGET2).
   - Diferido: "te quedan ~X € hasta el cobro (≈ €/día)" a partir del saldo, que necesita el "Hasta el cobro" de F1a-3.
@@ -518,6 +518,7 @@ Estado:
 12. **Resumen del mes** y **registro de saldo**. **Hecho.**
     - `features/plan/lib/month-summary.ts` y `MonthSummarySheet`. Plan lo ofrece al cerrar un mes, en la primera semana del siguiente y en los tres últimos días del propio.
     - `finance.balanceCheckins` por fecha, con borrado por `deletedAt` (ver `docs/state-persistence-sync.md`).
+    - **Cuentas separadas con su papel: hecho.** El registro de saldo pasa a ser una lista de cuentas (recibos, ahorro y libre) con su nombre, orden, historial y gráfica. La de recibos compara su saldo con lo que queda por pagar en el mes activo ("te sobran" / "te faltan"); la de ahorro, con el objetivo del mes. El saldo de antes es la cuenta `primary` (sigue en `balanceCheckins`); las demás van en `finance.balanceAccounts` y `finance.accountCheckins` (ver `docs/domain-model.md`).
     - Diferido: el saldo disponible hasta el cobro (≈ €/día), pendiente de "Hasta el cobro" (F1a-3).
 13. **Ciclo anclado al día de cobro** (opción). **Hecho.**
     - `src/domain/budget-cycle.ts` y `finance.budgetCycle`; el ciclo lleva el nombre del mes con más días (cobro ≥ 16: empieza el mes anterior). Ver `docs/domain-model.md`.

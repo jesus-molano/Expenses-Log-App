@@ -25,13 +25,13 @@ export function PlanSheetHeader({
       <div className="app-sheet-handle mx-auto mb-3 sm:hidden" />
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id={titleId} className="text-lg font-semibold text-[var(--app-text)]">
+          <h2 id={titleId} className="break-words text-lg font-semibold text-[var(--app-text)]">
             {title}
           </h2>
           {subtitle ? (
             <p
               className={cn(
-                "mt-1 text-sm text-[var(--app-text-muted)]",
+                "mt-1 break-words text-sm text-[var(--app-text-muted)]",
                 capitalizeSubtitle && "capitalize",
               )}
             >

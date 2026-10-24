@@ -258,6 +258,22 @@ export type BalanceCheckin = {
   deletedAt?: string;
 };
 
+// Para qué sirve una cuenta: de la que salen los recibos, la de ahorro o la
+// del día a día. Decide con qué se compara su saldo.
+export type BalanceAccountRole = "bills" | "savings" | "spending";
+
+// Cuenta bancaria cuyo saldo se anota. Borrarla guarda `deletedAt` en lugar
+// de quitar la entrada, y ese borrado gana siempre al fusionar.
+export type BalanceAccount = {
+  // Vacío: el nombre por defecto de su papel ("Cuenta de recibos").
+  name: string;
+  role: BalanceAccountRole;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+};
+
 export type FinanceStore = {
   incomeEvents: IncomeEvent[];
   monthlySalary: Record<string, MonthlySalarySettings>;
@@ -265,8 +281,13 @@ export type FinanceStore = {
   monthlySavingsContributions?: Record<string, MonthlySavingsContribution>;
   monthClosures?: Record<string, MonthClosure>;
   budgetCycle?: BudgetCycleSetting;
-  // Por fecha YYYY-MM-DD: un saldo por día.
+  // Saldos de la cuenta `primary`, por fecha YYYY-MM-DD: un saldo por día. Es
+  // la clave que ya leen y escriben los builds anteriores a las cuentas.
   balanceCheckins?: Record<string, BalanceCheckin>;
+  // Cuentas por id. La `primary` solo aparece aquí cuando se edita.
+  balanceAccounts?: Record<string, BalanceAccount>;
+  // Saldos de las demás cuentas, por `${accountId}:${YYYY-MM-DD}`.
+  accountCheckins?: Record<string, BalanceCheckin>;
   salaryExtraPays?: Record<string, SalaryExtraPaySettings>;
   salaryReceipts?: Record<string, SalaryReceipt>;
 };

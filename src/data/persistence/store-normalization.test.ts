@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyStore } from "@/domain/seed";
+import { mergeExpenseStores } from "./local-store";
 import {
   assignExpenseStoreOwner,
   inferStoreOwnerId,
@@ -187,6 +188,104 @@ describe("normalizeExpenseStore", () => {
       "balanceCheckins" in
         normalizeExpenseStore({ schemaVersion: 3, finance: { balanceCheckins: { x: 1 } } }).finance,
     ).toBe(false);
+  });
+
+  it("keeps valid accounts and drops broken ones", () => {
+    const at = "2026-10-20T10:00:00.000Z";
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      finance: {
+        balanceAccounts: {
+          primary: { name: " Sabadell ", role: "bills", order: 0, createdAt: at, updatedAt: at },
+          "account-1": { name: "BBVA ahorro", role: "savings", order: 2, createdAt: at, updatedAt: at, deletedAt: at },
+          // Lo ilegible que no impide mostrarla vuelve a sus valores por defecto.
+          "account-2": { name: 7, role: "spending", order: "1", updatedAt: at },
+          "account-3": { name: "x".repeat(80), role: "spending", order: 1, createdAt: at, updatedAt: at },
+          "no-role": { name: "x", role: "checking", order: 1, createdAt: at, updatedAt: at },
+          "no-date": { name: "x", role: "bills", order: 1 },
+          "bad id": { name: "x", role: "bills", order: 1, createdAt: at, updatedAt: at },
+          "account-4": "BBVA",
+        },
+      },
+    });
+
+    expect(store.finance.balanceAccounts).toEqual({
+      primary: { name: "Sabadell", role: "bills", order: 0, createdAt: at, updatedAt: at },
+      "account-1": {
+        name: "BBVA ahorro",
+        role: "savings",
+        order: 2,
+        createdAt: at,
+        updatedAt: at,
+        deletedAt: at,
+      },
+      "account-2": { name: "", role: "spending", order: 0, createdAt: at, updatedAt: at },
+      "account-3": { name: "x".repeat(40), role: "spending", order: 1, createdAt: at, updatedAt: at },
+    });
+  });
+
+  it("keeps valid balances of other accounts and drops broken ones", () => {
+    const at = "2026-10-20T10:00:00.000Z";
+    const store = normalizeExpenseStore({
+      schemaVersion: 3,
+      finance: {
+        accountCheckins: {
+          "account-1:2026-10-20": { amount: 5000.005, updatedAt: at },
+          "account-1:2026-10-21": { amount: 4900, updatedAt: at, deletedAt: at },
+          // Los de la `primary` solo valen en balanceCheckins.
+          "primary:2026-10-20": { amount: 1, updatedAt: at },
+          "account-1:2026-02-30": { amount: 1, updatedAt: at },
+          "account-1": { amount: 1, updatedAt: at },
+          "account-1:2026-10-22": { amount: Number.NaN, updatedAt: at },
+          "account-1:2026-10-23": { amount: 1, updatedAt: "ayer" },
+          "account-1:2026-10-24": null,
+        },
+      },
+    });
+
+    expect(store.finance.accountCheckins).toEqual({
+      "account-1:2026-10-20": { amount: 5000.01, updatedAt: at },
+      "account-1:2026-10-21": { amount: 4900, updatedAt: at, deletedAt: at },
+    });
+  });
+
+  it("never crashes on hostile account data and only writes the keys with something in them", () => {
+    for (const value of [null, 1, "x", [], [{ role: "bills" }], { a: [] }, { __proto__: { x: 1 } }]) {
+      const store = normalizeExpenseStore({
+        schemaVersion: 3,
+        finance: { balanceAccounts: value, accountCheckins: value },
+      });
+      expect("balanceAccounts" in store.finance).toBe(false);
+      expect("accountCheckins" in store.finance).toBe(false);
+    }
+    // Ids que todo objeto ya tiene, como llegan de un JSON: se descartan y no
+    // tocan el prototipo del registro al fusionar.
+    const at = "2026-10-20T10:00:00.000Z";
+    const raw = JSON.parse(
+        JSON.stringify({ schemaVersion: 3, finance: { balanceAccounts: {}, accountCheckins: {} } })
+          .replace(
+            '"balanceAccounts":{}',
+            `"balanceAccounts":{"__proto__":{"role":"bills","updatedAt":"${at}"},"constructor":{"role":"savings","updatedAt":"${at}"},"ok":{"role":"spending","updatedAt":"${at}"}}`,
+          )
+          .replace(
+            '"accountCheckins":{}',
+            `"accountCheckins":{"constructor:2026-10-20":{"amount":1,"updatedAt":"${at}"},"ok:2026-10-20":{"amount":1e308,"updatedAt":"${at}"},"ok:2026-10-21":{"amount":2,"updatedAt":"${at}"}}`,
+          ),
+    );
+    const hostile = normalizeExpenseStore(raw);
+    expect(Object.keys(hostile.finance.balanceAccounts ?? {})).toEqual(["ok"]);
+    expect(hostile.finance.accountCheckins).toEqual({ "ok:2026-10-21": { amount: 2, updatedAt: at } });
+    const merged = mergeExpenseStores(raw, emptyStore);
+    expect(Object.getPrototypeOf(merged.finance.balanceAccounts)).toBe(Object.prototype);
+    expect(Object.keys(merged.finance.balanceAccounts ?? {})).toEqual(["ok"]);
+    // Las cuentas de los stores anteriores a la v3 (una lista) se siguen
+    // descartando: son otra cosa.
+    const legacy = normalizeExpenseStore({
+      schemaVersion: 2,
+      finance: { accounts: [{ id: "legacy" }], balanceAccounts: [{ id: "legacy" }] },
+    });
+    expect("accounts" in legacy.finance).toBe(false);
+    expect("balanceAccounts" in legacy.finance).toBe(false);
   });
 
   it("falls back to a safe empty shape for invalid payloads", () => {

@@ -35,7 +35,9 @@ import {
   clearIncomeFromStore,
   closeMonthInStore,
   createCategoryInStore,
-  deleteBalanceCheckinInStore,
+  addBalanceAccountInStore,
+  deleteAccountBalanceInStore,
+  deleteBalanceAccountInStore,
   deleteCategoryInStore,
   deleteExpenseFromStore,
   deleteIncomeEventFromStore,
@@ -47,8 +49,9 @@ import {
   moveOccurrenceOnlyInStore,
   moveOccurrenceSeriesInStore,
   pauseSeriesInStore,
+  moveBalanceAccountInStore,
   reactivateSeriesInStore,
-  recordBalanceInStore,
+  recordAccountBalanceInStore,
   recordSalaryReceiptInStore,
   removeAmountChangeInStore,
   removePauseInStore,
@@ -63,6 +66,7 @@ import {
   payOccurrenceInStore,
   togglePaidInStore,
   undoSalaryReceiptInStore,
+  updateBalanceAccountInStore,
   updateBudgetCycleInStore,
   updateCategoryInStore,
   updateIncomeEventInStore,
@@ -75,6 +79,8 @@ import {
   updateReminderPreferencesInStore,
   updateSalaryExtraPayInStore,
   updateThemeInStore,
+  type AccountBalanceInput,
+  type BalanceAccountInput,
   type ReminderPreferencesInput,
   type SeriesAmountScope,
 } from "./store-commands";
@@ -421,12 +427,28 @@ function useExpenseStoreValue() {
     persist(updateBudgetCycleInStore(current(), anchor));
   }
 
-  function recordBalance(input: { date: string; amount: number }) {
-    persist(recordBalanceInStore(current(), input));
+  function addBalanceAccount(input: BalanceAccountInput) {
+    persist(addBalanceAccountInStore(current(), input));
   }
 
-  function deleteBalanceCheckin(date: string) {
-    persist(deleteBalanceCheckinInStore(current(), date));
+  function updateBalanceAccount(accountId: string, changes: Partial<BalanceAccountInput>) {
+    persist(updateBalanceAccountInStore(current(), accountId, changes));
+  }
+
+  function moveBalanceAccount(accountId: string, direction: -1 | 1) {
+    persist(moveBalanceAccountInStore(current(), accountId, direction));
+  }
+
+  function deleteBalanceAccount(accountId: string) {
+    persist(deleteBalanceAccountInStore(current(), accountId));
+  }
+
+  function recordAccountBalance(input: AccountBalanceInput) {
+    persist(recordAccountBalanceInStore(current(), input));
+  }
+
+  function deleteAccountBalance(input: { accountId: string; date: string }) {
+    persist(deleteAccountBalanceInStore(current(), input));
   }
 
   function updateTheme(theme: AppTheme) {
@@ -488,8 +510,12 @@ function useExpenseStoreValue() {
     restoreSnapshot,
     takeSnapshot,
     updateBudgetCycle,
-    recordBalance,
-    deleteBalanceCheckin,
+    addBalanceAccount,
+    updateBalanceAccount,
+    moveBalanceAccount,
+    deleteBalanceAccount,
+    recordAccountBalance,
+    deleteAccountBalance,
     updateTheme,
     updateLanguage,
     syncStatus: persistence.syncStatus,

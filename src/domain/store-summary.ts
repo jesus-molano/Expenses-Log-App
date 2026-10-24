@@ -41,6 +41,10 @@ export function hasUserData(store: ExpenseStore) {
     Object.keys(store.finance.monthlySalary).length > 0 ||
     Object.keys(store.finance.monthlySavingsTargets).length > 0 ||
     Object.keys(store.finance.salaryExtraPays ?? {}).length > 0 ||
-    Object.keys(store.finance.salaryReceipts ?? {}).length > 0
+    Object.keys(store.finance.salaryReceipts ?? {}).length > 0 ||
+    // Cuentas y saldos anotados.
+    Object.keys(store.finance.balanceCheckins ?? {}).length > 0 ||
+    Object.keys(store.finance.balanceAccounts ?? {}).length > 0 ||
+    Object.keys(store.finance.accountCheckins ?? {}).length > 0
   );
 }

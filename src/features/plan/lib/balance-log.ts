@@ -1,11 +1,16 @@
+import { PRIMARY_ACCOUNT_ID, balanceCheckinsOf } from "@/domain/balance-accounts";
 import { daysBetween } from "@/domain/calendar";
 import type { FinanceStore } from "@/domain/types";
 
 export type BalanceEntry = { date: string; amount: number };
 
-// Saldos anotados que siguen vigentes, del más antiguo al más reciente.
-export function activeBalanceEntries(finance: FinanceStore): BalanceEntry[] {
-  return Object.entries(finance.balanceCheckins ?? {})
+// Saldos anotados de una cuenta que siguen vigentes, del más antiguo al más
+// reciente.
+export function activeBalanceEntries(
+  finance: FinanceStore,
+  accountId: string = PRIMARY_ACCOUNT_ID,
+): BalanceEntry[] {
+  return Object.entries(balanceCheckinsOf(finance, accountId))
     .filter(([, checkin]) => !checkin.deletedAt)
     .map(([date, checkin]) => ({ date, amount: checkin.amount }))
     .sort((a, b) => a.date.localeCompare(b.date));

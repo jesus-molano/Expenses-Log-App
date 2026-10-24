@@ -3,7 +3,7 @@
 import { isSalaryCleared } from "@/domain/finance";
 import { dedupeOverrides } from "@/domain/overrides";
 import { emptyStore } from "@/domain/seed";
-import type { ExpenseStore } from "@/domain/types";
+import type { BalanceAccount, ExpenseStore } from "@/domain/types";
 import { latestUpdated, mergeLatestById } from "./merge-by-id";
 import {
   DELETED_KEYS,
@@ -189,6 +189,23 @@ export function mergeExpenseStores(
           normalizedLocalStore.finance.balanceCheckins,
         ),
       ),
+      // Cuentas: por id, la versión editada más tarde; una borrada sigue
+      // borrada aunque la otra copia la editara después.
+      ...withNonEmpty(
+        "balanceAccounts",
+        mergeAccountRecord(
+          normalizedCloudStore.finance.balanceAccounts,
+          normalizedLocalStore.finance.balanceAccounts,
+        ),
+      ),
+      // Saldos de las demás cuentas: por cuenta y día, el cambio más reciente.
+      ...withNonEmpty(
+        "accountCheckins",
+        mergeMonthlyRecord(
+          normalizedCloudStore.finance.accountCheckins,
+          normalizedLocalStore.finance.accountCheckins,
+        ),
+      ),
       // Por mes, la versión editada más tarde (pagas extra y "¿Has cobrado?").
       ...withNonEmpty(
         "salaryExtraPays",
@@ -333,4 +350,24 @@ function mergeContributionRecord(
       ([, contribution]) => !deleted.has(contribution.id),
     ),
   );
+}
+
+// Como `mergeMonthlyRecord`, pero el borrado de una cuenta gana siempre (como
+// los tombstones de `deleted`): editarla en otro dispositivo no la devuelve.
+// Restaurar una copia que la trae le da un id nuevo (`backup-commands`).
+function mergeAccountRecord(
+  cloud: Record<string, BalanceAccount> | undefined,
+  local: Record<string, BalanceAccount> | undefined,
+): Record<string, BalanceAccount> {
+  const result = { ...(cloud ?? {}) };
+  for (const [accountId, account] of Object.entries(local ?? {})) {
+    const existing = result[accountId];
+    result[accountId] =
+      existing && Boolean(existing.deletedAt) !== Boolean(account.deletedAt)
+        ? existing.deletedAt
+          ? existing
+          : account
+        : latestUpdated(existing, account);
+  }
+  return result;
 }
