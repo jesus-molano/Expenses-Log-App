@@ -87,6 +87,30 @@ describe("menuVerticalPlacement", () => {
     ).toEqual({ placement: "bottom", maxHeight: 244 });
   });
 
+  it("only counts the visible part of the sheet that holds the trigger", () => {
+    // Hoja baja al fondo de la pantalla: arriba de su borde el panel se cortaría.
+    expect(
+      menuVerticalPlacement({
+        anchorTop: 643,
+        anchorBottom: 687,
+        viewportHeight: 893,
+        panelHeight: 430,
+        boundsTop: 433,
+      }),
+    ).toEqual({ placement: "top", maxHeight: 190 });
+
+    expect(
+      menuVerticalPlacement({
+        anchorTop: 643,
+        anchorBottom: 687,
+        viewportHeight: 893,
+        panelHeight: 430,
+        boundsTop: 433,
+        boundsBottom: 893,
+      }).maxHeight,
+    ).toBeLessThanOrEqual(643 - 433);
+  });
+
   it("does not shrink the panel to an unusable height", () => {
     expect(
       menuVerticalPlacement({

@@ -27,7 +27,10 @@ export function CompactMenu({
   const popupRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const openWithKeyboardRef = useRef(false);
-  const suppressTriggerClickUntilRef = useRef(0);
+  // Tras tocar una opción, el clic fantasma que llega al disparador no debe
+  // reabrir el menú. Se limpia con un temporizador y no con la hora, que los
+  // relojes falsos de los tests (y los cambios de hora) pueden congelar.
+  const suppressTriggerClickRef = useRef(false);
   useMenuViewportClamp(open, align, menuRef, popupRef);
 
   useEffect(() => {
@@ -50,7 +53,10 @@ export function CompactMenu({
       if (menuRef.current.contains(event.target as Node)) {
         const target = event.target as HTMLElement;
         if (target.closest("button") !== triggerRef.current) {
-          suppressTriggerClickUntilRef.current = Date.now() + 450;
+          suppressTriggerClickRef.current = true;
+          window.setTimeout(() => {
+            suppressTriggerClickRef.current = false;
+          }, 450);
         }
         return;
       }
@@ -123,7 +129,7 @@ export function CompactMenu({
         ref={triggerRef}
         type="button"
         onClick={() => {
-          if (Date.now() < suppressTriggerClickUntilRef.current) return;
+          if (suppressTriggerClickRef.current) return;
           openWithKeyboardRef.current = false;
           onOpenChange(!open);
         }}

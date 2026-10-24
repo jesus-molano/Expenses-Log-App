@@ -162,6 +162,36 @@ test("lists every series with search and filters from the header", async ({ page
   await expect(page.getByRole("heading", { name: "Seguro coche" })).toBeVisible();
 });
 
+test("keeps the frequency menu inside the catalog sheet when it is short", async ({ page }) => {
+  await seed(page, store);
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Todos los gastos/ }).click();
+
+  const catalog = page.getByRole("dialog", { name: "Todos tus gastos" });
+  // Sin resultados la hoja queda baja: abrir el menú hacia arriba la desborda.
+  await catalog.getByRole("searchbox", { name: "Buscar gastos" }).fill("nada que coincida");
+  await expect(catalog.getByText("Ningún gasto coincide.")).toBeVisible();
+  await catalog.getByRole("button", { name: /^Frecuencia/ }).click();
+
+  const first = page.getByRole("option", { name: "Cualquier frecuencia" });
+  await expect(first).toBeVisible();
+  const menuBox = await page.locator(".app-select-menu-panel").boundingBox();
+  const sheetBox = await catalog.boundingBox();
+  expect(menuBox!.y).toBeGreaterThanOrEqual(sheetBox!.y);
+  await page.getByRole("option", { name: "Otras" }).scrollIntoViewIfNeeded();
+  await page.getByRole("option", { name: "Otras" }).click();
+  await expect(catalog.getByRole("button", { name: "Frecuencia: Otras" })).toBeVisible();
+
+  // Se puede volver a abrir y elegir la primera opción. Justo después de
+  // elegir, el menú ignora un instante el toque fantasma en su botón.
+  await expect(async () => {
+    await catalog.getByRole("button", { name: /^Frecuencia/ }).click();
+    await expect(first).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await first.click();
+  await expect(catalog.getByRole("button", { name: "Frecuencia: Cualquier frecuencia" })).toBeVisible();
+});
+
 test("saves contract details and a new category from the expense form", async ({ page }) => {
   await seed(page, store);
   await page.goto("/expenses/netflix");
