@@ -111,14 +111,13 @@ function ProvisionGroup({
               <p className="app-money text-lg font-semibold text-[var(--app-text)]">
                 {t("insights.provision.headline", language).replace(
                   "{amount}",
-                  formatCurrency(provision.monthlyTotal),
+                  formatCurrency(provision.monthlyToSetAside),
                 )}
               </p>
               <p className="app-money text-xs text-[var(--app-text-muted)]">
-                {t("insights.provision.perYear", language).replace(
-                  "{amount}",
-                  formatCurrency(provision.annualTotal),
-                )}
+                {t("insights.provision.average", language)
+                  .replace("{monthly}", formatCurrency(provision.monthlyTotal))
+                  .replace("{annual}", formatCurrency(provision.annualTotal))}
               </p>
             </div>
           </div>

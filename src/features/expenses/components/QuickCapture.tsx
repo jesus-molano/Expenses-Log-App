@@ -171,7 +171,7 @@ export function QuickCapture({
               placeholder={t("expenses.quickPlaceholder", language)}
               className={cn(
                 "input-control h-auto min-h-24 w-full resize-none py-3 leading-relaxed",
-                dictation.supported && "pr-14",
+                dictation.supported && "pr-16",
               )}
             />
             {dictation.supported ? (
@@ -186,8 +186,10 @@ export function QuickCapture({
                     ? t("expenses.dictationStop", language)
                     : t("expenses.dictationStart", language)
                 }
+                // Mismo margen que el texto del campo (py-3) y que los iconos
+                // de los demás campos (left-3 / right-3).
                 className={cn(
-                  "absolute bottom-2 right-2",
+                  "absolute bottom-3 right-3",
                   dictation.listening && "app-dictation-active",
                 )}
               >

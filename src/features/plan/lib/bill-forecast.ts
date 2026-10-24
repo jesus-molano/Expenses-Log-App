@@ -27,15 +27,20 @@ export type ProvisionItem = {
 };
 
 export type ProvisionPlan = {
-  // Lo que conviene apartar cada mes para los recibos no mensuales.
+  // Lo que hay que apartar este mes para llegar a tiempo a cada próximo
+  // recibo: la suma de lo que pide cada uno hasta su fecha.
+  monthlyToSetAside: number;
+  // Media a largo plazo: el coste de los próximos doce meses entre doce.
   monthlyTotal: number;
   annualTotal: number;
   items: ProvisionItem[];
 };
 
-// Provisión para los recibos que no se pagan cada mes (seguro, IBI...): su
-// coste de los próximos doce meses repartido en doce, y para el próximo cobro
-// de cada uno cuánto apartar al mes hasta entonces ("aparta 42,86 €/mes").
+// Provisión para los recibos que no se pagan cada mes (seguro, IBI...): para
+// el próximo cobro de cada uno, cuánto apartar al mes hasta entonces, y la
+// suma de todo eso como lo que hay que apartar este mes. La media (coste de
+// los próximos doce meses entre doce) es menor cuando un recibo grande llega
+// pronto, así que solo se muestra como referencia.
 export function buildProvisionPlan(
   store: ExpenseStore,
   { monthId, cycle = CALENDAR_CYCLE, language = "es" }: InsightOptions,
@@ -86,8 +91,17 @@ export function buildProvisionPlan(
         a.template.name.localeCompare(b.template.name),
     );
   const annualTotal = roundCents(items.reduce((sum, item) => sum + item.annual, 0));
+  // Lo que vence este mes ya está en lo que hay que pagar del mes: no se
+  // aparta aparte.
+  const monthlyToSetAside = roundCents(
+    items.reduce((sum, item) => {
+      if (!item.next) return sum + item.monthly;
+      return item.next.monthsUntil <= 1 ? sum : sum + item.next.perMonthUntilDue;
+    }, 0),
+  );
 
   return {
+    monthlyToSetAside,
     monthlyTotal: roundCents(annualTotal / COST_WINDOW_MONTHS),
     annualTotal,
     items,

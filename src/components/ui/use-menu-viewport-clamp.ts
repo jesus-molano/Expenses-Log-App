@@ -45,6 +45,10 @@ type MenuVerticalPlacementInput = {
   anchorBottom: number;
   viewportHeight: number;
   panelHeight: number;
+  // Zona visible donde puede pintarse el panel: la pantalla o, dentro de una
+  // hoja con scroll, la parte visible de esa hoja.
+  boundsTop?: number;
+  boundsBottom?: number;
   offset?: number;
   gutter?: number;
 };
@@ -58,14 +62,16 @@ export function menuVerticalPlacement({
   anchorBottom,
   viewportHeight,
   panelHeight,
+  boundsTop = 0,
+  boundsBottom = viewportHeight,
   offset = MENU_OFFSET_PX,
   gutter = VIEWPORT_GUTTER_PX,
 }: MenuVerticalPlacementInput): {
   placement: MenuPlacement;
   maxHeight: number | null;
 } {
-  const spaceBelow = Math.floor(viewportHeight - anchorBottom - offset - gutter);
-  const spaceAbove = Math.floor(anchorTop - offset - gutter);
+  const spaceBelow = Math.floor(boundsBottom - anchorBottom - offset - gutter);
+  const spaceAbove = Math.floor(anchorTop - boundsTop - offset - gutter);
 
   if (panelHeight <= spaceBelow) return { placement: "bottom", maxHeight: null };
 
@@ -78,11 +84,31 @@ export function menuVerticalPlacement({
   };
 }
 
+const CLIPPING_OVERFLOW = new Set(["hidden", "auto", "scroll", "clip"]);
+
+// Franja vertical visible para el panel: la pantalla recortada por cada
+// antepasado que corta su contenido (una hoja con scroll, un panel con
+// overflow). Un panel absoluto que pase de ahí queda cortado y no se puede
+// alcanzar haciendo scroll.
+function visibleVerticalBounds(element: HTMLElement, viewportHeight: number) {
+  let top = 0;
+  let bottom = viewportHeight;
+  for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
+    if (!CLIPPING_OVERFLOW.has(getComputedStyle(node).overflowY)) continue;
+    const rect = node.getBoundingClientRect();
+    const clientTop = rect.top + node.clientTop;
+    top = Math.max(top, clientTop);
+    bottom = Math.min(bottom, clientTop + node.clientHeight);
+  }
+  return { top, bottom };
+}
+
 // Mantiene el panel abierto dentro de la pantalla: limita su ancho al espacio
 // real hasta el borde (variable CSS --app-select-menu-available), lo abre
 // hacia arriba cuando abajo no cabe (data-placement="top") y, si hace falta,
-// limita su alto (--app-select-menu-available-height). Se recalcula al girar
-// o redimensionar.
+// limita su alto (--app-select-menu-available-height). Dentro de una hoja
+// con scroll cuenta solo su parte visible. Se recalcula al girar o
+// redimensionar.
 export function useMenuViewportClamp(
   open: boolean,
   align: MenuAlign,
@@ -114,11 +140,14 @@ export function useMenuViewportClamp(
       // Se mide el alto natural del panel (sin el limite de una medicion
       // anterior) antes de decidir hacia donde abre.
       popup.style.removeProperty("--app-select-menu-available-height");
+      const bounds = visibleVerticalBounds(popup, viewport.clientHeight);
       const { placement, maxHeight } = menuVerticalPlacement({
         anchorTop: rect.top,
         anchorBottom: rect.bottom,
         viewportHeight: viewport.clientHeight,
         panelHeight: popup.offsetHeight,
+        boundsTop: bounds.top,
+        boundsBottom: bounds.bottom,
       });
       popup.dataset.placement = placement;
       if (maxHeight !== null) {

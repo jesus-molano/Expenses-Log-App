@@ -949,8 +949,9 @@ export const messages = {
       },
       provision: {
         title: "Provisión para recibos no mensuales",
-        subtitle: "Lo que cuestan al año tus recibos trimestrales y anuales, repartido en 12 meses.",
+        subtitle: "Lo que tienes que apartar cada mes para llegar a tiempo a cada recibo trimestral o anual: la suma de la lista.",
         headline: "Aparta {amount} al mes",
+        average: "Media: {monthly}/mes · {annual}/año",
         next: "Próximo: {date} · {amount}",
         untilThen: "{amount}/mes hasta entonces",
         dueThisMonth: "Toca este mes",
@@ -1967,8 +1968,9 @@ export const messages = {
       },
       provision: {
         title: "Set-aside for non-monthly bills",
-        subtitle: "What your quarterly and yearly bills cost per year, spread over 12 months.",
+        subtitle: "What to set aside each month to reach every quarterly or yearly bill on time: the sum of the list.",
         headline: "Set aside {amount} a month",
+        average: "Average: {monthly}/month · {annual}/year",
         next: "Next: {date} · {amount}",
         untilThen: "{amount}/month until then",
         dueThisMonth: "Due this month",
