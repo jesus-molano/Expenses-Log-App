@@ -207,6 +207,28 @@ describe("series hooks", () => {
       expect(pauseSeries).toHaveBeenCalledWith("luz", { from: "2027-02-08", to: "2027-04-07" });
     });
 
+    it("drops a resume date the new start no longer offers", () => {
+      const pauseSeries = vi.fn();
+      const { result } = renderHook(() =>
+        usePauseSeriesSheet({ store, template: luz, now: NOW, pauseSeries }),
+      );
+
+      act(() => result.current.openSheet());
+      const firstStart = result.current.startChoices[0];
+      act(() => result.current.setFrom(result.current.startChoices.at(-1) ?? ""));
+      act(() => result.current.setResumeOn(result.current.resumeChoices.at(-1) ?? ""));
+      expect(result.current.resumeOn).toBe("2027-09-08");
+
+      // Desde octubre la vuelta de septiembre de 2027 ya no se lista.
+      act(() => result.current.setFrom(firstStart));
+      expect(result.current.resumeChoices).not.toContain("2027-09-08");
+      expect(result.current.resumeOn).toBe(OPEN_PAUSE);
+      expect(result.current.skippedCount).toBeNull();
+
+      act(() => result.current.confirm());
+      expect(pauseSeries).toHaveBeenCalledWith("luz", { from: "2026-10-08" });
+    });
+
     it("schedules a price from the first day of a month after the active one", () => {
       const scheduleAmountChange = vi.fn();
       const { result } = renderHook(() =>
@@ -230,5 +252,38 @@ describe("series hooks", () => {
       act(() => result.current.save(submitEvent));
       expect(scheduleAmountChange).toHaveBeenCalledWith("luz", { from: "2027-03-01", amount: 15 });
     });
+
+    it.each([
+      // Cobro el 5: "diciembre" empieza el 5 de diciembre.
+      { payday: 5, now: "2026-11-10T10:00:00", firstChoice: "2026-12", from: "2026-12-05" },
+      // Cobro el 28: "noviembre" empieza el 28 de octubre.
+      { payday: 28, now: "2026-10-20T10:00:00", firstChoice: "2026-11", from: "2026-10-28" },
+    ])(
+      "schedules a price from the payday that opens the chosen month (payday $payday)",
+      ({ payday, now, firstChoice, from }) => {
+        const scheduleAmountChange = vi.fn();
+        const finance = {
+          ...store.finance,
+          monthlySalary: { "2026-01": { amount: 2000, dayOfMonth: payday } },
+          budgetCycle: { anchor: "payday" as const, updatedAt: "2026-01-01T00:00:00.000Z" },
+        };
+        const { result } = renderHook(() =>
+          usePriceChangeSheet({
+            template: luz,
+            currentAmount: 60,
+            finance,
+            now: new Date(now),
+            language: "es",
+            scheduleAmountChange,
+          }),
+        );
+
+        act(() => result.current.openSheet());
+        expect(result.current.monthId).toBe(firstChoice);
+        act(() => result.current.setAmountText("15"));
+        act(() => result.current.save(submitEvent));
+        expect(scheduleAmountChange).toHaveBeenCalledWith("luz", { from, amount: 15 });
+      },
+    );
   });
 });

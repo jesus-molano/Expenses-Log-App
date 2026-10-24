@@ -10,6 +10,7 @@ import type {
   FinanceStore,
 } from "@/domain/types";
 import { formatMoneyInput, parseMoneyInput } from "@/shared/money";
+import { priceChangeStart } from "@/features/expenses/lib/price-change";
 
 // Meses que se ofrecen para un cambio de precio programado.
 const PRICE_CHANGE_MONTHS = 12;
@@ -24,7 +25,8 @@ type UsePriceChangeSheetOptions = {
 };
 
 // "Desde marzo cuesta 15 €": se elige un mes posterior al activo (el activo
-// se cambia editando el importe) y el nuevo precio rige desde su día 1.
+// se cambia editando el importe) y el nuevo precio rige desde el primer día
+// de ese mes de presupuesto (el día de cobro con el ciclo anclado al cobro).
 export function usePriceChangeSheet({
   template,
   currentAmount,
@@ -52,7 +54,7 @@ export function usePriceChangeSheet({
     event.preventDefault();
     const amount = parseMoneyInput(amountText);
     if (amount === null || amount <= 0 || !monthId) return;
-    scheduleAmountChange(template.id, { from: `${monthId}-01`, amount });
+    scheduleAmountChange(template.id, { from: priceChangeStart(monthId, finance), amount });
     setOpen(false);
   }
 

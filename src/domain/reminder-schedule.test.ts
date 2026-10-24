@@ -12,6 +12,7 @@ import {
   resolveTemplateReminder,
   sanitizeReminderPreferences,
   sanitizeTemplateReminder,
+  snapLeadDays,
   toggledTemplateReminder,
 } from "./reminder-schedule";
 import { emptyStore } from "./seed";
@@ -141,6 +142,16 @@ describe("expense reminder resolution", () => {
     expect(leadDayOptions({ frequency: "monthly" })).toEqual([1, 2, 3, 4, 5]);
   });
 
+  it("snaps a lead to the closest one offered for the frequency", () => {
+    expect(snapLeadDays({ frequency: "monthly" }, 30)).toBe(5);
+    expect(snapLeadDays({ frequency: "monthly" }, 14)).toBe(5);
+    expect(snapLeadDays({ frequency: "monthly" }, 4)).toBe(4);
+    // A igual distancia de 1 y de 3, la menor.
+    expect(snapLeadDays({ frequency: "yearly" }, 2)).toBe(1);
+    expect(snapLeadDays({ frequency: "yearly" }, 14)).toBe(14);
+    expect(snapLeadDays({ frequency: "yearly" }, 6)).toBe(7);
+  });
+
   it("uses the expense setting first and the default otherwise", () => {
     expect(
       resolveTemplateReminder(template("own", 5, { reminder: { enabled: false, daysBeforeCharge: 4 } }), preferences),
@@ -268,6 +279,22 @@ describe("buildOccurrenceReminders", () => {
 
     expect(stageOf(store)).toEqual(["today:before:0"]);
   });
+
+  it("still asks if a charge pushed back by bank holidays was charged", () => {
+    const stagesOn = (store: ExpenseStore, day: string) =>
+      buildOccurrenceReminders(store, new Date(`${day}T09:00:00`)).map(
+        (reminder) => `${reminder.occurrence.dueDate}:${reminder.stage}:${reminder.daysUntilCharge}`,
+      );
+    // Jueves Santo de 2026: se cobra el martes 7, tras el Lunes de Pascua.
+    const holyThursday = storeWith([template("holy", 2, { startDate: "2026-03-02" })]);
+    expect(stagesOn(holyThursday, "2026-04-07")).toEqual(["2026-04-02:charge_day:0"]);
+    expect(stagesOn(holyThursday, "2026-04-08")).toEqual(["2026-04-02:charge_check:-1"]);
+    expect(stagesOn(holyThursday, "2026-04-10")).toEqual(["2026-04-02:charge_check:-3"]);
+    expect(stagesOn(holyThursday, "2026-04-11")).toEqual([]);
+    // 1 de mayo en viernes: se cobra el lunes 4.
+    const labourDay = storeWith([template("labour", 1, { startDate: "2026-04-01" })]);
+    expect(stagesOn(labourDay, "2026-05-07")).toEqual(["2026-05-01:charge_check:-3"]);
+  });
 });
 
 describe("account notices", () => {
@@ -388,5 +415,28 @@ describe("countAttentionOccurrences", () => {
 
   it("ignores charges of deleted expenses", () => {
     expect(countAttentionOccurrences(storeWith([]), monday)).toBe(0);
+  });
+
+  it("looks back to the previous budget month with the payday cycle", () => {
+    const paydayStore = (dayOfMonth: number, templates: ExpenseTemplate[]): ExpenseStore => {
+      const base = storeWith(templates);
+      return {
+        ...base,
+        finance: {
+          ...base.finance,
+          monthlySalary: { "2026-01": { amount: 2000, dayOfMonth } },
+          budgetCycle: { anchor: "payday", updatedAt: "2026-01-01T00:00:00.000Z" },
+        },
+      };
+    };
+
+    // Cobro el 28: el 5 de noviembre es "noviembre" (28 oct - 27 nov) y el
+    // mes anterior empieza el 28 de septiembre, con el recibo del 29.
+    const late = paydayStore(28, [template("internet", 29, { startDate: "2026-09-29" })]);
+    expect(countAttentionOccurrences(late, new Date("2026-11-05T12:00:00"))).toBe(2);
+    // Cobro el 5: el 10 de noviembre el mes anterior va del 5 de octubre al 4
+    // de noviembre; el recibo del 2 de octubre ya no sale en Gastos.
+    const early = paydayStore(5, [template("phone", 2, { startDate: "2026-09-02" })]);
+    expect(countAttentionOccurrences(early, new Date("2026-11-10T12:00:00"))).toBe(1);
   });
 });

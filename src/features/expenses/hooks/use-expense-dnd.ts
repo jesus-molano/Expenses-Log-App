@@ -36,6 +36,8 @@ type UseExpenseDndOptions = {
   openMonth?: string;
   // Con el ciclo anclado al cobro, primer día en que se puede soltar.
   floorDate?: string;
+  // Si un cobro se puede mover: la misma regla que sus acciones.
+  canMove?: (occurrence: ExpenseOccurrence) => boolean;
   onMoveOccurrenceOnly: (
     occurrence: ExpenseOccurrence,
     dueDate: string,
@@ -52,6 +54,7 @@ export function useExpenseDnd({
   currentMonth,
   openMonth = currentMonth,
   floorDate,
+  canMove,
   onMoveOccurrenceOnly,
   onMoveOccurrenceSeries,
 }: UseExpenseDndOptions) {
@@ -131,6 +134,7 @@ export function useExpenseDnd({
       currentMonth,
       openMonth,
       floorDate,
+      canMove,
     });
     if (action === "series") {
       scheduleSeriesMove(occurrence, target.date, target);

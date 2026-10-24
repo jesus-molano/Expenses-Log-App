@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { resolveBudgetCycle } from "@/domain/budget-cycle";
 import type { AppLanguage, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
 import { clampViewMonth } from "../lib/month-view";
 import {
@@ -75,7 +76,12 @@ export function useOccurrenceDeepLink({
       }
       occurrenceId = occurrence.id;
       const monthId = clampViewMonth(
-        deepLinkViewMonth(occurrence, viewMonthId, visibleIds),
+        deepLinkViewMonth(
+          occurrence,
+          viewMonthId,
+          visibleIds,
+          resolveBudgetCycle(store.finance),
+        ),
         activeMonthId,
       );
       if (monthId !== viewMonthId) {

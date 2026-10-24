@@ -1,3 +1,4 @@
+import { snapLeadDays } from "@/domain/reminder-schedule";
 import type {
   CustomRecurrenceUnit,
   DraftExpense,
@@ -43,6 +44,21 @@ function recurrenceForFrequency(
   return current.rrule ? current : { frequency: "monthly" };
 }
 
+// Cambia la frecuencia del borrador y lleva su aviso propio a una antelación
+// que el selector ofrece para ella (30 días en un anual pasan a 5 en un
+// mensual).
+function withRecurrence(draft: DraftExpense, recurrence: RecurrenceRule): DraftExpense {
+  if (!draft.reminder) return { ...draft, recurrence };
+  return {
+    ...draft,
+    recurrence,
+    reminder: {
+      ...draft.reminder,
+      daysBeforeCharge: snapLeadDays(recurrence, draft.reminder.daysBeforeCharge),
+    },
+  };
+}
+
 export function updateDraftStartDate(
   draft: DraftExpense,
   startDate: string | undefined,
@@ -75,8 +91,7 @@ export function updateDraftRecurrence(
   );
 
   return {
-    ...draft,
-    recurrence,
+    ...withRecurrence(draft, recurrence),
     endDate: frequency === "once" ? undefined : draft.endDate,
   };
 }
@@ -85,28 +100,22 @@ export function updateDraftCustomInterval(
   draft: DraftExpense,
   interval: number,
 ): DraftExpense {
-  return {
-    ...draft,
-    recurrence: {
-      frequency: "custom",
-      interval: Math.max(interval || 1, 1),
-      unit: draft.recurrence.unit ?? "month",
-    },
-  };
+  return withRecurrence(draft, {
+    frequency: "custom",
+    interval: Math.max(interval || 1, 1),
+    unit: draft.recurrence.unit ?? "month",
+  });
 }
 
 export function updateDraftCustomUnit(
   draft: DraftExpense,
   unit: CustomRecurrenceUnit,
 ): DraftExpense {
-  return {
-    ...draft,
-    recurrence: {
-      frequency: "custom",
-      interval: Math.max(Number(draft.recurrence.interval) || 1, 1),
-      unit,
-    },
-  };
+  return withRecurrence(draft, {
+    frequency: "custom",
+    interval: Math.max(Number(draft.recurrence.interval) || 1, 1),
+    unit,
+  });
 }
 
 export function updateDraftEndDate(

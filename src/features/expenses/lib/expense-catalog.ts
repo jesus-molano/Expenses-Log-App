@@ -1,9 +1,9 @@
 import { addDays, addYears, parseISO, startOfMonth, subMonths } from "date-fns";
 import { toDateOnly } from "@/domain/calendar";
 import { commitmentStatus, type CommitmentStatus } from "@/domain/expense-details";
-import { occurrenceAmount } from "@/domain/finance";
+import { occurrenceAmount, occurrencesDueBetween } from "@/domain/finance";
 import { isOccurrenceOverdue } from "@/domain/pending";
-import { generateOccurrences, templateAmountOn } from "@/domain/recurrence";
+import { templateAmountOn } from "@/domain/recurrence";
 import { foldText, wordsOf } from "@/domain/text";
 import type {
   AppLanguage,
@@ -52,7 +52,8 @@ export type CatalogItem = {
 };
 
 // Todas las series, activas y terminadas, con su próximo cobro y lo que
-// cuestan al año. Las ocurrencias salen de las mismas reglas que el timeline.
+// cuestan al año. Las ocurrencias salen de las mismas reglas que el timeline:
+// un mes cerrado cuenta por sus registros y un cobro movido, por su fecha.
 export function buildExpenseCatalog({
   store,
   today,
@@ -69,13 +70,7 @@ export function buildExpenseCatalog({
   const windowStart = toDateOnly(startOfMonth(subMonths(todayDate, 1)));
   const yearEnd = toDateOnly(addDays(addYears(todayDate, 1), -1));
   const byTemplate = new Map<string, ExpenseOccurrence[]>();
-  for (const occurrence of generateOccurrences(
-    store.templates,
-    store.overrides,
-    windowStart,
-    yearEnd,
-    language,
-  )) {
+  for (const occurrence of occurrencesDueBetween(store, windowStart, yearEnd, language)) {
     const list = byTemplate.get(occurrence.template.id) ?? [];
     list.push(occurrence);
     byTemplate.set(occurrence.template.id, list);

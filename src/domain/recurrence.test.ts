@@ -270,6 +270,50 @@ describe("generateTemplateDates with invalid data", () => {
   });
 });
 
+describe("generateTemplateDates with an rrule", () => {
+  const rruleTemplate = (rrule: string) => ({
+    ...baseTemplate,
+    startDate: "2026-01-01",
+    dueDay: 15,
+    recurrence: { frequency: "rrule" as const, rrule },
+  });
+  const range = (count: number) => Array.from({ length: count }, (_, index) => index).join(",");
+
+  it("expands no sub-daily rule, from a crafted store or file", { timeout: 500 }, () => {
+    for (const rrule of [
+      "FREQ=HOURLY;DTSTART=20260101T000000Z",
+      "FREQ=MINUTELY;DTSTART=20260101T000000Z",
+      "FREQ=SECONDLY;DTSTART=20260101T000000Z",
+      `FREQ=YEARLY;BYHOUR=${range(24)};BYMINUTE=${range(60)};DTSTART=20260101T000000Z`,
+      `FREQ=DAILY;BYSECOND=${range(60)};DTSTART=20260101T000000Z`,
+    ]) {
+      expect(generateTemplateDates(rruleTemplate(rrule), "2026-01-01", "2026-12-31")).toEqual(
+        [],
+      );
+    }
+  });
+
+  it("keeps a monthly rule's charges", () => {
+    expect(
+      generateTemplateDates(
+        rruleTemplate("FREQ=MONTHLY;BYMONTHDAY=15;DTSTART=20260101T000000Z"),
+        "2026-01-01",
+        "2026-04-30",
+      ),
+    ).toEqual(["2026-01-15", "2026-02-15", "2026-03-15", "2026-04-15"]);
+  });
+
+  it("counts once the dates of a month that fall on the same charge day", () => {
+    expect(
+      generateTemplateDates(
+        rruleTemplate("FREQ=WEEKLY;BYDAY=MO;DTSTART=20260101T000000Z"),
+        "2026-01-01",
+        "2026-03-31",
+      ),
+    ).toEqual(["2026-01-15", "2026-02-15", "2026-03-15"]);
+  });
+});
+
 describe("first charge of a new expense", () => {
   const draft = {
     name: "Netflix",

@@ -10,6 +10,7 @@ import { toDateOnly } from "@/domain/calendar";
 import { currentSeriesAmount, seriesLifecycle } from "@/domain/series-lifecycle";
 import type { AppLanguage, ExpenseTemplate } from "@/domain/types";
 import type { useExpenseStore } from "@/stores/app/use-expense-store";
+import { scheduledPriceChanges } from "@/features/expenses/lib/price-change";
 import { useEndSeriesSheet } from "./use-end-series-sheet";
 import { usePauseSeriesSheet } from "./use-pause-series-sheet";
 import { usePayAmountFlow } from "./use-pay-amount-flow";
@@ -38,9 +39,7 @@ export function useSeriesDetail({
   const today = toDateOnly(now);
   const lifecycle = seriesLifecycle(template, today);
   const currentAmount = currentSeriesAmount(template, today, store.finance);
-  const scheduledChanges = (template.amountChanges ?? []).filter(
-    (change) => change.from > today,
-  );
+  const scheduledChanges = scheduledPriceChanges(template.amountChanges, today, store.finance);
   const priceHistory = useMemo(
     () => buildPriceHistory(store, template.id, today, { language }),
     [language, store, template.id, today],

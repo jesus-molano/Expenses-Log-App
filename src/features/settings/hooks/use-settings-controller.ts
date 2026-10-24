@@ -5,7 +5,7 @@ import { configuredPayday } from "@/domain/budget-month";
 import { toDateOnly } from "@/domain/calendar";
 import { resolveReminderPreferences } from "@/domain/reminder-schedule";
 import type { AppLanguage } from "@/domain/types";
-import { clearExpenseLocalData } from "@/data/persistence/local-store";
+import { clearDeviceData } from "@/data/persistence/device-data";
 import { readSyncMeta } from "@/data/persistence/sync-meta-store";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
@@ -14,7 +14,7 @@ import type { ReminderPreferencesInput } from "@/stores/app/store-commands";
 import { useExpenseStore } from "@/stores/app/use-expense-store";
 import { createClient } from "@/utils/supabase/client";
 import { useNotificationSettings } from "./use-notification-settings";
-import { useSettingsAuth, type SignOutOptions } from "./use-settings-auth";
+import { reloadHome, useSettingsAuth, type SignOutOptions } from "./use-settings-auth";
 import { describeBudgetCycle } from "../lib/budget-cycle-options";
 import { releasePushSubscription } from "../lib/push-notifications";
 import { deviceTimeZone } from "../lib/reminder-options";
@@ -158,10 +158,11 @@ export function useSettingsController({
       // suscripción del navegador para que la siguiente cuenta no la herede.
       await releasePushSubscription();
       await supabase?.auth.signOut();
-      clearExpenseLocalData();
+      // Las copias automáticas también: llevan los datos de la cuenta borrada.
+      await clearDeviceData();
       setUser(null);
       // Reload the document to discard the deleted account's in-memory store.
-      window.location.replace("/");
+      reloadHome();
     } catch {
       setMessage(t("settings.deleteAccountError"));
       setIsDeletingAccount(false);

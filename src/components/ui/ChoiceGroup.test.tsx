@@ -38,6 +38,26 @@ describe("ChoiceGroup", () => {
     );
   });
 
+  it("marks no option when the value is not among them, keeping the first tabbable", () => {
+    render(
+      <ChoiceGroup
+        label="Hasta"
+        value="2027-09-05"
+        options={[
+          { value: "open", label: "Hasta que la reanude" },
+          { value: "2026-11-05", label: "Vuelve el 5 nov" },
+        ]}
+        onChange={() => undefined}
+      />,
+    );
+
+    expect(screen.queryByRole("radio", { checked: true })).toBeNull();
+    const [first, second] = screen.getAllByRole("radio");
+    expect(first).toHaveAttribute("data-selected", "false");
+    expect(first).toHaveAttribute("tabindex", "0");
+    expect(second).toHaveAttribute("tabindex", "-1");
+  });
+
   it("moves the selection and the focus with the arrow keys, wrapping around", () => {
     render(<Harness />);
 

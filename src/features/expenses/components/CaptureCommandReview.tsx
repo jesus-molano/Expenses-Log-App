@@ -170,7 +170,7 @@ function CommandCard({
   const detail = commandDetailLabel(resolved, language, item.amount);
 
   return (
-    <li className="app-section-card grid gap-2 p-3">
+    <li className="app-section-card app-section-card-open grid gap-2 p-3">
       <div className="flex items-start gap-3">
         <input
           id={checkboxId}

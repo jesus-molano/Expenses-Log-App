@@ -249,7 +249,7 @@ export function ExpenseDashboard({
     now,
     language,
     recordSalaryReceipt,
-    onRecorded: (input) =>
+    onRecorded: (input) => {
       actionToast.show({
         message: capitalize(
           t("salary.received", language).replace(
@@ -262,7 +262,10 @@ export function ExpenseDashboard({
           undoSalaryReceipt(input.monthId);
           actionToast.dismiss();
         },
-      }),
+      });
+      // La tarjeta desaparece con el botón que tenía el foco.
+      focusMonthHeading();
+    },
   });
   const showSalaryPrompt = isSalaryPromptVisible(
     salaryPrompt.prompt,
@@ -390,6 +393,9 @@ export function ExpenseDashboard({
   const openMonthId =
     month.activeMonthId > month.calendarMonthId ? month.activeMonthId : month.calendarMonthId;
   const moveRange = occurrenceMoveRange(openMonthId, month.cycle, filters.today);
+  // Lo mismo decide si un cobro se mueve desde sus acciones y arrastrándolo.
+  const canMove = (occurrence: ExpenseOccurrence) =>
+    canMoveOccurrence(occurrence, openMonthId, month.cycle, filters.today);
 
   return (
     <DashboardShell
@@ -488,6 +494,7 @@ export function ExpenseDashboard({
           monthId={month.viewMonthId}
           openMonthId={filters.today.slice(0, 7)}
           dropFloorDate={month.dropFloorDate}
+          canMoveOccurrence={canMove}
           autoScroll={!showCloseCard && !onboarding.visible && !deepLink.openedFromLink}
           language={language}
           onTogglePaid={togglePaidWithMonthCheck}
@@ -625,7 +632,7 @@ export function ExpenseDashboard({
           occurrence={selectedOccurrence}
           minMoveDate={moveRange.min}
           maxMoveDate={moveRange.max}
-          canMove={canMoveOccurrence(selectedOccurrence, openMonthId, month.cycle, filters.today)}
+          canMove={canMove(selectedOccurrence)}
           language={language}
           onClose={() => setSelectedOccurrence(null)}
           onTogglePaid={togglePaidWithMonthCheck}

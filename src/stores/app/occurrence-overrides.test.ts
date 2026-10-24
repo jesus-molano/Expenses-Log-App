@@ -23,6 +23,7 @@ import {
   reconcileOrphanOverrides,
   upsertOccurrenceOverride,
 } from "./occurrence-overrides";
+import { endSeriesInStore, pauseSeriesInStore } from "./series-commands";
 
 const TEMPLATE: ExpenseTemplate = {
   id: "luz",
@@ -462,6 +463,63 @@ describe("occurrence overrides", () => {
       };
 
       expect(reconcileOrphanOverrides(store, today)).toBe(store);
+    });
+
+    describe("a weekly series paused or ended mid-month", () => {
+      const october = new Date(2026, 9, 4, 12);
+      const weekly: ExpenseTemplate = {
+        ...TEMPLATE,
+        id: "bus",
+        startDate: "2026-10-05",
+        dueDay: 5,
+        recurrence: { frequency: "custom", interval: 1, unit: "week" },
+      };
+
+      function skipped(date: string) {
+        const store: ExpenseStore = { ...emptyStore, templates: [weekly] };
+        const occurrence = generateStoreOccurrences(store, date, date)[0];
+        return skipOccurrenceInStore(store, occurrence);
+      }
+
+      function statusesIn(store: ExpenseStore) {
+        return {
+          charges: generateStoreOccurrences(store, "2026-10-01", "2026-10-31").map(
+            (occurrence) => `${occurrence.occurrenceDate}:${occurrence.status}`,
+          ),
+          overrides: store.overrides.map(
+            (override) => `${override.occurrenceDate}:${override.status}`,
+          ),
+        };
+      }
+
+      it("keeps a skip on a paused date where it was", () => {
+        const store = pauseSeriesInStore(
+          skipped("2026-10-19"),
+          "bus",
+          { from: "2026-10-10" },
+          october,
+        );
+
+        const reconciled = reconcileOrphanOverrides(store, october);
+
+        expect(reconciled).toBe(store);
+        expect(statusesIn(reconciled)).toEqual({
+          charges: ["2026-10-05:due"],
+          overrides: ["2026-10-19:skipped"],
+        });
+      });
+
+      it("keeps a skip after the last charge where it was", () => {
+        const store = endSeriesInStore(skipped("2026-10-26"), "bus", "2026-10-05", october);
+
+        const reconciled = reconcileOrphanOverrides(store, october);
+
+        expect(reconciled).toBe(store);
+        expect(statusesIn(reconciled)).toEqual({
+          charges: ["2026-10-05:due"],
+          overrides: ["2026-10-26:skipped"],
+        });
+      });
     });
   });
 });

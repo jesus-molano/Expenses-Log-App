@@ -22,6 +22,8 @@ type ExpenseListProps = {
   openMonthId?: string;
   // Con el ciclo anclado al cobro, primer día en que se puede soltar.
   dropFloorDate?: string;
+  // Si un cobro se puede arrastrar: la misma regla que sus acciones.
+  canMoveOccurrence?: (occurrence: ExpenseOccurrence) => boolean;
   // false si encima hay algo que el desplazamiento inicial taparía.
   autoScroll?: boolean;
   language?: AppLanguage;
@@ -42,6 +44,7 @@ export function ExpenseList({
   monthId = today.slice(0, 7),
   openMonthId = today.slice(0, 7),
   dropFloorDate,
+  canMoveOccurrence,
   autoScroll = true,
   language = "es",
   onTogglePaid,
@@ -57,6 +60,7 @@ export function ExpenseList({
     currentMonth,
     openMonth: openMonthId,
     floorDate: dropFloorDate,
+    canMove: canMoveOccurrence,
     onMoveOccurrenceOnly,
     onMoveOccurrenceSeries,
   });

@@ -345,7 +345,7 @@ export function MoneyDashboard() {
     now: today,
     language,
     recordSalaryReceipt,
-    onRecorded: (input) =>
+    onRecorded: (input) => {
       actionToast.show({
         message: capitalize(
           t("salary.received", language).replace(
@@ -358,7 +358,10 @@ export function MoneyDashboard() {
           undoSalaryReceipt(input.monthId);
           actionToast.dismiss();
         },
-      }),
+      });
+      // La tarjeta desaparece con el botón que tenía el foco.
+      focusMonthHeading();
+    },
   });
   // Como en Gastos, solo al mirar el mes de esa nómina o el activo.
   const salaryPromptCard = isSalaryPromptVisible(
@@ -376,7 +379,10 @@ export function MoneyDashboard() {
       onCancelOther={salaryPrompt.cancelOther}
       onAmountTextChange={salaryPrompt.setAmountText}
       onSaveOther={salaryPrompt.saveOther}
-      onDismiss={salaryPrompt.dismiss}
+      onDismiss={() => {
+        salaryPrompt.dismiss();
+        focusMonthHeading();
+      }}
     />
   ) : null;
   // Un ingreso extra cuenta en el mes que se está viendo: hoy si es el

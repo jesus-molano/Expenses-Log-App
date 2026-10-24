@@ -124,6 +124,28 @@ describe("capture commands", () => {
     });
   });
 
+  it("keeps what was paid on a variable bill when no amount is said", () => {
+    const paid: ExpenseStore = {
+      ...store,
+      overrides: [override("luz", "2026-10-08", { status: "paid", amountPaid: 71.2 })],
+    };
+
+    expect(resolveCaptureCommand(cmd("pay", "luz"), paid, context)).toMatchObject({
+      occurrence: { dueDate: "2026-10-08", status: "paid" },
+      amount: 71.2,
+      issue: "alreadyPaid",
+    });
+    expect(resolveCaptureCommand(cmd("pay", "luz", { amount: 71.2 }), paid, context)).toMatchObject({
+      amount: 71.2,
+      issue: "alreadyPaid",
+    });
+    // Otro importe corrige lo pagado.
+    expect(resolveCaptureCommand(cmd("pay", "luz", { amount: 75 }), paid, context)).toMatchObject({
+      amount: 75,
+      issue: null,
+    });
+  });
+
   it("moves to a new day, offering the series only inside the same month", () => {
     expect(resolveCaptureCommand(cmd("move", "netflix", { day: 10 }), store, context)).toMatchObject({
       newDueDate: "2026-10-10",

@@ -2,13 +2,18 @@ import { describe, expect, it } from "vitest";
 import { mergeExpenseStores } from "@/data/persistence/local-store";
 import { normalizeExpenseStore } from "@/data/persistence/store-normalization";
 import { getSalaryExtraPay } from "@/domain/finance";
+import { overrideIdFor } from "@/domain/overrides";
+import { DEFAULT_REMINDER_PREFERENCES } from "@/domain/reminder-schedule";
 import { emptyStore } from "@/domain/seed";
 import type {
   ExpenseOccurrenceOverride,
+  ExpenseStore,
   ExpenseTemplate,
   IncomeEvent,
 } from "@/domain/types";
 import { importStoreInStore, replaceStoreContents } from "./backup-commands";
+import { clearExpensesFromStore, deleteExpenseFromStore } from "./expense-commands";
+import { clearIncomeFromStore } from "./finance-commands";
 
 const now = new Date("2026-10-23T10:00:00.000Z");
 const stamp = now.toISOString();
@@ -239,12 +244,18 @@ describe("replaceStoreContents", () => {
     }
   });
 
-  it("lets a later import bring back an id that a previous replace removed", () => {
+  it("lets a later import bring back what a previous replace removed, under a new id", () => {
     const back = replaceStoreContents(replaced, current, { scope: "all", now: new Date("2026-10-24T10:00:00.000Z") });
 
-    expect(back.templates.map((item) => item.id).sort()).toEqual(["gym", "rent"]);
-    expect(back.deleted?.templates).not.toContain("gym");
-    expect(back.deleted?.templates).toContain("netflix");
+    expect(back.templates.map((item) => item.name).sort()).toEqual(["gym", "rent"]);
+    expect(byId(back.templates, "rent")).toBeDefined();
+    expect(byId(back.templates, "gym")).toBeUndefined();
+    // El id antiguo sigue borrado: una copia que aún tenga el tombstone no
+    // borra lo que ha vuelto.
+    expect(back.deleted?.templates).toEqual(expect.arrayContaining(["gym", "netflix"]));
+    for (const merged of [mergeExpenseStores(back, replaced), mergeExpenseStores(replaced, back)]) {
+      expect(merged.templates.map((item) => item.name).sort()).toEqual(["gym", "rent"]);
+    }
   });
 
   it("only replaces expenses when the file is a CSV", () => {
@@ -397,5 +408,177 @@ describe("replaceStoreContents — budget cycle and balance log", () => {
       // El saldo que solo estaba en los datos actuales queda borrado.
       expect(store.finance.balanceCheckins?.["2026-10-15"]?.deletedAt).toBe(stamp);
     }
+  });
+});
+
+describe("replaceStoreContents — data deleted before restoring", () => {
+  const later = new Date("2026-10-24T10:00:00.000Z");
+  const named = <T extends { name: string }>(items: T[], name: string) =>
+    items.filter((item) => item.name === name);
+
+  // Lo que hace "Borrar gastos": también el histórico, con tombstone.
+  function clearedExpenses(store: ExpenseStore): ExpenseStore {
+    const cleared = clearExpensesFromStore(store);
+    return {
+      ...cleared,
+      occurrenceRecords: [],
+      deleted: {
+        ...cleared.deleted,
+        occurrenceRecords: (store.occurrenceRecords ?? []).map((record) => record.id),
+      },
+    };
+  }
+
+  it("brings cleared expenses back under new ids that survive a merge with the cleared copy", () => {
+    const cleared = clearedExpenses(current);
+    const restored = replaceStoreContents(cleared, current, { scope: "all", now: later });
+
+    expect(restored.deleted?.templates).toEqual(expect.arrayContaining(["rent", "gym"]));
+    expect(restored.deleted?.categories).toEqual(expect.arrayContaining(["cat-home", "cat-old"]));
+    for (const merged of [
+      restored,
+      mergeExpenseStores(restored, cleared),
+      mergeExpenseStores(cleared, restored),
+    ]) {
+      expect(merged.templates.map((item) => item.name).sort()).toEqual(["gym", "rent"]);
+      const [rent] = named(merged.templates, "rent");
+      expect(rent.id).not.toBe("rent");
+      expect(byId(merged.categories, rent.categoryId)?.name).toBe("Casa");
+      expect(byId(merged.overrides, overrideIdFor({ templateId: rent.id, occurrenceDate: "2026-09-01" }))).toMatchObject({
+        templateId: rent.id,
+        status: "paid",
+        amountPaid: 700,
+      });
+      expect(
+        (merged.occurrenceRecords ?? []).find(
+          (record) => record.templateId === rent.id && record.occurrenceDate === "2026-09-01",
+        ),
+      ).toMatchObject({ status: "paid", amountPaid: 700 });
+    }
+  });
+
+  it("brings back the history of an expense that no longer existed", () => {
+    const withHistory = normalizeExpenseStore(
+      {
+        ...current,
+        occurrenceRecords: [
+          {
+            id: "record:old-gym:2026-08-05",
+            userId: "demo",
+            templateId: "old-gym",
+            occurrenceDate: "2026-08-05",
+            monthId: "2026-08",
+            dueDate: "2026-08-05",
+            name: "Gimnasio antiguo",
+            description: "",
+            plannedAmount: 35,
+            currency: "EUR",
+            categoryId: "cat-old",
+            categoryName: "Ocio",
+            status: "paid",
+            sortOrder: 0,
+            paidAt: "2026-08-05T08:00:00.000Z",
+            amountPaid: 35,
+            source: "native",
+            createdAt: "2026-08-05T08:00:00.000Z",
+            updatedAt: "2026-08-05T08:00:00.000Z",
+          },
+        ],
+      },
+      now,
+    );
+    const cleared = clearedExpenses(withHistory);
+    const restored = replaceStoreContents(cleared, withHistory, { scope: "all", now: later });
+
+    for (const merged of [
+      mergeExpenseStores(restored, cleared),
+      mergeExpenseStores(cleared, restored),
+    ]) {
+      expect(named(merged.occurrenceRecords ?? [], "Gimnasio antiguo")).toEqual([
+        expect.objectContaining({ status: "paid", amountPaid: 35, categoryName: "Ocio" }),
+      ]);
+    }
+  });
+
+  it("keeps a restored expense that was deleted on its own", () => {
+    const withoutRent = deleteExpenseFromStore(current, "rent");
+    const restored = replaceStoreContents(withoutRent, current, { scope: "all", now: later });
+
+    for (const merged of [
+      mergeExpenseStores(restored, withoutRent),
+      mergeExpenseStores(withoutRent, restored),
+    ]) {
+      expect(merged.templates.map((item) => item.name).sort()).toEqual(["gym", "rent"]);
+      // Lo que no se borró conserva su id.
+      expect(byId(merged.templates, "gym")).toBeDefined();
+      const [rent] = named(merged.templates, "rent");
+      expect(byId(merged.overrides, overrideIdFor({ templateId: rent.id, occurrenceDate: "2026-10-01" }))?.status).toBe("paid");
+    }
+  });
+
+  it("keeps restored income events after the income was cleared", () => {
+    const cleared = clearIncomeFromStore(current);
+    const restored = replaceStoreContents(cleared, current, { scope: "all", now: later });
+
+    expect(restored.deleted?.incomeEvents).toContain("evt-a");
+    for (const merged of [
+      mergeExpenseStores(restored, cleared),
+      mergeExpenseStores(cleared, restored),
+    ]) {
+      expect(merged.finance.incomeEvents).toEqual([
+        expect.objectContaining({ name: "evt-a", amount: 40, updatedAt: later.toISOString() }),
+      ]);
+      expect(merged.finance.incomeEvents[0].id).not.toBe("evt-a");
+    }
+  });
+});
+
+describe("replaceStoreContents — reminder settings", () => {
+  const fileReminders = {
+    ...DEFAULT_REMINDER_PREFERENCES,
+    defaultEnabled: true,
+    pushHour: 20,
+    updatedAt: "2026-09-01T00:00:00.000Z",
+  };
+  const withReminders = normalizeExpenseStore(
+    { ...imported, preferences: { theme: "atlas", language: "es", reminders: fileReminders } },
+    now,
+  );
+
+  it("brings the file's reminder settings, newer than any older copy, and keeps theme and language", () => {
+    const result = replaceStoreContents(current, withReminders, { scope: "all", now });
+
+    expect(result.preferences).toMatchObject({
+      theme: "nord",
+      language: "en",
+      reminders: { defaultEnabled: true, pushHour: 20, updatedAt: stamp },
+    });
+    const olderEdit = normalizeExpenseStore(
+      {
+        ...current,
+        preferences: {
+          ...current.preferences,
+          reminders: { ...DEFAULT_REMINDER_PREFERENCES, updatedAt: "2026-10-20T00:00:00.000Z" },
+        },
+      },
+      now,
+    );
+    for (const merged of [mergeExpenseStores(result, olderEdit), mergeExpenseStores(olderEdit, result)]) {
+      expect(merged.preferences?.reminders).toMatchObject({ defaultEnabled: true, pushHour: 20 });
+    }
+  });
+
+  it("keeps the current reminder settings when the file has none or only brings expenses", () => {
+    const here = normalizeExpenseStore(
+      { ...current, preferences: { ...current.preferences, reminders: fileReminders } },
+      now,
+    );
+
+    expect(replaceStoreContents(here, imported, { scope: "all", now }).preferences?.reminders).toEqual(
+      fileReminders,
+    );
+    expect(
+      replaceStoreContents(current, withReminders, { scope: "expenses", now }).preferences?.reminders,
+    ).toBeUndefined();
   });
 });

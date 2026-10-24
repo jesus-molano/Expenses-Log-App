@@ -1,6 +1,6 @@
 import { addDays, addMonths, addYears, endOfMonth, parseISO, subYears } from "date-fns";
 import { activeBudgetMonth } from "./budget-month";
-import { toDateOnly } from "./calendar";
+import { isValidDateOnly, toDateOnly } from "./calendar";
 import { generateStoreOccurrences } from "./finance";
 import {
   currentOrNextPause,
@@ -218,4 +218,132 @@ export function seriesLifecycle(
     : null;
 
   return { end, pause: { pause, active: current.active, firstSkipped, resumesOn } };
+}
+
+// Un fin y una pausa señalan cobros, no días. Al cambiar el calendario de la
+// serie (día de cobro, inicio o recurrencia), los cobros que señalaban pasan a
+// la fecha de su mes en el calendario nuevo, como los overrides de los meses
+// abiertos: "Finalizar tras ese cobro" sigue acabando en ese cobro y la pausa
+// salta los mismos meses. Una fecha que ya encaja con el calendario nuevo se
+// conserva. Si algún mes implicado no tiene un único cobro en los dos
+// calendarios (una serie semanal, p. ej.), se quedan como estaban.
+export function reanchorLifecycleForSchedule(
+  previous: ExpenseTemplate,
+  next: ExpenseTemplate,
+): Pick<ExpenseTemplate, "endDate" | "pauses"> {
+  const remap = chargeRemap(previous, next);
+  const pauses = previous.pauses?.flatMap((pause) => reanchorPause(pause, remap));
+  return {
+    endDate: previous.endDate && reanchorEndDate(previous.endDate, remap),
+    pauses: pauses?.length ? pauses : undefined,
+  };
+}
+
+type ChargeRemap = {
+  // Último cobro del calendario anterior antes de una fecha y primero desde ella.
+  before: (date: string) => string | undefined;
+  from: (date: string) => string | undefined;
+  // El cobro de ese mes en el calendario nuevo, si cada calendario tiene uno.
+  map: (charge: string) => string | null;
+};
+
+// Un cobro del calendario anterior y su fecha en el nuevo. undefined: no hay
+// cobro (nada que respetar); null: no se puede llevar al calendario nuevo.
+type Anchor = { charge: string; mapped: string } | undefined;
+
+function chargeRemap(previous: ExpenseTemplate, next: ExpenseTemplate): ChargeRemap {
+  const before = unboundedSchedule(previous);
+  const after = unboundedSchedule(next);
+  const chargesInMonth = (schedule: typeof before, date: string) =>
+    generateTemplateDates(
+      schedule,
+      `${date.slice(0, 7)}-01`,
+      toDateOnly(endOfMonth(parseISO(date))),
+    );
+  return {
+    before: (date) =>
+      generateTemplateDates(
+        before,
+        toDateOnly(subYears(parseISO(date), CHOICE_HORIZON_YEARS)),
+        shiftDays(date, -1),
+      ).at(-1),
+    from: (date) =>
+      generateTemplateDates(
+        before,
+        date,
+        toDateOnly(addYears(parseISO(date), CHOICE_HORIZON_YEARS)),
+      )[0],
+    map: (charge) => {
+      const old = chargesInMonth(before, charge);
+      const mapped = chargesInMonth(after, charge);
+      return old.length === 1 && mapped.length === 1 ? mapped[0] : null;
+    },
+  };
+}
+
+// El calendario sin pausas ni fin: los cobros que la serie programa.
+function unboundedSchedule({
+  startDate,
+  dueDay,
+  recurrence,
+}: ExpenseTemplate): Pick<ExpenseTemplate, "startDate" | "dueDay" | "recurrence"> {
+  return { startDate, dueDay, recurrence };
+}
+
+function anchorOf(charge: string | undefined, remap: ChargeRemap): Anchor | null {
+  if (!charge) return undefined;
+  const mapped = remap.map(charge);
+  return mapped ? { charge, mapped } : null;
+}
+
+function shiftDays(date: string, days: number) {
+  return toDateOnly(addDays(parseISO(date), days));
+}
+
+// El fin sigue tras el mismo último cobro y antes del siguiente.
+function reanchorEndDate(endDate: string, remap: ChargeRemap): string {
+  if (!isValidDateOnly(endDate)) return endDate;
+  const last = anchorOf(remap.before(shiftDays(endDate, 1)), remap);
+  const following = anchorOf(remap.from(shiftDays(endDate, 1)), remap);
+  if (!last || following === null) return endDate;
+  const fits = last.mapped <= endDate && (!following || endDate < following.mapped);
+  return endDate === last.charge || !fits ? last.mapped : endDate;
+}
+
+// La pausa sigue saltando los mismos cobros y ninguno más. Una pausa que no
+// saltaba ninguno se encoge para no saltar ninguno (o desaparece).
+function reanchorPause(pause: ExpensePause, remap: ChargeRemap): ExpensePause[] {
+  if (!isValidDateOnly(pause.from) || (pause.to && !isValidDateOnly(pause.to))) {
+    return [pause];
+  }
+  const previous = anchorOf(remap.before(pause.from), remap);
+  const first = anchorOf(remap.from(pause.from), remap);
+  if (previous === null || first === null) return [pause];
+
+  if (!first || (pause.to && first.charge > pause.to)) {
+    if (!pause.to) return [pause];
+    const from =
+      previous && pause.from <= previous.mapped ? shiftDays(previous.mapped, 1) : pause.from;
+    const to = first && pause.to >= first.mapped ? shiftDays(first.mapped, -1) : pause.to;
+    return from <= to ? [{ from, to }] : [];
+  }
+
+  const fromFits =
+    (!previous || pause.from > previous.mapped) && pause.from <= first.mapped;
+  const from = pause.from === first.charge || !fromFits ? first.mapped : pause.from;
+  if (!pause.to) return [{ from }];
+
+  const last = anchorOf(remap.before(shiftDays(pause.to, 1)), remap);
+  const resume = anchorOf(remap.from(shiftDays(pause.to, 1)), remap);
+  if (!last || resume === null) return [pause];
+  const toFits = last.mapped <= pause.to && (!resume || pause.to < resume.mapped);
+  // Una pausa "hasta el cobro con el que vuelve" sigue acabando el día antes.
+  const untilResume = resume && pause.to === shiftDays(resume.charge, -1);
+  const to =
+    resume && (untilResume || !toFits)
+      ? shiftDays(resume.mapped, -1)
+      : toFits
+        ? pause.to
+        : last.mapped;
+  return [{ from, to }];
 }

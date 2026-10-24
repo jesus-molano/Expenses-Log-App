@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import type { User } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearExpenseLocalData } from "@/data/persistence/local-store";
+import { clearDeviceData } from "@/data/persistence/device-data";
 import { releasePushSubscription } from "../lib/push-notifications";
 import { useSettingsAuth } from "./use-settings-auth";
 
@@ -9,8 +9,8 @@ vi.mock("../lib/push-notifications", () => ({
   releasePushSubscription: vi.fn(),
 }));
 
-vi.mock("@/data/persistence/local-store", () => ({
-  clearExpenseLocalData: vi.fn(),
+vi.mock("@/data/persistence/device-data", () => ({
+  clearDeviceData: vi.fn(),
 }));
 
 const user = { id: "00000000-0000-4000-8000-000000000001" } as User;
@@ -66,7 +66,7 @@ describe("useSettingsAuth", () => {
 
     expect(signedOut).toBe(true);
     expect(order).toEqual(["release-push", "sign-out"]);
-    expect(clearExpenseLocalData).not.toHaveBeenCalled();
+    expect(clearDeviceData).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
     expect(result.current.user).toBeNull();
     expect(result.current.isSigningOut).toBe(false);
@@ -77,14 +77,20 @@ describe("useSettingsAuth", () => {
 
   it("clears the device data and reloads when asked to", async () => {
     const { supabase, order } = mockSupabase();
-    const { result, reload } = renderAuth(supabase);
+    // Las copias de IndexedDB se borran antes de recargar, no a medias.
+    vi.mocked(clearDeviceData).mockImplementation(async () => {
+      await Promise.resolve();
+      order.push("clear-device");
+    });
+    const reload = vi.fn(() => order.push("reload"));
+    const { result } = renderAuth(supabase, reload);
 
     await act(async () => {
       await result.current.signOut({ clearLocalData: true });
     });
 
-    expect(order).toEqual(["release-push", "sign-out"]);
-    expect(clearExpenseLocalData).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(["release-push", "sign-out", "clear-device", "reload"]);
+    expect(clearDeviceData).toHaveBeenCalledTimes(1);
     expect(reload).toHaveBeenCalledTimes(1);
     // Sigue ocupado mientras recarga.
     expect(result.current.isSigningOut).toBe(true);
@@ -100,7 +106,7 @@ describe("useSettingsAuth", () => {
     });
 
     expect(signedOut).toBe(false);
-    expect(clearExpenseLocalData).not.toHaveBeenCalled();
+    expect(clearDeviceData).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
     expect(result.current.isSigningOut).toBe(false);
     expect(setMessage).toHaveBeenCalledWith(

@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import type { PriceHistoryEntry } from "@/domain/amount-history";
 import { formatCurrency } from "@/domain/calendar";
-import type { AppLanguage, ExpenseAmountChange } from "@/domain/types";
+import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
+import type { ScheduledPriceChange } from "@/features/expenses/lib/price-change";
 import { formatPriceMonth, priceRangeLabel } from "../../lib/series-format";
 
 type PriceCardProps = {
   currentAmount: number;
-  scheduled: ExpenseAmountChange[];
+  scheduled: ScheduledPriceChange[];
   history: PriceHistoryEntry[];
   language: AppLanguage;
   onSchedule: () => void;
@@ -43,7 +44,9 @@ export function PriceCard({
       {scheduled.length ? (
         <ul className="grid gap-2">
           {scheduled.map((change) => {
-            const month = formatPriceMonth(change.from, language);
+            // El mes de presupuesto elegido: con el ciclo anclado al cobro el
+            // precio puede empezar a finales del mes natural anterior.
+            const month = formatPriceMonth(`${change.monthId}-01`, language);
             return (
               <li
                 key={change.from}

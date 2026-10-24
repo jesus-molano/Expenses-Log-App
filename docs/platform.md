@@ -271,10 +271,10 @@ sin subir, la hoja avisa de que borrar los datos los perderia.
   suscripcion invalida el endpoint aunque falle el borrado remoto, y el cron
   poda esa fila con el 404/410. Asi la siguiente cuenta no hereda los avisos
   ni choca con la fila de la anterior.
-- Borrar los datos quita `expense-log-store-v1`, sus copias `.corrupt` y los
-  metadatos `expense-log-sync-v1`, y recarga para descartar el store en
-  memoria. Borrar la cuenta hace lo mismo y tambien anula la suscripcion del
-  navegador.
+- Borrar los datos quita `expense-log-store-v1`, sus copias `.corrupt`, los
+  metadatos `expense-log-sync-v1` y las copias automaticas de IndexedDB
+  (`clearDeviceData`), y recarga para descartar el store en memoria. Borrar
+  la cuenta hace lo mismo y tambien anula la suscripcion del navegador.
 - Sin red, `signOut` quita igualmente la sesion local; solo se da por fallido
   si la sesion sigue ahi.
 - Los datos locales de una cuenta nunca se fusionan ni se suben a otra: el

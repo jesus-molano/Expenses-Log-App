@@ -72,6 +72,56 @@ describe("salary commands", () => {
       ]);
     });
 
+    it("keeps a raise for the months after a following one-month salary", () => {
+      const raised = updateMonthlySalaryInStore(base, {
+        monthId: "2026-11",
+        salaryAmount: 2400,
+        salaryDay: 28,
+        scope: "fromMonth",
+      });
+      const withOneOff = updateMonthlySalaryInStore(raised, {
+        monthId: "2026-12",
+        salaryAmount: 2600,
+        salaryDay: 28,
+        scope: "month",
+      });
+
+      const updated = updateMonthlySalaryInStore(withOneOff, {
+        monthId: "2026-11",
+        salaryAmount: 2450,
+        salaryDay: 28,
+        scope: "month",
+      });
+
+      expect(amounts(updated, ["2026-10", "2026-11", "2026-12", "2027-01", "2027-06"])).toEqual([
+        2000, 2450, 2600, 2400, 2400,
+      ]);
+      expect(updated.finance.monthlySalary["2026-12"]).toMatchObject({ onlyThisMonth: true });
+      expect(updated.finance.monthlySalary["2027-01"]).toMatchObject({ amount: 2400, dayOfMonth: 28 });
+    });
+
+    it("pins the raise on the next month when it has no salary of its own", () => {
+      const raised = updateMonthlySalaryInStore(base, {
+        monthId: "2026-11",
+        salaryAmount: 2400,
+        salaryDay: 28,
+        scope: "fromMonth",
+      });
+
+      const updated = updateMonthlySalaryInStore(raised, {
+        monthId: "2026-11",
+        salaryAmount: 2450,
+        salaryDay: 28,
+        scope: "month",
+      });
+
+      expect(amounts(updated, ["2026-10", "2026-11", "2026-12", "2027-01"])).toEqual([
+        2000, 2450, 2400, 2400,
+      ]);
+      expect(updated.finance.monthlySalary["2026-12"]).toMatchObject({ amount: 2400 });
+      expect(updated.finance.monthlySalary["2026-12"].onlyThisMonth).toBeUndefined();
+    });
+
     it("changes that month and the following ones with 'desde este mes'", () => {
       const withOneOff = updateMonthlySalaryInStore(base, {
         monthId: "2027-02",

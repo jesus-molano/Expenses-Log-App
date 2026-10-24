@@ -16,6 +16,9 @@ function memoryBackend(initial: unknown[] = []) {
     remove: async (ids) => {
       ids.forEach((id) => items.delete(id));
     },
+    clear: async () => {
+      items.clear();
+    },
   };
   return { backend, items };
 }
@@ -110,5 +113,31 @@ describe("snapshot repository", () => {
     expect(list.at(-1)?.createdAt).toBe("2026-10-03T09:00:00.000Z");
     // La entrada dañada no se lista, pero tampoco se borra a ciegas.
     expect(items.has("broken")).toBe(true);
+  });
+
+  it("clears every copy, damaged ones too, and announces the change", async () => {
+    const { backend, items } = memoryBackend([{ id: "broken", createdAt: "x" }]);
+    const onChange = vi.fn();
+    const repository = createSnapshotRepository(backend, { onChange });
+    await repository.save(storeWithIncome(40), "manual", new Date("2026-10-22T09:00:00Z"));
+    await repository.save(storeWithIncome(50), "before-import", new Date("2026-10-23T09:00:00Z"));
+    onChange.mockClear();
+
+    await repository.clear();
+
+    expect(await repository.list()).toEqual([]);
+    expect(items.size).toBe(0);
+    expect(onChange).toHaveBeenCalledOnce();
+  });
+
+  it("lets a daily copy already under way finish before clearing", async () => {
+    const { backend, items } = memoryBackend();
+    const repository = createSnapshotRepository(backend);
+
+    const daily = repository.saveDaily(storeWithIncome(40), new Date("2026-10-23T09:00:00"));
+    await repository.clear();
+
+    expect(await daily).not.toBeNull();
+    expect(items.size).toBe(0);
   });
 });

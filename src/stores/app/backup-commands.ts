@@ -2,6 +2,7 @@ import {
   emptyFinanceStore,
   getSalaryExtraPaySettings,
   materializeClosedOccurrenceRecords,
+  occurrenceRecordId,
   salaryClearedTombstone,
 } from "@/domain/finance";
 import { occurrenceKeyOf, overrideIdFor } from "@/domain/overrides";
@@ -20,6 +21,7 @@ import {
   normalizeExpenseStore,
   withNonEmpty,
 } from "@/data/persistence/store-normalization";
+import { DEFAULT_THEME } from "@/shared/theme";
 
 export type ImportMode = "merge" | "replace";
 // "all": el archivo trae el store entero (JSON, copias). "expenses": solo
@@ -58,15 +60,25 @@ export function importStoreInStore(
 //   (cobros, cierres de mes, respuestas a "¿Has cobrado?", sueldos, pagas
 //   extra), porque un tombstone de un id determinista bloquearía para siempre
 //   volver a usarlo.
+// - Lo importado cuyo id ya tiene tombstone (se borró aquí o en el archivo)
+//   entra con un id nuevo (`rekeyTombstonedIds`).
 // - Los objetivos de ahorro no tienen tombstone: un mes que solo estaba en los
 //   datos actuales podría volver en esa fusión.
-// Las preferencias (tema e idioma) son del dispositivo y no se tocan.
+// Tema e idioma son del dispositivo y no se tocan; los avisos son de la cuenta
+// y vienen del archivo (`replacePreferences`).
 export function replaceStoreContents(
   current: ExpenseStore,
-  imported: ExpenseStore,
+  file: ExpenseStore,
   { scope, now = new Date() }: { scope: ImportScope; now?: Date },
 ): ExpenseStore {
   const stamp = now.toISOString();
+  const deleted = current.deleted ?? {};
+  const importedDeleted = scope === "all" ? (file.deleted ?? {}) : {};
+  const imported = rekeyTombstonedIds(
+    file,
+    (key) => new Set([...(deleted[key] ?? []), ...(importedDeleted[key] ?? [])]),
+    { scope, suffix: `-r${now.getTime().toString(36)}` },
+  );
   // Las categorías también: una copia antigua sin fecha perdería frente a la
   // versión con fecha de la nube (`latestUpdated`).
   const categories = imported.categories.map((category) => ({ ...category, updatedAt: stamp }));
@@ -82,7 +94,7 @@ export function replaceStoreContents(
     overrides,
     occurrenceRecords: imported.occurrenceRecords ?? [],
     finance,
-    preferences: current.preferences,
+    preferences: replacePreferences(current, imported, { scope, stamp }),
   };
   // El histórico de los meses cerrados sale de los datos importados y queda
   // como editado ahora, para que no lo pise el que se recalcula de los
@@ -105,8 +117,6 @@ export function replaceStoreContents(
   const removedTemplateOverrides = current.overrides
     .filter((override) => !templateIds.has(override.templateId))
     .map((override) => override.id);
-  const deleted = current.deleted ?? {};
-  const importedDeleted = scope === "all" ? (imported.deleted ?? {}) : {};
   const tombstones = (
     key: keyof typeof kept,
     removed: string[],
@@ -154,6 +164,111 @@ export function replaceStoreContents(
     },
     now,
   );
+}
+
+type TombstoneKey = keyof NonNullable<ExpenseStore["deleted"]>;
+
+// Un id con tombstone no puede volver tal cual: quitarle el tombstone solo
+// vale en este dispositivo, y la siguiente fusión con una copia que aún lo
+// tenga (la nube, otra pestaña, otro dispositivo) lo borraría otra vez. Lo
+// importado con esos ids entra con uno nuevo, junto con lo que depende de
+// ellos (categoría de los gastos, cobros e histórico de un gasto), y el
+// tombstone se queda: esas copias sueltan la versión antigua y nada se
+// duplica. No cambia el formato, así que los builds anteriores lo entienden.
+function rekeyTombstonedIds(
+  imported: ExpenseStore,
+  tombstoned: (key: TombstoneKey) => Set<string>,
+  { scope, suffix }: { scope: ImportScope; suffix: string },
+): ExpenseStore {
+  const remap = (items: Array<{ id: string }>, key: TombstoneKey) => {
+    const blocked = tombstoned(key);
+    return new Map(
+      items.filter((item) => blocked.has(item.id)).map((item) => [item.id, `${item.id}${suffix}`]),
+    );
+  };
+  const categoryIds = remap(imported.categories, "categories");
+  const templateIds = remap(imported.templates, "templates");
+  // El histórico de un gasto que ya no existe también: su id sale del gasto.
+  const importedTemplateIds = ids(imported.templates);
+  const blockedRecords = tombstoned("occurrenceRecords");
+  for (const record of imported.occurrenceRecords ?? []) {
+    if (!importedTemplateIds.has(record.templateId) && blockedRecords.has(record.id)) {
+      templateIds.set(record.templateId, `${record.templateId}${suffix}`);
+    }
+  }
+  const incomeIds = scope === "all" ? remap(imported.finance.incomeEvents, "incomeEvents") : new Map();
+  const contributionIds =
+    scope === "all"
+      ? remap(Object.values(imported.finance.monthlySavingsContributions ?? {}), "savingsContributions")
+      : new Map();
+  if (!categoryIds.size && !templateIds.size && !incomeIds.size && !contributionIds.size) {
+    return imported;
+  }
+
+  const rekeyed = <T extends { id: string }>(item: T, map: Map<string, string>): T => {
+    const id = map.get(item.id);
+    return id ? { ...item, id } : item;
+  };
+  const category = <T extends { categoryId?: string }>(item: T): T => {
+    const categoryId = item.categoryId && categoryIds.get(item.categoryId);
+    return categoryId ? { ...item, categoryId } : item;
+  };
+  const template = <T extends { templateId: string }>(
+    item: T,
+    idFor: (templateId: string) => string,
+  ): T => {
+    const templateId = templateIds.get(item.templateId);
+    return templateId ? { ...item, templateId, id: idFor(templateId) } : item;
+  };
+  const contributions = imported.finance.monthlySavingsContributions;
+
+  return {
+    ...imported,
+    categories: imported.categories.map((item) => rekeyed(item, categoryIds)),
+    templates: imported.templates.map((item) => category(rekeyed(item, templateIds))),
+    overrides: imported.overrides.map((item) =>
+      category(
+        template(item, (templateId) =>
+          overrideIdFor({ templateId, occurrenceDate: item.occurrenceDate }),
+        ),
+      ),
+    ),
+    occurrenceRecords: imported.occurrenceRecords?.map((item) =>
+      category(template(item, (templateId) => occurrenceRecordId(templateId, item.occurrenceDate))),
+    ),
+    finance: {
+      ...imported.finance,
+      incomeEvents: imported.finance.incomeEvents.map((item) => rekeyed(item, incomeIds)),
+      ...(contributions
+        ? {
+            monthlySavingsContributions: Object.fromEntries(
+              Object.entries(contributions).map(([monthId, item]) => [
+                monthId,
+                rekeyed(item, contributionIds),
+              ]),
+            ),
+          }
+        : {}),
+    },
+  };
+}
+
+// Tema e idioma se quedan: son de este dispositivo. Los avisos son de la
+// cuenta (los lee el cron), así que al sustituirlo todo vienen del archivo,
+// con la hora de ahora para ganar a las copias anteriores al fusionar. Un
+// archivo sin avisos (de un build anterior) deja los actuales.
+function replacePreferences(
+  current: ExpenseStore,
+  imported: ExpenseStore,
+  { scope, stamp }: { scope: ImportScope; stamp: string },
+): ExpenseStore["preferences"] {
+  const reminders = scope === "all" ? imported.preferences?.reminders : undefined;
+  if (!reminders) return current.preferences;
+  return {
+    ...current.preferences,
+    theme: current.preferences?.theme ?? DEFAULT_THEME,
+    reminders: { ...reminders, updatedAt: stamp },
+  };
 }
 
 function replaceOverrides(

@@ -51,7 +51,11 @@
   box-shadow: var(--app-shadow-section);
 }
 
-.app-settings-card {
+/* Tarjeta que lleva un SelectMenu: su desplegable, en posición absoluta, no
+   debe quedar recortado por el overflow: hidden de .app-section-card (la
+   utilidad overflow-visible de Tailwind pierde frente a esta hoja). */
+.app-settings-card,
+.app-section-card-open {
   overflow: visible;
 }
 

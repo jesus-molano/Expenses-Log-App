@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { clearExpenseLocalData } from "@/data/persistence/local-store";
+import { clearDeviceData } from "@/data/persistence/device-data";
 import { t } from "@/shared/i18n";
 import type { createClient } from "@/utils/supabase/client";
 import { releasePushSubscription } from "../lib/push-notifications";
@@ -14,7 +14,8 @@ export type SignOutOptions = {
   clearLocalData: boolean;
 };
 
-function reloadHome() {
+// Recarga en la portada para descartar el store que sigue en memoria.
+export function reloadHome() {
   window.location.replace("/");
 }
 
@@ -61,7 +62,8 @@ export function useSettingsAuth(
       }
 
       if (clearLocalData) {
-        clearExpenseLocalData();
+        // Las copias automáticas también: llevan el store entero.
+        await clearDeviceData();
         // Recarga para descartar también el store que sigue en memoria.
         reloading = true;
         reload();
