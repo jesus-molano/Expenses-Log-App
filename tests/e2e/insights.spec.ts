@@ -139,7 +139,9 @@ test("shows large upcoming bills, the monthly set-aside and cost by category", a
   await expect(largeBills.getByText(/1\.?050,00\s€ en total/)).toBeVisible();
   await expect(largeBills.getByText("Portátil")).toBeVisible();
   await expect(largeBills.getByText("en 35 días")).toBeVisible();
-  await expect(largeBills.getByText(/Aparta 75,00\s€ al mes/)).toBeVisible();
+  // IBI (50 €/mes hasta enero) + seguro (60 €/mes hasta marzo).
+  await expect(largeBills.getByText(/Aparta 110,00\s€ al mes/)).toBeVisible();
+  await expect(largeBills.getByText(/Media: 75,00\s€\/mes · 900,00\s€\/año/)).toBeVisible();
   await expect(largeBills.getByText(/60,00\s€\/mes hasta entonces/)).toBeVisible();
 
   const costs = page.getByRole("region", { name: "Coste por categoría" });

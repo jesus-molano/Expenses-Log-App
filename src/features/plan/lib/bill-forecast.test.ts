@@ -36,6 +36,8 @@ describe("buildProvisionPlan", () => {
 
     expect(plan.annualTotal).toBe(1020);
     expect(plan.monthlyTotal).toBe(85);
+    // Lo de cada recibo hasta su fecha: 50 + 60 + 9,23.
+    expect(plan.monthlyToSetAside).toBe(119.23);
     expect(
       plan.items.map((item) => [item.template.id, item.annual, item.monthly, item.next]),
     ).toEqual([
@@ -53,6 +55,14 @@ describe("buildProvisionPlan", () => {
       template: { id: "ibi" },
       next: { dueDate: "2027-01-10", monthsUntil: 1, perMonthUntilDue: 150 },
     });
+    // El IBI de enero ya va en lo que hay que pagar este mes.
+    expect(plan.monthlyToSetAside).toBe(
+      Math.round(
+        plan.items
+          .filter((item) => item.next && item.next.monthsUntil > 1)
+          .reduce((sum, item) => sum + item.next!.perMonthUntilDue, 0) * 100,
+      ) / 100,
+    );
   });
 
   it("is empty without non-monthly bills", () => {
@@ -61,7 +71,7 @@ describe("buildProvisionPlan", () => {
         { ...emptyStore, templates: [template("rent", 700, "2026-01-01", 1)] },
         { monthId: "2026-11" },
       ),
-    ).toEqual({ monthlyTotal: 0, annualTotal: 0, items: [] });
+    ).toEqual({ monthlyToSetAside: 0, monthlyTotal: 0, annualTotal: 0, items: [] });
   });
 });
 
