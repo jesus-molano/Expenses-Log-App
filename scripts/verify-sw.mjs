@@ -3,7 +3,16 @@
 // es mejor que falle el build.
 import { readFileSync } from "node:fs";
 
-const REQUIRED_ROUTES = ["/", "/money", "/settings", "/login", "/expenses/new"];
+// Las cuatro pestañas, Ajustes, el login y el atajo "Añadir gasto".
+const REQUIRED_ROUTES = [
+  "/",
+  "/money",
+  "/accounts",
+  "/forecast",
+  "/settings",
+  "/login",
+  "/expenses/new",
+];
 
 const source = readFileSync("public/sw.js", "utf8");
 // Solo las entradas del manifiesto: objetos con `url` y `revision` (en otros

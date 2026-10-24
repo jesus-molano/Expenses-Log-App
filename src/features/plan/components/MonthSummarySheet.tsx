@@ -12,6 +12,7 @@ import type {
   MonthSummaryChange,
   MonthSummaryChangeKind,
 } from "../lib/month-summary";
+import { MonthSummaryReview, type MonthSummaryReviewActions } from "./MonthSummaryReview";
 import { PlanSheetHeader } from "./PlanSheetHeader";
 
 const changeIcons: Record<MonthSummaryChangeKind, typeof Plus> = {
@@ -28,18 +29,22 @@ const changeLabelKeys = {
   down: "insights.summary.changeDown",
 } as const;
 
-// Resumen de un mes al cerrarlo o desde Plan: lo previsto, lo pagado, lo que
+// Resumen de un mes al cerrarlo o desde Mes: lo previsto, lo pagado, lo que
 // queda, lo ahorrado y los recibos que más cambian frente al mes anterior.
+// Con `review`, también corrige el ingreso fijo, el ahorro y los ingresos
+// puntuales de ese mes.
 export function MonthSummarySheet({
   summary,
   language,
   periodLabel,
+  review,
   onClose,
 }: {
   summary: MonthSummary;
   language: AppLanguage;
   // "28 oct – 27 nov" cuando el mes empieza el día de cobro.
   periodLabel?: string | null;
+  review?: MonthSummaryReviewActions;
   onClose: () => void;
 }) {
   const month = formatMonthName(summary.monthId, language);
@@ -139,6 +144,8 @@ export function MonthSummarySheet({
             </section>
           </>
         )}
+
+        {review ? <MonthSummaryReview summary={summary} language={language} {...review} /> : null}
       </div>
     </Sheet>
   );

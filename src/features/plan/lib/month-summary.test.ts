@@ -7,7 +7,12 @@ import type {
   ExpenseTemplate,
   RecurrenceRule,
 } from "@/domain/types";
-import { buildMonthSummary, summaryPromptMonth } from "./month-summary";
+import {
+  buildMonthSummary,
+  isSavingsGoalUnregistered,
+  isSummaryHighlighted,
+  summaryPromptMonth,
+} from "./month-summary";
 
 describe("buildMonthSummary", () => {
   const store: ExpenseStore = {
@@ -66,6 +71,13 @@ describe("buildMonthSummary", () => {
     expect(summary.deltas).toEqual({ planned: 167.01, paid: 166.2, savings: 250 });
   });
 
+  it("knows the phase of the month against the active one", () => {
+    const today = new Date(2026, 9, 29, 10);
+    expect(buildMonthSummary(store, "2026-09", { today }).phase).toBe("registered");
+    expect(buildMonthSummary(store, "2026-10", { today }).phase).toBe("current");
+    expect(buildMonthSummary(store, "2026-11", { today }).phase).toBe("projected");
+  });
+
   it("lists the biggest changes against the previous month", () => {
     const summary = buildMonthSummary(store, "2026-10", { today: new Date(2026, 9, 29, 10) });
 
@@ -82,6 +94,34 @@ describe("buildMonthSummary", () => {
     expect(
       buildMonthSummary(emptyStore, "2026-10", { today: new Date(2026, 9, 29, 10) }),
     ).toMatchObject({ plannedCount: 0, plannedTotal: 0, changes: [] });
+  });
+});
+
+describe("isSavingsGoalUnregistered", () => {
+  it("warns only for a registered month with a goal and nothing saved", () => {
+    expect(
+      isSavingsGoalUnregistered({ phase: "registered", savingsTarget: 300, savingsActual: 0 }),
+    ).toBe(true);
+    expect(
+      isSavingsGoalUnregistered({ phase: "registered", savingsTarget: 300, savingsActual: 50 }),
+    ).toBe(false);
+    expect(
+      isSavingsGoalUnregistered({ phase: "registered", savingsTarget: 0, savingsActual: 0 }),
+    ).toBe(false);
+    expect(
+      isSavingsGoalUnregistered({ phase: "current", savingsTarget: 300, savingsActual: 0 }),
+    ).toBe(false);
+  });
+});
+
+describe("isSummaryHighlighted", () => {
+  it("highlights the summary that is due when that month is on screen", () => {
+    const context = { today: "2026-11-03", calendarMonthId: "2026-11", activeMonthId: "2026-11" };
+    expect(isSummaryHighlighted({ ...context, viewMonthId: "2026-10" })).toBe(true);
+    expect(isSummaryHighlighted({ ...context, viewMonthId: "2026-11" })).toBe(false);
+    expect(
+      isSummaryHighlighted({ ...context, today: "2026-11-15", viewMonthId: "2026-10" }),
+    ).toBe(false);
   });
 });
 

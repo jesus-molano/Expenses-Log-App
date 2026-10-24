@@ -68,7 +68,7 @@ export function resolveActiveMonth(
     : calendarMonthId;
 }
 
-// Mes activo con el ciclo de Ajustes, el mismo que ven Gastos y Plan: su id,
+// Mes activo con el ciclo de Ajustes, el mismo que ven Gastos, Mes, Cuentas y Previsión: su id,
 // el día en que empieza y el ciclo con el que se reparten los demás meses.
 // Es también el mes abierto a cambios: lo anterior ya es historial.
 export function activeBudgetMonth(finance: FinanceStore, today: string) {

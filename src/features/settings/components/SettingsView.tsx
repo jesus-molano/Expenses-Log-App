@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { OfflineLink } from "@/components/ui/OfflineLink";
 import { OfflineStatusChip } from "@/components/ui/OfflineStatusChip";
+import { parseAppTab } from "@/shared/app-tabs";
 import { t } from "@/shared/i18n";
 import { useSettingsController } from "../hooks/use-settings-controller";
 import { SettingsDialogs } from "./SettingsDialogs";
@@ -18,12 +19,13 @@ import {
   LanguageRow,
   NotificationsRow,
   OfflineRow,
+  PlanBaseRow,
   RemindersRow,
   ThemeRow,
 } from "./SettingsRows";
 
 export function SettingsView() {
-  const from = useSearchParams().get("from") === "money" ? "money" : "expenses";
+  const from = parseAppTab(useSearchParams().get("from"));
   const settings = useSettingsController({ from });
 
   return (
@@ -56,6 +58,7 @@ export function SettingsView() {
             <RemindersRow settings={settings} />
             <InstallRow language={settings.currentLanguage} />
             <OfflineRow language={settings.currentLanguage} />
+            <PlanBaseRow language={settings.currentLanguage} />
             <BudgetCycleRow settings={settings} />
             <CategoriesRow language={settings.currentLanguage} />
             <ThemeRow settings={settings} />

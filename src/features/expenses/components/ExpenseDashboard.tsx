@@ -58,11 +58,10 @@ import {
   markNewExpenseIntentHandled,
   readNewExpenseIntent,
 } from "@/features/expenses/lib/new-expense-intent";
-import { MonthSummarySheet } from "@/features/plan/components/MonthSummarySheet";
-import { PlanSettingsSheet } from "@/features/plan/components/PlanSettingsSheet";
+import { MonthSummaryLayer } from "@/features/plan/components/MonthSummaryLayer";
+import { PlanSettingsFormSheet } from "@/features/plan/components/PlanSettingsSheet";
 import { SalaryPromptCard } from "@/features/plan/components/SalaryPromptCard";
-import { useMonthSummary } from "@/features/plan/hooks/use-month-summary";
-import { usePlanSettingsForm } from "@/features/plan/hooks/use-plan-settings-form";
+import { usePlanBaseSettings } from "@/features/plan/hooks/use-plan-base-settings";
 import { useSalaryPrompt } from "@/features/plan/hooks/use-salary-prompt";
 import { useCurrentDate } from "@/shared/hooks/use-current-date";
 import { t } from "@/shared/i18n";
@@ -99,8 +98,6 @@ export function ExpenseDashboard({
     recordSalaryReceipt,
     undoSalaryReceipt,
     createCategory,
-    updateMoneySettings,
-    updateSalaryExtraPay,
     applyCaptureCommands,
     revertCaptureCommands,
     syncStatus,
@@ -110,11 +107,8 @@ export function ExpenseDashboard({
   const month = useActiveMonth({ store, language, now, closeMonth, reopenMonth });
   const filters = useExpenseFilters(store, language, now, month.viewMonthId);
   const actionToast = useActionToast();
-  const monthSummary = useMonthSummary({
-    store,
-    today: filters.today,
-    language,
-  });
+  // "Ver resumen": el mismo resumen del mes, con sus acciones, que en Mes.
+  const [summaryMonthId, setSummaryMonthId] = useState<string | null>(null);
   const reminderBell = useReminderBell({
     store,
     language,
@@ -195,14 +189,8 @@ export function ExpenseDashboard({
     monthId: month.activeMonthId,
     syncing: syncStatus === "syncing",
   });
-  // Sueldo y día de cobro desde la guía, con la misma hoja que Plan.
-  const salaryForm = usePlanSettingsForm({
-    finance: store.finance,
-    language,
-    savingsMonthId: month.activeMonthId,
-    onSave: updateMoneySettings,
-    onSaveExtraPay: updateSalaryExtraPay,
-  });
+  // Sueldo y día de cobro desde la guía, con la misma hoja que Mes y Ajustes.
+  const salaryForm = usePlanBaseSettings(month.activeMonthId);
   // El primer gasto añadido con la guía a la vista la mantiene hasta
   // completarla u ocultarla.
   function trackFirstExpense() {
@@ -481,7 +469,7 @@ export function ExpenseDashboard({
               month.dismiss();
               focusMonthHeading();
             }}
-            onOpenSummary={() => monthSummary.open(month.calendarMonthId)}
+            onOpenSummary={() => setSummaryMonthId(month.calendarMonthId)}
           />
         ) : null}
       </div>
@@ -597,25 +585,7 @@ export function ExpenseDashboard({
         onSave={capture.saveForm}
       />
 
-      {salaryForm.settingsOpen ? (
-        <PlanSettingsSheet
-          language={language}
-          salaryAmount={salaryForm.salaryAmount}
-          salaryDay={salaryForm.salaryDay}
-          savingsTarget={salaryForm.savingsTarget}
-          dayPickerOpen={salaryForm.dayPickerOpen}
-          extraPayMonths={salaryForm.extraPayMonths}
-          extraPayAmount={salaryForm.extraPayAmount}
-          onToggleExtraPayMonth={salaryForm.toggleExtraPayMonth}
-          onExtraPayAmountChange={salaryForm.setExtraPayAmount}
-          onSalaryAmountChange={salaryForm.setSalaryAmount}
-          onSalaryDayChange={salaryForm.setSalaryDay}
-          onSavingsTargetChange={salaryForm.setSavingsTarget}
-          onDayPickerOpenChange={salaryForm.setDayPickerOpen}
-          onClose={salaryForm.closeSettings}
-          onSubmit={salaryForm.submitSettings}
-        />
-      ) : null}
+      <PlanSettingsFormSheet form={salaryForm} language={language} />
 
       {catalogOpen ? (
         <ExpenseCatalogSheet
@@ -679,12 +649,12 @@ export function ExpenseDashboard({
         />
       ) : null}
 
-      {monthSummary.summary ? (
-        <MonthSummarySheet
-          summary={monthSummary.summary}
+      {summaryMonthId ? (
+        <MonthSummaryLayer
+          monthId={summaryMonthId}
+          today={filters.today}
           language={language}
-          periodLabel={periodRangeLabel(monthSummary.summary.monthId, month.cycle, language)}
-          onClose={monthSummary.close}
+          onClose={() => setSummaryMonthId(null)}
         />
       ) : null}
 

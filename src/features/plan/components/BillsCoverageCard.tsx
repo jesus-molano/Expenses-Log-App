@@ -22,7 +22,6 @@ export function BillsCoverageCard({
 }) {
   const titleId = useId();
   const pending = formatCurrency(coverage.pending);
-  const short = coverage.leftover < 0;
   // Cuentas de recibos sin ningún saldo: no entran en la suma, y hay que
   // decirlo para que "te sobran" o "te faltan" no parezca de todas.
   const uncounted = coverage.accountCount - coverage.countedCount;
@@ -60,24 +59,7 @@ export function BillsCoverageCard({
             {" · "}
             {formatMessage("insights.accounts.bills.pending", { amount: pending }, language)}
             {" · "}
-            <span
-              className={`font-semibold ${
-                short ? "text-[var(--app-warning)]" : "text-[var(--app-success)]"
-              }`}
-            >
-              {short ? (
-                <TriangleAlert
-                  size={14}
-                  aria-hidden="true"
-                  className="mr-1 inline align-[-2px]"
-                />
-              ) : null}
-              {formatMessage(
-                short ? "insights.accounts.bills.shortfall" : "insights.accounts.bills.surplus",
-                { amount: formatCurrency(Math.abs(coverage.leftover)) },
-                language,
-              )}
-            </span>
+            <BillsCoverageVerdict leftover={coverage.leftover} language={language} />
           </p>
           {uncounted > 0 ? (
             <p className="mt-1 break-words text-xs text-[var(--app-text-muted)]">
@@ -106,5 +88,38 @@ export function BillsCoverageCard({
         </p>
       )}
     </div>
+  );
+}
+
+// "te sobran 200,00 €" en verde o "te faltan 150,00 €" en aviso, con su
+// icono. La usan la tarjeta de Cuentas y la línea de Mes.
+export function BillsCoverageVerdict({
+  leftover,
+  language,
+  capitalized = false,
+}: {
+  leftover: number;
+  language: AppLanguage;
+  // Al empezar una frase: "Te sobran…".
+  capitalized?: boolean;
+}) {
+  const short = leftover < 0;
+  const text = formatMessage(
+    short ? "insights.accounts.bills.shortfall" : "insights.accounts.bills.surplus",
+    { amount: formatCurrency(Math.abs(leftover)) },
+    language,
+  );
+
+  return (
+    <span
+      className={`font-semibold ${
+        short ? "text-[var(--app-warning)]" : "text-[var(--app-success)]"
+      }`}
+    >
+      {short ? (
+        <TriangleAlert size={14} aria-hidden="true" className="mr-1 inline align-[-2px]" />
+      ) : null}
+      {capitalized ? capitalize(text) : text}
+    </span>
   );
 }

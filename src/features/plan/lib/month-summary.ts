@@ -8,7 +8,12 @@ import {
 import { resolveActiveMonth } from "@/domain/budget-month";
 import { daysBetween, toDateOnly } from "@/domain/calendar";
 import { occurrenceAmount } from "@/domain/finance";
-import type { AppLanguage, ExpenseOccurrence, ExpenseStore } from "@/domain/types";
+import type {
+  AppLanguage,
+  ExpenseOccurrence,
+  ExpenseStore,
+  MonthlyMoneyPlan,
+} from "@/domain/types";
 import { buildPlanForMonth, occurrencesForMonth } from "./plan-dashboard";
 
 export const MONTH_SUMMARY_CHANGES = 5;
@@ -31,6 +36,8 @@ export type MonthSummaryChange = {
 export type MonthSummary = {
   monthId: string;
   previousMonthId: string;
+  // Registrado, actual o proyectado respecto al mes activo.
+  phase: MonthlyMoneyPlan["phase"];
   plannedTotal: number;
   plannedCount: number;
   paidTotal: number;
@@ -61,7 +68,7 @@ export function buildMonthSummary(
 ): MonthSummary {
   const previousMonthId = addMonthId(monthId, -1);
   // La fase (y con ella el ahorro reservado de un mes ya registrado) se mide
-  // contra el mes activo, como en Plan: un mes cerrado ya es registrado.
+  // contra el mes activo, como en Mes: un mes cerrado ya es registrado.
   const activeMonthId = resolveActiveMonth(
     toDateOnly(today),
     store.finance.monthClosures,
@@ -89,6 +96,7 @@ export function buildMonthSummary(
   return {
     monthId,
     previousMonthId,
+    phase: plan.phase,
     plannedTotal: plan.plannedExpensesTotal,
     plannedCount: plan.plannedExpenseCount,
     paidTotal: plan.paidExpensesTotal,
@@ -158,7 +166,7 @@ function totalsByTemplate(occurrences: ExpenseOccurrence[]) {
   return totals;
 }
 
-// Qué resumen ofrecer en Plan: el del mes que se acaba de cerrar, el del mes
+// Qué resumen resaltar en Mes: el del mes que se acaba de cerrar, el del mes
 // anterior durante la primera semana o el del propio mes en sus últimos días.
 export function summaryPromptMonth({
   today,
@@ -178,6 +186,24 @@ export function summaryPromptMonth({
     return addMonthId(calendarMonthId, -1);
   }
   return null;
+}
+
+// M17: en un mes registrado el libre solo resta el ahorro real; si había
+// objetivo y no se apuntó nada, el resumen lo avisa y ofrece registrarlo.
+export function isSavingsGoalUnregistered(
+  summary: Pick<MonthSummary, "phase" | "savingsTarget" | "savingsActual">,
+) {
+  return summary.phase === "registered" && summary.savingsTarget > 0 && summary.savingsActual === 0;
+}
+
+// Mes resalta "Resumen de <mes>" cuando es el resumen que toca mirar (el mes
+// que se acaba de cerrar, el anterior en su primera semana o el propio en sus
+// últimos días) y es el mes que se está viendo.
+export function isSummaryHighlighted({
+  viewMonthId,
+  ...context
+}: Parameters<typeof summaryPromptMonth>[0] & { viewMonthId: string }) {
+  return summaryPromptMonth(context) === viewMonthId;
 }
 
 function cents(value: number) {

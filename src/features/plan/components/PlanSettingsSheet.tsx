@@ -5,6 +5,7 @@ import { Field } from "@/components/ui/Field";
 import { Sheet } from "@/components/ui/Sheet";
 import type { AppLanguage } from "@/domain/types";
 import { t } from "@/shared/i18n";
+import type { PlanSettingsForm } from "../hooks/use-plan-settings-form";
 import { ExtraPayFields } from "./ExtraPayFields";
 import { PlanPaydayField } from "./PlanPaydayField";
 import { PlanSettingsHeader } from "./PlanSettingsHeader";
@@ -99,5 +100,36 @@ export function PlanSettingsSheet({
         </Button>
       </form>
     </Sheet>
+  );
+}
+
+// "Base del plan" con el estado de `usePlanSettingsForm`: la misma hoja desde
+// Mes, la guía de Gastos y Ajustes. No pinta nada mientras está cerrada.
+export function PlanSettingsFormSheet({
+  form,
+  language,
+}: {
+  form: PlanSettingsForm;
+  language: AppLanguage;
+}) {
+  if (!form.settingsOpen) return null;
+  return (
+    <PlanSettingsSheet
+      language={language}
+      salaryAmount={form.salaryAmount}
+      salaryDay={form.salaryDay}
+      savingsTarget={form.savingsTarget}
+      dayPickerOpen={form.dayPickerOpen}
+      extraPayMonths={form.extraPayMonths}
+      extraPayAmount={form.extraPayAmount}
+      onToggleExtraPayMonth={form.toggleExtraPayMonth}
+      onExtraPayAmountChange={form.setExtraPayAmount}
+      onSalaryAmountChange={form.setSalaryAmount}
+      onSalaryDayChange={form.setSalaryDay}
+      onSavingsTargetChange={form.setSavingsTarget}
+      onDayPickerOpenChange={form.setDayPickerOpen}
+      onClose={form.closeSettings}
+      onSubmit={form.submitSettings}
+    />
   );
 }

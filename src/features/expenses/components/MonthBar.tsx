@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import type { AppLanguage } from "@/domain/types";
@@ -12,6 +12,8 @@ type MonthBarProps = {
   monthId: string;
   // "28 oct – 27 nov" cuando el mes empieza el día de cobro.
   rangeLabel?: string | null;
+  // Marca junto a los días del mes (la fase "Registrado" o "Proyectado" en Mes).
+  badge?: ReactNode;
   activeMonthId: string;
   calendarMonthId: string;
   language: AppLanguage;
@@ -22,7 +24,7 @@ type MonthBarProps = {
   onReopen: () => void;
   // Destino del foco cuando desaparece o se desactiva el botón usado.
   headingRef: RefObject<HTMLHeadingElement | null>;
-  // En Plan el título de la página es otro: el mes no es un encabezado.
+  // En Mes el título de la página es otro: el mes no es un encabezado.
   titleAs?: "h2" | "p";
 };
 
@@ -31,6 +33,7 @@ type MonthBarProps = {
 export function MonthBar({
   monthId,
   rangeLabel,
+  badge,
   activeMonthId,
   calendarMonthId,
   language,
@@ -81,8 +84,11 @@ export function MonthBar({
         >
           {capitalize(formatMonthName(monthId, language, { withYear: true }))}
         </Title>
-        {rangeLabel ? (
-          <p className="text-xs text-[var(--app-text-muted)]">{rangeLabel}</p>
+        {rangeLabel || badge ? (
+          <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-[var(--app-text-muted)]">
+            {rangeLabel ? <span>{rangeLabel}</span> : null}
+            {badge}
+          </p>
         ) : null}
         {monthId !== activeMonthId ? (
           <Button variant="ghost" size="sm" onClick={onReset}>
