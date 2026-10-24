@@ -45,11 +45,27 @@ test("loads and edits the main app routes after going offline", async ({
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText("Por pagar")).toBeVisible();
 
-  await page.getByRole("link", { name: "Plan" }).click();
+  await page.getByRole("link", { name: "Mes" }).click();
   await expect(page).toHaveURL(/\/money$/);
   await expect(
     page.getByRole("heading", { level: 1, name: /Plan de/ }),
   ).toBeVisible();
+
+  await page.getByRole("link", { name: "Cuentas" }).click();
+  await expect(page).toHaveURL(/\/accounts$/);
+  await expect(page.getByRole("region", { name: "Cuentas" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Previsión" }).click();
+  await expect(page).toHaveURL(/\/forecast$/);
+  await expect(page.getByRole("region", { name: "Próximos recibos grandes" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Ajustes" }).click();
+  await expect(page).toHaveURL(/\/settings\?from=forecast$/);
+  await page.getByRole("link", { name: "Previsión" }).click();
+  await expect(page).toHaveURL(/\/forecast$/);
+
+  await page.getByRole("link", { name: "Mes" }).click();
+  await expect(page).toHaveURL(/\/money$/);
 
   await page.getByRole("link", { name: "Ajustes" }).click();
   await expect(page).toHaveURL(/\/settings\?from=money$/);
@@ -66,10 +82,10 @@ test("loads and edits the main app routes after going offline", async ({
   await expect(
     moneyPage.getByRole("heading", { level: 1, name: /Plan de/ }),
   ).toBeVisible();
-  // La revisión del mes también tiene el botón: se paga desde pendientes y
-  // desaparece de los dos sitios.
+  // Se paga desde la lista de recibos del mes, plegada de entrada.
+  await moneyPage.getByRole("button", { name: /^Recibos de/ }).click();
   await moneyPage
-    .getByRole("region", { name: "Recibos pendientes" })
+    .getByRole("region", { name: /^Recibos de/ })
     .getByRole("button", { name: "Marcar Movistar como pagado" })
     .click();
   await expect(
@@ -83,7 +99,7 @@ test("loads and edits the main app routes after going offline", async ({
   await expect(
     settingsPage.getByRole("heading", { level: 1, name: "Ajustes" }),
   ).toBeVisible();
-  await expect(settingsPage.getByRole("link", { name: "Plan" })).toBeVisible();
+  await expect(settingsPage.getByRole("link", { name: "Mes" })).toBeVisible();
 });
 
 test("shows in Ajustes the precache URL that blocks offline use", async ({
@@ -134,6 +150,16 @@ test("shows the offline chip in every main header without moving it", async ({
       path: "/money",
       header: page.locator("header[data-app-chrome]"),
       ready: page.getByRole("heading", { level: 1, name: /Plan de/ }),
+    },
+    {
+      path: "/accounts",
+      header: page.locator("header[data-app-chrome]"),
+      ready: page.getByRole("region", { name: "Cuentas" }),
+    },
+    {
+      path: "/forecast",
+      header: page.locator("header[data-app-chrome]"),
+      ready: page.getByRole("region", { name: "Próximos recibos grandes" }),
     },
     {
       path: "/settings?from=expenses",

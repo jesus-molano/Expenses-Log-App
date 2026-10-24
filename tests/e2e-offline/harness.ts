@@ -37,6 +37,8 @@ type BrowserName = PlaywrightWorkerOptions["browserName"];
 const ROUTES: Array<[string, (page: Page) => ReturnType<Page["getByText"]>]> = [
   ["/", (page) => page.getByText("Por pagar")],
   ["/money", (page) => page.getByRole("heading", { level: 1, name: /Plan de/ })],
+  ["/accounts", (page) => page.getByRole("region", { name: "Cuentas" })],
+  ["/forecast", (page) => page.getByRole("region", { name: "Próximos recibos grandes" })],
   [
     "/settings?from=money",
     (page) => page.getByRole("heading", { level: 1, name: "Ajustes" }),

@@ -238,14 +238,18 @@ test("asks '¿Has cobrado?' on payday and edits one month salary only", async ({
   await expect(page.getByRole("status").filter({ hasText: "Nómina de octubre cobrada" })).toBeVisible();
   await expect(prompt).toHaveCount(0);
 
-  await page.getByRole("link", { name: "Plan" }).click();
+  await page.getByRole("link", { name: "Mes" }).click();
   await expect(page.getByText(/cobrado 2\.?150,00/)).toBeVisible();
 
-  // M16: un sueldo distinto en noviembre no cambia diciembre.
-  await page.getByRole("combobox", { name: "Mes", exact: true }).selectOption({
-    label: "noviembre 2026",
-  });
-  await page.getByRole("button", { name: "Editar ingreso fijo" }).click();
+  // M16: un sueldo distinto en noviembre no cambia diciembre. Se corrige desde
+  // el resumen de noviembre.
+  await page.getByRole("button", { name: "Mes siguiente" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Plan de noviembre 2026" })).toBeAttached();
+  await page.getByRole("button", { name: /Resumen de noviembre/ }).click();
+  await page
+    .getByRole("dialog", { name: "Resumen de noviembre" })
+    .getByRole("button", { name: "Editar ingreso fijo" })
+    .click();
   const dialog = page.getByRole("dialog", { name: "Editar sueldo del mes" });
   const scope = dialog.getByRole("radiogroup", { name: "¿A qué meses afecta?" });
   await expect(scope.getByRole("radio", { name: "Desde este mes" })).toHaveAttribute(
@@ -276,7 +280,7 @@ test("sets the extra pay months from the plan settings", async ({ page }) => {
   });
   await page.goto("/money");
 
-  await page.getByRole("button", { name: "Configurar" }).click();
+  await page.getByRole("button", { name: "Cambiar base del plan" }).click();
   const december = page.getByRole("button", { name: "diciembre", exact: true });
   await december.click();
   await expect(december).toHaveAttribute("aria-pressed", "true");
@@ -294,8 +298,9 @@ test("records what was paid from the plan editor and keeps the series", async ({
   });
   await page.goto("/money");
 
-  // La fila de "Recibos pendientes" (la revisión del mes repite la lista).
-  const row = page.locator(".app-monthly-expense-row").filter({ hasText: "Luz" }).first();
+  // La lista de recibos del mes empieza plegada.
+  await page.getByRole("button", { name: /Recibos de octubre/ }).click();
+  const row = page.locator(".app-monthly-expense-row").filter({ hasText: "Luz" });
   await row.getByRole("button", { name: "Editar" }).click();
   const editor = page.locator('[data-editing="true"]');
   await editor.getByRole("button", { name: "Pagado" }).click();

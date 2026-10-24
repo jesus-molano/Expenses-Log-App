@@ -124,8 +124,8 @@ test("closes October with leftovers after payday and starts November", async ({ 
   await page.reload();
   await expect(page.getByText("Por pagar · noviembre")).toBeVisible();
 
-  // Plan sigue al mes activo y cuenta hasta el cobro de noviembre.
-  await page.getByRole("link", { name: "Plan" }).click();
+  // Mes sigue al mes activo y cuenta hasta el cobro de noviembre.
+  await page.getByRole("link", { name: "Mes" }).click();
   await expect(page.getByRole("heading", { level: 1, name: /Plan de noviembre 2026/i })).toBeVisible();
   const outlook = page.locator('[data-payday-outlook="true"]');
   await expect(outlook).toContainText("Hasta el cobro (sáb 28 nov · 31 días)");
@@ -171,15 +171,16 @@ test("an unresolved leftover waits as carry-over once November starts", async ({
   expect(await sectionIds(page)).not.toContain("today");
 });
 
-test("Plan follows the month viewed in Gastos and pays from the review", async ({ page }) => {
+test("Mes follows the month viewed in Gastos and pays from its bills list", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-28T10:00:00"));
   await seed(page, octoberWithLeftovers);
   await page.goto("/");
 
   await page.getByRole("button", { name: "Mes siguiente" }).click();
   await expect(page.getByText("Por pagar · noviembre")).toBeVisible();
-  await page.getByRole("link", { name: "Plan" }).click();
+  await page.getByRole("link", { name: "Mes" }).click();
   await expect(page.getByRole("heading", { level: 1, name: /Plan de noviembre 2026/i })).toBeVisible();
+  await expect(page.getByText("Libre · noviembre")).toBeVisible();
   await expect(page.getByText("Proyectado").first()).toBeVisible();
   await expect(page.locator('[data-payday-outlook="true"]')).toHaveCount(0);
 
@@ -189,14 +190,18 @@ test("Plan follows the month viewed in Gastos and pays from the review", async (
     "Hasta el cobro (sáb 28 nov · 31 días)",
   );
 
-  const review = page.getByRole("region", { name: "Revisión mensual" });
-  const payInternet = review.getByRole("button", { name: "Marcar Internet como pagado" });
+  // La lista del mes empieza plegada, con lo que queda por pagar.
+  const bills = page.getByRole("button", { name: /Recibos de octubre/ });
+  await expect(bills).toHaveAttribute("aria-expanded", "false");
+  await expect(bills).toContainText("2 pendientes · 75,00 €");
+  await bills.click();
+  const payInternet = page
+    .getByRole("region", { name: "Recibos de octubre" })
+    .getByRole("button", { name: "Marcar Internet como pagado" });
   await payInternet.scrollIntoViewIfNeeded();
   await payInternet.click();
   await expect(payInternet).toHaveCount(0);
-  await expect(
-    page.getByRole("region", { name: "Recibos pendientes" }).getByText("Internet"),
-  ).toHaveCount(0);
+  await expect(bills).toContainText("1 pendiente · 45,00 €");
 
   await page.getByRole("link", { name: "Gastos" }).click();
   await expect(page.getByText("Por pagar · octubre")).toBeVisible();
@@ -206,7 +211,7 @@ test("Plan follows the month viewed in Gastos and pays from the review", async (
 test("offers next year in December", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-12-15T10:00:00"));
   await seed(page, octoberWithLeftovers);
-  await page.goto("/money");
+  await page.goto("/forecast");
 
   const annualYear = page
     .getByRole("region", { name: "Plan anual" })
