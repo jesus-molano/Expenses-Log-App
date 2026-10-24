@@ -221,18 +221,13 @@ function normalizeAccountCheckins(value: unknown): Record<string, BalanceCheckin
 }
 
 function normalizeBalanceCheckin(entry: unknown): BalanceCheckin | null {
-  if (
-    !isRecord(entry) ||
-    typeof entry.amount !== "number" ||
-    !Number.isFinite(entry.amount) ||
-    !isTimestamp(entry.updatedAt)
-  ) {
+  if (!isRecord(entry) || typeof entry.amount !== "number" || !isTimestamp(entry.updatedAt)) {
     return null;
   }
-  const checkin: BalanceCheckin = {
-    amount: Math.round(entry.amount * 100) / 100,
-    updatedAt: entry.updatedAt,
-  };
+  // Finito también después de redondear: 1e308 × 100 ya es infinito.
+  const amount = Math.round(entry.amount * 100) / 100;
+  if (!Number.isFinite(amount)) return null;
+  const checkin: BalanceCheckin = { amount, updatedAt: entry.updatedAt };
   if (isTimestamp(entry.deletedAt)) checkin.deletedAt = entry.deletedAt;
   return checkin;
 }

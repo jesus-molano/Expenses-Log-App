@@ -18,6 +18,7 @@ import {
 import type { AccountInsight, AccountSummary } from "../lib/account-summary";
 import type { BalanceEntry } from "../lib/balance-log";
 import { formatShortDate } from "../lib/plan-dashboard";
+import { useMoveFocus } from "../hooks/use-move-focus";
 import { BalanceHistory, BalanceTrendLine } from "./BalanceHistory";
 
 // Una cuenta: su último saldo, lo que toca según su papel y su historial.
@@ -26,6 +27,7 @@ export function AccountCard({
   insight,
   monthId,
   language,
+  position,
   canMoveUp,
   canMoveDown,
   showReorder,
@@ -39,6 +41,9 @@ export function AccountCard({
   // Mes activo, para el objetivo de ahorro.
   monthId: string;
   language: AppLanguage;
+  // Puesto en la lista: al cambiar tras subirla o bajarla, el foco vuelve a
+  // sus botones.
+  position: number;
   canMoveUp: boolean;
   canMoveDown: boolean;
   showReorder: boolean;
@@ -50,6 +55,7 @@ export function AccountCard({
   const titleId = useId();
   const historyId = useId();
   const [historyOpen, setHistoryOpen] = useState(false);
+  const { upRef, downRef, move } = useMoveFocus({ position, canMoveUp, canMoveDown, onMove });
   const { account, entries, trend } = summary;
   const name = accountDisplayName(account, language);
   const label = (key: "insights.accounts.moveUp" | "insights.accounts.moveDown" | "insights.accounts.edit") =>
@@ -84,19 +90,21 @@ export function AccountCard({
           {showReorder ? (
             <>
               <IconButton
+                ref={upRef}
                 variant="ghost"
                 size="touch"
                 disabled={!canMoveUp}
-                onClick={() => onMove(-1)}
+                onClick={() => move(-1)}
                 aria-label={label("insights.accounts.moveUp")}
               >
                 <ChevronUp size={18} aria-hidden="true" />
               </IconButton>
               <IconButton
+                ref={downRef}
                 variant="ghost"
                 size="touch"
                 disabled={!canMoveDown}
-                onClick={() => onMove(1)}
+                onClick={() => move(1)}
                 aria-label={label("insights.accounts.moveDown")}
               >
                 <ChevronDown size={18} aria-hidden="true" />
@@ -162,7 +170,7 @@ export function AccountCard({
             size="sm"
             variant="ghost"
             aria-expanded={historyOpen}
-            aria-controls={historyId}
+            aria-controls={historyOpen ? historyId : undefined}
             trailingIcon={
               <ChevronDown
                 size={16}

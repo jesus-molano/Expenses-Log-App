@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { mergeExpenseStores } from "@/data/persistence/local-store";
 import { listBalanceAccounts } from "@/domain/balance-accounts";
 import { emptyStore } from "@/domain/seed";
 import type { ExpenseStore } from "@/domain/types";
@@ -267,6 +268,12 @@ describe("account balances", () => {
         amount: Number.POSITIVE_INFINITY,
       }),
     ).toBe(withSavings);
+    // Finito, pero infinito al pasarlo a céntimos: se guardaría como null.
+    for (const accountId of ["savings", "primary"]) {
+      expect(
+        recordAccountBalanceInStore(withSavings, { accountId, date: "2026-10-20", amount: 1e308 }),
+      ).toBe(withSavings);
+    }
   });
 
   it("deletes a balance by marking it, and recording the day again brings it back", () => {
@@ -310,5 +317,44 @@ describe("account balances", () => {
       at(t1),
     );
     expect(deleted.finance.balanceCheckins?.["2026-10-15"]?.deletedAt).toBe(t1);
+  });
+
+  it("keeps the default account listed after deleting its last balance", () => {
+    const deleted = [
+      { accountId: "primary", date: "2026-10-01" },
+      { accountId: "primary", date: "2026-10-15" },
+    ].reduce((store, input) => deleteAccountBalanceInStore(store, input, at(t1)), migrated);
+
+    expect(listBalanceAccounts(deleted.finance)).toEqual([
+      { id: "primary", name: "", role: "bills", order: 0 },
+    ]);
+    expect(deleted.finance.balanceAccounts?.primary?.updatedAt).toBe("1970-01-01T00:00:00.000Z");
+    // Ya con metadatos, borrar otro saldo no los toca.
+    const renamed = updateBalanceAccountInStore(migrated, "primary", { name: "Sabadell" }, at(t1));
+    expect(
+      deleteAccountBalanceInStore(renamed, { accountId: "primary", date: "2026-10-01" }, at(t2))
+        .finance.balanceAccounts,
+    ).toBe(renamed.finance.balanceAccounts);
+    // Sin saldo que borrar no cambia nada.
+    expect(deleteAccountBalanceInStore(migrated, { accountId: "primary", date: "2026-10-02" })).toBe(
+      migrated,
+    );
+  });
+
+  it("lets a rename on another device win over the defaults saved when deleting a balance", () => {
+    // El portátil la renombra; el móvil, sin saberlo, borra un saldo después.
+    const laptop = updateBalanceAccountInStore(migrated, "primary", { name: "Sabadell" }, at(t1));
+    const phone = deleteAccountBalanceInStore(
+      migrated,
+      { accountId: "primary", date: "2026-10-15" },
+      at(t2),
+    );
+
+    for (const merged of [mergeExpenseStores(phone, laptop), mergeExpenseStores(laptop, phone)]) {
+      expect(listBalanceAccounts(merged.finance)).toEqual([
+        { id: "primary", name: "Sabadell", role: "bills", order: 0 },
+      ]);
+      expect(merged.finance.balanceCheckins?.["2026-10-15"]?.deletedAt).toBe(t2);
+    }
   });
 });

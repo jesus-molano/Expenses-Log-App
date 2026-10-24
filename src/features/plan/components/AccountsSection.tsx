@@ -77,6 +77,7 @@ export function AccountsSection({
                   insight={accountInsight(summary, { savingsTarget })}
                   monthId={monthId}
                   language={language}
+                  position={index}
                   showReorder={summaries.length > 1}
                   canMoveUp={index > 0}
                   canMoveDown={index < summaries.length - 1}

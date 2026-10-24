@@ -509,6 +509,42 @@ describe("replaceStoreContents — accounts", () => {
     ]);
   });
 
+  it("gives restored accounts distinct ids that the store accepts", () => {
+    const later = new Date("2026-10-24T10:00:00.000Z");
+    const long = "a".repeat(80);
+    // Dos cuentas con la misma raíz y una con el id más largo posible, cada
+    // una con su saldo.
+    const file = [
+      (store: ExpenseStore) => withAccount(store, "ahorro", "savings", "2026-10-01T09:00:00.000Z"),
+      (store: ExpenseStore) => withAccount(store, "ahorro-rold", "savings", "2026-10-01T09:00:00.000Z"),
+      (store: ExpenseStore) => withAccount(store, long, "spending", "2026-10-01T09:00:00.000Z"),
+      ...["ahorro", "ahorro-rold", long].map(
+        (accountId, index) => (store: ExpenseStore) =>
+          recordAccountBalanceInStore(
+            store,
+            { accountId, date: "2026-10-10", amount: 100 + index },
+            at("2026-10-10T09:00:00.000Z"),
+          ),
+      ),
+    ].reduce((store, step) => step(store), current);
+    const deletedHere = ["ahorro", "ahorro-rold", long].reduce(
+      (store, id) => deleteBalanceAccountInStore(store, id, at("2026-10-20T09:00:00.000Z")),
+      file,
+    );
+
+    const restored = replaceStoreContents(deletedHere, file, { scope: "all", now: later });
+    const accounts = listBalanceAccounts(restored.finance);
+
+    expect(accounts).toHaveLength(3);
+    expect(new Set(accounts.map((account) => account.id)).size).toBe(3);
+    expect(accounts.every((account) => account.id.length <= 80)).toBe(true);
+    expect(
+      accounts
+        .map((account) => restored.finance.accountCheckins?.[`${account.id}:2026-10-10`]?.amount)
+        .sort(),
+    ).toEqual([100, 101, 102]);
+  });
+
   it("moves a deleted default account's balances to a new account when restoring it", () => {
     const later = new Date("2026-10-24T10:00:00.000Z");
     const deletedHere = deleteBalanceAccountInStore(here, "primary", at("2026-10-20T09:00:00.000Z"));

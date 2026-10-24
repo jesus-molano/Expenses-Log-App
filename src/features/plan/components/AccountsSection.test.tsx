@@ -31,18 +31,21 @@ function renderSection(
     onMove: vi.fn(),
     onDeleteEntry: vi.fn(),
   };
-  const summaries = summarizeAccounts(data);
-  render(
-    <AccountsSection
-      language="es"
-      monthId="2026-10"
-      summaries={summaries}
-      coverage={billsCoverage(summaries, { pending, monthStart })}
-      savingsTarget={300}
-      {...handlers}
-    />,
-  );
-  return handlers;
+  const section = (next: FinanceStore) => {
+    const summaries = summarizeAccounts(next);
+    return (
+      <AccountsSection
+        language="es"
+        monthId="2026-10"
+        summaries={summaries}
+        coverage={billsCoverage(summaries, { pending, monthStart })}
+        savingsTarget={300}
+        {...handlers}
+      />
+    );
+  };
+  const { rerender } = render(section(data));
+  return { ...handlers, rerender: (next: FinanceStore) => rerender(section(next)) };
 }
 
 describe("AccountsSection", () => {
@@ -81,6 +84,22 @@ describe("AccountsSection", () => {
     expect(coverage).toHaveTextContent("Es el saldo del 20 oct: puede que ya no esté al día.");
   });
 
+  it("says which bills accounts are left out of the sum for lack of a balance", () => {
+    renderSection({
+      ...finance,
+      balanceAccounts: {
+        ...finance.balanceAccounts,
+        nomina: { name: "Nómina", role: "bills", order: 2, createdAt: at, updatedAt: at },
+      },
+    });
+
+    const coverage = screen.getByRole("group", { name: "Recibos de octubre" });
+    expect(coverage).toHaveTextContent(/te sobran 400,00\s€/);
+    expect(coverage).toHaveTextContent(
+      "Una de tus cuentas de recibos no tiene saldo anotado y no se suma.",
+    );
+  });
+
   it("shows the savings goal and the change on a savings account", () => {
     renderSection(finance);
 
@@ -103,9 +122,29 @@ describe("AccountsSection", () => {
     expect(handlers.onMove).toHaveBeenCalledWith("primary", 1);
 
     const toggle = savings.getByRole("button", { name: "Ver historial" });
+    expect(toggle).not.toHaveAttribute("aria-controls");
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toBeInTheDocument();
     fireEvent.click(savings.getByRole("button", { name: "Borrar el saldo del 15 oct" }));
     expect(handlers.onDeleteEntry).toHaveBeenCalledWith("savings", { date: "2026-10-15", amount: 5300 });
+  });
+
+  it("keeps the focus on the reorder buttons after moving an account", () => {
+    const { rerender } = renderSection(finance);
+    const up = screen.getByRole("button", { name: "Subir BBVA ahorro" });
+    up.focus();
+    fireEvent.click(up);
+    // Ya es la primera: "Subir" queda desactivado y el foco pasa a "Bajar".
+    rerender({
+      ...finance,
+      balanceAccounts: {
+        primary: { ...finance.balanceAccounts!.primary, order: 1 },
+        savings: { ...finance.balanceAccounts!.savings, order: 0 },
+      },
+    });
+
+    expect(screen.getByRole("button", { name: "Subir BBVA ahorro" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Bajar BBVA ahorro" })).toHaveFocus();
   });
 });

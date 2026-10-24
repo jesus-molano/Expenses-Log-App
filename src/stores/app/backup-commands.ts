@@ -6,6 +6,7 @@ import {
   salaryClearedTombstone,
 } from "@/domain/finance";
 import {
+  ACCOUNT_ID_MAX_LENGTH,
   PRIMARY_ACCOUNT_DEFAULTS,
   PRIMARY_ACCOUNT_ID,
   accountCheckinKey,
@@ -290,8 +291,12 @@ function rekeyTombstonedAccounts(
   const checkins = { ...imported.accountCheckins };
   let balanceCheckins = imported.balanceCheckins;
   for (const { id } of blocked) {
-    // Sin acumular sufijos al restaurar varias veces.
-    const nextId = `${id.replace(/-r[0-9a-z]+$/, "")}${suffix}`;
+    const nextId = restoredAccountId(id, suffix, (candidate) =>
+      Boolean(
+        Object.prototype.hasOwnProperty.call(accounts, candidate) ||
+          current.balanceAccounts?.[candidate],
+      ),
+    );
     const account = storedBalanceAccount(imported, id)!;
     delete accounts[id];
     accounts[nextId] = { ...account, createdAt: account.createdAt || stamp };
@@ -320,6 +325,19 @@ function rekeyTombstonedAccounts(
     ...withNonEmpty("balanceAccounts", accounts),
     ...withNonEmpty("accountCheckins", checkins),
   };
+}
+
+// Id nuevo de una cuenta restaurada: sin acumular sufijos al restaurar varias
+// veces, dentro del largo que admite la normalización (si no, la cuenta se
+// descartaría) y sin pisar otra cuenta (dos borradas que comparten raíz, como
+// "ahorro" y "ahorro-r…", no acaban en la misma).
+function restoredAccountId(id: string, suffix: string, taken: (id: string) => boolean) {
+  const root = id.replace(/-r[0-9a-z]+$/, "");
+  for (let attempt = 1; ; attempt += 1) {
+    const tail = attempt === 1 ? suffix : `${suffix}${attempt}`;
+    const candidate = `${root.slice(0, ACCOUNT_ID_MAX_LENGTH - tail.length)}${tail}`;
+    if (!taken(candidate)) return candidate;
+  }
 }
 
 // Tema e idioma se quedan: son de este dispositivo. Los avisos son de la

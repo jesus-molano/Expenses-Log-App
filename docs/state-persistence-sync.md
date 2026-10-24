@@ -303,8 +303,10 @@ Reglas para campos nuevos:
   es natural, sin `balanceCheckins` no hay cuenta migrada y sin
   `balanceAccounts` ni `accountCheckins` no hay mas cuentas. Un valor ilegible
   se descarta en la normalizacion sin tocar el resto: una cuenta sin papel
-  conocido o sin `updatedAt`, un id con caracteres fuera de `[A-Za-z0-9_-]`, un
-  saldo sin importe finito o con una clave sin fecha valida, o un saldo de la
+  conocido o sin `updatedAt`, un id con caracteres fuera de `[A-Za-z0-9_-]`,
+  de mas de 80 o que coincide con una propiedad de cualquier objeto
+  (`__proto__`, `constructor`...), un saldo sin importe finito (tambien tras
+  redondear a centimos) o con una clave sin fecha valida, o un saldo de la
   `primary` dentro de `accountCheckins`.
 - Excepcion: los campos de F3 de dinero tambien se escriben ya, porque cada uno
   degrada a un comportamiento anterior y no a perder datos:

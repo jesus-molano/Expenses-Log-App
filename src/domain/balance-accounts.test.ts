@@ -3,6 +3,8 @@ import {
   PRIMARY_ACCOUNT_ID,
   accountCheckinKey,
   balanceCheckinsOf,
+  implicitPrimaryAccount,
+  isBalanceAccountId,
   isBalanceAccountOpen,
   listBalanceAccounts,
   nextBalanceAccountOrder,
@@ -32,8 +34,26 @@ describe("account check-in keys", () => {
   });
 
   it("rejects keys without a valid id or date", () => {
-    for (const key of ["2026-10-23", "a:b", ":2026-10-23", "a b:2026-10-23", "a:2026-02-30", "a:2026-10-23:x"]) {
+    for (const key of [
+      "2026-10-23",
+      "a:b",
+      ":2026-10-23",
+      "a b:2026-10-23",
+      "a:2026-02-30",
+      "a:2026-10-23:x",
+      `${"a".repeat(81)}:2026-10-23`,
+      "constructor:2026-10-23",
+      "__proto__:2026-10-23",
+    ]) {
       expect(parseAccountCheckinKey(key)).toBeNull();
+    }
+  });
+
+  it("rejects ids that every object already has", () => {
+    expect(isBalanceAccountId("account-1")).toBe(true);
+    expect(isBalanceAccountId("a".repeat(80))).toBe(true);
+    for (const id of ["__proto__", "constructor", "toString", "hasOwnProperty", "a".repeat(81), "", 7]) {
+      expect(isBalanceAccountId(id)).toBe(false);
     }
   });
 });
@@ -126,6 +146,23 @@ describe("account metadata and balances", () => {
     });
     expect(storedBalanceAccount(finance, "savings")).toEqual(finance.balanceAccounts!.savings);
     expect(storedBalanceAccount(finance, "unknown")).toBeNull();
+    // Solo las cuentas guardadas, nunca lo heredado de cualquier objeto.
+    expect(storedBalanceAccount(finance, "toString")).toBeNull();
+  });
+
+  it("stores the default account with a date any real edit beats", () => {
+    const stored = implicitPrimaryAccount();
+    expect(stored).toEqual({
+      name: "",
+      role: "bills",
+      order: 0,
+      createdAt: "1970-01-01T00:00:00.000Z",
+      updatedAt: "1970-01-01T00:00:00.000Z",
+    });
+    // Guardada, la cuenta se lista aunque no tenga saldos.
+    expect(
+      listBalanceAccounts({ ...emptyFinanceStore, balanceAccounts: { primary: stored } }),
+    ).toEqual([{ id: PRIMARY_ACCOUNT_ID, name: "", role: "bills", order: 0 }]);
   });
 
   it("knows which accounts accept balances", () => {

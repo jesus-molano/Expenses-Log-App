@@ -18,6 +18,7 @@ export const BALANCE_ACCOUNT_ROLES = [
 ] as const satisfies readonly BalanceAccountRole[];
 
 export const ACCOUNT_NAME_MAX_LENGTH = 40;
+export const ACCOUNT_ID_MAX_LENGTH = 80;
 
 // La `primary` sin metadatos: la cuenta de los recibos con el nombre por
 // defecto de su papel, la primera de la lista.
@@ -27,15 +28,22 @@ export const PRIMARY_ACCOUNT_DEFAULTS = {
   order: 0,
 } as const satisfies Pick<BalanceAccount, "name" | "role" | "order">;
 
-const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
-const CHECKIN_KEY_PATTERN = /^([A-Za-z0-9_-]{1,80}):(\d{4}-\d{2}-\d{2})$/;
+const ACCOUNT_ID_PATTERN = new RegExp(`^[A-Za-z0-9_-]{1,${ACCOUNT_ID_MAX_LENGTH}}$`);
+const CHECKIN_KEY_PATTERN = new RegExp(
+  `^([A-Za-z0-9_-]{1,${ACCOUNT_ID_MAX_LENGTH}}):(\\d{4}-\\d{2}-\\d{2})$`,
+);
 
 export function isBalanceAccountRole(value: unknown): value is BalanceAccountRole {
   return (BALANCE_ACCOUNT_ROLES as readonly unknown[]).includes(value);
 }
 
+// Un id que coincide con una propiedad de cualquier objeto ("__proto__",
+// "constructor", "toString"…) no vale: como clave de un registro, asignarlo
+// cambiaría el prototipo al fusionar y leerlo devolvería la propiedad heredada.
 export function isBalanceAccountId(value: unknown): value is string {
-  return typeof value === "string" && ACCOUNT_ID_PATTERN.test(value);
+  return (
+    typeof value === "string" && ACCOUNT_ID_PATTERN.test(value) && !(value in Object.prototype)
+  );
 }
 
 // Clave de un saldo en `accountCheckins`: una entrada plana por cuenta y día.
@@ -49,7 +57,7 @@ export function parseAccountCheckinKey(
   key: string,
 ): { accountId: string; date: string } | null {
   const match = CHECKIN_KEY_PATTERN.exec(key);
-  if (!match || !isValidDateOnly(match[2])) return null;
+  if (!match || !isBalanceAccountId(match[1]) || !isValidDateOnly(match[2])) return null;
   return { accountId: match[1], date: match[2] };
 }
 
@@ -59,10 +67,23 @@ export function storedBalanceAccount(
   finance: FinanceStore,
   accountId: string,
 ): BalanceAccount | null {
-  const stored = finance.balanceAccounts?.[accountId];
+  const accounts = finance.balanceAccounts;
+  const stored =
+    accounts && Object.prototype.hasOwnProperty.call(accounts, accountId)
+      ? accounts[accountId]
+      : undefined;
   if (stored) return stored;
   if (accountId !== PRIMARY_ACCOUNT_ID) return null;
   return { ...PRIMARY_ACCOUNT_DEFAULTS, createdAt: "", updatedAt: "" };
+}
+
+// La `primary` sin metadatos, guardada con sus valores por defecto para que
+// siga en la lista aunque se quede sin saldos. Lleva la fecha más antigua
+// posible: al fusionar, cualquier edición real (renombrarla, moverla o
+// borrarla, aquí o en otro dispositivo) gana a esta versión.
+export function implicitPrimaryAccount(): BalanceAccount {
+  const stamp = new Date(0).toISOString();
+  return { ...PRIMARY_ACCOUNT_DEFAULTS, createdAt: stamp, updatedAt: stamp };
 }
 
 // Se le pueden anotar saldos: existe y no está borrada. La `primary` existe

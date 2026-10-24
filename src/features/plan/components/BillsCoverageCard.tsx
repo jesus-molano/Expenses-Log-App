@@ -5,7 +5,7 @@ import { TriangleAlert } from "lucide-react";
 import { formatCurrency } from "@/domain/calendar";
 import type { AppLanguage } from "@/domain/types";
 import { capitalize, formatMonthName } from "@/features/expenses/lib/month-view";
-import { formatMessage } from "@/shared/i18n";
+import { formatMessage, t } from "@/shared/i18n";
 import type { BillsCoverage } from "../lib/account-summary";
 import { formatShortDate } from "../lib/plan-dashboard";
 
@@ -23,6 +23,9 @@ export function BillsCoverageCard({
   const titleId = useId();
   const pending = formatCurrency(coverage.pending);
   const short = coverage.leftover < 0;
+  // Cuentas de recibos sin ningún saldo: no entran en la suma, y hay que
+  // decirlo para que "te sobran" o "te faltan" no parezca de todas.
+  const uncounted = coverage.accountCount - coverage.countedCount;
 
   return (
     <div
@@ -76,6 +79,17 @@ export function BillsCoverageCard({
               )}
             </span>
           </p>
+          {uncounted > 0 ? (
+            <p className="mt-1 break-words text-xs text-[var(--app-text-muted)]">
+              {uncounted === 1
+                ? t("insights.accounts.bills.uncountedOne", language)
+                : formatMessage(
+                    "insights.accounts.bills.uncountedMany",
+                    { count: uncounted },
+                    language,
+                  )}
+            </p>
+          ) : null}
           {coverage.stale ? (
             <p className="mt-1 break-words text-xs text-[var(--app-text-muted)]">
               {formatMessage(

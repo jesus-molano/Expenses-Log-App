@@ -2,6 +2,7 @@ import {
   ACCOUNT_NAME_MAX_LENGTH,
   PRIMARY_ACCOUNT_ID,
   accountCheckinKey,
+  implicitPrimaryAccount,
   isBalanceAccountId,
   isBalanceAccountOpen,
   isBalanceAccountRole,
@@ -173,24 +174,29 @@ export function recordAccountBalanceInStore(
   if (input.accountId === PRIMARY_ACCOUNT_ID) {
     return recordBalanceInStore(store, input, now);
   }
-  if (!isValidDateOnly(input.date) || !Number.isFinite(input.amount)) return store;
+  const amount = Math.round(input.amount * 100) / 100;
+  if (!isValidDateOnly(input.date) || !Number.isFinite(amount)) return store;
   const key = accountCheckinKey(input.accountId, input.date);
   const existing = store.finance.accountCheckins?.[key];
   return withAccountCheckin(store, key, {
-    amount: Math.round(input.amount * 100) / 100,
+    amount,
     updatedAt: timestampAfter(existing?.updatedAt, now),
   });
 }
 
 // Borrar guarda `deletedAt`: si no, el merge con otro dispositivo lo
-// devolvería.
+// devolvería. Borrar saldos nunca borra la cuenta: la `primary` sin metadatos
+// solo se lista mientras tiene saldos, así que guarda aquí sus valores por
+// defecto para no desaparecer con el último.
 export function deleteAccountBalanceInStore(
   store: ExpenseStore,
   input: { accountId: string; date: string },
   now: Date = new Date(),
 ): ExpenseStore {
   if (input.accountId === PRIMARY_ACCOUNT_ID) {
-    return deleteBalanceCheckinInStore(store, input.date, now);
+    const next = deleteBalanceCheckinInStore(store, input.date, now);
+    if (next === store || store.finance.balanceAccounts?.[PRIMARY_ACCOUNT_ID]) return next;
+    return withBalanceAccount(next, PRIMARY_ACCOUNT_ID, implicitPrimaryAccount());
   }
   const key = accountCheckinKey(input.accountId, input.date);
   const existing = store.finance.accountCheckins?.[key];

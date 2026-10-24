@@ -207,7 +207,11 @@ Reglas:
   account"), la primera de la lista, y solo se muestra si tiene saldos; asi un
   usuario nuevo empieza sin cuentas. Al renombrarla, cambiarle el papel o
   moverla se guardan sus metadatos en `balanceAccounts.primary`, pero sus
-  saldos siguen en `balanceCheckins`.
+  saldos siguen en `balanceCheckins`. Borrar uno de sus saldos guarda tambien
+  sus valores por defecto (con fecha de 1970, para que cualquier edicion real
+  gane al fusionar): borrar saldos nunca borra la cuenta, tampoco el ultimo.
+- Si alguna cuenta de recibos no tiene saldos, no entra en la suma y la
+  comparacion lo dice.
 - Un nombre vacio es el nombre por defecto de su papel ("Cuenta de recibos",
   "Cuenta de ahorro", "Cuenta del dia a dia").
 - El orden se cambia de uno en uno (subir o bajar). Las cuentas que cambian de

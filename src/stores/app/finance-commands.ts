@@ -501,10 +501,13 @@ export function recordBalanceInStore(
   input: { date: string; amount: number },
   now: Date = new Date(),
 ): ExpenseStore {
-  if (!isValidDateOnly(input.date) || !Number.isFinite(input.amount)) return store;
+  // Un importe tan grande que al redondearlo sale infinito se guardaría como
+  // null y se perdería al cargar: no se anota.
+  const amount = Math.round(input.amount * 100) / 100;
+  if (!isValidDateOnly(input.date) || !Number.isFinite(amount)) return store;
   const existing = store.finance.balanceCheckins?.[input.date];
   return withBalanceCheckin(store, input.date, {
-    amount: Math.round(input.amount * 100) / 100,
+    amount,
     updatedAt: timestampAfter(existing?.updatedAt, now),
   });
 }

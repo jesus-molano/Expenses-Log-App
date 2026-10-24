@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyStore } from "@/domain/seed";
+import { mergeExpenseStores } from "./local-store";
 import {
   assignExpenseStoreOwner,
   inferStoreOwnerId,
@@ -257,6 +258,26 @@ describe("normalizeExpenseStore", () => {
       expect("balanceAccounts" in store.finance).toBe(false);
       expect("accountCheckins" in store.finance).toBe(false);
     }
+    // Ids que todo objeto ya tiene, como llegan de un JSON: se descartan y no
+    // tocan el prototipo del registro al fusionar.
+    const at = "2026-10-20T10:00:00.000Z";
+    const raw = JSON.parse(
+        JSON.stringify({ schemaVersion: 3, finance: { balanceAccounts: {}, accountCheckins: {} } })
+          .replace(
+            '"balanceAccounts":{}',
+            `"balanceAccounts":{"__proto__":{"role":"bills","updatedAt":"${at}"},"constructor":{"role":"savings","updatedAt":"${at}"},"ok":{"role":"spending","updatedAt":"${at}"}}`,
+          )
+          .replace(
+            '"accountCheckins":{}',
+            `"accountCheckins":{"constructor:2026-10-20":{"amount":1,"updatedAt":"${at}"},"ok:2026-10-20":{"amount":1e308,"updatedAt":"${at}"},"ok:2026-10-21":{"amount":2,"updatedAt":"${at}"}}`,
+          ),
+    );
+    const hostile = normalizeExpenseStore(raw);
+    expect(Object.keys(hostile.finance.balanceAccounts ?? {})).toEqual(["ok"]);
+    expect(hostile.finance.accountCheckins).toEqual({ "ok:2026-10-21": { amount: 2, updatedAt: at } });
+    const merged = mergeExpenseStores(raw, emptyStore);
+    expect(Object.getPrototypeOf(merged.finance.balanceAccounts)).toBe(Object.prototype);
+    expect(Object.keys(merged.finance.balanceAccounts ?? {})).toEqual(["ok"]);
     // Las cuentas de los stores anteriores a la v3 (una lista) se siguen
     // descartando: son otra cosa.
     const legacy = normalizeExpenseStore({
